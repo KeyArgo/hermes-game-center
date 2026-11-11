@@ -43,7 +43,8 @@ def test_auto_bet_is_on_by_default_and_the_spin_uses_it(tmp_path: Path) -> None:
     before = wallet.read()["chips"]
     row = autospin(wallet, kind="reply", tokens=400_000)
     assert row and row["bet"] > MIN_BET, "a big reply bets more"
-    assert wallet.read()["chips"] != before
+    # A spin that pays back exactly its bet leaves the balance unchanged, so check the arithmetic.
+    assert wallet.read()["chips"] == before - row["bet"] + row["payout"]
 
 
 def test_auto_bet_off_uses_the_bet_on_the_table(tmp_path: Path) -> None:
