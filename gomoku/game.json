@@ -1,0 +1,11 @@
+{
+  "id": "gomoku",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Gomoku",
+  "summary": "Five in a row on a 15 by 15 board. A built-in player can take a seat after you agree.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "table"
+}

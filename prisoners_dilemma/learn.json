@@ -1,0 +1,110 @@
+{
+  "title": "Prisoner's Dilemma",
+  "howto": {
+    "goal": "Score the most points across every match in the field.",
+    "setup": "A whole field of seats play each other once. Each match is one choice made together.",
+    "sections": [
+      {
+        "title": "The choice",
+        "text": "Choose Work together or Sell them out. Working together pays both 3 points; selling out pays 5 to the seller and 0 to the other."
+      },
+      {
+        "title": "Talking",
+        "text": "You can talk before choosing. Promises are not enforced — that is the game."
+      },
+      {
+        "title": "The field",
+        "text": "Every seat plays every other seat once. Points add up across all matches."
+      }
+    ],
+    "controls": [
+      "Click Work together or Sell them out to choose.",
+      "Type a line in the chat to talk before choosing.",
+      "Your score is the total across every match."
+    ],
+    "diagram": {
+      "kind": "cards",
+      "frames": [
+        {
+          "cards": [
+            "Together +3 each",
+            "Sell out +5 / 0"
+          ],
+          "say": "The two choices and what they pay."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "One match, played out.",
+    "frames": [
+      {
+        "say": "Every seat in the field plays every other seat once.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "You",
+              "tag": "seat"
+            },
+            {
+              "name": "Rival",
+              "tag": "seat"
+            }
+          ]
+        }
+      },
+      {
+        "say": "Before choosing, you can talk.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "\"Together?\"",
+            "\"Sure.\""
+          ]
+        }
+      },
+      {
+        "say": "Both choose at once. Together pays 3 each; selling out pays 5 to one and 0 to the other.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Together +3",
+            "Sell out +5/0"
+          ]
+        }
+      },
+      {
+        "say": "Points carry over to the next match.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "+3",
+            "+5"
+          ]
+        }
+      }
+    ],
+    "outro": "A promise is only worth what the other seat believes — and they remember last time."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Talk before choosing: it costs nothing and may change the answer.",
+        "focus": "chat"
+      },
+      {
+        "say": "Click Work together or Sell them out to choose.",
+        "focus": "choose"
+      },
+      {
+        "say": "Remember the same seat plays you again in the field.",
+        "focus": "seats"
+      },
+      {
+        "say": "Your total across every match is the score that counts.",
+        "focus": "score"
+      }
+    ]
+  }
+}

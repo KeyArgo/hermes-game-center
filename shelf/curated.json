@@ -1,0 +1,18 @@
+{
+  "note": "Play is this list and nothing else. Every game here is match-ready: seats, turns, a clear winner, a replay, a computer opponent and a lobby. Only a reviewed commit changes this file. A plugin cannot add its own game to Play from its manifest; outside code stays in Your games and in Community.",
+  "schema_version": 1,
+  "games": [
+    "connect4",
+    "reversi",
+    "checkers",
+    "gomoku",
+    "chessboard",
+    "go",
+    "hex",
+    "breakthrough",
+    "seabattle",
+    "blackjack",
+    "slots"
+  ],
+  "future": "FUTURE(2026-11-11): backgammon is off Play until it passes the game contract - replayable dice (tools/check_game.py replay), a Hermes model seat, lesson steps, a ship_gate.json entry and README count. Its pieces/dice fix and cover art stay in the code. Put it back here when those pass; delete backgammon/ if it never does."
+}

@@ -1,0 +1,53 @@
+{
+  "note": "A short hand-kept list of known game plugins. Suggestions link to their own catalog pages; a screen route is only used when checked by hand.",
+  "schema_version": 1,
+  "plugins": [
+    {
+      "plugin_id": "agent-hold-em",
+      "id": "agent-hold-em",
+      "title": "Agent Hold'Em",
+      "maker": "tony-simons-aiowa",
+      "summary": "Poker played by Hermes agents, three profile opponents and play chips only.",
+      "catalog": "https://hermes-agent.nousresearch.com/docs/plugins/agent-hold-em",
+      "route": ""
+    },
+    {
+      "plugin_id": "tamahermes",
+      "id": "tamahermes",
+      "title": "TamaHermes",
+      "maker": "ahrazzle",
+      "summary": "A pet that grows from real Hermes agent activity.",
+      "catalog": "https://hermes-agent.nousresearch.com/docs/plugins/tamahermes",
+      "route": "",
+      "note": "macOS only"
+    },
+    {
+      "plugin_id": "hermes-pets-all",
+      "id": "hermes-pets-all",
+      "title": "Hermes Pets",
+      "maker": "poponline63",
+      "summary": "Browse every pet installed for this Hermes profile, in its own pane.",
+      "catalog": "https://hermes-agent.nousresearch.com/docs/plugins/hermes-pets-all",
+      "route": ""
+    },
+    {
+      "plugin_id": "hermes-quest",
+      "id": "hermes-quest",
+      "title": "Hermes Quest",
+      "maker": "ap08960695",
+      "summary": "A read-only pixel-art RPG view of Kanban and worker activity.",
+      "catalog": "https://hermes-agent.nousresearch.com/docs/plugins/hermes-quest",
+      "route": ""
+    },
+    {
+      "plugin_id": "deskrpg",
+      "id": "deskrpg",
+      "title": "DeskRPG",
+      "maker": "dandacompany",
+      "summary": "Virtual offices for Hermes profiles, kanban, cron and artifacts.",
+      "catalog": "https://hermes-agent.nousresearch.com/docs/plugins/deskrpg",
+      "route": "",
+      "note": "No licence file in its repository"
+    }
+  ]
+}

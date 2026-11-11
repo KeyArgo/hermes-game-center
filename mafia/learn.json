@@ -1,0 +1,169 @@
+{
+  "title": "Mafia",
+  "howto": {
+    "goal": "Townsfolk: vote out both mafia. Mafia: survive until the town is outnumbered.",
+    "setup": "Six seats: two mafia, a doctor, a detective and two townsfolk. Day and night alternate.",
+    "sections": [
+      {
+        "title": "Night",
+        "text": "The mafia pick a victim. The doctor may save one person, and the detective may check one person's side."
+      },
+      {
+        "title": "Day",
+        "text": "Everyone talks, then votes by clicking a player's name. The most votes is removed from the town."
+      },
+      {
+        "title": "Winning",
+        "text": "The town wins when both mafia are out. The mafia win when they equal or outnumber the town."
+      }
+    ],
+    "controls": [
+      "Click a player's name to vote for that person.",
+      "Talk in the table chat — the whole town reads it."
+    ],
+    "diagram": {
+      "kind": "seats",
+      "frames": [
+        {
+          "seats": [
+            {
+              "name": "You",
+              "tag": "townsfolk"
+            },
+            {
+              "name": "Mara",
+              "tag": "townsfolk"
+            },
+            {
+              "name": "Ivo",
+              "tag": "detective"
+            },
+            {
+              "name": "Wren",
+              "tag": "doctor"
+            },
+            {
+              "name": "Ash",
+              "tag": "mafia"
+            },
+            {
+              "name": "Bell",
+              "tag": "mafia"
+            }
+          ],
+          "say": "Six seats, two of them mafia."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "One day and one night, played out.",
+    "frames": [
+      {
+        "say": "Six people sit down. Two are mafia, and only they know who.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "You",
+              "tag": "?"
+            },
+            {
+              "name": "Mara",
+              "tag": "?"
+            },
+            {
+              "name": "Ivo",
+              "tag": "?"
+            },
+            {
+              "name": "Wren",
+              "tag": "?"
+            },
+            {
+              "name": "Ash",
+              "tag": "?"
+            },
+            {
+              "name": "Bell",
+              "tag": "?"
+            }
+          ]
+        }
+      },
+      {
+        "say": "Night falls. The mafia choose a victim.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "Mara",
+              "tag": "victim"
+            }
+          ]
+        }
+      },
+      {
+        "say": "Day comes. Everyone argues about who stayed too quiet.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "Ash",
+              "tag": "accused"
+            },
+            {
+              "name": "You",
+              "tag": "speaking"
+            }
+          ]
+        }
+      },
+      {
+        "say": "The town votes. One person is removed.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "Ash",
+              "tag": "voted out"
+            }
+          ]
+        }
+      },
+      {
+        "say": "If both mafia are gone, the town wins.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "Town",
+              "tag": "wins"
+            }
+          ]
+        }
+      }
+    ],
+    "outro": "Say something every day. Silence is what gets people voted out."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Read the night result, then say what you noticed in chat.",
+        "focus": "chat"
+      },
+      {
+        "say": "Click a player's name to vote.",
+        "focus": "vote"
+      },
+      {
+        "say": "If you are the detective, share your checks carefully — the mafia hear them too.",
+        "focus": "chat"
+      },
+      {
+        "say": "Count the seats: when the mafia match the town, they win.",
+        "focus": "seats"
+      }
+    ]
+  }
+}

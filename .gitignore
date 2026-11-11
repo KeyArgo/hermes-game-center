@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+*.db
+*.sqlite
+*.sqlite3
+data/
+*.log
+.DS_Store
+.lanes/
+.hermes/
+
+proof/
+test-artifacts/
+
+# Per-run table state and player money. Created by playing, never published.
+rooms/
+wallet.json
+wallet.lock
+BUILD_INFO.json

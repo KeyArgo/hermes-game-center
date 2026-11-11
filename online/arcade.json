@@ -1,0 +1,77 @@
+{
+  "note": "Community arcade shelf. Link-out tiles only: we host none of these games. 'listed': false hides a tile until its owner says OK. 'label': 'wip' or 'prototype'.",
+  "tiles": [
+    {
+      "id": "nous-hermes-arcade",
+      "title": "Nous Hermes Arcade",
+      "by": "123mikeyd",
+      "url": "https://hermesarcade.123mikeyd.com/",
+      "repo": "",
+      "featured": true,
+      "listed": true,
+      "label": "wip",
+      "blurb": "The Nous community's own arcade. Games made with Hermes and by the Nous community. Submit your game there, in the Nous Research Discord thread.",
+      "facts": ["Main place for Nous arcade submissions", "Community site, not run by us"]
+    },
+    {
+      "id": "nrcu-platform-fighter",
+      "title": "The Legends of Nous Research",
+      "by": "123mikeyd",
+      "url": "https://123mikeyd.github.io/nrcu-platform-fighter/",
+      "repo": "123mikeyd/nrcu-platform-fighter",
+      "featured": false,
+      "listed": true,
+      "label": "prototype",
+      "blurb": "Smash-style party fighter with a story mode. Two players on one keyboard, or controllers.",
+      "facts": ["Browser alpha v0.6.2", "Very large first load: about 869 MB", "Desktop recommended; needs WebGL 2"]
+    },
+    {
+      "id": "brother-doge",
+      "title": "HODL OR DIE: Brother Doge",
+      "by": "123mikeyd",
+      "url": "https://123mikeyd.github.io/Brother_Doge_VideoGame/",
+      "repo": "123mikeyd/Brother_Doge_VideoGame",
+      "featured": false,
+      "listed": true,
+      "label": "wip",
+      "blurb": "Dogecoin-themed survival shooter. One player.",
+      "facts": ["HTML5, plays in the browser"]
+    },
+    {
+      "id": "clawpocalypse-now",
+      "title": "Clawpocalypse Now",
+      "by": "mojomast",
+      "url": "https://mojomast.github.io/clawpocalypse-now/",
+      "repo": "mojomast/clawpocalypse-now",
+      "featured": false,
+      "listed": false,
+      "label": "wip",
+      "blurb": "Agent Armageddon beat-'em-up in plain HTML5 canvas.",
+      "facts": ["Keyboard"]
+    },
+    {
+      "id": "roo-gang",
+      "title": "ROO GANG",
+      "by": "mojomast",
+      "url": "https://slophero.vercel.app/",
+      "repo": "mojomast/slophero",
+      "featured": false,
+      "listed": false,
+      "label": "prototype",
+      "blurb": "Infra extraction horror: keep the stack alive, get the man out.",
+      "facts": ["Last updated 2025"]
+    },
+    {
+      "id": "buttfights",
+      "title": "ButtFights",
+      "by": "mojomast",
+      "url": "https://bumfights.vercel.app/",
+      "repo": "mojomast/buttfights-project",
+      "featured": false,
+      "listed": false,
+      "label": "prototype",
+      "blurb": "Satirical Double Dragon-style brawler. Crude humour.",
+      "facts": ["Last updated 2025"]
+    }
+  ]
+}

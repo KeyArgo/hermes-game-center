@@ -1,0 +1,11 @@
+{
+  "id": "liars-dice",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Liar's Dice",
+  "summary": "Five hidden dice each. Bid higher on how many of one face are on the table, or call the last bid a lie and make them show the dice.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "play"
+}

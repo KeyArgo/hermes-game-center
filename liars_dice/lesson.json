@@ -1,0 +1,22 @@
+{
+ "steps": [
+  {
+   "say": "In Liar's Dice, everyone rolls five hidden dice that only they can see. On your turn, make a bid for how many dice of a certain face value are showing across all players.",
+   "setup": [],
+   "goal": [],
+   "praise": "Let's learn Liar's Dice!"
+  },
+  {
+   "say": "Each bid must be higher than the last. You can bid more dice on the same face, or the same number of dice on a higher face (aces are highest). If you think the bid is a lie, you can call it instead of bidding.",
+   "setup": [],
+   "goal": [],
+   "praise": "You understand the bids!"
+  },
+  {
+   "say": "When someone calls a lie, everyone reveals their dice. The actual count of the bid face is counted. If the bid was true, the caller loses a die. If false, the bidder loses one. Keep playing until only one player has dice left—that player wins!",
+   "setup": [],
+   "goal": [],
+   "praise": "You've got it!"
+  }
+ ]
+}

@@ -1,0 +1,153 @@
+{
+  "title": "Gomoku",
+  "howto": {
+    "goal": "Get five or more of your stones in an unbroken line — across, down, or diagonally.",
+    "setup": "A 15 by 15 board. White moves first.",
+    "sections": [
+      {
+        "title": "Placing",
+        "text": "Click an empty point to place a stone. Stones never move or come off."
+      },
+      {
+        "title": "Five in a row",
+        "text": "Five or more touching stones in a straight line wins immediately."
+      },
+      {
+        "title": "Open threes",
+        "text": "Three in a row with both ends open is very hard to stop — build those first."
+      }
+    ],
+    "controls": [
+      "Click an empty point to place a stone.",
+      "The ringed point is where this lesson wants you.",
+      "Watch for the computer's open three and block one end."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 15,
+      "rows": 15,
+      "frames": [
+        {
+          "cells": [
+            [
+              7,
+              7,
+              "X"
+            ]
+          ],
+          "say": "Take the centre."
+        },
+        {
+          "cells": [
+            [
+              7,
+              7,
+              "X"
+            ],
+            [
+              7,
+              8,
+              "X"
+            ],
+            [
+              7,
+              9,
+              "X"
+            ]
+          ],
+          "say": "Three in a row, both ends open."
+        },
+        {
+          "cells": [
+            [
+              7,
+              7,
+              "X"
+            ],
+            [
+              7,
+              8,
+              "X"
+            ],
+            [
+              7,
+              9,
+              "X"
+            ],
+            [
+              7,
+              10,
+              "X"
+            ],
+            [
+              7,
+              11,
+              "X"
+            ]
+          ],
+          "say": "Five wins."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A short computer game: white builds a line and black has to answer it.",
+    "moves": [
+      "h8",
+      "h9",
+      "g8",
+      "i8",
+      "f8"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Empty 15 by 15 board."
+      },
+      {
+        "at": 1,
+        "say": "White takes the centre."
+      },
+      {
+        "at": 2,
+        "say": "Black answers just above it."
+      },
+      {
+        "at": 3,
+        "say": "White builds sideways."
+      },
+      {
+        "at": 4,
+        "say": "Black blocks the right end."
+      },
+      {
+        "at": 5,
+        "say": "White extends the other way — the line now has one open end."
+      }
+    ],
+    "outro": "A three with an open end threatens four — block it before it becomes five."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click the centre point for your first stone.",
+        "focus": "board",
+        "highlight": [
+          "h8"
+        ]
+      },
+      {
+        "say": "Build a line of three with both ends open.",
+        "focus": "board"
+      },
+      {
+        "say": "Block the computer's open three before it becomes four.",
+        "focus": "board"
+      },
+      {
+        "say": "Five in a row ends the game — keep counting.",
+        "focus": "board"
+      }
+    ]
+  }
+}

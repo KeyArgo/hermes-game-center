@@ -1,0 +1,22 @@
+{
+ "steps": [
+  {
+   "say": "This is a blind auction with two players and five valuable lots. You can talk to your opponent first, then submit secret bids.",
+   "setup": [],
+   "goal": [],
+   "praise": "Let's get started!"
+  },
+  {
+   "say": "Each lot is worth a different amount to each player. Talk to gather clues about what your opponent wants, but remember: you can't see their bids until you submit yours.",
+   "setup": [],
+   "goal": [],
+   "praise": "Good strategy!"
+  },
+  {
+   "say": "When it's time to bid, place secret bids on each lot. The higher bidder on each lot wins it and pays their bid. Your goal is the highest net worth: coins left plus the value of your lots to you.",
+   "setup": [],
+   "goal": [],
+   "praise": "You've got it!"
+  }
+ ]
+}

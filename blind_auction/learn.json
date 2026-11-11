@@ -1,0 +1,138 @@
+{
+  "title": "Blind Auction",
+  "howto": {
+    "goal": "Finish with a higher net worth than the other bidder.",
+    "setup": "Two bidders, five lots, and a private value for each lot. Talk first, then send one secret set of bids.",
+    "sections": [
+      {
+        "title": "Talking",
+        "text": "Use the table chat before bidding. What you say is not binding — but it shapes the other bidder's guess."
+      },
+      {
+        "title": "Sealed bids",
+        "text": "Send one set of bids for the lots you want. Neither side sees the other's bids until both are in."
+      },
+      {
+        "title": "Winning",
+        "text": "Won lots are worth their private value to you. The higher net worth — spare coins plus what your lots were worth — wins."
+      }
+    ],
+    "controls": [
+      "Click an amount button for a lot to add that bid.",
+      "Press Send these bids once for the whole auction.",
+      "Chat with the other bidder before you commit — it is part of the game."
+    ],
+    "diagram": {
+      "kind": "cards",
+      "frames": [
+        {
+          "cards": [
+            "Lot 1",
+            "Lot 2",
+            "Lot 3",
+            "Lot 4",
+            "Lot 5"
+          ],
+          "say": "Five lots, each with a value only you can see."
+        },
+        {
+          "cards": [
+            "Bid",
+            "Bid",
+            "—",
+            "Bid",
+            "—"
+          ],
+          "say": "You bid on the lots you want."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "An auction played out in five beats.",
+    "frames": [
+      {
+        "say": "Two bidders sit down. Five lots are on the table.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        }
+      },
+      {
+        "say": "Each lot has a private value. Yours is hidden from the other bidder.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "£40",
+            "£15",
+            "£70"
+          ]
+        }
+      },
+      {
+        "say": "They talk. One claims to care only about the first lot.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "You",
+              "tag": "bidder"
+            },
+            {
+              "name": "Rival",
+              "tag": "bidder"
+            }
+          ]
+        }
+      },
+      {
+        "say": "Both send sealed bids. The higher bid on a lot wins it.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "40",
+            "15",
+            "70"
+          ]
+        }
+      },
+      {
+        "say": "Won lots pay their value. The richer wallet wins.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Wallet £125",
+            "Wallet £90"
+          ]
+        }
+      }
+    ],
+    "outro": "Bid on what is worth most to you, and do not believe everything said in chat."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Read the private value of each lot before you bid.",
+        "focus": "lots"
+      },
+      {
+        "say": "Talk in chat — a small misdirection can lower the other bid.",
+        "focus": "chat"
+      },
+      {
+        "say": "Bid on the lots worth most to you, not the ones the rival praises.",
+        "focus": "bid"
+      },
+      {
+        "say": "Press Send these bids once. You cannot change them afterwards.",
+        "focus": "send"
+      }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "note": "Tools for making games, not playing them. Every card opens that tool's own page; Game Center installs nothing and runs none of it.",
+  "notice": "Community-made, not affiliated with Nous Research or with Game Center.",
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "game-dev",
+      "title": "Game Dev",
+      "kind": "plugin",
+      "maker": "123mikeyd",
+      "summary": "Read-only look at a Godot project: files, assets, a playable-slice checklist.",
+      "url": "https://hermes-agent.nousresearch.com/docs/plugins/game-dev",
+      "note": "MIT licence."
+    },
+    {
+      "id": "gameforge",
+      "title": "GameForge",
+      "kind": "plugin",
+      "maker": "DECRUX9812",
+      "summary": "Sound, music, sprites, 3D models, four web genres, Godot and Unity builds, a playtester.",
+      "url": "https://hermes-agent.nousresearch.com/docs/plugins/gameforge",
+      "note": "MIT licence."
+    },
+    {
+      "id": "godot-studio",
+      "title": "Godot Studio",
+      "kind": "plugin",
+      "maker": "Foolafroos",
+      "summary": "Headless Godot 4 checks and exports, with a builds gallery.",
+      "url": "https://hermes-agent.nousresearch.com/docs/plugins/godot-studio",
+      "note": "Needs Godot 4. No licence file in its repository."
+    },
+    {
+      "id": "game-editor",
+      "title": "Game Editor",
+      "kind": "plugin",
+      "maker": "TakeshiTGAL",
+      "summary": "Places assets in the Godot scene open in your editor, plays it, fixes what broke.",
+      "url": "https://hermes-agent.nousresearch.com/docs/plugins/game-editor",
+      "note": "macOS only. Needs Godot 4.7 and the Godot AI add-on."
+    },
+    {
+      "id": "csharp-game-editor",
+      "title": "C# Game Editor",
+      "kind": "plugin",
+      "maker": "TakeshiTGAL",
+      "summary": "Builds a Unity script, object and scene from one feature description.",
+      "url": "https://hermes-agent.nousresearch.com/docs/plugins/csharp-game-editor",
+      "note": "macOS only. Needs Unity and MCP for Unity."
+    },
+    {
+      "id": "pixel-art",
+      "title": "Pixel Art",
+      "kind": "skill",
+      "maker": "dodo-reach",
+      "summary": "Turns a picture into era-correct pixel art, then into a short animated loop.",
+      "url": "https://github.com/NousResearch/hermes-agent/tree/main/optional-skills/creative/pixel-art",
+      "note": "Official Hermes skill · MIT licence."
+    }
+  ]
+}

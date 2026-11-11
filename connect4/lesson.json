@@ -1,0 +1,63 @@
+{
+ "steps": [
+  {
+   "say": "Click the middle column to drop your first piece. It falls to the lowest empty spot, and the middle gives you more ways to build a line.",
+   "setup": [],
+   "goal": [
+    "4"
+   ],
+   "praise": "Nice drop!"
+  },
+  {
+   "say": "Four in a row wins: across, up, or diagonal. You have three across the bottom. Finish the line.",
+   "setup": [
+    "4",
+    "4",
+    "3",
+    "3",
+    "2",
+    "2"
+   ],
+   "goal": [
+    "1",
+    "5"
+   ],
+   "wins": true,
+   "tip": "Look along the bottom row for an open end.",
+   "praise": "Four in a row!"
+  },
+  {
+   "say": "Your opponent has three across the bottom. Block the open end before they make four.",
+   "setup": [
+    "1",
+    "4",
+    "1",
+    "3",
+    "7",
+    "2"
+   ],
+   "goal": [
+    "5"
+   ],
+   "tip": "Their line is in columns 2, 3 and 4. Which end is still open?",
+   "praise": "Good block!"
+  },
+  {
+   "say": "Lines can go straight up too. You have three stacked in one column. Make it four.",
+   "setup": [
+    "4",
+    "5",
+    "4",
+    "5",
+    "4",
+    "6"
+   ],
+   "goal": [
+    "4"
+   ],
+   "wins": true,
+   "tip": "Drop on top of your own stack.",
+   "praise": "You win!"
+  }
+ ]
+}

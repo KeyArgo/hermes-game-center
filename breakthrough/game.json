@@ -1,0 +1,12 @@
+{
+  "id": "breakthrough",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Breakthrough",
+  "summary": "Race a pawn to the far rank or take every enemy pawn. Pawns step or capture forward only. A built-in player can take a seat after you agree.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "draws": false,
+  "kind": "table"
+}

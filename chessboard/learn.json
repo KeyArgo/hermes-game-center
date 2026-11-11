@@ -1,0 +1,158 @@
+{
+  "title": "Chess",
+  "howto": {
+    "goal": "Checkmate the other king: put it in check with no legal way out.",
+    "setup": "The usual starting position. White moves first.",
+    "sections": [
+      {
+        "title": "Pieces",
+        "text": "Each piece moves its own way. Pawns go forward one square, or two on their first move, and capture diagonally."
+      },
+      {
+        "title": "Check and mate",
+        "text": "A king in check must escape. If it cannot, the game is over — checkmate."
+      },
+      {
+        "title": "Castling",
+        "text": "Once your king and rook are untouched, click the king and then two squares toward the rook to castle."
+      },
+      {
+        "title": "Draws",
+        "text": "Stalemate, fifty moves with no capture or pawn move, threefold repetition, and too little material to mate are draws."
+      }
+    ],
+    "controls": [
+      "Click a piece, then the square it should move to.",
+      "Legal destinations are marked when a piece is picked up.",
+      "Promotion and castling happen by clicking the two squares; a small chooser appears for a pawn reaching the last rank."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 8,
+      "rows": 8,
+      "frames": [
+        {
+          "cells": [
+            [
+              6,
+              4,
+              "P"
+            ],
+            [
+              4,
+              4,
+              "P"
+            ]
+          ],
+          "say": "A pawn may go two squares from its start."
+        },
+        {
+          "cells": [
+            [
+              6,
+              6,
+              "N"
+            ],
+            [
+              5,
+              4,
+              "N"
+            ]
+          ],
+          "say": "A knight jumps in an L shape."
+        },
+        {
+          "cells": [
+            [
+              7,
+              4,
+              "K"
+            ],
+            [
+              7,
+              6,
+              "K"
+            ],
+            [
+              7,
+              7,
+              "R"
+            ]
+          ],
+          "say": "Castling moves the king two squares."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A short opening played by the computer, with the ideas named as they happen.",
+    "moves": [
+      "e2e4",
+      "e7e5",
+      "g1f3",
+      "b8c6",
+      "f1c4",
+      "g8f6"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "The starting position. White moves first."
+      },
+      {
+        "at": 1,
+        "say": "White pushes the king's pawn two squares and opens the centre."
+      },
+      {
+        "at": 2,
+        "say": "Black mirrors it, claiming the same central squares."
+      },
+      {
+        "at": 3,
+        "say": "White develops a knight toward the centre."
+      },
+      {
+        "at": 4,
+        "say": "Black develops a knight to defend the centre pawn."
+      },
+      {
+        "at": 5,
+        "say": "White's bishop aims at the weakest square in black's camp."
+      },
+      {
+        "at": 6,
+        "say": "Black defends it and prepares to castle."
+      }
+    ],
+    "outro": "In the opening, develop your pieces and keep your king safe. Do not chase pawns with your queen."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click the pawn in front of your king, then two squares forward.",
+        "focus": "board",
+        "highlight": [
+          "e2e4"
+        ]
+      },
+      {
+        "say": "Bring a knight out toward the centre — knights jump in an L shape.",
+        "focus": "board",
+        "highlight": [
+          "g1f3"
+        ]
+      },
+      {
+        "say": "Develop your bishop so it aims at the other side's weak square.",
+        "focus": "board"
+      },
+      {
+        "say": "Castle to keep your king safe: click the king, then two squares toward the rook.",
+        "focus": "board",
+        "highlight": [
+          "e1g1"
+        ]
+      }
+    ]
+  }
+}

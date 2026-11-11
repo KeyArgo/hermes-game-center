@@ -1,0 +1,86 @@
+{
+  "_comment": "One entry per current document. 'code' is the code the doc describes: if that code changed after the doc's revision date, tools/doc_stamp.py --check calls the doc STALE. 'markers' are words the doc must contain, so a feature cannot exist only in code. Add an entry when you add a doc; history/ is never mapped.",
+  "README.md": {
+    "code": [
+      "plugin.yaml",
+      "shelf/wallet.py",
+      "__init__.py"
+    ],
+    "markers": [
+      "bonus points",
+      "recovery key"
+    ]
+  },
+  "SECURITY.md": {
+    "code": [
+      "online/",
+      "shelf/wallet.py"
+    ],
+    "markers": [
+      "lobby_url",
+      "recovery key"
+    ]
+  },
+  "docs/ADD-YOUR-GAME.md": {
+    "code": [
+      "kit.py",
+      "shelf/"
+    ],
+    "markers": [
+      "game.json"
+    ]
+  },
+  "docs/BOT-API.md": {
+    "code": [
+      "online/"
+    ],
+    "markers": [
+      "bot"
+    ]
+  },
+  "docs/HOSTING.md": {
+    "code": [
+      "online/server.py"
+    ],
+    "markers": [
+      "lobby_url"
+    ]
+  },
+  "docs/LABS.md": {
+    "code": [],
+    "markers": [
+      "lab"
+    ]
+  },
+  "docs/ONLINE-PLAY.md": {
+    "code": [
+      "online/"
+    ],
+    "markers": [
+      "chat",
+      "lobby",
+      "chip and point totals"
+    ]
+  },
+  "docs/STOCK-LEAGUE.md": {
+    "code": [
+      "online/league.py",
+      "online/bouts.py"
+    ],
+    "markers": [
+      "stock league"
+    ]
+  },
+  "docs/SUBMIT-A-GAME.md": {
+    "code": [],
+    "markers": [
+      "submit"
+    ]
+  },
+  "docs/SECURITY-REVIEW-2026-11-09.md": {
+    "code": [],
+    "markers": [
+      "security review"
+    ]
+  }
+}

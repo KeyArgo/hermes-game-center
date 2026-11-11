@@ -1,0 +1,11 @@
+{
+  "id": "mafia",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Mafia",
+  "summary": "A talking table: six seats, two mafia, a doctor and a detective. Talk by day, vote someone out, and let the mafia pick a victim at night.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "play"
+}

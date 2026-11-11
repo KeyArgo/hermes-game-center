@@ -1,0 +1,69 @@
+{
+ "steps": [
+  {
+   "say": "Click the centre point to place your first stone. From there you can grow in every direction.",
+   "setup": [],
+   "goal": [
+    "h8"
+   ],
+   "praise": "Good start!"
+  },
+  {
+   "say": "Your opponent has four in a row, with one end already blocked. Block the other end now.",
+   "setup": [
+    "h8",
+    "g8",
+    "i8",
+    "a1",
+    "j8",
+    "a2",
+    "k8"
+   ],
+   "goal": [
+    "l8"
+   ],
+   "tip": "Their line runs along row 8. Find its open end.",
+   "praise": "Blocked!"
+  },
+  {
+   "say": "Five in a row wins. You have four across. Add the fifth.",
+   "setup": [
+    "h8",
+    "a1",
+    "i8",
+    "c1",
+    "j8",
+    "e1",
+    "k8",
+    "g1"
+   ],
+   "goal": [
+    "g8",
+    "l8"
+   ],
+   "wins": true,
+   "tip": "Either end of your line works.",
+   "praise": "Five in a row!"
+  },
+  {
+   "say": "Diagonals count too. You have four on a diagonal. Finish it.",
+   "setup": [
+    "h8",
+    "a1",
+    "i9",
+    "c1",
+    "j10",
+    "e1",
+    "k11",
+    "g1"
+   ],
+   "goal": [
+    "g7",
+    "l12"
+   ],
+   "wins": true,
+   "tip": "Follow the slant one more step either way.",
+   "praise": "You win!"
+  }
+ ]
+}

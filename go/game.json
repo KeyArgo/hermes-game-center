@@ -1,0 +1,12 @@
+{
+  "id": "go",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Go",
+  "summary": "Surround more of the board. 9 by 9, area scoring, two passes end it. A built-in player can take a seat after you agree.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "draws": false,
+  "kind": "table"
+}

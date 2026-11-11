@@ -1,0 +1,165 @@
+{
+  "title": "Doctrine",
+  "howto": {
+    "goal": "Write a small strategy card and send it into a turn-based fight on the hex board. The card with the better priorities gives you the better moves.",
+    "setup": "You write a card of eight weighted priorities: what to attack, what to defend, when to push. Then you fight a house card on the hex board.",
+    "sections": [
+      {
+        "title": "The card",
+        "text": "A card is a short list of weighted priorities. Higher weights win arguments when the bot has to choose."
+      },
+      {
+        "title": "The fight",
+        "text": "The battle runs turn by turn on a hex board. You click a highlighted hex to move your units; the card sets their priorities."
+      },
+      {
+        "title": "Improving",
+        "text": "After a fight, change one weight at a time. A card that wins moves up the ladder."
+      }
+    ],
+    "controls": [
+      "Press Play a battle to fight with your saved card.",
+      "Edit the card in Card JSON and press Save card, or press Improve my bot to ask your model for a better one.",
+      "Use Restart and Step to replay the fight move by move."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 7,
+      "rows": 7,
+      "frames": [
+        {
+          "cells": [
+            [
+              3,
+              3,
+              "X"
+            ]
+          ],
+          "say": "Your units start here."
+        },
+        {
+          "cells": [
+            [
+              3,
+              3,
+              "X"
+            ],
+            [
+              2,
+              4,
+              "X"
+            ]
+          ],
+          "say": "The card decides where they push."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A fight between two cards, in four beats.",
+    "frames": [
+      {
+        "say": "Two players each write a weighted card of priorities.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Attack 8",
+            "Hold 3",
+            "Flank 5"
+          ]
+        }
+      },
+      {
+        "say": "The fight starts on the hex board.",
+        "diagram": {
+          "kind": "grid",
+          "cols": 7,
+          "rows": 7,
+          "cells": [
+            [
+              3,
+              2,
+              "X"
+            ],
+            [
+              3,
+              4,
+              "O"
+            ]
+          ]
+        }
+      },
+      {
+        "say": "Each turn the cards decide movement, so the fight plays itself.",
+        "diagram": {
+          "kind": "grid",
+          "cols": 7,
+          "rows": 7,
+          "cells": [
+            [
+              3,
+              3,
+              "X"
+            ],
+            [
+              2,
+              4,
+              "X"
+            ],
+            [
+              3,
+              4,
+              "O"
+            ]
+          ]
+        }
+      },
+      {
+        "say": "One side breaks through and the fight ends.",
+        "diagram": {
+          "kind": "grid",
+          "cols": 7,
+          "rows": 7,
+          "cells": [
+            [
+              3,
+              5,
+              "X"
+            ],
+            [
+              4,
+              5,
+              "X"
+            ],
+            [
+              4,
+              4,
+              "O"
+            ]
+          ]
+        }
+      }
+    ],
+    "outro": "Change one weight at a time and fight again — that is how a card gets better."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Read the priorities on your card before you change anything.",
+        "focus": "card"
+      },
+      {
+        "say": "Change the weights in Card JSON and press Save card, or press Improve my bot.",
+        "focus": "weights"
+      },
+      {
+        "say": "Press Play a battle to fight, then use Step to see what your card actually did.",
+        "focus": "send"
+      },
+      {
+        "say": "Change one weight at a time, or you will not know what helped.",
+        "focus": "weights"
+      }
+    ]
+  }
+}

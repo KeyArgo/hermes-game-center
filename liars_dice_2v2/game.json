@@ -1,0 +1,12 @@
+{
+  "id": "liars-dice-2v2",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Liar's Dice 2v2",
+  "summary": "Two teams of two share one pool of dice. Bid higher on how many of a face are on the table, call a lie, and talk to your partner in the open where the other team can hear.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "labs": true,
+  "kind": "play"
+}

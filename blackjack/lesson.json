@@ -1,0 +1,24 @@
+{
+  "title": "Blackjack Basics",
+  "intro": "You play against the dealer. Goal: get 21 or beat the dealer without busting.",
+  "steps": [
+    {
+      "say": "Pick your stake from the ladder: click bet10 to deal a hand.",
+      "goal": ["bet10"],
+      "tip": "The bet buttons set what a hand is worth. Start small.",
+      "praise": "Bet placed. The cards are dealt and it is your turn."
+    },
+    {
+      "say": "Raise the stake when you feel ready: click bet25 for the next hand.",
+      "goal": ["bet25"],
+      "tip": "Every bet is paid from the same wallet, so pick what you can afford.",
+      "praise": "A bigger stake. Blackjack pays 3:2 and a win pays even money."
+    },
+    {
+      "say": "When you are confident, click bet100. The dealer stands on all 17s.",
+      "goal": ["bet100"],
+      "tip": "Keep enough chips for another hand; the table never ends on its own.",
+      "praise": "You know the ladder. Now play a hand: hit, stand or double."
+    }
+  ]
+}

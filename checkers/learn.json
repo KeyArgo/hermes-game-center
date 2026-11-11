@@ -1,0 +1,134 @@
+{
+  "title": "Checkers",
+  "howto": {
+    "goal": "Capture all of the other side's pieces, or leave them with no legal move.",
+    "setup": "English checkers on an 8 by 8 board. Each side starts with twelve pieces on the dark squares. White moves first.",
+    "sections": [
+      {
+        "title": "Moving",
+        "text": "Pieces move one square diagonally forward. Captures are compulsory: if you can jump, you must."
+      },
+      {
+        "title": "Jumping",
+        "text": "Jump over an adjacent enemy piece to an empty square beyond it, and that piece is removed."
+      },
+      {
+        "title": "Kings",
+        "text": "A piece reaching the far rank becomes a king and may move diagonally both ways."
+      },
+      {
+        "title": "Draws",
+        "text": "80 moves with no capture and no crowning is a draw."
+      }
+    ],
+    "controls": [
+      "Click a piece, then the square to move to.",
+      "The ringed squares are the moves this lesson wants.",
+      "If several jumps are possible, any of them is legal."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 8,
+      "rows": 8,
+      "frames": [
+        {
+          "cells": [
+            [
+              5,
+              2,
+              "O"
+            ],
+            [
+              4,
+              3,
+              "X"
+            ]
+          ],
+          "say": "A diagonal step forward."
+        },
+        {
+          "cells": [
+            [
+              5,
+              2,
+              "O"
+            ],
+            [
+              4,
+              3,
+              "O"
+            ],
+            [
+              3,
+              4,
+              "X"
+            ]
+          ],
+          "say": "A jump captures the piece."
+        },
+        {
+          "cells": [
+            [
+              0,
+              1,
+              "X"
+            ]
+          ],
+          "say": "A piece on the far rank becomes a king."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "The computer plays both sides. Watch how a forced capture changes the position.",
+    "moves": [
+      "c3-b4",
+      "f6-e5",
+      "g3-f4",
+      "e5-g3"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "White and black face each other along the middle."
+      },
+      {
+        "at": 1,
+        "say": "White steps forward on the left."
+      },
+      {
+        "at": 2,
+        "say": "Black advances to meet it."
+      },
+      {
+        "at": 3,
+        "say": "White closes the gap."
+      },
+      {
+        "at": 4,
+        "say": "Black jumps over a white piece and captures it."
+      }
+    ],
+    "outro": "Captures are compulsory, so a piece offered up can force your opponent's reply."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click a piece that can move forward diagonally.",
+        "focus": "board"
+      },
+      {
+        "say": "If a capture is shown, you must take it — click the piece, then the landing square.",
+        "focus": "board"
+      },
+      {
+        "say": "Keep your back row intact so the other side cannot crown a king quickly.",
+        "focus": "board"
+      },
+      {
+        "say": "Trade pieces when you are ahead: fewer pieces means fewer ways to lose.",
+        "focus": "board"
+      }
+    ]
+  }
+}

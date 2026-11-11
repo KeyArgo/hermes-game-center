@@ -1,0 +1,145 @@
+{
+  "title": "Olympus Arena",
+  "howto": {
+    "goal": "Send a champion into the arena with a strategy card. The card decides the whole battle, and the fight replays exactly from its seed.",
+    "setup": "Your champion against a house champion, or four champions in a free-for-all. A strategy card sets how your champion fights. No model is called while the tanks fight.",
+    "sections": [
+      {
+        "title": "Champions",
+        "text": "Each champion has its own strength and habits."
+      },
+      {
+        "title": "Strategy card",
+        "text": "The card decides the whole battle up front. You watch it play out, and it can be replayed exactly."
+      },
+      {
+        "title": "Replays",
+        "text": "Every fight has a seed, so the same seed always produces the same fight. Nothing is random after the fact."
+      }
+    ],
+    "controls": [
+      "Press Fight to send your champion against a house champion.",
+      "Press Four-way to send it against three house champions.",
+      "Press Replay to watch the same fight again from its seed."
+    ],
+    "diagram": {
+      "kind": "seats",
+      "frames": [
+        {
+          "seats": [
+            {
+              "name": "Bulwark",
+              "tag": "seat 1"
+            },
+            {
+              "name": "Skirmisher",
+              "tag": "seat 2"
+            },
+            {
+              "name": "Sniper",
+              "tag": "seat 3"
+            },
+            {
+              "name": "Bruiser",
+              "tag": "seat 4"
+            }
+          ],
+          "say": "Four seats, four champions."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "An arena fight in four beats.",
+    "frames": [
+      {
+        "say": "Four champions take their seats.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "Bulwark",
+              "tag": "1"
+            },
+            {
+              "name": "Skirmisher",
+              "tag": "2"
+            },
+            {
+              "name": "Sniper",
+              "tag": "3"
+            },
+            {
+              "name": "Bruiser",
+              "tag": "4"
+            }
+          ]
+        }
+      },
+      {
+        "say": "Each seat gets a strategy card.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Push 7",
+            "Hold 4",
+            "Focus 9"
+          ]
+        }
+      },
+      {
+        "say": "The battle plays out from its seed, turn by turn.",
+        "diagram": {
+          "kind": "grid",
+          "cols": 6,
+          "rows": 6,
+          "cells": [
+            [
+              2,
+              2,
+              "X"
+            ],
+            [
+              3,
+              3,
+              "O"
+            ]
+          ]
+        }
+      },
+      {
+        "say": "The last champion standing takes the arena.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "Sniper",
+              "tag": "winner"
+            }
+          ]
+        }
+      }
+    ],
+    "outro": "Same seed, same fight: try a different card and replay it to compare."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Check your saved card — it decides the whole battle.",
+        "focus": "card"
+      },
+      {
+        "say": "Press Fight to send your champion into the arena.",
+        "focus": "start"
+      },
+      {
+        "say": "Watch the fight; nothing is decided by chance after the seed.",
+        "focus": "start"
+      },
+      {
+        "say": "Press Replay to see the same fight again.",
+        "focus": "replay"
+      }
+    ]
+  }
+}

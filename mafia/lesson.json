@@ -1,0 +1,22 @@
+{
+ "steps": [
+  {
+   "say": "In Mafia, you're assigned a secret role: you might be a regular villager, a doctor, a detective, or one of the mafia. Only you see your role.",
+   "setup": [],
+   "goal": [],
+   "praise": "Let's learn Mafia!"
+  },
+  {
+   "say": "During the day, everyone talks together. Then everyone votes to remove someone from the game. The person with the most votes is eliminated. If you're eliminated, you can still watch.",
+   "setup": [],
+   "goal": [],
+   "praise": "You understand the day phase!"
+  },
+  {
+   "say": "At night, the mafia chooses a victim to eliminate. The doctor can protect someone from being eliminated, and the detective can investigate someone's role. When all mafia are eliminated or all villagers are gone, the game ends and roles are revealed.",
+   "setup": [],
+   "goal": [],
+   "praise": "You know how to play!"
+  }
+ ]
+}

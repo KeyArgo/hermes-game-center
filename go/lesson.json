@@ -1,0 +1,42 @@
+{
+ "steps": [
+  {
+   "say": "Click any empty point where the lines cross to place a stone. Stones never move once placed.",
+   "setup": [],
+   "goal": [],
+   "praise": "Nice start!"
+  },
+  {
+   "say": "A stone with no empty point next to it is captured. Black's middle stone has one empty point left. Fill it.",
+   "setup": [
+    "e4",
+    "e5",
+    "d5",
+    "a1",
+    "f5",
+    "a2"
+   ],
+   "goal": [
+    "e6"
+   ],
+   "tip": "Look at the black stone in the middle: which side is still open?",
+   "praise": "Captured!"
+  },
+  {
+   "say": "Your stone in the middle is nearly surrounded. Save it by adding a stone next to it, giving it more room.",
+   "setup": [
+    "e5",
+    "d5",
+    "a1",
+    "f5",
+    "a2",
+    "e6"
+   ],
+   "goal": [
+    "e4"
+   ],
+   "tip": "Only one point next to your stone is still empty.",
+   "praise": "Saved!"
+  }
+ ]
+}

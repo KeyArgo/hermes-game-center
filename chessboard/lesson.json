@@ -1,0 +1,58 @@
+{
+ "steps": [
+  {
+   "say": "Click a piece, then where it goes. Start by moving the king's pawn two squares: e2 to e4.",
+   "setup": [],
+   "goal": [
+    "e2e4"
+   ],
+   "tip": "Click the pawn in front of the king, then two squares up.",
+   "praise": "Great start!"
+  },
+  {
+   "say": "Bring out a knight. Knights jump in an L shape. Move the knight from g1 to f3.",
+   "setup": [
+    "e2e4",
+    "e7e5"
+   ],
+   "goal": [
+    "g1f3"
+   ],
+   "tip": "The knight is next to the bishop on the right.",
+   "praise": "Developed!"
+  },
+  {
+   "say": "Castle to keep your king safe: click the king, then two squares toward the rook.",
+   "setup": [
+    "e2e4",
+    "e7e5",
+    "g1f3",
+    "b8c6",
+    "f1c4",
+    "g8f6"
+   ],
+   "goal": [
+    "e1g1"
+   ],
+   "tip": "Click e1, then g1. The rook jumps over.",
+   "praise": "Safe king!"
+  },
+  {
+   "say": "Checkmate wins: the king is attacked and cannot escape. Your queen can do it in one move.",
+   "setup": [
+    "e2e4",
+    "e7e5",
+    "f1c4",
+    "b8c6",
+    "d1h5",
+    "g8f6"
+   ],
+   "goal": [
+    "h5f7"
+   ],
+   "wins": true,
+   "tip": "Look at f7, guarded only by the king. Your bishop backs up the queen.",
+   "praise": "Checkmate!"
+  }
+ ]
+}

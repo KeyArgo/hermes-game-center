@@ -1,0 +1,47 @@
+{
+  "title": "Backgammon",
+  "howto": {
+    "goal": "Be the first to bear off all 15 of your checkers.",
+    "setup": "Each player has 15 checkers. White moves from point 24 toward point 1; black moves from point 1 toward point 24. White starts.",
+    "sections": [
+      {
+        "title": "Dice and movement",
+        "text": "Your turn starts with a roll: press Roll and the two dice tumble and land. Move using both dice if possible, in either order, one die per move. Doubles give four moves of that number. If only one die can be played, use the higher one when possible."
+      },
+      {
+        "title": "Points and hits",
+        "text": "You may land on an empty point, your own checkers, or a single opposing checker. Two or more opposing checkers block a point. Landing on a single opposing checker hits it onto the bar."
+      },
+      {
+        "title": "The bar",
+        "text": "You must enter every checker on the bar before moving any other checker. Enter using a die into the opponent's home board; blocked points cannot be entered."
+      },
+      {
+        "title": "Bearing off",
+        "text": "When all your remaining checkers are in your six-point home board, bear them off using the exact die. A higher die may remove a checker only when none is farther from the edge."
+      }
+    ],
+    "controls": [
+      "Press Roll when it is your turn: the two dice tumble and land on your roll. Doubles give you four moves.",
+      "Tap a lit checker, then tap a lit point to move it there, or drag the checker onto the point. Lit points are the only places the dice can take it.",
+      "The bar and the off tray light up when a checker goes there. Tap Bar to bring a checker in, or Bear off to take one off the board.",
+      "The dice shown are the moves still left. If nothing can move with them, press Pass."
+    ]
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Make points with two checkers to block your opponent.",
+        "focus": "board"
+      },
+      {
+        "say": "Enter checkers on the bar before moving others.",
+        "focus": "board"
+      },
+      {
+        "say": "Bring every checker home before bearing off.",
+        "focus": "board"
+      }
+    ]
+  }
+}
