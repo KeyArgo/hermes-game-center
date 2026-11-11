@@ -236,3 +236,13 @@ def test_the_bundle_carries_the_three_extras_the_owner_asked_for():
     assert "'Click to copy the version'" in bundle, "the chip's tooltip does not say what a click does"
     assert "CHIP_COPIED_MS" in version, "the chip has no \"Copied\" window"
     assert "onKeyDown" in version, "the chip is not reachable from the keyboard"
+
+
+def test_close_game_center_sits_top_right_not_bottom():
+    """Owner's ask 2026-11-11: Close Game Center at the top right (the tab row on Games, floated top
+    right elsewhere), never the old fixed bottom-right corner."""
+    home = (SRC / "70-home.js").read_text(encoding="utf-8")
+    route = (SRC / "80-plugin.js").read_text(encoding="utf-8")
+    assert "'data-gc-close-header': '1', style: { marginLeft: 'auto' }" in home
+    assert "position: 'absolute', right: 16, top: 12" in route
+    assert "bottom: 40" not in route

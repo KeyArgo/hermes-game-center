@@ -1,5 +1,5 @@
 // ---- 70-home.js: the Games page: Play, Experimental Games, the lobby and the tabs
-function GameCenterPage({ ctx }) {
+function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
   const [error, setError] = useState('')
@@ -16,6 +16,8 @@ function GameCenterPage({ ctx }) {
   const [hostAddr, setHostAddr] = useState('')
   const [query, setQuery] = useState('')
   const [area, setArea] = useState('games')
+  // The route draws Close Game Center itself off the Games screen; it needs to know which screen.
+  useEffect(() => { if (typeof onArea === 'function') onArea(area) }, [area])
   // The lobby's short How to play card, opened from the header like the other
   // surfaces' how-to cards.
   const [lobbyHowto, setLobbyHowto] = useState(false)
@@ -262,7 +264,10 @@ function GameCenterPage({ ctx }) {
       button('Games', () => setArea('games'), { primary: area === 'games' }),
       button('Champions', () => setArea('champions'), { primary: area === 'champions' }),
       // The Admin tab appears only for a staff key that works with this account.
-      staffRole ? button('Admin', () => setArea('admin'), { primary: area === 'admin' }) : null
+      staffRole ? button('Admin', () => setArea('admin'), { primary: area === 'admin' }) : null,
+      // The way out, top right of the Games screen, level with the tabs (owner's ask, 2026-11-11).
+      // Other screens get the same button floated top right by GameCenterRoute (80-plugin.js).
+      area === 'games' ? jsx('span', { 'data-gc-close-header': '1', style: { marginLeft: 'auto' }, children: closeGameCenterButton(ctx) }) : null
     ]
   })
 

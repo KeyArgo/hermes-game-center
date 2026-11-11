@@ -579,8 +579,8 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
       jsxs('div', {
         style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }, children: [
           jsx('div', { style: { fontWeight: 650, fontSize: 12 }, children: '#games' }),
-          view.player.named ? null : jsxs('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 }, children: [
-            field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }), button('Set', setPlayerName, { disabled: !name.trim() })
+          view.player.named ? null : jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
+            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }) }), button('Set', setPlayerName, { disabled: !name.trim() })
           ] }),
           jsx('div', { style: muted, children: lookingLine }),
           jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
@@ -589,8 +589,8 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
               jsx('span', { style: { color: text.secondary }, children: item.text }),
               jsx('span', { style: { color: text.tertiary, marginLeft: 4, whiteSpace: 'nowrap' }, children: lobbyStamp(item.at) })
             ] }, index)) : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' }) }),
-          jsxs('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 }, children: [
-            field(chat, setChat, view.player.named ? 'Say something' : 'Set a name first', sendChat, { label: 'Say something in the lobby chat' }),
+          jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
+            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(chat, setChat, view.player.named ? 'Say something' : 'Set a name first', sendChat, { label: 'Say something in the lobby chat' }) }),
             button('Send', sendChat, { disabled: !chat.trim() || !view.player.named })
           ] }),
           sayProblem ? jsx('div', {
