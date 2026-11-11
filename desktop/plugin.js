@@ -22126,7 +22126,7 @@ function AdminPage({ ctx, view, onBack }) {
 }
 
 // ---- 70-home.js: the Games page: Play, Experimental Games, the lobby and the tabs
-function GameCenterPage({ ctx }) {
+function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
   const [error, setError] = useState('')
@@ -22143,6 +22143,8 @@ function GameCenterPage({ ctx }) {
   const [hostAddr, setHostAddr] = useState('')
   const [query, setQuery] = useState('')
   const [area, setArea] = useState('games')
+  // The route draws Close Game Center itself off the Games screen; it needs to know which screen.
+  useEffect(() => { if (typeof onArea === 'function') onArea(area) }, [area])
   // The lobby's short How to play card, opened from the header like the other
   // surfaces' how-to cards.
   const [lobbyHowto, setLobbyHowto] = useState(false)
@@ -22389,7 +22391,10 @@ function GameCenterPage({ ctx }) {
       button('Games', () => setArea('games'), { primary: area === 'games' }),
       button('Champions', () => setArea('champions'), { primary: area === 'champions' }),
       // The Admin tab appears only for a staff key that works with this account.
-      staffRole ? button('Admin', () => setArea('admin'), { primary: area === 'admin' }) : null
+      staffRole ? button('Admin', () => setArea('admin'), { primary: area === 'admin' }) : null,
+      // The way out, top right of the Games screen, level with the tabs (owner's ask, 2026-11-11).
+      // Other screens get the same button floated top right by GameCenterRoute (80-plugin.js).
+      area === 'games' ? jsx('span', { 'data-gc-close-header': '1', style: { marginLeft: 'auto' }, children: closeGameCenterButton(ctx) }) : null
     ]
   })
 
@@ -23407,8 +23412,8 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
       jsxs('div', {
         style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }, children: [
           jsx('div', { style: { fontWeight: 650, fontSize: 12 }, children: '#games' }),
-          view.player.named ? null : jsxs('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 }, children: [
-            field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }), button('Set', setPlayerName, { disabled: !name.trim() })
+          view.player.named ? null : jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
+            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }) }), button('Set', setPlayerName, { disabled: !name.trim() })
           ] }),
           jsx('div', { style: muted, children: lookingLine }),
           jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
@@ -23417,8 +23422,8 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
               jsx('span', { style: { color: text.secondary }, children: item.text }),
               jsx('span', { style: { color: text.tertiary, marginLeft: 4, whiteSpace: 'nowrap' }, children: lobbyStamp(item.at) })
             ] }, index)) : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' }) }),
-          jsxs('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 }, children: [
-            field(chat, setChat, view.player.named ? 'Say something' : 'Set a name first', sendChat, { label: 'Say something in the lobby chat' }),
+          jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
+            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(chat, setChat, view.player.named ? 'Say something' : 'Set a name first', sendChat, { label: 'Say something in the lobby chat' }) }),
             button('Send', sendChat, { disabled: !chat.trim() || !view.player.named })
           ] }),
           sayProblem ? jsx('div', {
@@ -24080,17 +24085,7 @@ export default {
         id: 'page',
         area: ROUTES_AREA,
         data: { path: ROUTE },
-        render: () => jsxs('div', {
-          style: { position: 'relative', height: '100%' },
-          children: [
-            jsx(GamesBoundary, { where: 'page', onClose: () => closeGameCenter(ctx), children: jsx(GameCenterPage, { ctx }) }),
-            // Always there, on every screen of the page: one press and Game Center is out of the way.
-            jsx('div', {
-              style: { position: 'fixed', right: 16, bottom: 40, zIndex: 40 },
-              children: button('Close Game Center', () => closeGameCenter(ctx), { title: 'Back to the chat. Your game stays where you left it.' })
-            })
-          ]
-        })
+        render: () => jsx(GameCenterRoute, { ctx })
       },
       {
         id: 'nav',
@@ -24140,3 +24135,25 @@ export default {
 
 // Shared with Game Center Online (online/web/app.js), which draws the same boards in a browser.
 export { BoardSvg, coverArt, startingPicture, tableAccess }
+
+// The Game Center page and its one way out. On the Games screen Close Game Center sits in the
+// header, top right, beside search (owner's ask, 2026-11-11); on every other screen (Settings,
+// Champions, Community, ...) it floats top right instead of the old bottom-right corner.
+function GameCenterRoute({ ctx }) {
+  const [area, setArea] = useState('games')
+  return jsxs('div', {
+    style: { position: 'relative', height: '100%' },
+    children: [
+      jsx(GamesBoundary, { where: 'page', onClose: () => closeGameCenter(ctx), children: jsx(GameCenterPage, { ctx, onArea: setArea }) }),
+      area === 'games' ? null : jsx('div', {
+        'data-gc-close-float': '1',
+        style: { position: 'absolute', right: 16, top: 12, zIndex: 40 },
+        children: closeGameCenterButton(ctx)
+      })
+    ]
+  })
+}
+
+function closeGameCenterButton(ctx) {
+  return button('Close Game Center', () => closeGameCenter(ctx), { title: 'Back to the chat. Your game stays where you left it.' })
+}

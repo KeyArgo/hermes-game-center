@@ -39,17 +39,7 @@ export default {
         id: 'page',
         area: ROUTES_AREA,
         data: { path: ROUTE },
-        render: () => jsxs('div', {
-          style: { position: 'relative', height: '100%' },
-          children: [
-            jsx(GamesBoundary, { where: 'page', onClose: () => closeGameCenter(ctx), children: jsx(GameCenterPage, { ctx }) }),
-            // Always there, on every screen of the page: one press and Game Center is out of the way.
-            jsx('div', {
-              style: { position: 'fixed', right: 16, bottom: 40, zIndex: 40 },
-              children: button('Close Game Center', () => closeGameCenter(ctx), { title: 'Back to the chat. Your game stays where you left it.' })
-            })
-          ]
-        })
+        render: () => jsx(GameCenterRoute, { ctx })
       },
       {
         id: 'nav',
@@ -99,3 +89,25 @@ export default {
 
 // Shared with Game Center Online (online/web/app.js), which draws the same boards in a browser.
 export { BoardSvg, coverArt, startingPicture, tableAccess }
+
+// The Game Center page and its one way out. On the Games screen Close Game Center sits in the
+// header, top right, beside search (owner's ask, 2026-11-11); on every other screen (Settings,
+// Champions, Community, ...) it floats top right instead of the old bottom-right corner.
+function GameCenterRoute({ ctx }) {
+  const [area, setArea] = useState('games')
+  return jsxs('div', {
+    style: { position: 'relative', height: '100%' },
+    children: [
+      jsx(GamesBoundary, { where: 'page', onClose: () => closeGameCenter(ctx), children: jsx(GameCenterPage, { ctx, onArea: setArea }) }),
+      area === 'games' ? null : jsx('div', {
+        'data-gc-close-float': '1',
+        style: { position: 'absolute', right: 16, top: 12, zIndex: 40 },
+        children: closeGameCenterButton(ctx)
+      })
+    ]
+  })
+}
+
+function closeGameCenterButton(ctx) {
+  return button('Close Game Center', () => closeGameCenter(ctx), { title: 'Back to the chat. Your game stays where you left it.' })
+}

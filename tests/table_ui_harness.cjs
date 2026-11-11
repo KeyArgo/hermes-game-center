@@ -4385,6 +4385,13 @@ async function lobbyColumnContract() {
   assert.ok(inputFor(tree, 'Say something in the lobby chat'), 'the labelled chat box is there for a named player too')
 
   reset()
+  // 4. The column is narrow (140 px): each box gets its own full-width line with its button under
+  // it, never squeezed side by side (owner's ask, 2026-11-11).
+  reset()
+  tree = paint({ view: unnamed })
+  const sayRows = nodes(tree).filter(node => node.props && node.props['data-lobby-say-row'] === '1')
+  assert.equal(sayRows.length, 2, 'the name row and the chat row are both stacked rows')
+  for (const row of sayRows) assert.equal(row.props.style.flexDirection, 'column', 'a box sits above its button')
   console.log('lobby chat column: refused drafts are kept, matches play here: passed')
 }
 
