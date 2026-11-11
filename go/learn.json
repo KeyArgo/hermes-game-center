@@ -1,0 +1,143 @@
+{
+  "title": "Go",
+  "howto": {
+    "goal": "Score more points than the other side: your stones plus empty points only you surround. Dark gets 7.5 points.",
+    "setup": "A 9 by 9 board. Light moves first and passes are allowed; dark gets 7.5 points.",
+    "sections": [
+      {
+        "title": "Placing",
+        "text": "Click an empty point to place a stone. Stones are captured when they have no empty neighbour left."
+      },
+      {
+        "title": "Capturing",
+        "text": "Surround an enemy group completely and it comes off the board."
+      },
+      {
+        "title": "Ending",
+        "text": "Two passes in a row end the game, and the side holding more points wins; dark's 7.5 points are added to its score."
+      }
+    ],
+    "controls": [
+      "Click an empty point to place a stone.",
+      "Click Pass when you have nothing useful left.",
+      "The ringed point is where this lesson wants you."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 9,
+      "rows": 9,
+      "frames": [
+        {
+          "cells": [
+            [
+              4,
+              4,
+              "X"
+            ]
+          ],
+          "say": "A stone in the middle."
+        },
+        {
+          "cells": [
+            [
+              4,
+              4,
+              "X"
+            ],
+            [
+              3,
+              4,
+              "O"
+            ],
+            [
+              4,
+              3,
+              "O"
+            ],
+            [
+              4,
+              5,
+              "O"
+            ],
+            [
+              5,
+              4,
+              "O"
+            ]
+          ],
+          "say": "Four neighbours surround it."
+        },
+        {
+          "cells": [
+            [
+              4,
+              4,
+              "."
+            ]
+          ],
+          "say": "A surrounded stone is captured and removed."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A short computer game on 9 by 9, showing contact play and how a group's shape grows.",
+    "moves": [
+      "e5",
+      "e6",
+      "d5",
+      "f5",
+      "d6"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Empty 9 by 9 board."
+      },
+      {
+        "at": 1,
+        "say": "Light takes a central point."
+      },
+      {
+        "at": 2,
+        "say": "Dark plays beside it, touching."
+      },
+      {
+        "at": 3,
+        "say": "Light extends along the row."
+      },
+      {
+        "at": 4,
+        "say": "Dark blocks the other side."
+      },
+      {
+        "at": 5,
+        "say": "Light strengthens the group's shape."
+      }
+    ],
+    "outro": "In Go, stones that stay connected stay alive. Spread out early, connect later."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click a central point for your first stone.",
+        "focus": "board",
+        "highlight": [
+          "e5"
+        ]
+      },
+      {
+        "say": "Keep your stones connected — a lone stone is easy to surround.",
+        "focus": "board"
+      },
+      {
+        "say": "Surround a single enemy stone on all four sides to capture it.",
+        "focus": "board"
+      },
+      {
+        "say": "Click Pass when you have no useful move left.",
+        "focus": "pass"
+      }
+    ]
+  }
+}

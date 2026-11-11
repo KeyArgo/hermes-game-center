@@ -1,0 +1,61 @@
+{
+ "steps": [
+  {
+   "say": "Click the centre cell to place your first stone. Light joins top to bottom; dark joins left to right, and the centre is strong.",
+   "setup": [],
+   "goal": [
+    "f6"
+   ],
+   "praise": "Good start!"
+  },
+  {
+   "say": "Stones that touch make a chain. Place a stone touching your stone at f6.",
+   "setup": [
+    "f6",
+    "c3"
+   ],
+   "goal": [
+    "f5",
+    "g5",
+    "e6",
+    "g6",
+    "e7",
+    "f7"
+   ],
+   "tip": "Pick one of the six cells around f6.",
+   "praise": "Linked!"
+  },
+  {
+   "say": "Your chain runs from the top to row 10. One more stone reaches the bottom edge and wins.",
+   "setup": [
+    "f1",
+    "a1",
+    "f2",
+    "a2",
+    "f3",
+    "a3",
+    "f4",
+    "a4",
+    "f5",
+    "a5",
+    "f6",
+    "a6",
+    "f7",
+    "a7",
+    "f8",
+    "a8",
+    "f9",
+    "a9",
+    "f10",
+    "a10"
+   ],
+   "goal": [
+    "e11",
+    "f11"
+   ],
+   "wins": true,
+   "tip": "Touch f10 and the bottom row at once.",
+   "praise": "You win!"
+  }
+ ]
+}

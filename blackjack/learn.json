@@ -1,0 +1,59 @@
+{
+  "title": "Blackjack",
+  "howto": {
+    "goal": "Beat the dealer without going over 21. A two-card 21 is blackjack and pays 3:2.",
+    "setup": "One hand at a time against the house dealer. Bets are paid from the Jackpot wallet.",
+    "sections": [
+      {
+        "title": "Betting",
+        "text": "Pick a stake from the ladder and the chips leave your wallet. A win pays even money, a push returns the bet, and blackjack pays 3:2."
+      },
+      {
+        "title": "Hit or stand",
+        "text": "Hit takes another card, stand stops, and double doubles the stake for one more card on your first two. The dealer stands on all 17s."
+      },
+      {
+        "title": "The table stays open",
+        "text": "A finished hand goes straight back to betting with the last cards shown. The table never ends on its own, and a broke player gets a fresh stack."
+      }
+    ],
+    "controls": [
+      "Click a bet button to deal a hand.",
+      "Click Hit, Stand or Double while the hand is live.",
+      "The dealer's second card stays hidden until the hand is settled."
+    ]
+  },
+  "demo": {
+    "intro": "One bet and the cards come out.",
+    "moves": [
+      "bet10"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "The table waits for a bet. The stake is paid from your wallet."
+      },
+      {
+        "at": 1,
+        "say": "Bet placed: you get two cards and the dealer shows one. Now hit, stand or double."
+      }
+    ],
+    "outro": "Stand on a strong total and hit a weak one; the dealer must keep drawing to 17."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Pick a small stake with a bet button and the hand is dealt.",
+        "focus": "board"
+      },
+      {
+        "say": "Hit while your total is low, and stand when it is strong enough.",
+        "focus": "board"
+      },
+      {
+        "say": "Blackjack pays 3:2. A push returns your stake and the table keeps going.",
+        "focus": "board"
+      }
+    ]
+  }
+}

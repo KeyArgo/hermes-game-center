@@ -1,0 +1,147 @@
+{
+  "title": "Hex",
+  "howto": {
+    "goal": "Join your top side to your bottom side with an unbroken chain of your stones before the other side joins left to right.",
+    "setup": "An 11 by 11 rhombus. Light joins top to bottom, dark joins left to right. Light moves first.",
+    "sections": [
+      {
+        "title": "No draws",
+        "text": "Every full board has exactly one connected side, so a Hex game always ends with a winner."
+      },
+      {
+        "title": "Chains",
+        "text": "Stones touch along their six edges. A chain that reaches both of your sides wins."
+      },
+      {
+        "title": "Blocking",
+        "text": "You cannot take a stone back, so a move both extends your chain and blocks theirs is strong."
+      }
+    ],
+    "controls": [
+      "Click any empty cell to place your stone.",
+      "The ringed cell is where this lesson wants you.",
+      "Undo in a learning game takes back your last move and the computer's reply."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 11,
+      "rows": 11,
+      "frames": [
+        {
+          "cells": [
+            [
+              5,
+              5,
+              "X"
+            ]
+          ],
+          "say": "Start near the middle."
+        },
+        {
+          "cells": [
+            [
+              5,
+              5,
+              "X"
+            ],
+            [
+              4,
+              5,
+              "X"
+            ]
+          ],
+          "say": "Join stones edge to edge."
+        },
+        {
+          "cells": [
+            [
+              5,
+              5,
+              "X"
+            ],
+            [
+              4,
+              5,
+              "X"
+            ],
+            [
+              3,
+              5,
+              "X"
+            ]
+          ],
+          "say": "A chain reaching the far side wins."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "Watch the computer play itself. Light is building top to bottom; dark builds left to right.",
+    "moves": [
+      "f6",
+      "g6",
+      "e6",
+      "f7",
+      "e7",
+      "g5"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Empty board. Light wants the middle, because the middle is shortest to both sides."
+      },
+      {
+        "at": 1,
+        "say": "Light takes f6, the centre cell."
+      },
+      {
+        "at": 2,
+        "say": "Dark answers beside it at g6, starting its own line across the board."
+      },
+      {
+        "at": 3,
+        "say": "Light extends at e6 — a chain of two."
+      },
+      {
+        "at": 4,
+        "say": "Dark pushes at f7, blocking the light chain's path down the board."
+      },
+      {
+        "at": 5,
+        "say": "Light steps around at e7, keeping the chain connected."
+      },
+      {
+        "at": 6,
+        "say": "Dark blocks at g5. Notice both sides now threaten a route."
+      }
+    ],
+    "outro": "The side that keeps one connected line wins. In Play & Learn you make the same first moves yourself."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "You are Light and move first. Click the middle of the board to place your first stone.",
+        "focus": "board",
+        "highlight": [
+          "f6"
+        ]
+      },
+      {
+        "say": "Place your next stone so it touches one of your stones along an edge. If the swap took your first stone, start a fresh chain.",
+        "focus": "board",
+        "highlight": [
+          "e6",
+          "f7"
+        ]
+      },
+      {
+        "say": "Build a line that reaches both of your sides. Top to bottom is yours.",
+        "focus": "board"
+      },
+      {
+        "say": "If the computer blocks you, go around it — never leave a gap in your chain.",
+        "focus": "board"
+      }
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "note": "Community shelf. Link-out cards only: Game Center hosts none of these games and never loads them. Every url must be https. A bad entry is skipped with a note on the shelf.",
+  "schema_version": 1,
+  "games": [
+    {
+      "id": "nous-hermes-arcade",
+      "title": "Nous Hermes Arcade",
+      "creator": "123mikeyd",
+      "url": "https://hermesarcade.123mikeyd.com/"
+    },
+    {
+      "id": "nrcu-platform-fighter",
+      "title": "The Legends of Nous Research",
+      "creator": "123mikeyd",
+      "url": "https://123mikeyd.github.io/nrcu-platform-fighter/"
+    },
+    {
+      "id": "brother-doge",
+      "title": "HODL OR DIE: Brother Doge",
+      "creator": "123mikeyd",
+      "url": "https://123mikeyd.github.io/Brother_Doge_VideoGame/"
+    },
+    {
+      "id": "clawpocalypse-now",
+      "title": "Clawpocalypse Now",
+      "creator": "mojomast",
+      "url": "https://mojomast.github.io/clawpocalypse-now/"
+    },
+    {
+      "id": "roo-gang",
+      "title": "ROO GANG",
+      "creator": "mojomast",
+      "url": "https://slophero.vercel.app/"
+    },
+    {
+      "id": "misty-mountain",
+      "title": "Misty Mountain",
+      "creator": "123mikeyd",
+      "url": "https://github.com/123mikeyd/hermes-community-care-package/releases/tag/v0.1.0-prototype",
+      "kind": "download",
+      "note": "A Godot 4 learning prototype you download and open in the editor. It does not play in the browser. No licence file in the repository."
+    },
+    {
+      "id": "gladiator",
+      "title": "Gladiator",
+      "creator": "runtimenoteslabs",
+      "url": "https://runtimenotes.com/projects/gladiator/",
+      "kind": "watch",
+      "note": "A watch-only page with a demo of two AI companies competing. It is not a game you play. MIT."
+    }
+  ]
+}

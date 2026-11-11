@@ -1,0 +1,64 @@
+{
+  "title": "Slots",
+  "howto": {
+    "goal": "Match symbols on a payline and win chips. Three jackpot symbols on a line pay the most.",
+    "setup": "Every spin costs the stake you pick, paid in chips from the Jackpot wallet.",
+    "sections": [
+      {
+        "title": "Choose a stake",
+        "text": "The bet ladder runs from 25 chips up. A spin costs exactly that stake, so pick an amount you can keep paying."
+      },
+      {
+        "title": "Paylines",
+        "text": "Classic has nine windows and five paylines. Hermes Robots has one row of three robot reels and one payline."
+      },
+      {
+        "title": "Honest odds",
+        "text": "Each machine plays fixed reel strips and publishes the session's own odds. There are no pulls and no earned counters: chips are the only currency."
+      }
+    ],
+    "controls": [
+      "Click a bet button to set the stake.",
+      "Click Spin to pull the reels, or tick Auto-spin to spin on every message.",
+      "Pick a machine above the reels: Classic or Hermes Robots."
+    ]
+  },
+  "demo": {
+    "intro": "Set a stake and take one spin.",
+    "moves": [
+      "bet25",
+      "spin"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "The machine is ready. The default stake is the minimum bet."
+      },
+      {
+        "at": 1,
+        "say": "The stake is set at 25 chips; the next spin costs that much."
+      },
+      {
+        "at": 2,
+        "say": "The reels turn. Any symbols that line up pay from the table."
+      }
+    ],
+    "outro": "The machine never ends: change the stake, change the machine, or spin again."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Press spin to pull the reels and see the published paytable.",
+        "focus": "board"
+      },
+      {
+        "say": "Use the bet ladder to choose what each spin costs.",
+        "focus": "board"
+      },
+      {
+        "say": "Three jackpot symbols on a payline pay the biggest prize.",
+        "focus": "board"
+      }
+    ]
+  }
+}

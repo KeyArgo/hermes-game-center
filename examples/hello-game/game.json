@@ -1,0 +1,11 @@
+{
+  "id": "hello",
+  "schema_version": 1,
+  "plugin_id": "hello-game",
+  "title": "Hello",
+  "summary": "The smallest possible Game Center game. It answers whatever you type.",
+  "entry": "game.py",
+  "factory": "create",
+  "kind": "table",
+  "bots": false
+}

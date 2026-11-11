@@ -1,0 +1,37 @@
+{
+ "steps": [
+  {
+   "say": "Pieces move one square diagonally forward. Click any of your pieces, then the square it should move to.",
+   "setup": [],
+   "goal": [],
+   "praise": "Good move!"
+  },
+  {
+   "say": "If you can jump an enemy piece, you must. Jump over it to take it off the board.",
+   "setup": [
+    "g3-h4",
+    "f6-g5"
+   ],
+   "goal": [
+    "h4-f6"
+   ],
+   "tip": "Your piece on h4 can jump the one next to it.",
+   "praise": "Captured!"
+  },
+  {
+   "say": "After a jump, if you can jump again, keep going. Take two pieces in one move.",
+   "setup": [
+    "e3-d4",
+    "f6-g5",
+    "a3-b4",
+    "b6-c5",
+    "d4-b6"
+   ],
+   "goal": [
+    "a7-c5-a3"
+   ],
+   "tip": "Start with the piece on a7 and click each landing square.",
+   "praise": "Double jump!"
+  }
+ ]
+}

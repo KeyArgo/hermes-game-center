@@ -1,0 +1,14 @@
+{
+  "id": "blackjack",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Blackjack",
+  "tagline": "Beat the dealer",
+  "summary": "Play one hand of blackjack against the house dealer, betting chips from the Jackpot wallet.",
+  "players": "1",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "table",
+  "solo": true
+}

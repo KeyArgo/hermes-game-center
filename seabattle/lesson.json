@@ -1,0 +1,41 @@
+{
+ "steps": [
+  {
+   "say": "Drag the carrier from the tray onto a1. A click on a ship turns it, and every ship must sit on your own waters.",
+   "setup": [],
+   "goal": [
+    "place carrier a1 h"
+   ],
+   "tip": "The carrier is five squares long. Pick it up in the tray and let go over a1.",
+   "praise": "That is the carrier down."
+  },
+  {
+   "say": "Your fleet is laid out and the enemy's is hidden. Click a square in the enemy waters to fire; a red ring is a hit and a pale dot is a miss.",
+   "setup": [
+    "random",
+    "look",
+    "random",
+    "look"
+   ],
+   "goal": [
+    "fire e5"
+   ],
+   "tip": "e5 is the middle square; it is as good a first shot as any.",
+   "praise": "Shot away!"
+  },
+  {
+   "say": "Both fleets now use the same published layout, mirrored. Your carrier runs a1 to e1, so theirs runs j1 to f1. Fire j1.",
+   "setup": [
+    "duplicate",
+    "look",
+    "random",
+    "look"
+   ],
+   "goal": [
+    "fire j1"
+   ],
+   "tip": "Count in from the right edge: j1 is their carrier's stern.",
+   "praise": "You found their carrier!"
+  }
+ ]
+}

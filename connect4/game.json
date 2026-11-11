@@ -1,0 +1,11 @@
+{
+  "id": "connect4",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Connect Four",
+  "summary": "Drop a piece. Four in a row wins. A built-in player can take a seat after you agree.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "table"
+}

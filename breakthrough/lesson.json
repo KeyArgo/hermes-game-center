@@ -1,0 +1,57 @@
+{
+ "steps": [
+  {
+   "say": "Each side has sixteen pawns. Click any of your pawns, then a square one step forward. Pawns never move sideways or backward.",
+   "setup": [],
+   "goal": [],
+   "praise": "Good move!"
+  },
+  {
+   "say": "A pawn can also step diagonally forward onto an empty square. That is how you slip past a wall of pawns.",
+   "setup": [
+    "b2-b3",
+    "b7-b6"
+   ],
+   "goal": [
+    "b3-c4"
+   ],
+   "tip": "The pawn on b3 can go straight on, or diagonally to c4.",
+   "praise": "That frees the file."
+  },
+  {
+   "say": "Only a diagonal step takes a piece. Move your pawn diagonally onto an enemy pawn to capture it.",
+   "setup": [
+    "b2-b3",
+    "a7-a6",
+    "b3-b4",
+    "a6-a5"
+   ],
+   "goal": [
+    "b4-a5"
+   ],
+   "tip": "Your pawn on b4 sits next to a black pawn on a5.",
+   "praise": "Captured!"
+  },
+  {
+   "say": "The far rank is full of black pawns, so you break through by taking one. Your pawn on h7 can take the black pawn on g8 and win straight away.",
+   "setup": [
+    "g2-g3",
+    "a7-a6",
+    "g3-g4",
+    "b7-b6",
+    "g4-g5",
+    "c7-c6",
+    "g5-g6",
+    "d7-d6",
+    "g6-h7",
+    "a6-a5"
+   ],
+   "goal": [
+    "h7-g8"
+   ],
+   "wins": true,
+   "tip": "The pawn on h7 steps diagonally forward onto the black pawn on g8.",
+   "praise": "You reached the far rank. That is the game."
+  }
+ ]
+}

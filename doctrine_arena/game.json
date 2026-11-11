@@ -1,0 +1,11 @@
+{
+  "id": "doctrine-arena",
+  "plugin": "hermes-gameshelf",
+  "title": "Olympus Arena",
+  "subtitle": "The arena of the gods",
+  "summary": "Send a champion into Olympus Arena. A strategy card decides the whole battle, it plays out on its own, and it replays exactly from its seed. No model is called while the tanks fight.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "play"
+}

@@ -1,0 +1,7 @@
+name: match-ready-game
+version: "0.1.0"
+description: A tiny example plugin whose game meets the Play contract, so tools/check_game.py passes.
+manifest_version: 2
+api_version: 1
+license: MIT
+tags: [game]

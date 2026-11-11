@@ -1,0 +1,11 @@
+{
+  "id": "tic-tac-toe",
+  "schema_version": 1,
+  "plugin_id": "match-ready-game",
+  "title": "Tic-Tac-Toe",
+  "summary": "Three in a row on a 3 by 3 board. The smallest game that meets the Play contract.",
+  "entry": "game.py",
+  "factory": "create",
+  "kind": "table",
+  "bots": true
+}

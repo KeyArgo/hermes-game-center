@@ -1,0 +1,24 @@
+{
+  "title": "Slots Basics",
+  "intro": "Pick a bet, then spin. Every machine pays exact, published odds from your chips.",
+  "steps": [
+    {
+      "say": "Press spin to pull the reels. Click spin and watch the payout line.",
+      "goal": ["spin"],
+      "tip": "Spin is always the big button. The stake comes from your wallet.",
+      "praise": "That is a spin. Matches on a line pay; three jackpot symbols pay the most."
+    },
+    {
+      "say": "Choose what a spin is worth: click bet50 to set a bigger stake.",
+      "goal": ["bet50"],
+      "tip": "The bet ladder runs from 25 up. Pick a stake you can keep paying.",
+      "praise": "Stake set. The cost of a spin is taken from your chips each time."
+    },
+    {
+      "say": "Now spin at your new stake. Click spin and the reels turn again.",
+      "goal": ["spin"],
+      "tip": "Every spin costs the stake, so watch your chips as well as the reels.",
+      "praise": "You have the machine. Change machines above the reels any time."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "blind-auction",
+  "schema_version": 1,
+  "plugin": "hermes-gameshelf",
+  "title": "Blind Auction",
+  "summary": "Two bidders, five lots and a private value for each. Talk first, then send one secret set of bids. The richer wallet at the end wins.",
+  "entry": "game.py",
+  "factory": "create",
+  "bots": true,
+  "kind": "play"
+}

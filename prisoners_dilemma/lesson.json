@@ -1,0 +1,22 @@
+{
+ "steps": [
+  {
+   "say": "In Prisoner's Dilemma, you and one or more opponents play multiple rounds against each other. In each round, you choose to cooperate or defect (sell out).",
+   "setup": [],
+   "goal": [],
+   "praise": "Let's learn the game!"
+  },
+  {
+   "say": "The payoff for each round depends on both players' choices: if both cooperate, you get 3 points each. If both defect, you get 1 point each. If one defects and one cooperates, the defector gets 5 and the cooperator gets 0.",
+   "setup": [],
+   "goal": [],
+   "praise": "You understand the payoff!"
+  },
+  {
+   "say": "After talking to your opponents, make your secret choice. Your total score is the sum of all rounds against all opponents. The highest total score wins the round-robin.",
+   "setup": [],
+   "goal": [],
+   "praise": "Ready to play!"
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+{"id":"doctrine","plugin":"hermes-gameshelf","title":"Doctrine","summary":"Write a bot as a small card of weighted priorities, then send it into a turn-based fight on the hex board. Watch, ladder, share, and improve it.","entry":"game.py","factory":"create","bots":true,"kind":"play"}

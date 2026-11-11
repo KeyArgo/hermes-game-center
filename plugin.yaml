@@ -1,0 +1,53 @@
+name: hermes-gameshelf
+version: "1.0.0"
+description: >
+  Game Center for Hermes Agent. The curated games that ship with it are ready
+  to play on the first run. A game another plugin brings has a place of its
+  own, clearly marked as outside code. A person plays, or they agree before an
+  AI takes a seat. Another plugin joins by shipping game.json. Online play with
+  other people, match alerts and the bot ladder are opt-in and off until you
+  turn them on; the plain disclosure in the dock says exactly what is sent, the
+  recovery key is kept through Hermes's credentials, and everything local keeps
+  working when the server is down.
+manifest_version: 2
+api_version: 1
+requires_hermes: ">=0.23.0"
+license: MIT
+tags: [game]
+provides_tools:
+  - games_play
+provides_hooks:
+  - pre_llm_call
+  - pre_tool_call
+  - post_api_request
+config_schema:
+  allow_ai:
+    type: bool
+    default: true
+    label: Allow AI seats
+    description: Off means no game may seat an AI. On still requires a person to agree before an AI faces a human.
+  doom_wad:
+    type: string
+    default: ""
+    label: Doom WAD
+    description: Path to the Doom game data (.wad) to use. Empty uses the free Freedoom files when they are installed.
+  submit_url:
+    type: string
+    default: "https://games.hermesnet.xyz/submit"
+    label: Submit your game link
+    description: Where the Submit your game button goes. Empty shows the submission guide link instead.
+  submit_docs_url:
+    type: string
+    default: ""
+    label: Submission guide link
+    description: A web page with the submission guide, shown when the Submit link above is empty.
+  lobby_url:
+    type: string
+    default: "https://games.hermesnet.xyz"
+    label: Online lobby address
+    description: Where online play and match alerts connect. Online play stays off until you turn it on in the Game Center dock, and nothing is sent before that.
+  lobby_key:
+    type: secret
+    env: HERMES_GAMESHELF_LOBBY_KEY
+    label: Online recovery key
+    description: The recovery key for your online name. Game Center keeps it with your other Hermes credentials when you create a player or sign in, and you can paste it here by hand.

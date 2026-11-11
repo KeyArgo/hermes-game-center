@@ -1,0 +1,39 @@
+{
+ "steps": [
+  {
+   "say": "Click any blue dot to place a disc: a line of the other colour must sit between your new disc and one of yours, and those discs flip.",
+   "setup": [],
+   "goal": [],
+   "praise": "Nice flip!"
+  },
+  {
+   "say": "Some moves flip more than others. Find the move that flips the most discs.",
+   "setup": [
+    "d3",
+    "e3",
+    "f4",
+    "c5"
+   ],
+   "goal": [
+    "d6"
+   ],
+   "tip": "Count how many discs each dot would flip.",
+   "praise": "Biggest flip!"
+  },
+  {
+   "say": "Corners can never be flipped back. When you can take a corner, it is usually the best move.",
+   "setup": [
+    "d3",
+    "c3",
+    "c4",
+    "e3",
+    "b2"
+   ],
+   "goal": [
+    "a1"
+   ],
+   "tip": "One of the dots is in a corner.",
+   "praise": "Corner taken!"
+  }
+ ]
+}

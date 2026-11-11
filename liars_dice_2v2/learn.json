@@ -1,0 +1,143 @@
+{
+  "title": "Liar's Dice 2v2",
+  "howto": {
+    "goal": "Be on the last team with dice. Bid on how many of one face are on the table, or call the last bid a lie.",
+    "setup": "Each team of two shares one pool of ten dice. Each player sees only their own dice.",
+    "sections": [
+      {
+        "title": "Teams",
+        "text": "You and your partner share a pool. Talk in the open — the other team hears everything."
+      },
+      {
+        "title": "Bidding",
+        "text": "A bid says a face and a count for the whole table. Each new bid must raise the count or the face."
+      },
+      {
+        "title": "Calling a lie",
+        "text": "Call the bid and everyone shows their dice. The team that is wrong loses a die from its pool."
+      }
+    ],
+    "controls": [
+      "Click a bid button to raise the count or the face.",
+      "Click Call the bid a lie to challenge the last bid.",
+      "Use the table chat to coordinate with your partner — openly."
+    ],
+    "diagram": {
+      "kind": "pips",
+      "frames": [
+        {
+          "values": [
+            2,
+            5,
+            5,
+            6,
+            1
+          ],
+          "say": "Your dice, and your partner's are separate."
+        },
+        {
+          "values": [
+            5,
+            5,
+            5
+          ],
+          "say": "Between a team, fives add up fast."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A team round played out.",
+    "frames": [
+      {
+        "say": "Two teams sit down, five dice each.",
+        "diagram": {
+          "kind": "seats",
+          "seats": [
+            {
+              "name": "You",
+              "tag": "team A"
+            },
+            {
+              "name": "Partner",
+              "tag": "team A"
+            },
+            {
+              "name": "Rival",
+              "tag": "team B"
+            },
+            {
+              "name": "Rival 2",
+              "tag": "team B"
+            }
+          ]
+        }
+      },
+      {
+        "say": "The first bid is low: two fives.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            5,
+            5
+          ]
+        }
+      },
+      {
+        "say": "A rival raises to four fives, counting their own dice.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            5,
+            5,
+            5,
+            5
+          ]
+        }
+      },
+      {
+        "say": "Your partner calls the lie. Everyone shows their dice.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            5,
+            5,
+            5
+          ]
+        }
+      },
+      {
+        "say": "Only three fives exist, so the rival team loses a die.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            5,
+            5,
+            5
+          ]
+        }
+      }
+    ],
+    "outro": "Tell your partner what you hold — the other team is listening, so be careful."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Count the face you hold most of, then say it in chat so your partner knows.",
+        "focus": "chat"
+      },
+      {
+        "say": "Bid low at first; you can raise on your next turn.",
+        "focus": "bid"
+      },
+      {
+        "say": "Remember the other team hears your hints too.",
+        "focus": "chat"
+      },
+      {
+        "say": "Call a lie when the count is more than your team's dice can support.",
+        "focus": "call"
+      }
+    ]
+  }
+}

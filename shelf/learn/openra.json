@@ -1,0 +1,97 @@
+{
+  "title": "OpenRA",
+  "howto": {
+    "goal": "Play the OpenRA program you installed yourself, with the mods it brings.",
+    "setup": "This game is a program on this computer, not a Game Center table.",
+    "sections": [
+      {
+        "title": "What this screen does",
+        "text": "This card starts OpenRA on this computer. It brings its own mods and menus."
+      },
+      {
+        "title": "Where it runs",
+        "text": "The program is the one you installed. Game Center only starts it and steps out of the way."
+      },
+      {
+        "title": "Back here",
+        "text": "Close the program and this page is waiting for you."
+      }
+    ],
+    "controls": [
+      "Click Play to open the program.",
+      "Click Back to leave this card without starting anything.",
+      "Nothing here needs typing."
+    ],
+    "diagram": {
+      "kind": "cards",
+      "frames": [
+        {
+          "cards": [
+            "Play",
+            "Close"
+          ],
+          "say": "Play opens the program; closing it returns you here."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "How OpenRA opens from Game Center.",
+    "frames": [
+      {
+        "say": "OpenRA runs as its own program on this computer.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Play",
+            "Close"
+          ]
+        }
+      },
+      {
+        "say": "Game Center starts it and hands over the screen.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Starting…"
+          ]
+        }
+      },
+      {
+        "say": "Play the game in its own window.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Your game"
+          ]
+        }
+      },
+      {
+        "say": "Close the window and this card is here again.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "Back here"
+          ]
+        }
+      }
+    ],
+    "outro": "Game Center does not run the game itself — the program you installed does."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click Play to open the program.",
+        "focus": "start"
+      },
+      {
+        "say": "Play it in its own window; its own menus do the rest.",
+        "focus": "start"
+      },
+      {
+        "say": "Close the program when you are done.",
+        "focus": "back"
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "doctrine-card/1",
+  "name": "Long Game",
+  "author": "house",
+  "personality": "Waits for openings and finishes weakened foes.",
+  "weights": {
+    "aggression": 35,
+    "safety": 55,
+    "objective": 85,
+    "focus": 100,
+    "cohesion": 20,
+    "center": 5,
+    "mobility": 50,
+    "endurance": 90
+  }
+}

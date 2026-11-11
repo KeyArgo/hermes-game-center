@@ -1,0 +1,140 @@
+{
+  "title": "Breakthrough",
+  "howto": {
+    "goal": "Race one of your pawns to the far rank, or capture every enemy pawn.",
+    "setup": "An 8 by 8 board with two rows of pawns each. White moves first.",
+    "sections": [
+      {
+        "title": "Moving",
+        "text": "Pawns step one square straight forward, or one square diagonally forward; a diagonal step can capture an enemy pawn."
+      },
+      {
+        "title": "No going back",
+        "text": "Pawns never move backwards, so every step commits you."
+      },
+      {
+        "title": "Winning",
+        "text": "Reaching the far rank with any pawn wins at once. Taking every enemy pawn also wins."
+      }
+    ],
+    "controls": [
+      "Click a pawn, then the square to move to.",
+      "The ringed squares are the moves this lesson wants.",
+      "Diagonal squares can capture or step into an empty square; straight squares are quiet steps."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 8,
+      "rows": 8,
+      "frames": [
+        {
+          "cells": [
+            [
+              6,
+              3,
+              "X"
+            ],
+            [
+              5,
+              3,
+              "X"
+            ]
+          ],
+          "say": "A pawn steps forward."
+        },
+        {
+          "cells": [
+            [
+              6,
+              3,
+              "X"
+            ],
+            [
+              5,
+              4,
+              "O"
+            ],
+            [
+              4,
+              5,
+              "X"
+            ]
+          ],
+          "say": "A diagonal step captures."
+        },
+        {
+          "cells": [
+            [
+              0,
+              2,
+              "X"
+            ]
+          ],
+          "say": "Reaching the far rank wins."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "The computer plays both sides, pushing pawns toward each other.",
+    "moves": [
+      "d2-d3",
+      "d7-d6",
+      "e2-e3",
+      "e7-e6",
+      "f2-f3",
+      "f7-f6"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Two solid rows of pawns."
+      },
+      {
+        "at": 1,
+        "say": "White advances in the middle."
+      },
+      {
+        "at": 2,
+        "say": "Black answers directly opposite."
+      },
+      {
+        "at": 3,
+        "say": "White pushes beside it."
+      },
+      {
+        "at": 4,
+        "say": "Black holds the line."
+      },
+      {
+        "at": 5,
+        "say": "White keeps coming."
+      },
+      {
+        "at": 6,
+        "say": "Black mirrors. Soon one side must commit diagonally."
+      }
+    ],
+    "outro": "The first side to create a gap usually loses the race — keep your line unbroken."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click a pawn and step it straight forward.",
+        "focus": "board"
+      },
+      {
+        "say": "Keep your pawns side by side so nothing can slip between them.",
+        "focus": "board"
+      },
+      {
+        "say": "Capture diagonally when a pawn can get past the line.",
+        "focus": "board"
+      },
+      {
+        "say": "The first pawn to the far rank wins — watch the race.",
+        "focus": "board"
+      }
+    ]
+  }
+}

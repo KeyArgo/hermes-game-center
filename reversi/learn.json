@@ -1,0 +1,135 @@
+{
+  "title": "Reversi",
+  "howto": {
+    "goal": "Finish with more of your discs on the board than the other side.",
+    "setup": "An 8 by 8 board with four discs in the middle: two of each colour. White moves first.",
+    "sections": [
+      {
+        "title": "Flipping",
+        "text": "Place a disc so it traps a line of the other colour between two of yours. That whole line flips to your colour."
+      },
+      {
+        "title": "Legal moves only",
+        "text": "A move must flip at least one disc. If you have no legal move, your turn is skipped."
+      },
+      {
+        "title": "The end",
+        "text": "The game ends when neither side can move. The side with more discs wins."
+      }
+    ],
+    "controls": [
+      "Click an empty square to place a disc.",
+      "Squares that would flip something are the only legal ones.",
+      "Watch the corners: a corner disc can never be flipped."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 8,
+      "rows": 8,
+      "frames": [
+        {
+          "cells": [
+            [
+              3,
+              3,
+              "O"
+            ],
+            [
+              3,
+              4,
+              "X"
+            ],
+            [
+              3,
+              5,
+              "X"
+            ]
+          ],
+          "say": "Place here to trap a line."
+        },
+        {
+          "cells": [
+            [
+              3,
+              3,
+              "X"
+            ],
+            [
+              3,
+              4,
+              "X"
+            ],
+            [
+              3,
+              5,
+              "X"
+            ]
+          ],
+          "say": "The trapped disc flips to your colour."
+        },
+        {
+          "cells": [
+            [
+              0,
+              0,
+              "X"
+            ]
+          ],
+          "say": "A corner can never be taken back."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A short computer game showing how a flip works.",
+    "moves": [
+      "d3",
+      "c3",
+      "f5",
+      "d2"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Four discs in the middle. White moves first."
+      },
+      {
+        "at": 1,
+        "say": "White places beside the black discs and flips one."
+      },
+      {
+        "at": 2,
+        "say": "Black flips that line back to black."
+      },
+      {
+        "at": 3,
+        "say": "White takes a square on the other side."
+      },
+      {
+        "at": 4,
+        "say": "Black flips a line from below. Every move changes the count."
+      }
+    ],
+    "outro": "Early on, giving away discs can be good: it limits your opponent's legal moves."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click a square that traps a line of the other colour.",
+        "focus": "board"
+      },
+      {
+        "say": "Corners can never be flipped, so work toward them.",
+        "focus": "board"
+      },
+      {
+        "say": "Avoid giving the other side a corner.",
+        "focus": "board"
+      },
+      {
+        "say": "If you have no legal move the turn passes — that is normal.",
+        "focus": "board"
+      }
+    ]
+  }
+}

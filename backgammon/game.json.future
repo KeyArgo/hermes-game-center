@@ -1,0 +1,1 @@
+{"id":"backgammon","schema_version":1,"plugin":"hermes-gameshelf","title":"Backgammon","summary":"Race your checkers home, hit blots and bear off. Play a friend or the computer.","entry":"game.py","factory":"create","bots":true,"kind":"table"}

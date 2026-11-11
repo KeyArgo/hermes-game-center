@@ -1,0 +1,153 @@
+{
+  "title": "Connect Four",
+  "howto": {
+    "goal": "Get four of your pieces in a row — across, down, or diagonally — before the other side does.",
+    "setup": "A seven-column, six-row grid. Pieces fall to the lowest empty slot. White moves first.",
+    "sections": [
+      {
+        "title": "Dropping",
+        "text": "Click a column and your piece lands at the bottom of that column. You cannot drop into a full column."
+      },
+      {
+        "title": "Four in a row",
+        "text": "Four touching pieces in any straight line wins: across, down, or diagonally."
+      },
+      {
+        "title": "Blocking",
+        "text": "If the other side has three in a row with an open end, take that square first."
+      }
+    ],
+    "controls": [
+      "Click a column to drop your piece.",
+      "Hover a column to see where the piece would land.",
+      "Undo in a learning game takes back your last move and the computer's reply."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 7,
+      "rows": 6,
+      "frames": [
+        {
+          "cells": [
+            [
+              5,
+              3,
+              "X"
+            ]
+          ],
+          "say": "A piece lands at the bottom."
+        },
+        {
+          "cells": [
+            [
+              5,
+              3,
+              "X"
+            ],
+            [
+              4,
+              3,
+              "X"
+            ],
+            [
+              3,
+              3,
+              "X"
+            ]
+          ],
+          "say": "Three in a column."
+        },
+        {
+          "cells": [
+            [
+              5,
+              3,
+              "X"
+            ],
+            [
+              4,
+              3,
+              "X"
+            ],
+            [
+              3,
+              3,
+              "X"
+            ],
+            [
+              2,
+              3,
+              "X"
+            ]
+          ],
+          "say": "Four in a column wins."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "Watch a short computer game: both sides drop pieces, and black has to answer white's threat.",
+    "moves": [
+      "4",
+      "4",
+      "3",
+      "3",
+      "5",
+      "2"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Empty grid. The middle columns are strongest because they reach the most lines."
+      },
+      {
+        "at": 1,
+        "say": "White drops in the middle column."
+      },
+      {
+        "at": 2,
+        "say": "Black answers in the same column, stacking underneath."
+      },
+      {
+        "at": 3,
+        "say": "White starts a second line beside it."
+      },
+      {
+        "at": 4,
+        "say": "Black blocks that side."
+      },
+      {
+        "at": 5,
+        "say": "White spreads wider, building two threats at once."
+      },
+      {
+        "at": 6,
+        "say": "Black takes the open side. Two threats is how this game is won."
+      }
+    ],
+    "outro": "Look for a move that creates two threats at once. Your opponent can only block one."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Click the middle column to drop your first piece.",
+        "focus": "board",
+        "highlight": [
+          "4"
+        ]
+      },
+      {
+        "say": "Now build a line of three pieces in one direction.",
+        "focus": "board"
+      },
+      {
+        "say": "Watch for the computer's three in a row and block the open end.",
+        "focus": "board"
+      },
+      {
+        "say": "Aim for a move that makes two threats at once — it cannot block both.",
+        "focus": "board"
+      }
+    ]
+  }
+}

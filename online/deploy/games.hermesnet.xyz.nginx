@@ -1,0 +1,62 @@
+# Game Center Online — nginx site for games.hermesnet.xyz.
+# Install: /etc/nginx/sites-available/games.hermesnet.xyz, symlink into sites-enabled.
+# certbot --nginx -d games.hermesnet.xyz adds the TLS server block and the http->https redirect.
+# Does not touch the hermesnet.xyz / bbs.hermesnet.xyz site file.
+
+limit_req_zone  $binary_remote_addr zone=games_api:10m rate=10r/s;
+limit_conn_zone $binary_remote_addr zone=games_conn:10m;
+
+map $http_upgrade $games_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name games.hermesnet.xyz;
+
+    client_max_body_size 16k;
+    access_log /var/log/nginx/games.hermesnet.xyz.access.log;
+    error_log  /var/log/nginx/games.hermesnet.xyz.error.log;
+
+    location /ws/ {
+        limit_conn games_conn 30;
+        proxy_pass http://127.0.0.1:8790;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $games_connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # The lobby socket (contract A): one long-lived connection per person. Without HTTP/1.1 and
+    # the Upgrade headers nginx answers 400 and the Hall never connects (found in the 2026-11-10 deploy).
+    location = /api/lobby/socket {
+        limit_conn games_conn 30;
+        proxy_pass http://127.0.0.1:8790;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $games_connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location /api/ {
+        limit_req zone=games_api burst=40 nodelay;
+        proxy_pass http://127.0.0.1:8790;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location / {
+        limit_req zone=games_api burst=80 nodelay;
+        proxy_pass http://127.0.0.1:8790;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}

@@ -1,0 +1,132 @@
+{
+  "title": "Liar's Dice",
+  "howto": {
+    "goal": "Be the last player with dice. Bid on how many of one face are on the whole table, or call the last bid a lie.",
+    "setup": "Each player rolls five hidden dice and sees only their own. Everyone starts with five dice.",
+    "sections": [
+      {
+        "title": "Bidding",
+        "text": "A bid says a face and a count, for example three fours. Each new bid must raise the count or the face."
+      },
+      {
+        "title": "Calling a lie",
+        "text": "If you think the bid is too high, call it. Everyone shows their dice. Whoever is wrong loses one die."
+      },
+      {
+        "title": "Winning",
+        "text": "The last player holding dice wins the game."
+      }
+    ],
+    "controls": [
+      "Click a bid button to raise the count or the face.",
+      "Click Call the bid a lie to challenge the last bid.",
+      "Use the table chat to talk before you bid — talking is part of the game."
+    ],
+    "diagram": {
+      "kind": "pips",
+      "frames": [
+        {
+          "values": [
+            2,
+            4,
+            4,
+            6,
+            1
+          ],
+          "say": "Your five dice are hidden from everyone else."
+        },
+        {
+          "values": [
+            4,
+            4,
+            4
+          ],
+          "say": "You can see three fours here. Bid on fours."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "intro": "A round played out, with the bid and the challenge named.",
+    "frames": [
+      {
+        "say": "Four players each roll five dice and look only at their own.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            3,
+            3,
+            5,
+            6,
+            2
+          ]
+        }
+      },
+      {
+        "say": "The first player bids two threes.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            3,
+            3,
+            3
+          ]
+        }
+      },
+      {
+        "say": "The next player raises it to three threes.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      },
+      {
+        "say": "A third player is not convinced and calls the bid a lie.",
+        "diagram": {
+          "kind": "cards",
+          "cards": [
+            "?",
+            "?",
+            "?"
+          ]
+        }
+      },
+      {
+        "say": "Everyone shows their dice. There are only two threes, so the bidder loses a die.",
+        "diagram": {
+          "kind": "pips",
+          "values": [
+            3,
+            3
+          ]
+        }
+      }
+    ],
+    "outro": "Count what you can see, and bid one higher than you believe the table holds."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Look at your own dice and count the faces you hold most of.",
+        "focus": "dice"
+      },
+      {
+        "say": "Make a low, safe bid to start — two of a face you actually hold.",
+        "focus": "bid"
+      },
+      {
+        "say": "Raise the bid only when you hold more of that face yourself.",
+        "focus": "bid"
+      },
+      {
+        "say": "Call a lie when the count asked for is more than you think the table can hold.",
+        "focus": "call"
+      }
+    ]
+  }
+}

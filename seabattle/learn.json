@@ -1,0 +1,156 @@
+{
+  "title": "Sea Battle",
+  "howto": {
+    "goal": "Sink all five of the other fleet's ships before they sink yours.",
+    "setup": "Two 10 by 10 seas. Each side hides five ships, from a carrier of five squares down to a destroyer of two. White lays out first.",
+    "sections": [
+      {
+        "title": "Laying out",
+        "text": "Drag a ship from the tray onto your waters, or click it first to turn it. Ships lie across or down, and they cannot overlap."
+      },
+      {
+        "title": "Firing",
+        "text": "Click a square in the other fleet's water. A red ring is a hit and a pale dot is a miss."
+      },
+      {
+        "title": "Sinking",
+        "text": "A ship sinks when every one of its squares has been hit. Sink all five to win."
+      }
+    ],
+    "controls": [
+      "Drag a ship from the tray onto your waters; a click turns it. Press Random to lay out the whole fleet.",
+      "Click a square in the enemy water to fire.",
+      "Press Look after handing the screen to another person."
+    ],
+    "diagram": {
+      "kind": "grid",
+      "cols": 10,
+      "rows": 10,
+      "frames": [
+        {
+          "cells": [
+            [
+              4,
+              4,
+              "X"
+            ]
+          ],
+          "say": "A ship laid across the middle."
+        },
+        {
+          "cells": [
+            [
+              4,
+              4,
+              "X"
+            ],
+            [
+              4,
+              3,
+              "o"
+            ],
+            [
+              4,
+              2,
+              "o"
+            ]
+          ],
+          "say": "A hit fills the square; a miss is a pale dot."
+        },
+        {
+          "cells": [
+            [
+              4,
+              4,
+              "X"
+            ],
+            [
+              4,
+              5,
+              "X"
+            ],
+            [
+              4,
+              6,
+              "X"
+            ]
+          ],
+          "say": "Hit every square of a ship to sink it."
+        }
+      ]
+    }
+  },
+  "demo": {
+    "seats": "computer",
+    "intro": "Both fleets use the same published layout, mirrored. White hunts the black fleet, then black answers.",
+    "moves": [
+      "duplicate",
+      "duplicate",
+      "fire e5",
+      "fire e5",
+      "fire j1",
+      "fire a1",
+      "fire j3",
+      "fire a3"
+    ],
+    "lines": [
+      {
+        "at": 0,
+        "say": "Both seas are hidden. White lays out first, then black."
+      },
+      {
+        "at": 1,
+        "say": "White lays down the published five-ship fleet."
+      },
+      {
+        "at": 2,
+        "say": "Black mirrors the same fleet, left to right, so both start equal."
+      },
+      {
+        "at": 3,
+        "say": "White fires into the middle at e5. Nothing is there: a miss."
+      },
+      {
+        "at": 4,
+        "say": "Black fires at the same square in white's sea. Also a miss."
+      },
+      {
+        "at": 5,
+        "say": "White fires at j1 and hits the black carrier."
+      },
+      {
+        "at": 6,
+        "say": "Black answers at a1 and hits white's carrier."
+      },
+      {
+        "at": 7,
+        "say": "White hits the battleship at j3."
+      },
+      {
+        "at": 8,
+        "say": "Black hits back at a3. Both sides now know where to hunt."
+      }
+    ],
+    "outro": "Once you get a hit, fire along that row or column. Sink all five ships to win."
+  },
+  "coach": {
+    "steps": [
+      {
+        "say": "Drag a ship from the tray onto a square of your waters; a click turns it. Random lays out the whole fleet.",
+        "focus": "tray"
+      },
+      {
+        "say": "Click a square in the enemy water to fire. A red ring means you hit a ship.",
+        "focus": "board"
+      },
+      {
+        "say": "After a hit, fire at the squares next to it: ships lie in straight lines.",
+        "focus": "board"
+      },
+      {
+        "say": "Press Look when you pass the screen. It stays covered until the next person looks.",
+        "focus": "pass"
+      }
+    ]
+  }
+}
