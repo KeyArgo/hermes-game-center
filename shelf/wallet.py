@@ -12,11 +12,33 @@ loses either change.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import time
 from pathlib import Path
+
+try:  # POSIX
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no fcntl; an unguarded import stopped the
+    fcntl = None     # whole plugin backend loading there ("Plugin not found", 2026-11-11).
+    import msvcrt
+
+
+def _try_lock(lock) -> None:
+    """Take the wallet lock without waiting; OSError when another process holds it."""
+    if fcntl is not None:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    lock.seek(0)
+    msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+
+
+def _unlock(lock) -> None:
+    if fcntl is not None:
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        return
+    lock.seek(0)
+    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 START_CHIPS = 10_000
 # Chips only: no pulls, no earned counter. A spin costs the bet and pays chips.
@@ -108,7 +130,7 @@ class Wallet:
             deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
             while True:
                 try:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    _try_lock(lock)
                     break
                 except OSError:
                     if time.monotonic() >= deadline:
@@ -124,7 +146,7 @@ class Wallet:
                 tmp.write_text(json.dumps(data), encoding="utf-8")
                 os.replace(tmp, self.path)
             finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
+                _unlock(lock)
 
     def _load(self) -> dict:
         try:
