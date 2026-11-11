@@ -3,7 +3,7 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-11 (ffbe5625)_
 
 Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
 
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](scripts/test.sh) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![Hermes plugin](https://img.shields.io/badge/Hermes-plugin-5b8def)](plugin.yaml) [![version](https://img.shields.io/badge/version-1.0.0-blue)](plugin.yaml)
+[![release](https://img.shields.io/github/v/release/KeyArgo/hermes-game-center)](https://github.com/KeyArgo/hermes-game-center/releases/latest) [![tests](https://img.shields.io/badge/tests-passing-brightgreen)](scripts/test.sh) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![Hermes plugin](https://img.shields.io/badge/Hermes-plugin-5b8def)](plugin.yaml) [![version](https://img.shields.io/badge/version-1.0.0-blue)](plugin.yaml) [![stars](https://img.shields.io/github/stars/KeyArgo/hermes-game-center?style=social)](https://github.com/KeyArgo/hermes-game-center/stargazers)
 
 ## Install
 
