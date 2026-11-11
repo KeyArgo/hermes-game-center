@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## [1.0.0] — unreleased
 
+- **Game Center loads on Windows (owner's report, 2026-11-11).** A fresh Windows install answered every
+  Game Center call with 404 "Plugin not found": `shelf/wallet.py` imported `fcntl`, which Windows does not
+  have, so the backend never loaded. The wallet now takes the same one-byte `msvcrt` lock that
+  `shelf/filelock.py` already uses there; Linux and macOS keep the identical `flock` path.
+  `tests/test_windows_import.py` loads the dashboard API with `fcntl` blocked and moves chips through the
+  Windows lock path.
+- **Close Game Center sits top right (owner's ask, 2026-11-11)**, level with the Games / Champions tabs, and
+  floats top right on the other screens instead of the bottom-right corner. The lobby column's name and
+  chat boxes take the full width with their button under them.
 - **Game Center page lobby column is only the lobby (owner's report, 2026-11-11).** The Lobby / Game tab
   row is gone: the Game tab was cut off at the column's edge and the page has no table of its own. A
   match the lobby makes shows as one card with **Play here** on top of the lobby; the name and chat rows
