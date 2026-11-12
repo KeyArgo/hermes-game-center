@@ -202,8 +202,12 @@ def test_beginner_does_miss() -> None:
 
 @pytest.mark.parametrize("name", GAMES)
 @tolerates_one_load_loss
-def test_expert_beats_beginner_over_seeds(name: str) -> None:
+def test_expert_beats_beginner_over_seeds(name: str, monkeypatch) -> None:
     """The one test the feature must pass: the top level holds against the floor."""
+    if name == "checkers":
+        # Checkers' clock-bounded search lost one of two seeded games on a busy CI runner even
+        # after the retry. Its node budget is the real strength; measure that (about 2 minutes).
+        monkeypatch.setenv("GAMESHELF_BOT_DETERMINISTIC", "1")
     rules = load(name)
     if name in {"chessboard", "connect4"}:
         # These two search against a clock. A shorter clock keeps the suite quick
