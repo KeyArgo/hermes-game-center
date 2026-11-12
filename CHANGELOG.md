@@ -4,16 +4,7 @@ Versions follow `VERSIONING-STANDARD.md`: `plugin.yaml` names the release target
 carries the real identity (version · commit · date · dirty) from `version_stamp.py`, surfaced at the
 top of Game Center's Settings and at `GET /v1/version`.
 
-## Unreleased
-
-- **A flaky test is now deterministic.** The blackjack seating test dealt a random shoe; when a natural ended the hand early, the dealer's model was never asked to play, about one run in ten. It now deals a fixed hand.
-- **The checkers strength test measures search, not the clock.** On a busy CI runner the clock-bounded expert could lose a seeded game; that test now runs the bot's deterministic node budget.
-- **Corrected docs:** `SECURITY.md` lists all three hooks, and `LIMITS.md` counts eleven Play games.
-- **The version chip tells a release from a development build.** A catalog install of the pinned commit, or a checkout at the release tag, reads `X.Y.Z`; any other build reads `X.Y.Z-dev`. `tools/release_check.py` and the release workflow keep the version, the changelog, the tag and the GitHub release in step.
-- **Documentation:** a rebuilt README with a recorded demo and current Hermes Desktop screenshots, and a full docs set (usage, reference, architecture, configuration, troubleshooting, FAQ, development and testing).
-- **Project files:** contributing guide, code of conduct, security policy, issue and pull request templates, and CODEOWNERS.
-
-## 1.0.0 — 2026-11-11
+## 1.0.0 — in catalog review
 
 First public release.
 
@@ -24,6 +15,18 @@ First public release.
 - **Lessons and hints** on real positions, replayed through the game's own rules, so a lesson can never teach an illegal move.
 - **Online play is optional and off by default.** One shared lobby with chat and play requests when you turn it on. Everything else works offline.
 - **People play first.** A model calling the tool can never take a seat for someone. The other person joins with `/games <game> join`.
+
+### After the hackathon submission
+
+The hackathon entry pins commit `ccfe915` ([NousResearch/hermes-agent#154026](https://github.com/NousResearch/hermes-agent/pull/154026), tag `hackathon-submission`). 1.0.0 is the commit the catalog accepts; these changes came after the submission:
+
+- **Tournament seats ask the right model.** A lambda in the champion loop captured the loop variable late; it now binds each entrant.
+- **A flaky test is now deterministic.** The blackjack seating test dealt a random shoe; when a natural ended the hand early, the dealer's model was never asked to play, about one run in ten. It now deals a fixed hand.
+- **The checkers strength test measures search, not the clock.** On a busy CI runner the clock-bounded expert could lose a seeded game; that test now runs the bot's deterministic node budget.
+- **Corrected docs:** `SECURITY.md` lists all three hooks, and `LIMITS.md` counts eleven Play games.
+- **The version chip tells a release from a development build.** A catalog install of the pinned commit, or a checkout at the release tag, reads `X.Y.Z`; any other build reads `X.Y.Z-dev`. `tools/release_check.py` and the release workflow keep the version, the changelog, the tag and the GitHub release in step.
+- **Documentation:** a rebuilt README with a recorded demo and current Hermes Desktop screenshots, and a full docs set (usage, reference, architecture, configuration, troubleshooting, FAQ, development and testing).
+- **Project files:** contributing guide, code of conduct, security policy, issue and pull request templates, and CODEOWNERS.
 
 ## Development history (before 1.0.0)
 

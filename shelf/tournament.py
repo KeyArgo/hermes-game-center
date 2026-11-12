@@ -190,7 +190,7 @@ def play_match(rules, white, black, ask, *, seed=0, cap_calls=None, calls=None, 
                     own_calls[entrant_id] += 1
                     started = time.monotonic()
                     try:
-                        answer = kit._bounded(lambda p: ask(entrant, champion_system(entrant), p), prompt)
+                        answer = kit._bounded(lambda p, entrant=entrant: ask(entrant, champion_system(entrant), p), prompt)
                         if isinstance(answer, dict):
                             amount = answer.get('tokens', 0)
                             if isinstance(amount, (int, float)) and amount >= 0:
@@ -279,7 +279,7 @@ def play_doctrine_match(white, black, ask, *, seed=0, cap_calls=None, calls=None
         own_calls[entrant_id] += 1
         started = time.monotonic()
         try:
-            answer = kit._bounded(lambda p: ask(entrant, champion_system(entrant, card=True), p), prompt)
+            answer = kit._bounded(lambda p, entrant=entrant: ask(entrant, champion_system(entrant, card=True), p), prompt)
             text = answer.get('move', '') if isinstance(answer, dict) else str(answer or '')
             if isinstance(answer, dict):
                 amount = answer.get('tokens', 0)
