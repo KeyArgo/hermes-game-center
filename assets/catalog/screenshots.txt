@@ -1,0 +1,6 @@
+screenshots/game-center-home.png
+screenshots/chess-in-play.png
+screenshots/connect-four-lesson.png
+screenshots/referee-refusal.png
+screenshots/game-center-settings.png
+screenshots/community-creations.png

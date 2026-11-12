@@ -31,7 +31,7 @@ README.md.
   against another person, never from a tool call.
 - **Lessons are not adaptive.** Three or four fixed steps on real positions, never scored, never
   recorded.
-- **Only the ten table games are "Play".** Everything another plugin ships goes to **Your games**,
+- **Only the eleven games in `shelf/curated.json` are "Play".** Everything another plugin ships goes to **Your games**,
   is labelled outside code, and is never seated at a Game Center table, never enters a tournament,
   never gets a rating. Labs cards are excluded from the Play tiles. A Play game that fails the ship
   gate is demoted to Labs.

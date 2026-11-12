@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 600px; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(80% 65% at 0% 0%, rgba(62,224,197,.14), transparent 65%),
+      radial-gradient(70% 60% at 100% 100%, rgba(169,155,255,.12), transparent 65%),
+      #070b14;
+    color: #eef3fb;
+    font-family: ui-sans-serif, "Segoe UI", system-ui, -apple-system, sans-serif;
+    position: relative;
+  }
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(62,224,197,.055) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(90deg, rgba(62,224,197,.055) 0 1px, transparent 1px 34px);
+    mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.35) 62%, transparent 100%);
+  }
+  .left {
+    position: absolute; left: 72px; top: 78px; width: 470px; z-index: 2;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; color: #9aa8bd; font-size: 15px; font-weight: 700; letter-spacing: .18em; }
+  .brand img { width: 44px; height: 44px; }
+  h1 { font-size: 78px; line-height: 1.02; letter-spacing: -.035em; margin-top: 30px; font-weight: 800; }
+  .tag { margin-top: 22px; font-size: 25px; line-height: 1.35; color: #b9c6d9; max-width: 440px; }
+  .tag b { color: #3ee0c5; font-weight: 700; }
+  .meta { margin-top: 30px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { border: 1px solid #243044; background: rgba(16,24,38,.82); color: #d7e2f2; border-radius: 999px; padding: 8px 13px; font-size: 13px; font-weight: 600; }
+  .pill.accent { border-color: rgba(62,224,197,.45); color: #3ee0c5; }
+  .shot {
+    position: absolute; z-index: 2; right: 52px; top: 64px; width: 590px; height: 472px;
+    border: 1px solid #2b3a52; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0,0,0,.6), 0 0 0 6px rgba(255,255,255,.025);
+    background: #0b1220;
+  }
+  .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+  .glow { position: absolute; z-index: 1; right: 90px; top: 30px; width: 560px; height: 520px; background: radial-gradient(closest-side, rgba(62,224,197,.18), transparent 72%); filter: blur(6px); }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+  <div class="left">
+    <div class="brand"><img src="../brand/mark.svg" alt=""> HERMES AGENT · GAME CENTER</div>
+    <h1>Game Center</h1>
+    <div class="tag">Games Hermes can actually play — and a <b>referee</b> that refuses an illegal move out loud.</div>
+    <div class="meta">
+      <div class="pill accent">18 games</div>
+      <div class="pill">11 curated Play titles</div>
+      <div class="pill">Hermes Agent ≥ 0.23.0</div>
+      <div class="pill">MIT</div>
+    </div>
+  </div>
+  <div class="shot"><img src="../../screenshots/game-center-home.png" alt="The Game Center Play shelf"></div>
+</body>
+</html>

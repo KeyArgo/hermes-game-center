@@ -1,6 +1,6 @@
 // tools/referee_refusal_shot.mjs — the README's referee-refusal screenshot, from the real plugin.
 //
-//   node tools/referee_refusal_shot.mjs [--port 18764] [--out screenshots/07-referee-refusal.png]
+//   node tools/referee_refusal_shot.mjs [--port 18764] [--out screenshots/referee-refusal.png]
 //
 // It serves the REAL built plugin with tests/browser_table_server.py (only the SDK is stubbed),
 // stages a genuine refusal with tools/referee_refusal_stage.py, opens Chess, and screenshots the
@@ -19,7 +19,7 @@ const arg = (name, fallback) => {
 
 const ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname))
 const PORT = Number(arg('port', '18864'))
-const OUT = arg('out', path.join(ROOT, 'screenshots', '07-referee-refusal.png'))
+const OUT = arg('out', path.join(ROOT, 'screenshots', 'referee-refusal.png'))
 const MAX_BYTES = 300 * 1024
 const MAX_WIDTH = 1200
 const URL_BASE = `http://127.0.0.1:${PORT}/`

@@ -1,39 +1,47 @@
-# Game Center (hermes-gameshelf)
-_Applies to Game Center 1.0.0 · last revised 2026-11-11 (ffbe5625)_
+<p align="center"><img src="assets/brand/mark.svg" width="88" height="88" alt="Game Center"></p>
+<h1 align="center">Game Center</h1>
+<p align="center"><em>Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
+
+_Applies to Game Center 1.0.0 · last revised 2026-11-11 (b2a67f2c)_
+
+<p align="center">
+  <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="docs/TESTING.md"><img src="https://img.shields.io/badge/tests-1642%20passing-2ea44f?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/KeyArgo/hermes-game-center/releases/latest"><img src="https://img.shields.io/github/v/release/KeyArgo/hermes-game-center?style=flat-square&color=2f6bff" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f6bff?style=flat-square" alt="Licence: MIT"></a>
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Agent-%E2%89%A5%200.23.0-7c3aed?style=flat-square" alt="Hermes Agent 0.23.0 or later"></a>
+  <a href="plugin.yaml"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-555?style=flat-square" alt="Platform: Linux, macOS and Windows"></a>
+  <a href=".github/workflows/tests.yml"><img src="https://img.shields.io/badge/python-3.13-3776ab?style=flat-square" alt="Tested on Python 3.13"></a>
+  <a href="https://github.com/KeyArgo/hermes-game-center/stargazers"><img src="https://img.shields.io/github/stars/KeyArgo/hermes-game-center?style=flat-square&color=f5b301" alt="GitHub stars"></a>
+</p>
+
+![The Play shelf at this commit: eleven curated games, the lobby beside them](screenshots/game-center-home.png)
+
+<p align="center"><a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#how-it-works">How it works</a> · <a href="#documentation">Documentation</a> · <a href="#testing">Testing</a> · <a href="#contributing">Contributing</a></p>
+
+## What it is
 
 Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
 
-[![release](https://img.shields.io/github/v/release/KeyArgo/hermes-game-center)](https://github.com/KeyArgo/hermes-game-center/releases/latest) [![tests](https://img.shields.io/badge/tests-passing-brightgreen)](scripts/test.sh) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![Hermes plugin](https://img.shields.io/badge/Hermes-plugin-5b8def)](plugin.yaml) [![version](https://img.shields.io/badge/version-1.0.0-blue)](plugin.yaml) [![stars](https://img.shields.io/github/stars/KeyArgo/hermes-game-center?style=social)](https://github.com/KeyArgo/hermes-game-center/stargazers)
+Eleven of them are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on.
 
-## Install
+### Why it's different
 
-```bash
-hermes plugins install KeyArgo/hermes-game-center --yes-deps --enable
-```
+- **The rules are real, and the referee says no.** The model proposes, the referee decides. An illegal move is refused in plain words — the move, then the reason — the built-in player moves instead, and the refusal is kept in the game record and shown on the board.
+- **A person plays first.** A move never silently takes a seat: the other person types `/games <game> join` or `sit black` before they can move. A model calling the tool cannot give that yes.
+- **Online is optional and off by default.** The games, lessons, hints and the computer opponent keep working with the server down.
 
-That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on.
+## Features
 
-| If you see | Do this |
-|---|---|
-| No **Games** entry in the Desktop sidebar | Command palette (Ctrl+K), then **Reload desktop plugins** |
-| An AI seat, hint or `Improve` does nothing | Those run through your Hermes model — set one with `hermes model`, or Settings → Models → **Game Shelf opponent** |
-
-The plugin's manifest name is `hermes-gameshelf`; the repository is `hermes-game-center`. `enable`, `disable` and `remove` take the manifest name.
-
-![Chess: a model seat proposed two illegal moves, and the referee refused each one](screenshots/07-referee-refusal.png)
-
-On the board above: a model seat proposed `a8a1` and `e8e8` for black. The referee named each move and its reason in one sentence, refused both, and the built-in player moved `b8 → c6` instead. The sentence is badged on the move and recorded in the game's own state.
-
-## What you get
-
-- **Real rules engines, and a referee that says no.** The model proposes, the referee decides. An illegal move is refused in plain words — the move, then the reason — the built-in player moves instead, and the refusal is kept in the game record and shown on the board.
+- **Real rules engines, and a referee that says no.** Eighteen game folders, each with its own rules; the referee settles every move.
 - **Play people, inside Hermes.** Online play joins one shared lobby — the Hall — with a chat, a list of who is here, and play requests. It is off until you turn it on.
 - **Your Hermes model as an opponent.** Give a seat to your own model: it gets the board and the legal moves and must answer with one legal move. Any provider works, including a free one.
 - **Slots over the chat.** One Slots game on the Jackpot cabinet, which can float over the conversation.
 - **Lessons and a hint**, on real positions, each replayed through the game's own rules — so a lesson can never teach an illegal move.
-- **Online is optional and off by default.** The games, lessons, hints and the computer opponent run on this computer and keep working with the server down.
+- **Points for playing and for using Hermes**, shown beside the chips the cabinet spends.
+- **A workshop and a community shelf.** Other plugins add a game by shipping `game.json`; community games open in your own browser and are never loaded here.
 
-## The games
+### The games
 
 The **Play** shelf is the curated list in [shelf/curated.json](shelf/curated.json) — eleven games, and only a reviewed commit changes it. A plugin cannot add its own game to Play from its manifest.
 
@@ -53,7 +61,7 @@ The **Play** shelf is the curated list in [shelf/curated.json](shelf/curated.jso
 
 The page opens on **Play** with the lobby beside it, and four links above it: **How to play**, the **Experimental** shelf, **Settings** and **Community creations** (the **Champions** tab beside *Games* is a placeholder — see below). **Settings** carries your name, the per-game match alerts, table sounds and the Jackpot over-chat switch, and shows the **version chip** for this install at the top — `v1.0.0 · 2026-11-11 · <commit>`, click to copy. The same chip is drawn at the top of the Games screen, so the build on screen can be named at a glance.
 
-## Playing
+### Playing
 
 `/games` opens the shelf; `/games <game> new` starts a table, `/games <game> state` shows it, and `/games <game> lesson` then `lesson next` walks a lesson. Moves, by game:
 
@@ -72,7 +80,7 @@ In Hermes Desktop, **Games** in the sidebar opens the graphical table and you mo
 
 A move never silently takes a seat: the other person types `/games <game> join` or `sit black` before they can move. `resign` ends your own seat; `leave` opens it before play; `abandon` ends a table without awarding a win; `draw` and `draw accept` offer and take a draw; `rematch` needs both identified people to agree.
 
-## Points
+### Points and chips
 
 Winning a game pays **100 bonus points** into your Game Center account — one award per win, never for a draw, whatever the board or the opponent. A win by resignation counts, because the referee settles it as a win.
 
@@ -88,21 +96,21 @@ The wallet keeps points under the key `bonus` and the screen calls them **Points
 - **100 points for every game you win** (once per win, never a draw).
 - **10 points for every 1,000,000 tokens your chats use**, counting tokens in and out, so the account grows with how much Hermes you actually use. Whole points are paid as they are earned (one point per 100,000 tokens) and the remainder carries into the next reply. The reward strip shows both — `Points: 41 · 3.4M tokens used (10 points per 1M)`.
 
-Points convert to chips at **75%** — four points buy three chips. The Jackpot panel has a slider, a number and **Max**, so you choose how many points to cash in; points are also your ranking, so cashing in lowers it. The other direction (chips back to points) is not built yet.
+Points convert to chips at **75%** — four points buy three chips. The Jackpot panel has a slider, a number and **Max**, so you choose how many points you cash in; points are also your ranking, so cashing in lowers it. The other direction (chips back to points) is not built yet.
 
-## Slots over the chat
+### Slots over the chat
 
 **Slots** is one Play game, played on the **Jackpot** cabinet. Every spin costs the bet in chips, from the same wallet Blackjack bets from; pick a bet (25 chips up) and press Spin.
 
-Two machines sit above the reels, and you can switch between them mid-session: **Classic** (nine windows, five paylines) and **Hermes Olympus** (one line, three Greek reels). **The odds favour the player**: each machine draws its chance of winning once per session, uniformly between 50% and 52%, and every win pays at least the bet,, and pays back **110%** of what it takes — a person who keeps spinning is slowly up, not slowly down. One session in fifty is a **bonus** at 60% and one in fifty is **cold** at 40%; the picker names that in a single word, never as a number. **The screen prints none of these numbers**: the mechanics run and the odds are drawn and paid, but no percentage appears on either machine.
+Two machines sit above the reels, and you can switch between them mid-session: **Classic** (nine windows, five paylines) and **Hermes Olympus** (one line, three Greek reels). **The odds favour the player**: each machine draws its chance of winning once per session, uniformly between 50% and 52%, and every win pays at least the bet, and pays back **110%** of what it takes — a person who keeps spinning is slowly up, not slowly down. One session in fifty is a **bonus** at 60% and one in fifty is **cold** at 40%; the picker names that in a single word, never as a number. **The screen prints none of these numbers**: the mechanics run and the odds are drawn and paid, but no percentage appears on either machine.
 
 **Auto-spin** spins by itself while Hermes is working — one spin per reply and one per tool call, only while a machine is on screen, never on an idle timer. Your points rack up from the tokens you spend. **Auto-bet** sizes each stake by what the reply cost, from the table minimum up a ladder; turn it off in the cabinet's card to bet the lever amount.
 
-A win climbs a ladder of recorded sound tiers — a small CHING, then NICE! and BIG WIN!, then HUGE WIN! with the alarm, and a full JACKPOT of coins — with coins spilling, a chip counter climbing and, for a big one, a gold flash. The overlay and the flash are fixed, click-through and take no focus, so a big win never stops you typing. The sounds are recorded clips (Mixkit's free slot set) with a synthesised fallback; provenance is in `THIRD-PARTY-NOTICES.md`.
+A win climbs a ladder of recorded sound tiers — a small CHING, then NICE! and BIG WIN!, then HUGE WIN! with the alarm, and a full JACKPOT of coins — with coins spilling, a chip counter climbing and, for a big one, a gold flash. The overlay and the flash are fixed, click-through and take no focus, so a big win never stops you typing. The sounds are recorded clips (Mixkit's free slot set) with a synthesised fallback; provenance is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 **Show over chat** floats a see-through copy of the cabinet over the conversation: 70% opaque at full size by default, with its own size control (50–200%) and opacity control (25–100%). The switch and its controls are one shared setting — the same one in the cabinet's own panel, in the status bar and in Settings — so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
 
-## Learn, hint, and your own model
+### Learn, hint, and your own model
 
 **Learn to play** (`/games <game> lesson`, then `lesson next`) walks through three or four steps on real positions, each replayed through the game's own rules. Lessons are never scored or recorded.
 
@@ -112,7 +120,7 @@ A win climbs a ladder of recorded sound tiers — a small CHING, then NICE! and 
 
 **Play my agent** (`/games allow-ai <game> black=agent`) seats your own Hermes model. On its turn it gets the board, the rules and the legal moves — never player names — and must answer with one legal move. It gets two tries, then the built-in player moves for it, and any refusal is recorded and badged. One model call per move. Choose the model under Settings → Models → **Game Shelf opponent**; any provider works, including a free one. Left unset, it follows your main model. Works in every table game.
 
-## Talking tables
+### Talking tables
 
 Four games where the players talk as well as move, using the rules of [TextArena](https://github.com/TextArena/TextArena) (MIT, vendored in `third_party/textarena/`, not installed). Its card sits on the Experimental shelf, locked for now like every other card there; start the table in chat with `/games mafia new`. The seats then sit round a table, every move is a click, and the message box only opens while that game is in a talking phase.
 
@@ -127,23 +135,127 @@ Each seat can be you, the built-in player, or your Hermes model. A seat's prompt
 
 **Watch it think.** A model seat answers four short Read questions (what I know, what they did, what they want me to believe, my safest line), writes at most 80 tokens of private working, then names its action. The person whose bot it is reads all of that in the side panel while the game runs; an opponent's screen never carries it, and it is never written into a shared game file.
 
-## Doctrine and Olympus Arena
+### Doctrine and Olympus Arena
 
 Doctrine is a bot written as a small JSON **card**: a name and eight weighted priorities (aggression, safety, objective, focus, cohesion, center, mobility, endurance), each whole from 0 to 100. Four house cards ship with different personalities. A card is data, never code, and every card is checked against fixed size and range limits before it is used.
 
 A battle is **deterministic, seeded and turn-based**, with a clear win rule, and **no model is called during a battle**, so the same seed and cards always give the identical replay. `Improve` sends your card to the model in Settings → Models → **Game Shelf opponent**, validates the reply, and plays it against your old card over five seeds in both seats; the new card is kept only if it wins more. Olympus Arena is a separate real-time tank battle decided by a strategy card. Both live on the Experimental shelf.
 
-## Champions and tournaments
+### Champions and tournaments
 
 The shelf ships the machinery for bot **champions** (a named playbook, Elo ratings and badges) and headless **tournaments** (`shelf/champions.py`, `shelf/tournament.py`). **In this version the Champions tab is a placeholder**: press it and it says the matches it needs do not run in this version, so a champion cannot be created and a tournament cannot be run from the page. Play and Experimental are unaffected.
 
-## Experimental, and community creations
+### Experimental and community creations
 
 Everything that is not curated Play — the installed talking tables and experiments, the workshop prototypes (Liar's Dice 2v2, Pet Battles, Mafia Town) and any game another plugin ships — sits behind one small **Experimental** link, and its cards are kept locked for now: visible to look at, with no way in. A game that is not in `shelf/curated.json` never reaches Play, a tournament or a rating.
 
 **Community creations** is a side link with a few cards for games other people made and host on their own sites. Game Center does not load them — no iframes, no previews, no fetching: nothing happens until you press **Open**, which hands the address to your own browser through the Desktop's `openExternal`. The list lives in [community/games.json](community/games.json), is https-only, and a bad entry is skipped with a plain note. That view also carries **Submit your game** ([docs/SUBMIT-A-GAME.md](docs/SUBMIT-A-GAME.md) explains the three levels in plain words).
 
-## Online play and the bot ladder (opt-in)
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="screenshots/chess-in-play.png" alt="Chess in play against the built-in player"><br><em>Chess in play: the referee reads every move, and the coach names the opening.</em></td>
+<td width="50%"><img src="screenshots/connect-four-lesson.png" alt="Connect Four lesson, step 1 of 4"><br><em>A lesson on a real position, replayed through the game's own rules.</em></td>
+</tr>
+<tr>
+<td width="50%"><img src="screenshots/game-center-settings.png" alt="Game Center settings"><br><em>Settings: your name, per-game match alerts, AI seats and the version chip.</em></td>
+<td width="50%"><img src="screenshots/community-creations.png" alt="Community creations shelf"><br><em>Community creations: link-out cards that open in your own browser.</em></td>
+</tr>
+</table>
+
+## Install
+
+```bash
+hermes plugins install KeyArgo/hermes-game-center --yes-deps --enable
+```
+
+That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on.
+
+**Requirements:** Hermes Agent 0.23.0 or later. The plugin is pure Python and JavaScript; the tests run on Python 3.13. Online play, if you turn it on, needs the network; everything else does not.
+
+| If you see | Do this |
+|---|---|
+| No **Games** entry in the Desktop sidebar | Command palette (Ctrl+K), then **Reload desktop plugins** |
+| An AI seat, hint or `Improve` does nothing | Those run through your Hermes model — set one with `hermes model`, or Settings → Models → **Game Shelf opponent** |
+
+The plugin's manifest name is `hermes-gameshelf`; the repository is `hermes-game-center`. `enable`, `disable` and `remove` take the manifest name.
+
+### Upgrade, uninstall, and your data
+
+- **Upgrade:** install again with the same command, then reload desktop plugins. Your data folder, wallet and name stay where they are.
+- **Uninstall:** `hermes plugins remove hermes-gameshelf`. That removes the code, not your data.
+- **Where data lives:** one folder per game, plus `players.json`, `wallet.json`, `champions/`, `ratings.json`, `tournaments/`, `installed.json` and `online.json`, all under Hermes's plugin data directory for `hermes-gameshelf` (`plugins/plugin_storage.py` decides the exact path). Delete that folder to remove everything Game Center remembers, including points and chips.
+
+## Quick start
+
+1. Open **Games** in the Hermes Desktop sidebar. The Play shelf opens with the lobby beside it.
+2. Press **Connect Four**, then a level (Beginner, Intermediate, Advanced or Expert). You are seated; click a column to drop a piece.
+3. Or stay in chat: `/games connect4 new white=human black=local level=beginner`, then `/games connect4 move 4`.
+4. Try **Learn to play** on any Play card for a three- or four-step lesson on a real board.
+5. Open **Settings** to set your name, the per-game match alerts and the AI-seat switch.
+
+## How it works
+
+```mermaid
+flowchart LR
+  P["Person in Hermes Desktop or chat"] --> D["desktop/plugin.js (built from desktop/src/)"]
+  P --> C1["/games command and games_play tool"]
+  D --> A["dashboard/plugin_api.py /api routes"]
+  C1 --> S["shelf/commands.py"]
+  A --> CAT["shelf/catalog.py: discovers game.json folders"]
+  S --> CAT
+  CAT --> G["game folders: game.json + game.py"]
+  G --> K["kit.py Table: seats, turns, referee, lessons"]
+  K --> ST["state.json per game in the plugin data folder"]
+  A --> W["shelf/wallet.py: wallet.json (chips, points, tokens)"]
+  A --> O["shelf/online_source.py"]
+  O --> SRV["online/server.py: the optional lobby"]
+```
+
+The Desktop page never judges a move. It sends the move to `dashboard/plugin_api.py`, which routes it through `shelf/catalog.py` to the game's own `game.py`; the table checks it through `kit.py` and writes the result to that game's `state.json`. The same path serves the `/games` command and the `games_play` tool, so a move typed in chat and a click on the board go through one referee.
+
+`shelf/catalog.py` discovers the game folders that ship here and any installed plugin that ships a `game.json`. `shelf/curated.json` is the reviewed Play list; everything else is Experimental. `shelf/wallet.py` keeps chips and points, `shelf/online_source.py` speaks to the optional lobby in `online/`, and `desktop/plugin.js` is generated from the numbered parts in `desktop/src/` by `tools/build_plugin.py`.
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [docs/README.md](docs/README.md) | Index of every document. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, data flow and where data lives. |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting, environment variable and config key the code reads. |
+| [docs/USAGE.md](docs/USAGE.md) | A walkthrough of each user-facing feature. |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Tools, commands, hooks, HTTP routes and config keys. |
+| [docs/FAQ.md](docs/FAQ.md) | Short answers to the questions the code raises. |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Real failure modes and what to do. |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Repo layout, build, tests and CI. |
+| [docs/ADD-YOUR-GAME.md](docs/ADD-YOUR-GAME.md) | Put another plugin's game on the shelf. |
+| [docs/SUBMIT-A-GAME.md](docs/SUBMIT-A-GAME.md) | The three places a game can live. |
+| [docs/ONLINE-PLAY.md](docs/ONLINE-PLAY.md) | Exactly what online play sends, and when. |
+| [docs/BOT-API.md](docs/BOT-API.md) | The WebSocket protocol a bot speaks. |
+| [docs/HOSTING.md](docs/HOSTING.md) | Run the lobby on your own server. |
+| [docs/LABS.md](docs/LABS.md) | What lives on the Experimental shelf. |
+| [docs/STOCK-LEAGUE.md](docs/STOCK-LEAGUE.md) | The design-only stock league. |
+| [docs/SECURITY-REVIEW-2026-11-09.md](docs/SECURITY-REVIEW-2026-11-09.md) | The six-area security review and what it proved. |
+| [TESTING.md](docs/TESTING.md) | How to run every suite, with counts. |
+| [LIMITS.md](LIMITS.md) | What the plugin does not do. |
+| [VERIFY.md](VERIFY.md) | Claims and the commands that check them. |
+| [SECURITY.md](SECURITY.md) | Credentials, traffic, storage and how to stop each. |
+| [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) | Vendored code and artwork, with licences. |
+| [PROVENANCE.md](PROVENANCE.md) | How the repository came to be, and what is unverified. |
+| [CHANGELOG.md](CHANGELOG.md) | Release history. |
+| [BACKLOG.md](BACKLOG.md) | Known work and what is deliberately not built. |
+| [SHIP-GATE.md](SHIP-GATE.md) | The release gate and its per-surface checks. |
+
+## Privacy & security
+
+- **Writes** only its own data folder (one folder per game, plus `players.json`, `champions/`, `ratings.json`, `tournaments/` and `online.json` for the online preferences). Nothing outside it, and no Hermes config. The one exception is the online recovery key, which goes through Hermes's credential route and nowhere else.
+- **Reads** the game folders that ship with the plugin, and the `game.json` of any installed, enabled plugin in the Hermes home's `plugins` folder (or beside this plugin). Nothing else is claimed.
+- **Model calls go only through Hermes** (never to a provider directly) and only when a person chose them: an AI seat you agreed to (`allow-ai`), a hint you asked for (your model adds one short reason), a Doctrine card you asked the model to improve or a named profile you asked to author one, or a bot-ladder game you started. No model call happens on its own. Prompts carry game data only — boards, moves, bot weights — plus the one name you typed yourself.
+- **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. The one exception is online play, which is off until you turn it on. With online play on it talks to that one address (or the `lobby_url` you set) and nothing else; **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser.
+- **No telemetry, no self-update, no remote code loading, no binaries.** Updates arrive only when you install a newer version, and the code is MIT.
+
+### Online play and the bot ladder (opt-in)
 
 Games with other people are a separate service, `https://games.hermesnet.xyz`, run by the author. It is **off until you turn it on**, and the dock's **Lobby** tab shows the whole disclosure before you do:
 
@@ -155,26 +267,34 @@ What that means in practice:
 - **Your identity is a display name plus a recovery key.** Creating a player shows the key once with **Copy recovery key**; it is kept through Hermes's own credential route (the same place as a provider API key, `HERMES_GAMESHELF_LOBBY_KEY`) and can be pasted by hand in Plugins → Game Center → *Online recovery key*. Game Center never writes it to a file of its own and never logs it.
 - **The Hall is the shared lobby.** It keeps one connection open while online play is on, and shows a roster of who is here, a chat (`#games`) and **play requests**: set which games you are open to, ask someone for a game, they accept, and both of you are seated at a private table — no code to paste.
 - **The lobby lists everyone who is signed in while they are online**, so nobody has to queue, say hello or open a page to be seen. The switches at the top are **Appear offline** (saved on your account: you are in no roster and no request reaches you), **Take game requests**, and one switch per game. **Find match** is a row of game chips — one game, several, or **All games**, and nothing is picked for you — and the server offers the match to both people at once, as a dialog *"X wants to play Connect 4 — Join / Not now"*; Join seats both at a private table inside Hermes. Lobby posts carry their date and time and are kept one day.
-- **The bot ladder** (off the pane for now, 2026-11-11: `PANE_LADDER_OFF` hides the ladder and the Bots
-  and leagues area on the dock, with the blocks kept in the bundle — rated bot-versus-bot is not proven end
-  to end and belongs with Champions): press **Enter ladder**, read the estimate (how many model calls one
-  rated game is likely to take on *this* computer, and that only the move your model picks is sent), then
-  **Start ladder game**. Your agent plays under its own bot name and key, through the protocol in
-  [docs/BOT-API.md](docs/BOT-API.md), with its model running here.
+- **The bot ladder** (off the pane for now, 2026-11-11: `PANE_LADDER_OFF` hides the ladder and the Bots and leagues area on the dock, with the blocks kept in the bundle — rated bot-versus-bot is not proven end to end and belongs with Champions): press **Enter ladder**, read the estimate (how many model calls one rated game is likely to take on *this* computer, and that only the move your model picks is sent), then **Start ladder game**. Your agent plays under its own bot name and key, through the protocol in [docs/BOT-API.md](docs/BOT-API.md), with its model running here.
 - **Match alerts do not pop up in this build** (`ALERTS_OFF`): the status bar still shows a quiet count of who is waiting, but nothing is notified and no alert line is drawn. The per-game switches in Settings are still there. When the server is down the dock says so in one plain sentence and everything local keeps working.
 - **Polling** happens only while the Game Center page (or the dock) is active, with 15, 30, 60 then 120 second backoff after a miss. Nothing is polled when online play is off.
 
-The longer version, including exactly what is and is not sent, is in [docs/ONLINE-PLAY.md](docs/ONLINE-PLAY.md).
+The longer version, including exactly what is and is not sent, is in [docs/ONLINE-PLAY.md](docs/ONLINE-PLAY.md). The security stance is in [SECURITY.md](SECURITY.md).
 
-## What this plugin does on your machine
+## Testing
 
-- **Writes** only its own data folder (one folder per game, plus `players.json`, `champions/`, `ratings.json`, `tournaments/` and `online.json` for the online preferences). Nothing outside it, and no Hermes config. The one exception is the online recovery key, which goes through Hermes's credential route and nowhere else.
-- **Reads** the game folders that ship with the plugin, and the `game.json` of any installed, enabled plugin in the Hermes home's `plugins` folder (or beside this plugin). Nothing else is claimed.
-- **Model calls go only through Hermes** (never to a provider directly) and only when a person chose them: an AI seat you agreed to (`allow-ai`), a hint you asked for (your model adds one short reason), a Doctrine card you asked the model to improve or a named profile you asked to author one, or a bot-ladder game you started. No model call happens on its own. Prompts carry game data only — boards, moves, bot weights — plus the one name you typed yourself.
-- **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. The one exception is online play, which is off until you turn it on. With online play on it talks to that one address (or the `lobby_url` you set) and nothing else; **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser.
-- **No telemetry, no self-update, no remote code loading, no binaries.** Updates arrive only when you install a newer version, and the code is MIT.
+```bash
+python3 -m pytest tests -q -p no:cacheprovider   # the full suite, no network, no model
+python3 tools/build_plugin.py                     # the bundle CI grades
+node tests/table_ui_harness.cjs                   # the Desktop page's state machine
+node tests/jackpot_overlay_harness.cjs            # the over-chat slot cabinet
+node tests/slot_fit_regression.mjs                # the cabinet fits the page, in real headless Chrome
+scripts/test.sh                                   # the build, both harnesses, the fit check and pytest
+```
 
-## Adding your own game
+CI runs the pytest suite and the two node harnesses on every push; the fit regression needs Chrome. The suite is offline: no model, no network, no GPU. [TESTING.md](docs/TESTING.md) breaks down every suite and its count; [VERIFY.md](VERIFY.md) lists the claims each run proves.
+
+## Limits
+
+The short list: no private rooms, no kick and no room bans; people are never rated; online play is off by default and is someone else's server; Hint is narrow by design; lessons are not adaptive. The full, blunt list is in [LIMITS.md](LIMITS.md).
+
+## Contributing
+
+Bug reports, small focused fixes and new ideas are welcome. Start with [CONTRIBUTING.md](.github/CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md); the issue templates are in [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE). Report security problems privately through GitHub's **Report a vulnerability** form, never in a public issue.
+
+### Adding your own game
 
 The short version is below; the full guide, including the `external` kind for a game with its own Desktop screen, is [docs/ADD-YOUR-GAME.md](docs/ADD-YOUR-GAME.md). A complete example plugin lives in [examples/hello-game](examples/hello-game).
 
@@ -207,20 +327,17 @@ class Game:
 
 Do not register your own slash command: `/games` is the shelf and it routes to you. A two-seat game that only writes its rules can lean on `kit.Table`, which handles seats, turns, consent, saving, lessons and the built-in player.
 
-## Tests
+## License
 
-```
-scripts/test.sh                     # everything below, in one pass
-python3 -m pytest -q tests          # the full suite, no network, no model
-node tests/table_ui_harness.cjs     # the Desktop page's state machine
-node tests/jackpot_overlay_harness.cjs
-node tests/slot_fit_regression.mjs  # the slot cabinet fits the Games page, in real headless Chrome
-```
+MIT. See [LICENSE](LICENSE).
 
-`scripts/test.sh` runs all four. The fit regression needs a Chrome binary (`CHROME_BIN`, else `google-chrome`/`/opt/google/chrome/chrome`) and the same network the QA server needs for its pinned React modules; CI runs the pytest suite and the two node harnesses, not the browser check.
+## Acknowledgements
 
-Catalog screenshots live in [screenshots/](screenshots/): the store, a game in play, a lesson, Review my game, the agent seat, a Play card, and the referee's refusal. `tools/referee_refusal_shot.mjs` regenerates the last one from the real plugin.
+- **[TextArena](https://github.com/TextArena/TextArena)** — MIT; the rules for Mafia, Liar's Dice, Prisoner's Dilemma and Blind Auction, vendored in `third_party/textarena/`.
+- **chessnut piece drawings** — Apache-2.0, by Alexis Luengas; inlined into `desktop/plugin.js`.
+- **Chess openings** — the lichess opening book data vendored under `vendor/chess-openings/`.
+- **Mixkit free slot sounds** — recorded clips with a synthesised fallback.
 
-## Licence
+Every licence and every deviation is recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-MIT. See `LICENSE`.
+<p align="center">Built by <a href="https://github.com/KeyArgo">KeyArgo</a> · InovinLabs</p>

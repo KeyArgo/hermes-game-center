@@ -1,5 +1,5 @@
 # SECURITY
-_Applies to Game Center 1.0.0 · last revised 2026-11-11 (53bbdb41)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-11 (b2a67f2c)_
 
 What this plugin does to your machine and your network, and how to stop it. Sourced from
 README.md ("What this plugin does on your machine"), `plugin.yaml`, and the Desktop table code.
@@ -10,6 +10,12 @@ the wallet's lock and payout paths, the agent-seat consent gate, and the vendore
 by a probe or by a test that failed before its fix. What was run, what it showed, and which claims from
 an outside review were rejected are listed in the review notes. Claims in this file that were
 read rather than executed say so; PROVENANCE.md records the earlier, read-only audit.
+
+## Supported versions
+
+Security fixes are made on the current **1.0.x** line. Older snapshots are not maintained. Report a
+problem privately through GitHub's **Security → Report a vulnerability** form on this repository;
+do not open a public issue with a working exploit in it.
 
 ## Credentials
 
@@ -98,9 +104,10 @@ where the code and that contract disagree.
 
 ## Hooks and the automatic bet
 
-Two hooks are registered, and both are disclosed here because both can move the local wallet:
+Three hooks are registered, and all three are disclosed here because any of them can move the local wallet:
 
 - `pre_llm_call` - one automatic spin per turn, only while the machine is on screen.
+- `pre_tool_call` - one automatic spin at most once per 1.2 seconds across a burst of tool calls.
 - `post_api_request` - counts the reply's tokens (10 points per 1M in or out, into the see-through
   wallet's points) and then takes one automatic spin sized by what the reply cost.
 
