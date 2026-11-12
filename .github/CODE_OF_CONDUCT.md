@@ -10,4 +10,4 @@ To report a problem, open a private report via GitHub's **Report a vulnerability
 
 Maintainers may remove, edit or reject comments, commits, code, issues and other contributions that do not follow this code, and will explain a moderation decision when it is safe to do so.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to send a change and [SECURITY.md](SECURITY.md) for the security-reporting route.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to send a change and [SECURITY.md](../SECURITY.md) for the security-reporting route.
