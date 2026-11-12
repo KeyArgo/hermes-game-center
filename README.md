@@ -7,7 +7,7 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="docs/TESTING.md"><img src="https://img.shields.io/badge/tests-1642%20passing-2ea44f?style=flat-square" alt="Tests"></a>
-  <a href="https://github.com/KeyArgo/hermes-game-center/releases/latest"><img src="https://img.shields.io/github/v/release/KeyArgo/hermes-game-center?style=flat-square&color=2f6bff" alt="Release"></a>
+  <a href="https://github.com/NousResearch/hermes-agent/pull/154026"><img alt="Hermes plugin catalog: in review" src="https://img.shields.io/badge/plugin%20catalog-in%20review-f59e0b?style=flat-square"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f6bff?style=flat-square" alt="Licence: MIT"></a>
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Agent-%E2%89%A5%200.23.0-7c3aed?style=flat-square" alt="Hermes Agent 0.23.0 or later"></a>
   <a href="plugin.yaml"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-555?style=flat-square" alt="Platform: Linux, macOS and Windows"></a>
