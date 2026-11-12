@@ -16,6 +16,7 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-11 (9b1d5a0f)_
 </p>
 
 ![The Play shelf at this commit: eleven curated games, the lobby beside them](screenshots/game-center-home.png)
+<p align="center"><em>The Play shelf at this commit: eleven curated games, the lobby beside them.</em></p>
 
 <p align="center"><a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#how-it-works">How it works</a> · <a href="#documentation">Documentation</a> · <a href="#testing">Testing</a> · <a href="#contributing">Contributing</a></p>
 
