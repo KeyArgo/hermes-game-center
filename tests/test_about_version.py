@@ -16,13 +16,18 @@ def _declared() -> str:
     )
 
 
+def _release_of(version):
+    """A development build reads X.Y.Z-dev[.N]; the release it is heading for is still plugin.yaml's."""
+    return version.split("-dev", 1)[0]
+
+
 def test_about_reports_the_manifest_version():
-    assert plugin_api.about()["version"] == _declared()
+    assert _release_of(plugin_api.about()["version"]) == _declared()
 
 
 def test_the_version_route_carries_the_whole_identity():
     answer = plugin_api.version_route()
-    assert answer["version"] == _declared()
+    assert _release_of(answer["version"]) == _declared()
     assert {"commit", "commit_date", "built_at", "dirty", "channel", "source"} <= set(answer)
 
 
