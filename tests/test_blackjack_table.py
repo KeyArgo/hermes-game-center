@@ -226,6 +226,12 @@ def test_the_table_controls_seat_the_computer_and_the_model(tmp_path: Path) -> N
     answer = table.command("allow-ai black=agent", complete=complete, player=ME)
     seats = {seat["side"]: seat for seat in table.picture(player=ME)["seats"]}
     assert seats["black"]["kind"] == "agent" and seats["black"]["name"] == "Your agent", answer
+    # A fixed deal: a natural settles the hand before the dealer is asked, so a
+    # random shoe made this check fail roughly one run in ten.
+    state_path = tmp_path / "blackjack" / "state.json"
+    state = json.loads(state_path.read_text())
+    state["deck"] = list(reversed(["10S", "10H", "9S", "7H"]))  # deal order: player, dealer, player, dealer
+    state_path.write_text(json.dumps(state))
     table.command("move bet10", complete=complete, player=ME)
     assert asked, "the model seated as the dealer was never asked to play"
     assert table.picture(player=ME)["legal"], "the table is still playable after the dealer's turn"
