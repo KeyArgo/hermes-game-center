@@ -172,7 +172,7 @@ hermes plugins install KeyArgo/hermes-game-center --yes-deps --enable
 
 That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on.
 
-**Requirements:** Hermes Agent 0.23.0 or later. The plugin is pure Python and JavaScript; the tests run on Python 3.13. Online play, if you turn it on, needs the network; everything else does not.
+**Requirements:** Hermes Agent 0.23.0 or later. The plugin is Python and JavaScript with no compiled binaries; the tests run on Python 3.13. Online play, if you turn it on, needs the network; everything else does not.
 
 | If you see | Do this |
 |---|---|
