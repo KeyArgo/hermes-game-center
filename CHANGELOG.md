@@ -4,7 +4,29 @@ Versions follow `VERSIONING-STANDARD.md`: `plugin.yaml` names the release target
 carries the real identity (version · commit · date · dirty) from `version_stamp.py`, surfaced at the
 top of Game Center's Settings and at `GET /v1/version`.
 
-## [1.0.0] — unreleased
+## Unreleased
+
+- **A flaky test is now deterministic.** The blackjack seating test dealt a random shoe; when a natural ended the hand early, the dealer's model was never asked to play, about one run in ten. It now deals a fixed hand.
+- **Corrected docs:** `SECURITY.md` lists all three hooks, and `LIMITS.md` counts eleven Play games.
+- **The version chip tells a release from a development build.** A catalog install of the pinned commit, or a checkout at the release tag, reads `X.Y.Z`; any other build reads `X.Y.Z-dev`. `tools/release_check.py` and the release workflow keep the version, the changelog, the tag and the GitHub release in step.
+- **Documentation:** a rebuilt README with a recorded demo and current Hermes Desktop screenshots, and a full docs set (usage, reference, architecture, configuration, troubleshooting, FAQ, development and testing).
+- **Project files:** contributing guide, code of conduct, security policy, issue and pull request templates, and CODEOWNERS.
+
+## 1.0.0 — 2026-11-11
+
+First public release.
+
+- **Eleven curated Play games:** Connect Four, Reversi, Checkers, Breakthrough, Gomoku, Chess, Go, Hex, Sea Battle, Blackjack and Slots. Each has seats, turns, a clear winner, a replay and a computer opponent.
+- **A referee that says no.** Every move goes through the game's own rules engine, whether it comes from you, the built-in player or a model.
+- **Your Hermes model as an opponent.** Give a seat to your own model. It gets the board and the legal moves and must answer with one legal move. Any provider works.
+- **Play beside your work.** In Hermes Desktop, **Games** opens the graphical table, and a game can sit next to the chat while Hermes works.
+- **Lessons and hints** on real positions, replayed through the game's own rules, so a lesson can never teach an illegal move.
+- **Online play is optional and off by default.** One shared lobby with chat and play requests when you turn it on. Everything else works offline.
+- **People play first.** A model calling the tool can never take a seat for someone. The other person joins with `/games <game> join`.
+
+## Development history (before 1.0.0)
+
+The notes below were written during development, before the first public release.
 
 - **Game Center loads on Windows (owner's report, 2026-11-11).** A fresh Windows install answered every
   Game Center call with 404 "Plugin not found": `shelf/wallet.py` imported `fcntl`, which Windows does not
