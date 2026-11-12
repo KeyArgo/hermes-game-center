@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in Game Center does not work as described
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems must not be public issues. Use the **Security** tab and **Report a vulnerability** instead.
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What did you see, and where (a Play game, the lobby, chat, the online server)?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Ubuntu 24.04, macOS 15, Windows 11
+    validations:
+      required: true
+  - type: input
+    id: hermes
+    attributes:
+      label: Hermes Agent version
+      description: The output of `hermes --version`.
+    validations:
+      required: true
+  - type: input
+    id: gamecenter
+    attributes:
+      label: Game Center version
+      description: The version chip shows it, for example `v1.0.0 · 2026-11-11 · abc12345`.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove anything private, including names, keys and local paths, before pasting.
