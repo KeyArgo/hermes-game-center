@@ -82,5 +82,77 @@
     "markers": [
       "security review"
     ]
+  },
+  "docs/README.md": {
+    "code": [],
+    "markers": [
+      "index"
+    ]
+  },
+  "docs/ARCHITECTURE.md": {
+    "code": [
+      "shelf/catalog.py",
+      "kit.py"
+    ],
+    "markers": [
+      "catalog.py"
+    ]
+  },
+  "docs/CONFIGURATION.md": {
+    "code": [
+      "plugin.yaml",
+      "__init__.py"
+    ],
+    "markers": [
+      "lobby_url"
+    ]
+  },
+  "docs/DEVELOPMENT.md": {
+    "code": [
+      "tools/build_plugin.py",
+      "tests/"
+    ],
+    "markers": [
+      "build_plugin.py"
+    ]
+  },
+  "docs/FAQ.md": {
+    "code": [],
+    "markers": [
+      "online play"
+    ]
+  },
+  "docs/REFERENCE.md": {
+    "code": [
+      "__init__.py",
+      "dashboard/plugin_api.py"
+    ],
+    "markers": [
+      "games_play"
+    ]
+  },
+  "docs/TROUBLESHOOTING.md": {
+    "code": [],
+    "markers": [
+      "Chrome"
+    ]
+  },
+  "docs/USAGE.md": {
+    "code": [
+      "kit.py",
+      "desktop/src/"
+    ],
+    "markers": [
+      "/games"
+    ]
+  },
+  "docs/TESTING.md": {
+    "code": [
+      "tests/",
+      "tools/build_plugin.py"
+    ],
+    "markers": [
+      "pytest"
+    ]
   }
 }
