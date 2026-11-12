@@ -6,7 +6,7 @@ Thanks for helping. Bug reports, small focused fixes and new ideas are all welco
 
 Open an issue with the template. For a bug, include your OS, your Hermes Agent version (`hermes --version`), the Game Center version shown in the plugin, the steps, and what you expected.
 
-Security problems must not be public issues. Use GitHub's **Security → Report a vulnerability** form on this repository; see [SECURITY.md](SECURITY.md).
+Security problems must not be public issues. Use GitHub's **Security → Report a vulnerability** form on this repository; see [SECURITY.md](../SECURITY.md).
 
 ## Set up a checkout
 
@@ -37,7 +37,7 @@ node tests/jackpot_overlay_harness.cjs
 hermes plugins validate .
 ```
 
-`scripts/test.sh` runs the whole set, including the headless-Chrome fit check (`--fast` skips that check). Counts and the opt-in suites are in [TESTING.md](TESTING.md).
+`scripts/test.sh` runs the whole set, including the headless-Chrome fit check (`--fast` skips that check). Counts and the opt-in suites are in [TESTING.md](../docs/TESTING.md).
 
 ## Send a change
 

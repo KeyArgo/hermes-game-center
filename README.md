@@ -18,6 +18,10 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-11 (9b1d5a0f)_
 ![The Play shelf at this commit: eleven curated games, the lobby beside them](screenshots/game-center-home.png)
 <p align="center"><em>The Play shelf at this commit: eleven curated games, the lobby beside them.</em></p>
 
+<p align="center"><img src="docs/media/game-center-demo.gif" alt="Game Center in Hermes Desktop: picking how to play, then Connect Four against the computer" width="100%"/></p>
+
+<p align="center"><sub><b>Game Center inside Hermes Desktop.</b> Pick a game and how to play, then play it on a real board. <a href="https://x.com/MHArgonaut/status/2120634664704528466">Watch the full demo ▶</a></sub></p>
+
 <p align="center"><a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#how-it-works">How it works</a> · <a href="#documentation">Documentation</a> · <a href="#testing">Testing</a> · <a href="#contributing">Contributing</a></p>
 
 ## What it is
@@ -156,12 +160,20 @@ Everything that is not curated Play — the installed talking tables and experim
 
 <table>
 <tr>
-<td width="50%"><img src="screenshots/chess-in-play.png" alt="Chess in play against the built-in player"><br><em>Chess in play: the referee reads every move, and the coach names the opening.</em></td>
-<td width="50%"><img src="screenshots/connect-four-lesson.png" alt="Connect Four lesson, step 1 of 4"><br><em>A lesson on a real position, replayed through the game's own rules.</em></td>
+<td width="50%" align="center"><img src="screenshots/referee-refusal.png" alt="Chess: the referee refuses a model seat's illegal move" width="100%"/><br/><sub><b>The referee says no.</b> A model seat proposed an illegal move; it was refused in one sentence and the built-in player moved instead.</sub></td>
+<td width="50%" align="center"><img src="screenshots/desktop-play-while-coding.png" alt="Sea Battle in the pane beside the Hermes chat" width="100%"/><br/><sub><b>Play while Hermes works.</b> A game sits in the pane beside your chat.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="screenshots/game-center-settings.png" alt="Game Center settings"><br><em>Settings: your name, per-game match alerts, AI seats and the version chip.</em></td>
-<td width="50%"><img src="screenshots/community-creations.png" alt="Community creations shelf"><br><em>Community creations: link-out cards that open in your own browser.</em></td>
+<td width="50%" align="center"><img src="screenshots/desktop-shelf.png" alt="The Game Center page in Hermes Desktop with the curated Play shelf" width="100%"/><br/><sub><b>The Play shelf</b> in Hermes Desktop: eleven curated games.</sub></td>
+<td width="50%" align="center"><img src="screenshots/chess-in-play.png" alt="Chess in play against the built-in player" width="100%"/><br/><sub><b>Chess in play.</b> The referee reads every move, and the coach names the opening.</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="screenshots/connect-four-lesson.png" alt="Connect Four lesson, step 1 of 4" width="100%"/><br/><sub><b>Lessons</b> on a real position, replayed through the game's own rules.</sub></td>
+<td width="50%" align="center"><img src="screenshots/game-center-settings.png" alt="Game Center settings" width="100%"/><br/><sub><b>Settings:</b> your name, per-game match alerts, AI seats and the version chip.</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="screenshots/community-creations.png" alt="Community creations shelf" width="100%"/><br/><sub><b>Community creations:</b> link-out cards that open in your own browser.</sub></td>
+<td width="50%"></td>
 </tr>
 </table>
 
