@@ -1,3 +1,6 @@
 {
-  "mirrors": []
+  "mirrors": [],
+  "prepare": [
+    "python3 tools/doc_stamp.py --write"
+  ]
 }

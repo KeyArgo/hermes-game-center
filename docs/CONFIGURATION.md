@@ -1,6 +1,6 @@
 # Configuration
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-11 (9b1d5a0f)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
 
 Every setting, environment variable and stored preference the code reads, with the default it uses.
 
