@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-11 (9b1d5a0f)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
