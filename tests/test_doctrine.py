@@ -359,24 +359,56 @@ def test_profile_author_refuses_private(game):
     assert "Usage" in game.command("author")
 
 
-def test_profile_author_uses_a_test_home(game, tmp_path):
+def test_profile_author_reads_the_model_door_and_signs_the_card(game):
     seen = {}
 
-    def fake_run(profile, prompt, home):
-        seen.update(profile=profile, prompt=prompt, home=home)
-        return json.dumps(STRONG), ""
+    def fake_complete(prompt, max_tokens=0):
+        seen.update(prompt=prompt, max_tokens=max_tokens)
+        return {"move": json.dumps(STRONG), "remark": "", "tokens": 12}
 
-    reply, error = game.profiles.author("test-profile", "write a card", home=tmp_path, runner=fake_run)
+    reply, error = game.profiles.author("test-profile", "write a card", complete=fake_complete)
     assert error == "" and "Probe Winner" in reply
-    assert seen["home"] == tmp_path and seen["profile"] == "test-profile"
     assert "write a card" in seen["prompt"]
-    refused, why = game.profiles.author("private", "x", home=tmp_path, runner=fake_run)
+    assert seen["max_tokens"] == game.profiles.MAX_TOKENS
+    refused, why = game.profiles.author("private", "x", complete=fake_complete)
     assert refused is None and "private" in why
 
 
-def test_profile_author_command(game, monkeypatch):
-    monkeypatch.setattr(game.profiles, "_run", lambda profile, prompt, home: (json.dumps(STRONG), ""))
+def test_the_author_path_starts_no_process_and_inherits_no_environment(game, monkeypatch):
+    """The review's finding: the authoring run started `hermes chat` with dict(os.environ).
+
+    Hermes reads an empty `--toolsets` as "not set", so that child got the profile's default tools and
+    whatever approval-mode variables were in the environment. The card is now written by
+    ``ctx.llm.complete``, which cannot run a tool, so there is nothing to restrict - and no process to
+    start. This test is what keeps it that way.
+    """
+    import subprocess
+
+    def no_process(*args, **kwargs):  # pragma: no cover - reached only on a regression
+        raise AssertionError(f"the authoring path started a process: {args!r}")
+
+    monkeypatch.setattr(subprocess, "run", no_process)
+    monkeypatch.setattr(subprocess, "Popen", no_process)
+    source = (ROOT / "doctrine" / "profiles.py").read_text(encoding="utf-8")
+    assert "subprocess" not in source, "doctrine/profiles.py must not import subprocess at all"
+    assert "--toolsets" not in source, "there is no CLI run left to pass a tool set to"
+    assert "os.environ" not in source, "nothing to inherit, so nothing to copy"
+
+    reply, error = game.profiles.author(
+        "test-profile", "write a card", complete=lambda prompt, max_tokens=0: json.dumps(STRONG)
+    )
+    assert error == "" and "Probe Winner" in reply
+
+
+def test_authoring_without_a_model_says_so_instead_of_starting_one(game):
     answer = game.command("author test-profile")
+    assert "needs one model" in answer
+    assert "Probe Winner" not in picture(game)["your_card"]["name"]
+
+
+def test_profile_author_command(game, monkeypatch):
+    monkeypatch.setattr(game, "complete", lambda prompt, max_tokens=0: {"move": json.dumps(STRONG)})
+    answer = game.command("author test-profile", complete=game.complete)
     assert "wrote Probe Winner" in answer
     shown = picture(game)
     assert shown["your_card"]["name"] == "Probe Winner"
@@ -384,5 +416,8 @@ def test_profile_author_command(game, monkeypatch):
 
 
 def test_profile_runner_error_is_friendly(game, monkeypatch):
-    monkeypatch.setattr(game.profiles, "_run", lambda profile, prompt, home: (None, "no such profile"))
-    assert "no such profile" in game.command("author ghost")
+    def broken(prompt, max_tokens=0):
+        raise RuntimeError("the provider is down")
+
+    monkeypatch.setattr(game, "complete", broken)
+    assert "did not answer" in game.command("author ghost", complete=broken)

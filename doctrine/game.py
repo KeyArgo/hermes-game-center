@@ -236,7 +236,7 @@ class Doctrine:
             "/games doctrine export [replay]            export your card or the last replay",
             "/games doctrine ladder                     your card against all four house cards",
             "/games doctrine improve                    ask your model for a better card",
-            "/games doctrine author <profile>           ask a named profile to write a card",
+            "/games doctrine author <profile>           write a card, signed with a named profile",
             "/games doctrine tree                       your card's family tree",
             "/games doctrine reset                      clear the board",
         ])
@@ -468,8 +468,13 @@ class Doctrine:
         why = self.profiles.problem(profile)
         if why:
             return why
+        if self.complete is None:
+            return ("Writing a card needs one model, and none is configured here. "
+                    "Pick one in Settings → Models → \"Game Shelf opponent\". Everything else still works.")
         flavour = " ".join(rest[1:]) or state["your_card"].get("personality", "")
-        reply, error = self.profiles.author(profile, self.profiles.prompt(flavour))
+        # The card comes from the person's own model through Hermes's plugin LLM door: text only, no
+        # child process, no tool set and no environment to inherit (review, 2026-11-12).
+        reply, error = self.profiles.author(profile, self.profiles.prompt(flavour), complete=self.complete)
         if error:
             return error
         candidate, problems = self.card_mod.validate(_extract_json(reply) or reply.strip())
