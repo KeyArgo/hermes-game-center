@@ -1,6 +1,6 @@
 # Testing
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
 How to run every suite, what each one covers, and the counts measured on this commit.
 
@@ -22,18 +22,18 @@ CI (`.github/workflows/tests.yml`) runs the pytest suite and the four Node harne
 
 ## Counts at this commit
 
-Measured locally on 2026-11-11 with `python3 -m pytest tests -q -p no:cacheprovider --durations=15` and the two Node harnesses from a clean checkout.
+Measured on 2026-11-13 at commit `0ad31b9` with `python3 -m pytest tests -q -p no:cacheprovider` and the Node harnesses, from a clean checkout.
 
 | Suite | Command | Result |
 |---|---|---|
-| Python suite | `python3 -m pytest tests -q -p no:cacheprovider` | **1554 passed, 28 skipped, 1 failed** in 1036.29 s (17:16) |
-| Desktop page harness | `node tests/table_ui_harness.cjs` | **81 checks passed, 0 failed** |
+| Python suite | `python3 -m pytest tests -q -p no:cacheprovider` | **1578 passed, 28 skipped** in 1372.95 s (22:52) |
+| Desktop page harness | `node tests/table_ui_harness.cjs` | **82 checks passed, 0 failed** |
 | Over-chat slot harness | `node tests/jackpot_overlay_harness.cjs` | **7 checks passed, 0 failed** |
-| Combined badge count | pytest + the two harnesses | **1642 passing** |
+| Combined badge count | pytest + the two harnesses | **1667 passing** |
 | Slot fit regression (not in CI) | `node tests/slot_fit_regression.mjs` | one headless-Chrome check; see below |
 | Over-chat live render | `node tests/overchat_slot_live.mjs` (or `pytest tests/test_overchat_slot_live.py`) | real React: off -> on, resize, off |
 
-The 28 skips are opt-in groups and environment-gated tests, reported as skips, not failures. The one failure in this tree is `tests/test_blackjack_table.py::test_the_table_controls_seat_the_computer_and_the_model`, the red blackjack test a separate lane is fixing; it passes when run alone and fails in the full run. No other test failed.
+The 28 skips are opt-in groups and environment-gated tests, reported as skips, not failures — the online suite with no server, the browser checks with no Chrome, and the two advisory-lock tests on Windows. Nothing failed in this run. CI runs the whole suite on Linux, macOS and Windows (`.github/workflows/tests.yml`), so a platform that breaks a test says so on the pull request.
 
 ## What each suite covers
 

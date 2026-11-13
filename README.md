@@ -2,11 +2,11 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="docs/TESTING.md"><img src="https://img.shields.io/badge/tests-1642%20passing-2ea44f?style=flat-square" alt="Tests"></a>
+  <a href="docs/TESTING.md"><img src="https://img.shields.io/badge/tests-1667%20passing-2ea44f?style=flat-square" alt="Tests"></a>
   <a href="https://github.com/NousResearch/hermes-agent/pull/154026"><img alt="Hermes plugin catalog: in review" src="https://img.shields.io/badge/plugin%20catalog-in%20review-f59e0b?style=flat-square"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f6bff?style=flat-square" alt="Licence: MIT"></a>
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Agent-%E2%89%A5%200.23.0-7c3aed?style=flat-square" alt="Hermes Agent 0.23.0 or later"></a>
