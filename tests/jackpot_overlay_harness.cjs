@@ -13,7 +13,9 @@ const sandbox = {
   console: { log: console.log, warn: console.warn, error: console.error, info: (...args) => said.push(args.join(' ')) },
   Set, setTimeout, clearTimeout, setInterval, clearInterval,
   PANES_AREA: 'panes', PALETTE_AREA: 'palette', ROUTES_AREA: 'routes',
-  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' }
+  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' },
+  // The composer's seams: where the see-through machines are contributed (review, 2026-11-12).
+  COMPOSER_AREAS: { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
 }
 sandbox.window = {
   localStorage: {
@@ -343,63 +345,100 @@ assert.equal(overBox.props.checked, false, 'the over-chat setting starts off')
 overBox.props.onChange({ target: { checked: true } })
 assert.equal(storage['gameshelf.slots.overchat'], '1', 'turning it on is remembered')
 reset()
-sandbox.overProps = { ctx: { rest: async () => data } }
-const overTree = draw('SlotsOverChat(overProps)')
-const overWrapper = nodes(overTree).find(node => node.props && node.props['data-jackpot'] === 'overchat')
-assert.ok(overWrapper, 'the over-chat machine is mounted from the status item')
-// Owner's ask 2026-11-09: five points more opaque than the 15% it was, and the viewer
-// can change it with the − / + control beside Show over chat.
-assert.equal(overWrapper.props.style.opacity, 0.2, 'the over-chat machine sits at 20% by default')
-assert.equal(overWrapper.props.style.pointerEvents, 'none', 'it does not block the chat')
-const bareSlot = nodes(overTree).find(node => node.type && node.type.name === 'SlotMachine')
-// The copy is the same machine as the play-while-you-code pane - points card, glass and all - with the dismissal
-// controls on, which is `chat: true, bare: false`. This check used to demand the bare cabinet; the
-// owner asked for the full machine over the chat on 2026-11-09 ("should have points and all, and
-// look the same"), and the harness was never brought along.
-assert.ok(bareSlot && bareSlot.props.chat, 'the over-chat machine is the full machine with its controls')
-assert.equal(bareSlot.props.scaleOverride, 1, 'the over-chat copy starts at the cabinet size')
-// Simulate a normal chat column and the complete machine, including the controls below the cabinet.
-const listeners = {}
-sandbox.window.innerWidth = 1400
-sandbox.window.innerHeight = 900
-sandbox.window.addEventListener = (name, fn) => { listeners[name] = fn }
-sandbox.window.removeEventListener = name => { delete listeners[name] }
-const chatColumn = { getBoundingClientRect: () => ({ left: 350, top: 0, width: 800, height: 900 }), parentElement: null }
-sandbox.document.body = {}
-sandbox.document.querySelector = () => ({ parentElement: chatColumn })
-reset()
-const initialMeasured = draw('SlotsOverChat(overProps)')
-const initialSlot = nodes(initialMeasured).find(node => node.type && node.type.name === 'SlotMachine')
-initialSlot.props.cabinetRef.current = { offsetWidth: 600, offsetHeight: 1000 }
-listeners.resize()
-const measured = draw('SlotsOverChat(overProps)')
-const measuredBox = nodes(measured).find(node => node.props && node.props['data-jackpot'] === 'overchat')
-const measuredSlot = nodes(measured).find(node => node.type && node.type.name === 'SlotMachine')
-const scaledBox = measuredBox.props.children
-assert.ok(scaledBox.props.style.width / 600 >= 0.6, 'normal chat column has a readable scale')
-assert.ok(scaledBox.props.style.height <= 900 - measuredBox.props.style.top, 'the entire machine fits the frame height')
-reset()
-// The Games page uses this same SlotMachine; its measurement ref must cover the whole machine,
-// including everything below the decorated cabinet, rather than the cabinet alone.
-sandbox.overSlotProps = measuredSlot.props
-const completeMachine = draw('SlotMachine(overSlotProps)')
-assert.equal(completeMachine.props.ref, measuredSlot.props.cabinetRef, 'frame fitting measures the full Games-page machine height')
-reset()
-// The status subscriber stays mounted through off -> on; no Games page is needed to revive it.
-draw('JackpotStatusItem(props)')
-evaluate('smSetOverchat(false)')
-assert.equal(draw('JackpotStatusItem(props)'), null, 'switching off unmounts the copy')
-evaluate('smSetOverchat(true)')
-assert.ok(!nodes(draw('JackpotStatusItem(props)')).some(node => node.type && node.type.name === 'SlotsOverChat'),
-  'the retired overlay is not mounted')
-reset()
-sandbox.overSlotProps = bareSlot.props
-const overSlotTree = draw('SlotMachine(overSlotProps)')
-const overClose = nodes(overSlotTree).find(node => node.type === 'button' && node.props && node.props['aria-label'] === 'Close')
-assert.ok(overClose, 'the over-chat machine has its own close control')
-overClose.props.onClick()
-assert.equal(storage['gameshelf.slots.overchat'], '0', 'closing the over-chat machine turns the setting off')
-reset()
+sandbox.overChatProps = { ctx: { rest: async () => data } }
+// The composer draws the strip; this stub's jsx() records component elements rather than running them, so
+// the strip is read as the tree it hands the app (the wrappers and the widths), and each machine's copy is
+// then drawn directly — the same two-draw dance the rest of this file uses for a measured component.
+function drawStrip(width) {
+  reset()
+  let tree = draw('OverChatStrip(overChatProps)')
+  const host = nodes(tree).find(node => node.props && node.props['data-overchat'] === 'strip')
+  if (!host) return tree
+  if (host.props.ref) host.props.ref.current = { clientWidth: width, getBoundingClientRect: () => ({ width }) }
+  return draw('OverChatStrip(overChatProps)')
+}
+const stripHalves = tree => nodes(tree).filter(node => node.props
+  && (node.props['data-overchat'] === 'slots' || node.props['data-overchat'] === 'jackpot'))
+sandbox.copyProps = { ctx: { rest: async () => data }, width: 760 }
+// The v2 copy adopts its switch from the plugin's own storage (that is what makes it survive a reload), so
+// this ctx carries a store rather than relying on a switch another test flipped.
+sandbox.v2Store = { 'jackpot2.overchat': true }
+sandbox.v2CopyProps = {
+  ctx: {
+    rest: async () => data,
+    storage: {
+      get: (key, fallback) => (key in sandbox.v2Store ? sandbox.v2Store[key] : fallback),
+      set: (key, value) => { sandbox.v2Store[key] = value }
+    }
+  },
+  width: 380
+}
+function drawCopy(width) {
+  reset()
+  sandbox.copyProps.width = width
+  let tree = draw('SlotsOverChatCopy(copyProps)')
+  const cabinet = nodes(tree).find(node => node.type && node.type.name === 'SlotMachine')
+  if (cabinet && cabinet.props.cabinetRef) cabinet.props.cabinetRef.current = { offsetWidth: 600, offsetHeight: 1000 }
+  return draw('SlotsOverChatCopy(copyProps)')
+}
+{
+  // The strip is ONE contribution to the composer's underside slot. The slot gives it a width; the strip
+  // halves that between the machines and hands each its share. Nothing here is measured off the app.
+  evaluate('smSetOverchat(true)')
+  evaluate('jp2LSetOverchat(false)')
+  const tree = drawStrip(760)
+  const halves = stripHalves(tree)
+  assert.equal(halves.length, 1, 'one machine on, one place in the strip')
+  assert.ok(Number(halves[0].props.style.width) >= 759, 'the machine on its own gets the whole slot')
+  assert.equal(halves[0].props.style.display, 'flex', 'the strip is one row')
+  const element = [].concat(halves[0].props.children || [])[0]
+  assert.equal(element && element.type && element.type.name, 'SlotsOverChatCopy', 'the slot holds the cabinet copy')
+  assert.equal(element.props.width, 760, 'and it is told the width it may use')
+  reset()
+  console.log('slots: the composer slot owns the place and the width: passed')
+}
+
+{
+  // The copy itself: the same machine with its controls (`chat: true`), at the viewer's opacity, sized
+  // from the width it was given, watch-only, and with no position of its own.
+  const tree = drawCopy(760)
+  const overWrapper = nodes(tree).find(node => node.props && node.props['data-jackpot'] === 'overchat')
+  assert.ok(overWrapper, 'the over-chat machine is drawn in the composer slot')
+  assert.equal(overWrapper.props.style.opacity, 0.2, 'it sits at 20% by default')
+  assert.equal(overWrapper.props.style.pointerEvents, 'none', 'it does not block the chat')
+  // A containing block for the scaled machine inside it, and nothing more: an in-flow box the slot lays
+  // out, never a fixed one the plugin floats over the page.
+  assert.equal(overWrapper.props.style.position, 'relative', 'the slot places it; the copy does not place itself')
+  assert.ok(!('left' in overWrapper.props.style) && !('top' in overWrapper.props.style), 'no coordinates of its own')
+  const bareSlot = nodes(tree).find(node => node.type && node.type.name === 'SlotMachine')
+  assert.ok(bareSlot && bareSlot.props.chat, 'the over-chat machine is the full machine with its controls')
+  assert.equal(bareSlot.props.scaleOverride, 1, 'the copy scales its box; the machine keeps its own size')
+  const boxWidth = Number(overWrapper.props.style.width) || 0
+  const boxHeight = Number(overWrapper.props.style.height) || 0
+  assert.ok(boxWidth > 0 && boxHeight > 0, `drawn at a size a person can see (${boxWidth}x${boxHeight})`)
+  assert.ok(boxWidth <= 760 + 0.5, 'never wider than the slot it was given')
+  assert.ok(boxHeight <= 320 + 0.5, 'nor taller than the strip budget allows')
+  // The Games page uses this same SlotMachine; its measurement ref must cover the whole machine,
+  // including everything below the decorated cabinet, rather than the cabinet alone.
+  sandbox.overSlotProps = bareSlot.props
+  const completeMachine = draw('SlotMachine(overSlotProps)')
+  assert.equal(completeMachine.props.ref, bareSlot.props.cabinetRef, 'frame fitting measures the full machine height')
+  reset()
+  // The switch is still the one the table and the status chip draw: off takes the copy out of the slot.
+  evaluate('smSetOverchat(false)')
+  assert.equal(draw('SlotsOverChatCopy(copyProps)'), null, 'switching off takes the machine out of the slot')
+  evaluate('smSetOverchat(true)')
+  assert.ok(!nodes(drawCopy(760)).some(node => node.type && node.type.name === 'SlotsOverChat'),
+    'the retired overlay component is not mounted')
+  sandbox.overSlotProps = nodes(drawCopy(760)).find(node => node.type && node.type.name === 'SlotMachine').props
+  const overSlotTree = draw('SlotMachine(overSlotProps)')
+  const overClose = nodes(overSlotTree).find(node => node.type === 'button' && node.props && node.props['aria-label'] === 'Close')
+  assert.ok(overClose, 'the over-chat machine has its own close control')
+  overClose.props.onClick()
+  assert.equal(storage['gameshelf.slots.overchat'], '0', 'closing the over-chat machine turns the setting off')
+  reset()
+  console.log('slots: the copy is drawn inside the composer slot, fitted to it: passed')
+}
 const offTree = draw('SlotMachine(tableProps)')
 const offLabel = nodes(offTree).find(node => node.type === 'label' && words(node).includes('Show over chat'))
 assert.equal(nodes(offLabel).find(node => node.type === 'input').props.checked, false,
@@ -534,27 +573,32 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 })
 
 {
-  // Owner's ask 2026-11-09: the see-through machine belongs over the conversation, not over
-  // Settings, the plugin manager or another plugin's page. The app routes with the URL hash.
-  const setHash = value => { sandbox.window.location = { hash: value } }
-  setHash('#/settings')
-  assert.equal(evaluate('jpOnChatScreen()'), false, 'no machine over Settings')
-  setHash('#/capabilities?tab=plugins')
-  assert.equal(evaluate('jpOnChatScreen()'), false, 'no machine over the plugin manager')
-  setHash('#/messaging')
-  assert.equal(evaluate('jpOnChatScreen()'), false, 'no machine over messaging settings')
-  setHash('#/plugins')
-  assert.equal(evaluate('jpOnChatScreen()'), false, 'no machine over the plugin list')
-  // A denylist: an unrecognised path shows the machine, because a missing one over the chat is
-  // worse than an extra copy on a screen nobody named.
-  setHash('#/some-unknown-screen')
-  assert.equal(evaluate('jpOnChatScreen()'), true, 'an unknown path is treated as the conversation')
-  setHash('#/')
-  assert.equal(evaluate('jpOnChatScreen()'), true, 'the chat root is a conversation')
-  setHash('')
-  assert.equal(evaluate('jpOnChatScreen()'), true, 'an empty hash is a conversation')
-  assert.ok(source.includes('if (!on || !onChatScreen) return null'), 'the copy is not drawn off the chat')
-  console.log('slots: the over-chat machine only shows over the conversation: passed')
+  // Review, 2026-11-12: the see-through machine used to be a position:fixed div of ours appended to the
+  // app's <body>, measured against the app's own markup (it scanned every <textarea> and walked their
+  // ancestors for a "chat column") and gated by the route's hash. A plugin that does that can be broken by
+  // an app update and can break the app. It is a `composer.underside` contribution now, so the slot itself
+  // decides where it goes: the slot is part of the conversation's composer and does not exist on any other
+  // screen, which is what "only over the conversation" means from here on.
+  const registration = source.slice(source.indexOf("id: 'overchat'") - 40, source.indexOf("id: 'overchat'") + 500)
+  assert.ok(registration.includes('COMPOSER_AREAS.underside'),
+    'the machines are contributed to the composer underside slot: ' + registration)
+  for (const gone of ['JP_OFF_CHAT', 'jpOnChatScreen', 'useJpOnChatScreen', 'JP_chatColumn', 'JP_composer',
+                      'jp2LOnChatRoute', 'jp2LLayerNode', 'jp2LEnsureLayer', 'jp2LApply(']) {
+    assert.ok(!source.includes(gone), `${gone} is gone: the slot answers the question the DOM was asked`)
+  }
+  // A node of ours may be queried (the sea-battle board looks inside its own frame); the DOCUMENT may not.
+  assert.ok(!/document\s*\.\s*querySelector(All)?\(/.test(source), 'the app\'s markup is never queried')
+  assert.ok(!/document\.(body|head)\s*\.\s*(append|remove|insert)/.test(source),
+    'nothing is appended to or removed from the app\'s <body> or <head>')
+  assert.ok(!/createElement\(\s*['"]style/.test(source), 'and no stylesheet element is created for the document')
+  assert.ok(!source.includes('window.hermesDesktop'), 'and no private app door is used')
+  // Nothing is drawn while both switches are off: the strip is a slot contribution that renders null.
+  evaluate('smSetOverchat(false)')
+  evaluate('jp2LSetOverchat(false)')
+  reset()  // a fresh mount is what the composer does when the slot comes back
+  assert.equal(draw('OverChatStrip(overChatProps)'), null, 'no strip while both switches are off')
+  reset()
+  console.log('slots: the machines live in the composer slot, not over the app\'s markup: passed')
 }
 
 {
@@ -578,10 +622,6 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
   // the Slots table's switches are how it is turned on, off or changed.
   assert.ok(source.includes('if (!overchatOn) return null'),
     'the status chip is withheld while the over-chat machine is off')
-  // ...but the switch has to be readable from somewhere that still runs while it is off, or the copy
-  // can only be turned on from a screen the switch itself hides. Measured 2026-11-10: after a rebuild
-  // the wallet said overchat=true and the machine still never appeared, because adoption lived only
-  // inside the table. The status item adopts the snapshot's switch too, above that return.
   assert.ok(source.includes('SM_adoptPrefs(data.overchat)'),
     'the status item adopts the stored switch, not only the table')
   const adoptAt = source.indexOf('SM_adoptPrefs(data.overchat)')
@@ -593,120 +633,70 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 
 {
   // Owner's report 2026-11-09: the size slider barely moved the copy. The machine was resizing
-  // itself, the fit recomputed against that, and the two cancelled. The wrapper scales now.
+  // itself, the fit recomputed against that, and the two cancelled. The wrapper scales now, and the
+  // fit is the slot's own width - never the window, never a column measured off the app.
   assert.ok(source.includes('scaleOverride: 1'), 'the machine draws at its own size and the wrapper scales it')
-  // The guard moved above the arithmetic (a cabinet that has not been laid out reports 0 and the
-  // measure retries), so this is the current expression rather than the old one-line ternary.
-  assert.ok(source.includes('const fit = (width * 0.7) / natural'), 'the fit is measured once, at 100%')
-  assert.ok(source.includes('const ceiling = Math.min(width, viewport) / natural'), 'the copy fits the column and window')
-  // The scale is now clamped in both directions - by the window and by the frame it is drawn in -
-  // so the slider still multiplies the fit, and is still the first factor of the minimum.
-  assert.ok(source.includes('const scale = Math.max(0, Math.min(fit * overchatScale, ceiling, ceilingHeight))'),
-    'the slider multiplies that fit')
-  console.log('slots: the size slider scales the copy, up to the window: passed')
-}
-
-// The two helpers both over-chat blocks below read the copy with: its node, and the box it is
-// drawn in (the fixed wrapper carries left/top/width; the height lives on the scaled box inside
-// it, because a transform does not give the wrapper one).
-const copyOf = tree => nodes(tree).find(node => node.props && node.props['data-jackpot'] === 'overchat')
-// The copy's own box: the fixed wrapper's left/top/width, and the height of the scaled box inside it
-// (a transform does not give the wrapper a height).
-const boxOf = node => {
-  const style = node.props.style
-  const scaled = node.props.children && node.props.children.props ? node.props.children.props.style : {}
-  const left = Number(style.left) || 0
-  const top = Number(style.top) || 0
-  const width = Number(style.width) || 0
-  const height = Number(scaled.height) || 0
-  return { left, top, width, height, right: left + width, bottom: top + height }
+  assert.ok(source.includes('function overchatFitScale'), 'one fit rule, measured against the slot')
+  // Half the share at the default size, and the height budget at full size.
+  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 760, 1)'), 0.32,
+    'a tall cabinet is capped by the strip\'s height budget, not by the window')
+  const narrow = evaluate('overchatFitScale({ width: 600, height: 1000 }, 180, 1)')
+  assert.ok(600 * narrow <= 180 + 0.5, `never wider than the share it was given (${600 * narrow} of 180)`)
+  const doubled = evaluate('overchatFitScale({ width: 600, height: 1000 }, 380, 2)')
+  assert.ok(600 * doubled <= 380 + 0.5, 'and the size slider cannot push it past that share either')
+  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 760, 0.5)'), 0.16,
+    'the slider multiplies the fit')
+  assert.equal(evaluate('overchatFitScale(null, 300, 1)'), 0, 'nothing is drawn before the cabinet is measured')
+  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 0, 1)'), 0,
+    'nor before the slot has a width')
+  console.log('slots: the size slider scales the copy, inside the slot it was given: passed')
 }
 
 {
-  // ---- the ORIGINAL machine's copy over the conversation (release blocker, 2026-11-11) ---------
-  // Owner's report: the switch is on and NOTHING appears over the chat in the real app, on either
-  // machine. The build that worked (9433891) mounted this copy as a fixed child of its own status
-  // item, measured the chat column - the first textarea's first ancestor wider than half the window -
-  // and drew it. What came after added a show gate that trusted the Game Center page's mere presence,
-  // and Hermes keeps that page mounted behind the conversation, so the copy was suppressed over the
-  // very screen it exists for. These checks pin the mount, the measurement and the show logic.
-  const gamesScreen = {
-    nodeType: 1,
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1160, height: 880 })
-  }
-  let gamesUp = false
-  // The conversation: a composer, and an ancestor of it wider than half the window. This is exactly
-  // the DOM the copy has to measure itself against.
-  const composer = { parentElement: chatColumn }
-  sandbox.document.querySelector = selector => (selector === '.games-center-layout'
-    ? (gamesUp ? gamesScreen : null)
-    : composer)
-  sandbox.window.innerWidth = 1400
-  sandbox.window.innerHeight = 900
-  sandbox.window.location = { hash: '' }
+  // The two machines share the slot when both switches are on: two halves and a gap, never one drawn over
+  // the other. That is structural now — a flex row cannot overlap — rather than the old "keep to your own
+  // half of the column" arithmetic.
   evaluate('smSetOverchat(true)')
-
-  // Draw the copy the way the real host does: once to get the ref, a measurement, then again - the
-  // same two-draw dance the section above uses.
-  const drawCopy = () => {
-    reset()
-    const first = draw('SlotsOverChat(overProps)')
-    const slot = nodes(first).find(node => node.type && node.type.name === 'SlotMachine')
-    if (slot && slot.props.cabinetRef) slot.props.cabinetRef.current = { offsetWidth: 600, offsetHeight: 1000 }
-    if (listeners.resize) listeners.resize()
-    return draw('SlotsOverChat(overProps)')
-  }
-
-  const noGames = copyOf(drawCopy())
-  assert.ok(noGames, 'the original machine is mounted over the conversation with its switch on and no Games page')
-  assert.notEqual(String(noGames.props.style.visibility), 'hidden', 'and it is not hidden')
-  {
-    const box = boxOf(noGames)
-    assert.ok(box.width > 0 && box.height > 0, `it is drawn at a size a person can see (${box.width}x${box.height})`)
-    assert.ok(box.left >= 350 - 1 && box.right <= 1150 + 1, 'over the chat column it was measured against')
-    assert.ok(box.bottom <= 900 + 1, 'and inside the column it hangs in')
-    assert.equal(noGames.props.style.opacity, 0.2, 'at the viewer’s own opacity')
-    assert.equal(noGames.props.style.pointerEvents, 'none', 'and never in the way of the chat')
-    assert.equal(noGames.props.style.justifyContent, 'center', 'a lone copy is centred in its frame')
-  }
-
-  // A mounted Games page must NOT hide it: that is what Hermes looks like from the chat, and the
-  // presence of the page - laid out or not - is not what is on screen.
-  gamesUp = true
-  assert.equal(evaluate('jpOnChatScreen()'), true,
-    'a mounted Games page does not hide the copy from the conversation')
-  assert.ok(copyOf(drawCopy()), 'and the copy is still drawn over the conversation')
-
-  // The Games page WITH the main area: no conversation on screen, so no copy.
-  sandbox.document.querySelector = selector => (selector === '.games-center-layout' ? gamesScreen : null)
-  assert.equal(evaluate('jpOnChatScreen()'), false, 'no copy when the Games page has the main area')
-  assert.equal(draw('SlotsOverChat(overProps)'), null, 'and nothing is drawn there')
-
-  // The route says it too, without needing the DOM at all.
-  sandbox.document.querySelector = selector => (selector === '.games-center-layout' ? null : composer)
-  sandbox.window.location = { hash: '#/games' }
-  assert.equal(evaluate('jpOnChatScreen()'), false, 'the Games route alone keeps the copy off the page')
-  sandbox.window.location = { hash: '' }
-  // The release rule (2026-11-11) covers THIS machine's copy as well as the Jackpot cabinet: no win
-  // chance, no return, no percentage beside a session. The bundle-wide check in jackpot2_harness.cjs
-  // pins the same strings; this is the same promise read from the side of the old machine.
-  for (const gone of ['% win this session', '% back promised', '% of spins win', '% · bonus', '% · cold']) {
-    assert.ok(!source.includes(gone), `the original machine prints no "${gone}" anywhere, its copy included`)
-  }
-  // The copy is the full machine (points card and controls included, `chat: true`), which is what the
-  // owner asked for on 2026-11-09 - pinned here again because this lane rewrote the show path.
-  assert.ok(source.includes('bare: false') && source.includes('chat: true'),
-    'the copy over the chat is the full machine, not a stripped cabinet')
-  // The copy polls while it is mounted (that is how the shelf's stored switch reaches it), so the last
-  // draw leaves a timer behind: run the cleanups, or node waits for it and never exits.
+  evaluate('jp2LSetOverchat(true)')
+  const tree = drawStrip(760)
+  const halves = stripHalves(tree)
+  assert.equal(halves.length, 2, 'both machines have a place in the strip')
+  const widths = halves.map(node => Number(node.props.style.width) || 0)
+  assert.ok(widths.every(value => value > 0), `each half has a width (${widths.join(', ')})`)
+  const gap = Number(tree.props.style.gap) || 0
+  assert.ok(widths[0] + widths[1] + gap <= 760 + 0.5,
+    `the two halves and the gap fit the slot (${widths[0]} + ${gap} + ${widths[1]})`)
+  assert.equal(tree.props.style.display, 'flex', 'the strip is one row')
+  evaluate('jp2LSetOverchat(false)')
+  const solo = drawStrip(760)
+  const one = stripHalves(solo)
+  assert.equal(one.length, 1, 'one switch off takes that machine out of the strip')
+  assert.ok(Number(one[0].props.style.width) >= 759, 'and the one left gets the whole slot')
+  evaluate('smSetOverchat(false)')
   reset()
-  console.log('slots: the over-chat copy is drawn over the conversation, and not over the games: passed')
+  console.log('slots: two machines share the slot without overlapping: passed')
 }
 
 {
-  const status = source.slice(source.indexOf('function JackpotStatusItem('), source.indexOf('function JackpotOverlay('))
-  assert.ok(!status.includes('jsx(SlotsOverChat'), 'the retired overlay is not mounted')
-  const geo = evaluate('jp2LSharedGeometry({ left: 350, top: 0, width: 800, height: 900 }, 1, false)')
-  assert.ok(Math.abs(geo.left + geo.width / 2 - 750) <= 1, 'the remaining overlay is centered')
-  console.log('slots: one centered over-chat layer: passed')
+  // The Jackpot v2 copy is drawn the same way — inside its share of the slot, at the person's own size, in
+  // our own stage — and its tint rules are a <style> element of the stage rather than a stylesheet pushed
+  // into the app's <head>.
+  evaluate('jp2LSetOverchat(true)')
+  const tree = draw('jp2LOverChatCopy(v2CopyProps)')
+  const surface = nodes(tree).find(node => node.props && node.props['data-jp2-surface'] === 'copy')
+  assert.ok(surface, 'the Jackpot v2 copy is drawn')
+  assert.ok(!('position' in surface.props.style), 'placed by the slot, not fixed over the app')
+  assert.ok(Number(surface.props.style.width) > 0, 'drawn at a width the slot gave it')
+  const stage = nodes(tree).find(node => node.props && node.props['data-jp2-stage'] === '1')
+  assert.ok(stage, 'the cabinet sits in a scaled stage of ours')
+  const rules = nodes(tree).find(node => node.type === 'style')
+  assert.ok(rules, 'the stage carries its own rules as a <style> element')
+  assert.ok(String(rules.props.children).includes('[data-jp2-stage]'),
+    'and every rule in it is scoped to that stage')
+  const scale = evaluate('jp2LSlotScale(380, 0.5)')
+  assert.ok(scale > 0 && 560 * scale <= 380 + 0.5, `fitted into its share (${scale})`)
+  assert.equal(evaluate('jp2LSlotScale(0, 0.5)'), 0, 'nothing before the slot has a width')
+  evaluate('jp2LSetOverchat(false)')
+  reset()
+  console.log('slots: the Jackpot v2 copy lives in the slot too, with its own stage rules: passed')
 }

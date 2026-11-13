@@ -7,7 +7,8 @@ const source = fs.readFileSync(path.join(__dirname, '../desktop/plugin.js'), 'ut
 const sandbox = {
   console, Set, setTimeout, clearTimeout, setInterval, clearInterval,
   PANES_AREA: 'panes', PALETTE_AREA: 'palette', ROUTES_AREA: 'routes',
-  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' }
+  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' },
+  COMPOSER_AREAS: { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
 }
 // The SDK host the plugin reads at load. Only what the pane uses is here, so a
 // missing door behaves like an older desktop.
@@ -2226,8 +2227,14 @@ async function paneContract() {
   assert.equal(entries.find(item => item.id === 'version'), undefined, 'the version is not a status-bar item')
   assert.equal(entries.find(item => item.area === 'right' && item.data && item.data.version), undefined,
     'and nothing else registers it in the status bar')
-  assert.equal(entries.filter(item => item.area === 'right').length, 2,
-    'the status bar has one Slots item')
+  assert.equal(entries.filter(item => item.area === 'right').length, 1,
+    'the status bar has one Slots item and nothing else')
+  // The two see-through machines are a composer-slot contribution now (review, 2026-11-12): the app owns
+  // where they go, so nothing has to be anchored in the status bar or floated over the app's markup.
+  assert.ok(entries.find(item => item.area === 'composer.underside' && item.id === 'overchat'),
+    'the over-chat machines are contributed to the composer underside slot')
+  assert.equal(entries.find(item => item.id === 'jackpot2'), undefined,
+    'and no status-bar item is left just to host an overlay')
   reset()
   const versionStamp = { version: '9.9.9', commit: 'abcdef1234567890', commit_date: '2026-11-10T09:00:00-07:00', dirty: false }
   const chipCtx = makeCtx({ 'pane-game': 'connect4' })
@@ -5758,19 +5765,16 @@ async function refereeBadgeContract() {
   assert.ok(source.includes("'data-gm-opponent'"), 'the table names its opponent')
   assert.ok(source.includes("'data-gm-vs'"), 'the one who-line carries the seat-kind hook')
   assert.ok(!source.includes("'data-gm-findmatch'"), 'and offers no browser door to find a match')
-  // In full screen the see-through machine must fit the window's height as well as its width, and
-  // must not spill a scrollbar (owner's report, 2026-11-09).
-  assert.ok(source.includes('ceilingHeight'), 'the over-chat machine is fitted to the window height')
-  assert.ok(source.includes('frameBottom - top'), 'the full machine fits the available height')
-  // And it is fitted to the frame it is drawn in, not the window: a preview pane that is a third of
-  // the window used to get a machine sized for the window and clipped on every side.
-  //
-  // It must NOT be fitted to the element it is mounted inside. That element is the status-bar span -
-  // roughly sixty pixels wide and twenty tall - and measuring against it set fit to 60*0.7/natural
-  // and the height room to 22-16 px, so the scale floor won and the machine drew at 2% of its size,
-  // invisible at any opacity (found 2026-11-10; the owner had reported it as "will not show").
-  assert.ok(source.includes('const frame = rect && rect.width && rect.height ? rect : null'),
-    'the over-chat machine is fitted to the chat column, or the window')
+  // The see-through machine is fitted to the SLOT it is given (review, 2026-11-12): the composer's
+  // underside measures its own box, hands each machine a share of the width, and the copy is fitted into
+  // that share with a height budget — never against the window, and never against the app's markup.
+  assert.ok(source.includes('function overchatFitScale'), 'the copy is fitted to the width it was given')
+  assert.ok(source.includes('OVERCHAT_MAX_HEIGHT'), 'and to a height budget, so it cannot eat the chat')
+  assert.ok(source.includes('OVERCHAT_SLOT') && source.includes('minWidth: 0'),
+    'the strip hands each machine a shrinking share of one row')
+  assert.ok(!source.includes('ceilingHeight'), 'the window is no longer measured at all')
+  assert.ok(!source.includes('const frame = rect && rect.width && rect.height ? rect : null'),
+    'and no chat column is measured off the app')
   assert.ok(!source.includes('Math.min(columnWidth, holder.width)'),
     'the status-bar span is never used as the frame')
   assert.ok(source.includes('if (answer && answer.picture) setBoard('), 'a move paints from the command reply')
@@ -5821,8 +5825,8 @@ async function refereeBadgeContract() {
   assert.ok(source.includes("data-sm-points-line"), 'the points are said in a plain sentence')
   assert.ok(source.includes("data-sm-tokens-line"), 'the tokens line says how far the next point is')
   assert.ok(!source.includes('(10 points per 1M)'), 'the old bracketed rate is gone')
-  assert.ok(source.includes('Math.max(0, viewport)'),
-    'with no chat column found, the over-chat machine centres on the window, not on viewport-420')
+  assert.ok(source.includes('justifyContent: \'center\''),
+    'the strip centres the machines it draws, without measuring a chat column to centre them on')
   console.log('slots: points in plain words, over-chat centred: passed')
 }
 
@@ -6550,9 +6554,15 @@ async function gcextrasContract() {
   const copied = []
   sandbox.navigator = { clipboard: { writeText: text => { copied.push(text); return Promise.resolve() } } }
   const line = 'v1.0.0-dev.7 · 2026-11-11 · abcdef12'
-  sandbox.gcChip = { ctx: { rest: async path => (path === '/v1/version'
-    ? { version: '1.0.0-dev.7', commit: 'abcdef1234567890', commit_short: 'abcdef12', commit_date: '2026-11-11T09:00:00-07:00', dirty: false }
-    : {}) } }
+  // The copy goes through the SDK's own clipboard door (ctx.os.writeClipboard) — never a hidden textarea
+  // appended to the app's <body> (review, 2026-11-12).
+  const clip = []
+  sandbox.gcChip = { ctx: {
+    os: { writeClipboard: text => { clip.push(text); copied.push(text); return Promise.resolve(true) } },
+    rest: async path => (path === '/v1/version'
+      ? { version: '1.0.0-dev.7', commit: 'abcdef1234567890', commit_short: 'abcdef12', commit_date: '2026-11-11T09:00:00-07:00', dirty: false }
+      : {})
+  } }
   const drawChip = () => { cursor = 0; const tree = evaluate('GamesVersionChip(gcChip)'); const pending = effects; effects = []; pending.forEach(effect => effect()); return tree }
   drawChip()
   await tick()
@@ -6578,23 +6588,31 @@ async function gcextrasContract() {
   await new Promise(resolve => setTimeout(resolve, 1600))
   chip = drawChip()
   assert.equal(words(chip), line, 'the chip goes back to the version it names')
-  // With no async clipboard, a hidden textarea and the copy command are the fallback.
-  sandbox.navigator = {}
-  const savedCreate = sandbox.document.createElement
-  const savedBody = sandbox.document.body
-  const savedExec = sandbox.document.execCommand
-  const used = []
-  sandbox.document.createElement = () => ({ style: {}, setAttribute() {}, select() { used.push('select') } })
-  sandbox.document.body = { appendChild() {}, removeChild() {} }
-  sandbox.document.execCommand = command => { used.push(command); return true }
+  // Where the SDK door is missing, the browser's own clipboard still does the job...
+  sandbox.navigator = { clipboard: { writeText: text => { copied.push(text); return Promise.resolve() } } }
+  const doorless = { ctx: { rest: sandbox.gcChip.ctx.rest } }
+  sandbox.gcChip = doorless
+  chip = drawChip()
   chip.props.onClick()
   await tick()
-  assert.ok(used.includes('copy'), 'the fallback issues the copy command when the clipboard is missing')
+  assert.equal(copied.length, 4, 'with no SDK door the browser clipboard copies instead')
+  // ...and where neither exists the chip says nothing rather than inventing a copy, and touches no
+  // element of the app's to try.
+  sandbox.navigator = {}
+  const touched = []
+  const savedCreate = sandbox.document.createElement
+  sandbox.document.createElement = () => { touched.push('createElement'); return { style: {}, setAttribute() {}, select() {} } }
+  const provable = { ctx: { rest: sandbox.gcChip.ctx.rest } }
+  sandbox.gcChip = provable
+  reset()  // a fresh chip, so the earlier "Copied" is not what is being read
+  drawChip()
+  await tick()
   chip = drawChip()
-  assert.equal(words(chip), 'Copied', 'and the fallback reports the copy just the same')
+  chip.props.onClick()
+  await tick()
+  assert.deepEqual(touched, [], 'no element of the app\'s is created for a copy')
+  assert.equal(words(drawChip()), line, 'and the chip never claims a copy it could not make')
   sandbox.document.createElement = savedCreate
-  sandbox.document.body = savedBody
-  sandbox.document.execCommand = savedExec
   // Let that last "Copied" land in the chip's own slots before the page takes them over.
   await new Promise(resolve => setTimeout(resolve, 1600))
   reset()

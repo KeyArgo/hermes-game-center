@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
@@ -113,7 +113,7 @@ Two machines sit above the reels, and you can switch between them mid-session: *
 
 A win climbs a ladder of recorded sound tiers — a small CHING, then NICE! and BIG WIN!, then HUGE WIN! with the alarm, and a full JACKPOT of coins — with coins spilling, a chip counter climbing and, for a big one, a gold flash. The overlay and the flash are fixed, click-through and take no focus, so a big win never stops you typing. The sounds are recorded clips (Mixkit's free slot set) with a synthesised fallback; provenance is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-**Show over chat** floats a see-through copy of the cabinet over the conversation: 70% opaque at full size by default, with its own size control (50–200%) and opacity control (25–100%). The switch and its controls are one shared setting — the same one in the cabinet's own panel, in the status bar and in Settings — so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
+**Show over chat** draws a see-through copy of the cabinet in the strip under the message box — the composer's own slot, so it appears exactly while the conversation does and never over the Games page, Settings or another plugin's page. It is sized from that strip: the slot's width is the limit, the copy takes half of it at the default size, and the size control (25–200%) and opacity control (25–100%) share one setting with the cabinet's own panel, the status bar and Settings, so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
 
 ### Learn, hint, and your own model
 
@@ -293,11 +293,13 @@ python3 -m pytest tests -q -p no:cacheprovider   # the full suite, no network, n
 python3 tools/build_plugin.py                     # the bundle CI grades
 node tests/table_ui_harness.cjs                   # the Desktop page's state machine
 node tests/jackpot_overlay_harness.cjs            # the over-chat slot cabinet
+node tests/jackpot2_harness.cjs                   # the Jackpot v2 copy, its switch and the fit
+node tests/jackpot2_look_harness.cjs              # the Jackpot v2 tint, and the ink it keeps readable
 node tests/slot_fit_regression.mjs                # the cabinet fits the page, in real headless Chrome
-scripts/test.sh                                   # the build, both harnesses, the fit check and pytest
+scripts/test.sh                                   # the build, every harness, the fit check and pytest
 ```
 
-CI runs the pytest suite and the two node harnesses on every push; the fit regression needs Chrome. The suite is offline: no model, no network, no GPU. [TESTING.md](docs/TESTING.md) breaks down every suite and its count; [VERIFY.md](VERIFY.md) lists the claims each run proves.
+CI runs the pytest suite and the four node harnesses on every push; the fit regression needs Chrome. The suite is offline: no model, no network, no GPU. [TESTING.md](docs/TESTING.md) breaks down every suite and its count; [VERIFY.md](VERIFY.md) lists the claims each run proves.
 
 ## Limits
 

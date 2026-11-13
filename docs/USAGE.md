@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -81,7 +81,7 @@ Open **Slots** on the Play shelf. Pick a bet (25 chips up) and press **Spin**.
 - **Classic** is a nine-window, five-payline machine; **Hermes Olympus** is one line on three Greek reels. You can switch mid-session.
 - **Auto-spin** spins while Hermes is working: one per reply and one per tool call, only while a machine is on screen.
 - **Auto-bet** sizes each stake by what the reply cost.
-- **Show over chat** floats a see-through copy over the conversation. Its size and opacity controls are shared by the cabinet, the status bar and Settings.
+- **Show over chat** draws a see-through copy in the strip under the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. Its size and opacity controls are shared by the cabinet, the status bar and Settings.
 
 The screen prints no odds. The mechanics and payouts are in `shelf/jackpot.py` and `shelf/slotplay.py`; the audit script is `scripts/slot-audit.py`.
 

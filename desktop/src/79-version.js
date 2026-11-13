@@ -18,36 +18,33 @@
 // How long the chip wears "Copied". Long enough to see, short enough not to look stuck.
 const CHIP_COPIED_MS = 1500
 
-// Where the async clipboard is missing or refuses (an older desktop, a page without the permission),
-// a hidden textarea and the old copy command are the fallback, so a copy never silently does nothing.
-function copyWithTextarea(text) {
+// Copies one line and resolves true once it is on the clipboard, through the app's own door first.
+//
+// `ctx.os.writeClipboard` is the SDK's curated clipboard and the only one a plugin should use: it is
+// attributed to the plugin, it resolves false (never throws) where the capability is missing, and it
+// needs nothing of the document. What it replaced was a hidden <textarea> appended to the app's <body>
+// and an execCommand — the same reach into the app's markup the review asked us to stop doing
+// (2026-11-12), for a copy that the browser's own clipboard API already does.
+function copyChipText(text, ctx) {
   try {
-    if (typeof document === 'undefined' || !document.body || typeof document.createElement !== 'function') return false
-    const box = document.createElement('textarea')
-    box.value = text
-    box.setAttribute('readonly', '')
-    box.style.position = 'fixed'
-    box.style.top = '-1000px'
-    box.style.opacity = '0'
-    document.body.appendChild(box)
-    box.select()
-    const done = typeof document.execCommand === 'function' ? document.execCommand('copy') : false
-    document.body.removeChild(box)
-    return done !== false
-  } catch (error) {
-    return false
-  }
+    const door = ctx && ctx.os && typeof ctx.os.writeClipboard === 'function' ? ctx.os : null
+    if (door) {
+      return Promise.resolve(door.writeClipboard(text)).then(done => {
+        if (done !== false) return true
+        return copyWithNavigator(text)
+      }, () => copyWithNavigator(text))
+    }
+  } catch (error) { /* fall through to the browser's own clipboard */ }
+  return copyWithNavigator(text)
 }
 
-// Copies one line and resolves true once it is on the clipboard, whichever door worked.
-function copyChipText(text) {
+function copyWithNavigator(text) {
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      return Promise.resolve(navigator.clipboard.writeText(text))
-        .then(() => true, () => copyWithTextarea(text))
+      return Promise.resolve(navigator.clipboard.writeText(text)).then(() => true, () => false)
     }
-  } catch (error) { /* fall through to the textarea */ }
-  return Promise.resolve(copyWithTextarea(text))
+  } catch (error) { /* no clipboard on this host */ }
+  return Promise.resolve(false)
 }
 
 function GamesVersionChip({ ctx, style }) {
@@ -78,9 +75,11 @@ function GamesVersionChip({ ctx, style }) {
     build.source ? 'read from ' + build.source : '',
     'Click to copy the version'
   ].filter(Boolean).join('\n')
-  // The chip copies its own text — the same line it shows, so what is pasted is what was read.
+  // The chip copies its own text — the same line it shows, so what is pasted is what was read. It only
+  // says "Copied" when the copy actually happened: a host with no clipboard at all must not claim one.
   const copy = () => {
-    Promise.resolve(copyChipText(line)).then(() => {
+    Promise.resolve(copyChipText(line, ctx)).then(done => {
+      if (!done) return
       setCopied(true)
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => setCopied(false), CHIP_COPIED_MS)

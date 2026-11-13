@@ -7,7 +7,7 @@
  * Plain ESM, jsx() only; imports limited to @hermes/plugin-sdk, react, react/jsx-runtime.
  */
 
-import { host, PALETTE_AREA, PANES_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA, STATUSBAR_AREAS, useValue } from '@hermes/plugin-sdk'
+import { COMPOSER_AREAS, host, PALETTE_AREA, PANES_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA, STATUSBAR_AREAS, useValue } from '@hermes/plugin-sdk'
 import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 

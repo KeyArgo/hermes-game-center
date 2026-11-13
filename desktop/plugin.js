@@ -10,7 +10,7 @@
  * Plain ESM, jsx() only; imports limited to @hermes/plugin-sdk, react, react/jsx-runtime.
  */
 
-import { host, PALETTE_AREA, PANES_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA, STATUSBAR_AREAS, useValue } from '@hermes/plugin-sdk'
+import { COMPOSER_AREAS, host, PALETTE_AREA, PANES_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA, STATUSBAR_AREAS, useValue } from '@hermes/plugin-sdk'
 import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
@@ -8097,27 +8097,28 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
   })
 }
 
-// ---- 19-jackpot-overlay.js: the floating slot machine over the chat and its status-bar chip counter
+// ---- 19-jackpot-overlay.js: the slot cabinet in the composer's strip, and its status-bar chip
+//
+// Two surfaces: the chip in the status bar (the switch, the running total, and the panel a click opens),
+// and the see-through copy of the cabinet that 78-overchat-slot.js draws in the composer's underside
+// slot. The copy is a slot contribution, not an overlay: nothing here measures the app, appends to its
+// <body> or reads the route (review, 2026-11-12).
 
 const JP_STORE = { open: false, listeners: new Set() }
 const JP_STORAGE_KEY = 'gameshelf.jackpot.overlay'
 
 // React's layout effect where the host has one, the ordinary effect where it does not (the harnesses
-// stub exactly the hooks a part is allowed to use, and they stub useEffect). The over-chat copy has
-// to know the machine's size before the first paint: measured afterwards, the machine is drawn once
-// at its full size and then snaps to its fit, which is the "sometimes it is just huge" the owner saw
-// (2026-11-09) and exactly what the visibility gate used to paper over. Resolved per call, never at
-// load: a harness hands the bundle its hook stubs after loading it, so a name read at load time
-// would simply not be there.
+// stub exactly the hooks a part is allowed to use, and they stub useEffect). It is used to attach a
+// ResizeObserver and to ask for the one render that follows a mount, because a ref is only filled in once
+// the tree is committed. Resolved per call, never at load: a harness hands the bundle its hook stubs
+// after loading it, so a name read at load time would simply not be there.
 function useJpLayoutEffect(fn, deps) {
   const hook = typeof useLayoutEffect === 'function' ? useLayoutEffect : useEffect
   return hook(fn, deps)
 }
 
-// The copy's numbers before the machine has been measured. `natural: 0` is how "not measured" is
-// spelled: it never hides the copy (that is the defect this path exists to fix) and it never stops the
-// numbers arriving, because the measurement runs before the first paint through useJpLayoutEffect.
-const JP_LAYOUT_EMPTY = { left: 0, top: 0, width: 0, scale: 1, natural: 0, naturalHeight: 0 }
+// A cabinet that has not been measured yet is drawn at 100% in a zero-sized box (see the copy below):
+// that is what makes its own size measurable at all, and one render later the fitted size replaces it.
 
 function JP_readOpen() {
   try {
@@ -8573,161 +8574,72 @@ function JackpotOverlay({ ctx, onClose, data }) {
   })
 }
 
-// Where the app is, read from its own router: the desktop routes with the URL hash. The
-// conversation is the empty hash (or "#/"), and the screens the machine must not float over have
-// their own paths. This is a denylist on purpose: an unexpected path shows the machine, because a
-// missing machine over the chat is worse than one extra copy on a screen nobody named. (The first
-// cut was the inverse and hid it over the conversation too - owner's report, 2026-11-09.)
+// ---- the see-through machine, in the composer's own slot ---------------------
 //
-// '/games' is named here now (2026-11-11): the Games page has a route of its own, and the copy over
-// the chat belongs over the conversation only.
-const JP_OFF_CHAT = ['/games', '/settings', '/capabilities', '/messaging', '/plugins', '/onboarding', '/welcome', '/about']
-
-// Is the CONVERSATION the thing on screen? The conversation's composer is a textarea that belongs to
-// neither a game surface (a play table, the "play while you wait" pane) nor the Game Center page
-// itself - those textareas are the games'. This is the same test that finds the chat column, asked as
-// a yes/no question, and it is what keeps the copy over the conversation: Hermes keeps the Game
-// Center page mounted after the person walks back to the chat, so "a Games element exists" says
-// nothing about what is being looked at (owner's report, 2026-11-11: the switch is on and nothing
-// appears over the chat).
-function JP_composer() {
-  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null
-  const gamesOnly = '.games-play-table, .games-wait-pane, .games-center-layout'
-  const isChats = node => Boolean(node)
-    && !(typeof node.closest === 'function' && node.closest(gamesOnly))
-  let found = []
-  // Every textarea, not just the first: a pane or a game page can hold one that comes first in the
-  // document, and picking that one would measure the copy against the wrong box.
-  if (typeof document.querySelectorAll === 'function') {
-    const all = document.querySelectorAll('textarea')
-    found = all && typeof all.length === 'number' ? Array.prototype.slice.call(all) : []
-  }
-  if (!found.length) {
-    const one = document.querySelector('textarea')
-    if (one) found = [one]
-  }
-  return found.find(isChats) || null
-}
-
-function jpOnChatScreen() {
-  try {
-    const hash = String((typeof window !== 'undefined' && window.location && window.location.hash) || '').replace(/^#/, '')
-    const path = hash.split('?')[0]
-    if (path && path !== '/' && JP_OFF_CHAT.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return false
-    // A Games page can be up while the app still calls the route the conversation, so the DOM is
-    // asked too - but only about a Games page that has taken the main area, and only when the
-    // conversation is NOT on screen. Asking it any other way is what hid the copy for good: the Games
-    // page stays mounted behind the chat, so the copy was suppressed over the very screen it is for
-    // (owner's report, 2026-11-11). A composer outside the games IS the conversation, so nothing that
-    // is merely still mounted can hide the copy from it.
-    const gamesScreen = typeof document !== 'undefined' && typeof document.querySelector === 'function'
-      ? document.querySelector('.games-center-layout')
-      : null
-    if (gamesScreen && gamesScreen.nodeType === 1 && !JP_composer()) {
-      const box = typeof gamesScreen.getBoundingClientRect === 'function' ? gamesScreen.getBoundingClientRect() : null
-      if (!box || (box.width > 0 && box.height > 0)) return false
-    }
-    return true
-  } catch {
-    return true
-  }
-}
-
-function useJpOnChatScreen() {
-  const [onChat, setOnChat] = useState(jpOnChatScreen())
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined
-    const read = () => setOnChat(jpOnChatScreen())
-    window.addEventListener('hashchange', read)
-    read()
-    return () => { if (typeof window.removeEventListener === 'function') window.removeEventListener('hashchange', read) }
-  }, [])
-  return onChat
-}
-
-// The see-through machine over the chat. It is mounted by the always-present status item,
-// so it is on screen whether or not Game Center is open. It reads the same /jackpot door
-// as the corner panel and reports itself visible, so auto-spin keeps running while chatting.
+// WHERE IT IS DRAWN. Not over the app's markup, and not by measuring it: the copy is rendered inside
+// the composer's `composer.underside` slot (78-overchat-slot.js), which is a real surface of the
+// Desktop SDK. That slot belongs to the conversation's composer, so it exists exactly while the
+// conversation is on screen. There is no route sniffing here, no scan of the app's textareas, no walk
+// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body> — the
+// review's finding (2026-11-12), and the reason an app update can no longer break this machine or be
+// broken by it.
 //
-// The chat column is found the way the build that worked found it (9433891): the first textarea's
-// first ancestor wider than half the window. That rule is the whole measurement - and when the shell
-// exposes no such column, the copy is measured against the window instead of a box that does not
-// exist.
-function JP_chatColumn() {
-  const composer = JP_composer()
-  if (!composer) return null
-  const viewport = Number(window.innerWidth) || 0
-  let node = composer.parentElement
-  while (node && node !== document.body) {
-    if (typeof node.getBoundingClientRect === 'function') {
-      const rect = node.getBoundingClientRect()
-      if (rect && rect.width > viewport * 0.5) return node
-    }
-    node = node.parentElement
-  }
-  return null
+// HOW BIG IT IS. The strip that owns the slot measures its own box and hands each machine its share of
+// the width; this component fits the cabinet into that share and then applies the person's own size
+// slider on top, capped by the same share. Nothing here reads window.innerWidth, a textarea's
+// position, or another element's rect.
+//
+// The height budget both copies share. A machine in the composer's underside pushes the composer up,
+// so "as big as its share allows" would eat the conversation; this keeps it a picture of a machine.
+const OVERCHAT_MAX_HEIGHT = 320
+
+// Fit a cabinet of `natural` size into `room` pixels of slot width. "100%" is the largest the slot
+// allows — whichever runs out first, the width share or the strip's height budget — and the person's own
+// size slider multiplies it from there, still never past the width share. 0 while either number is
+// unknown (the first paint, before the cabinet has been laid out).
+function overchatFitScale(natural, room, multiplier) {
+  const width = Math.max(0, Number(room) || 0)
+  if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
+  const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
+  const byWidth = width / natural.width
+  const byHeight = OVERCHAT_MAX_HEIGHT / natural.height
+  const scale = Math.min(Math.min(byWidth, byHeight) * factor, byWidth)
+  // Below two percent is not a small copy, it is an invisible one: draw nothing rather than a smudge.
+  return scale > 0.02 ? Math.floor(scale * 10000) / 10000 : 0
 }
 
-// ---- the two machines on one conversation ------------------------------------
-// The owner keeps BOTH machines (2026-11-11) and both switches may be on at once, so the conversation
-// is shared instead of fought over: this one keeps the LEFT half of the chat column, from its
-// top-left corner, and Jackpot v2 keeps the right half, from its bottom-right. Two copies that each
-// stay inside their own half of the column cannot touch, whatever size they draw at - which is what
-// makes "they must not overlap" a rule rather than a hope. The other machine's switch is only ever
-// READ here: the two switches stay separate, and turning this one off never turns v2 off.
-function JP_v2OverChat() {
-  try {
-    return Boolean(typeof JP2L_STORE !== 'undefined' && JP2L_STORE && JP2L_STORE.overchat)
-  } catch {
-    // Before the Jackpot v2 part of the bundle has run, or in a build without it: nothing to share.
-    return false
-  }
+// The cabinet's size at 100%, read from our OWN element (never the app's). It is read on every render
+// rather than kept in state: the element is ours, the read is one property, and a ResizeObserver only has
+// to ask for a new render — which is what keeps the fit correct when a late font or the symbol art
+// changes the cabinet's layout.
+function overchatNatural(ref) {
+  const node = ref && ref.current
+  if (!node) return null
+  const width = Number(node.offsetWidth) || 0
+  const height = Number(node.offsetHeight) || 0
+  return width > 0 && height > 0 ? { width, height } : null
 }
 
-function useJpV2OverChat() {
-  const [on, setOn] = useState(JP_v2OverChat)
-  useEffect(() => {
-    if (typeof JP2L_STORE === 'undefined' || !JP2L_STORE || !JP2L_STORE.listeners) return undefined
-    const listener = value => setOn(Boolean(value))
-    JP2L_STORE.listeners.add(listener)
-    setOn(JP_v2OverChat())
-    return () => { JP2L_STORE.listeners.delete(listener) }
-  }, [])
-  return on
-}
-
-function SlotsOverChat({ ctx }) {
-  const [on, setOn] = useSmOverchat()
+function SlotsOverChatCopy({ ctx, width }) {
+  const [on] = useSmOverchat()
   const [snapshot, setSnapshot] = useState(JP_LAST)
   const cabinetRef = useRef(null)
-  const [layout, setLayout] = useState(JP_LAYOUT_EMPTY)
+  const [, setResized] = useState(0)
   const [alpha] = useSmOverchatAlpha()
   const [overchatScale] = useSmScale()
-  // The other machine's switch, read-only: both may be over the chat at once, and then the
-  // conversation is halved rather than shared (see the note above JP_v2OverChat).
-  const v2On = useJpV2OverChat()
-  // Re-read the surface on every render: the status item mounts once, the games screen can open at
-  // the root route afterwards, and a hashchange-only listener never fires for that (2026-11-10).
-  const hashSaysChat = useJpOnChatScreen()
-  const onChatScreen = hashSaysChat && jpOnChatScreen()
+
+  // The picture. The status chip polls as well and is what adopts the shelf's stored switch on load;
+  // this copy only needs the numbers while it is on screen, which is when it is mounted at all.
   useEffect(() => {
-    // Poll even while the switch reads off: the shelf's stored value is what turns the copy on, and a
-    // component that only starts polling once it is already on can never adopt it - the same deadlock
-    // that hid the switch behind the switch (2026-11-10). Off polls slowly, on polls at 600 ms.
     let alive = true
-    let wait = on ? 600 : 1500
     let timer = null
+    let wait = 600
     const load = async () => {
       try {
         const next = await jpRead(ctx)
         if (!alive) return
         JP_LAST = next
         setSnapshot(next)
-        // The stored switch is the truth: the copy must come back on a reload without the person
-        // walking to the Games table first (owner's report, 2026-11-10: the copy showed over the
-        // games area but never over the chat). Adopting it here is what the status item does for the
-        // chip; the overlay has to do it for itself, because it is the surface being asked for.
-        if (!on && next && next.overchat && next.overchat.on === true) setOn(true)
         wait = 600
       } catch {
         // A failed poll leaves the last good picture; try again a little later.
@@ -8737,138 +8649,41 @@ function SlotsOverChat({ ctx }) {
     }
     load()
     return () => { alive = false; clearTimeout(timer) }
-  }, [ctx, on])
-  // While the see-through machine is actually on screen it counts as visible for auto-spin, so a
-  // reply spins it even when the person is in another game (owner's note, 2026-11-09: they hear the
-  // machine while playing Sea Battle). Off the conversation it is not drawn, so it must not count:
-  // that would spin a machine nobody can see.
+  }, [ctx])
+
+  // While the machine is drawn it counts as visible for auto-spin, so a reply spins it even when the
+  // person is in another game. It is only mounted while it is shown, so being mounted IS being visible.
   useEffect(() => {
-    if (!on || !onChatScreen) return undefined
     const door = (path, body) => ctx.rest(path, { method: 'POST', body })
     jpVisible(1, door)
     return () => jpVisible(-1, door)
-  }, [ctx, on, onChatScreen])
+  }, [ctx])
+
+  // The symbol art and the fonts settle after the first paint, and each of those changes the cabinet's
+  // layout — one ResizeObserver asks for the render, and the render reads the size again.
   useJpLayoutEffect(() => {
-    if (!on || !onChatScreen) return undefined
-    const measure = () => {
-      const viewport = Number(window.innerWidth) || 0
-      const column = JP_chatColumn()
-      const rect = column && typeof column.getBoundingClientRect === 'function'
-        ? column.getBoundingClientRect()
-        : null
-      // The frame the copy is measured against: the chat column when the shell exposes one, otherwise
-      // the window. It is NOT the element the copy is mounted inside - that is the status-bar span,
-      // about sixty pixels wide and twenty tall, and measuring against it is what made the machine
-      // 2% of its size and effectively invisible (found 2026-11-10 by reading the numbers rather than
-      // the screenshot: fit = 60*0.7/natural, room = 22-16 px, so the scale floor won every time).
-      // No column to sit on (the shell's DOM does not always expose one): the window, which keeps the
-      // machine centred rather than 210 px left of the window's centre (owner's report, 2026-11-09).
-      const frame = rect && rect.width && rect.height ? rect : null
-      const windowWidth = Math.max(0, viewport)
-      const windowHeight = Number(window.innerHeight) || 0
-      const left = frame && Number.isFinite(frame.left) ? Math.max(0, frame.left) : 0
-      const whole = frame ? Math.max(0, Math.min(windowWidth, frame.left + frame.width) - left) : windowWidth
-      // Both machines over the chat: half the conversation each, this one the left half. Two boxes
-      // that stay inside their own half of the column cannot touch, which is what makes the owner's
-      // "they must not overlap" true by construction rather than by luck (2026-11-11).
-      const half = v2On && frame ? Math.max(0, whole / 2) : 0
-      const width = half || whole
-      const cabinet = cabinetRef.current
-      // The machine is drawn at its table size, so this is its width and height at 100%.
-      const natural = cabinet && cabinet.offsetWidth ? cabinet.offsetWidth : 0
-      const naturalHeight = cabinet && cabinet.offsetHeight ? cabinet.offsetHeight : 0
-      // A cabinet that has not been laid out yet reports 0, and the numbers are then simply not known
-      // this time round. That is a reason to look again in a moment, never a reason to leave the copy
-      // out: waiting for a measurement that may never come is the defect this whole path exists to
-      // fix (owner's report, 2026-11-11: the switch is on and nothing appears over the chat). The
-      // last good numbers stay on screen until the new ones are here, which is also what keeps the
-      // copy from being drawn at 100% once ("sometimes it is just huge", owner's report, 2026-11-09).
-      if (!natural || !naturalHeight || !width) {
-        if (!layout.natural) retry = setTimeout(measure, 60)
-        return
-      }
-      // 100% fills 70% of the chat column (the size it always had); the slider multiplies that, and
-      // the top of the range is capped by the window in BOTH directions so the copy can neither spill
-      // off the bottom (the full-screen fix) nor past the right edge.
-      const fit = (width * 0.7) / natural
-      const ceiling = Math.min(width, viewport) / natural
-      // Where the frame starts, not where the window does. "top: 8%" is 8% of the window, so in a
-      // pane that begins low and is short, the machine started too far down and its bottom was cut
-      // off (owner's report, 2026-11-10: "the on screen slot machine is missing its bottom").
-      const frameTop = frame && Number.isFinite(frame.top) ? Math.max(0, frame.top) : 0
-      const top = Math.min(windowHeight, frameTop + Math.min(8, Math.max(0, windowHeight - frameTop)))
-      const frameBottom = frame ? Math.min(windowHeight, frame.top + frame.height) : windowHeight
-      const room = Math.max(0, frameBottom - top)
-      const ceilingHeight = room / naturalHeight
-      const scale = Math.max(0, Math.min(fit * overchatScale, ceiling, ceilingHeight))
-      // A scale this small is not a small copy, it is an invisible one: a frame with no room left
-      // (a wrapper that collapsed, a pane mid-transition). Keep the last good layout and look again.
-      if (!(scale > 0.02)) {
-        if (!layout.natural) retry = setTimeout(measure, 150)
-        return
-      }
-      const box = { left, top, width, scale, natural, naturalHeight }
-      // Only redraw when the numbers actually moved: setLayout on every ResizeObserver tick was a
-      // render loop of its own.
-      setLayout(prev => (Math.abs((prev.scale || 0) - box.scale) < 0.001
-        && prev.left === box.left && prev.top === box.top && prev.width === box.width
-        && prev.natural === box.natural && prev.naturalHeight === box.naturalHeight) ? prev : box)
-    }
-    let retry = null
-    let watchers = []
-    let observedColumn = null
-    const remeasure = () => {
-      if (retry) { clearTimeout(retry); retry = null }
-      const column = JP_chatColumn()
-      if (column !== observedColumn) {
-        if (watchers.length) { watchers.forEach(watcher => watcher.disconnect()); watchers = [] }
-        observedColumn = column
-        if (column && typeof ResizeObserver !== 'undefined') {
-          const onColumn = new ResizeObserver(remeasure)
-          try { onColumn.observe(column); watchers.push(onColumn) } catch (error) { /* a dead column is not fatal */ }
-        }
-      }
-      measure()
-    }
-    remeasure()
-    if (typeof ResizeObserver !== 'undefined') {
-      // The cabinet changes size on its own: the machine can be switched (three reels against nine
-      // windows), the symbol art loads late, and the fonts settle after first paint. Watching the
-      // cabinet is what keeps "always the right size" true rather than a one-shot measurement.
-      const cabinet = cabinetRef.current
-      if (cabinet) {
-        const onCabinet = new ResizeObserver(remeasure)
-        try { onCabinet.observe(cabinet); watchers.push(onCabinet) } catch (error) { /* as above */ }
-      }
-    }
-    // Area changes can replace the composer without changing the URL.
-    // A light poll, not a body-wide observer: the plugin must not watch the app's own markup.
-    const areaWatcher = setInterval(() => {
-      if (JP_chatColumn() !== observedColumn) remeasure()
-    }, 1000)
-    if (typeof window.addEventListener === 'function') {
-      window.addEventListener('resize', measure)
-      window.addEventListener('orientationchange', measure)
-      window.addEventListener('hashchange', measure)
-    }
-    const settles = [0, 120, 400, 1200].map(delay => setTimeout(measure, delay))
-    // Web fonts and images land after the first paint; both change the machine's natural size.
+    // One render after mount, whatever the observer does: the ref is only filled in once the tree is
+    // committed, so the first render can only see "not measured yet". Without this the copy would wait
+    // for a resize that may never come — a cabinet already at its final size fires no event at all.
+    setResized(count => count + 1)
+    const cabinet = cabinetRef.current
+    if (typeof ResizeObserver === 'undefined' || !cabinet) return undefined
+    let watcher = null
     try {
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure)
-    } catch (error) { /* an old shell without the font set simply keeps the timers */ }
-    return () => {
-      watchers.forEach(watcher => watcher.disconnect())
-      clearInterval(areaWatcher)
-      if (typeof window.removeEventListener === 'function') {
-        window.removeEventListener('resize', measure)
-        window.removeEventListener('orientationchange', measure)
-        window.removeEventListener('hashchange', measure)
-      }
-      settles.forEach(timer => clearTimeout(timer))
-      if (retry) clearTimeout(retry)
+      watcher = new ResizeObserver(() => setResized(count => count + 1))
+      watcher.observe(cabinet)
+    } catch {
+      return undefined
     }
-  }, [on, onChatScreen, v2On, snapshot && snapshot.machine, overchatScale])
-  if (!on || !onChatScreen) return null
+    return () => { if (watcher && typeof watcher.disconnect === 'function') watcher.disconnect() }
+  }, [])
+
+  const natural = overchatNatural(cabinetRef)
+  const scale = overchatFitScale(natural, width, overchatScale)
+  if (!on) return null
+  // The machine is drawn even before it has been measured — at 100%, clipped to nothing — because its own
+  // size is what the measurement is of. One frame, and the box below takes the fitted size.
+  const ready = Boolean(natural && scale)
   const machines = (snapshot && snapshot.machines) || []
   const machineId = (snapshot && snapshot.machine) || (machines[0] && machines[0].id) || ''
   const machine = machines.find(item => item.id === machineId) || machines[0] || null
@@ -8879,45 +8694,36 @@ function SlotsOverChat({ ctx }) {
   const bet = Number(snapshot && snapshot.bet) || 0
   const bets = (snapshot && snapshot.bets) || []
   const odds = (snapshot && snapshot.odds) || null
-  const off = () => setOn(false)
-  // Both machines on: this one is the left-hand copy, anchored at the frame's top-left corner; on its
-  // own it stays centred in the frame it has to itself (the shell's own look, owner's report
-  // 2026-11-09: a copy measured from left 0 read as left-justified). Either way the box stays inside
-  // its half of the conversation, which is what keeps the two machines off one another.
-  const sharing = Boolean(v2On && layout.width)
+  const off = () => smSetOverchat(false)
   return jsx('div', {
     'data-jackpot': 'overchat',
     style: {
-      position: 'fixed', left: layout.left, top: layout.top ?? 0, width: layout.width || 'auto',
-      // The see-through machine sits at the viewer's opacity, 20% by default (owner's ask,
-      // 2026-11-09: five points more opaque than the 15% it was). The − / + control beside
-      // "Show over chat" changes it and the choice is kept in this browser. The × / Show
-      // controls are the only things drawn above it.
-      //
-      // There is deliberately no `visibility` gate here any more: the copy used to be hidden until a
-      // measurement arrived, and a measurement that never arrives then hides the machine for good -
-      // which is the owner's release blocker this change exists for (2026-11-11). The numbers are
-      // measured in this component, before the first paint (JP_USE_LAYOUT), so there is nothing to
-      // hide from.
-      zIndex: 60, opacity: alpha,
-      pointerEvents: 'none', boxSizing: 'border-box',
-      display: 'flex', justifyContent: sharing ? 'flex-start' : 'center', color: text.primary, fontSize: 12
+      // Relative, because the machine inside is absolutely positioned: that is what lets it be measured
+      // before this box has a size. A plain child of a zero-width box measures as zero, and a machine that
+      // only draws once measured would then never draw at all.
+      position: 'relative',
+      width: ready ? natural.width * scale : 0,
+      height: ready ? natural.height * scale : 0,
+      // The see-through machine sits at the viewer's opacity, 20% by default. The box is the size the
+      // machine actually paints at: a transform does not shrink the layout box, so sizing the wrapper
+      // is what keeps the strip's own height honest.
+      opacity: alpha,
+      // It is for watching, not clicking: a click here must never be one the conversation wanted. The
+      // machine's own dismissal controls sit in the strip and opt back in.
+      pointerEvents: 'none',
+      boxSizing: 'border-box', overflow: 'hidden',
+      color: text.primary, fontSize: 12
     },
-    // The scaled box is given the size the machine actually paints at. A transform does not shrink
-    // the layout box, so without this the child kept its full width inside a narrower centred
-    // wrapper, pushed itself right, and read as dials pinned left with dead space beside them
-    // (owner's report, 2026-11-09: the "centering" problem).
     children: jsx('div', {
       style: {
-        width: layout.natural ? layout.natural * layout.scale : 'auto',
-        height: layout.naturalHeight ? layout.naturalHeight * layout.scale : 'auto'
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: natural ? natural.width : 'max-content',
+        height: natural ? natural.height : 'auto',
+        transform: `scale(${ready ? scale : 1})`,
+        transformOrigin: 'top left'
       },
-      children: jsx('div', {
-        style: {
-          width: layout.natural || 'auto',
-          transform: `scale(${layout.scale})`,
-          transformOrigin: 'top left'
-        },
       children: jsx(SlotMachine, {
         machine,
         machines,
@@ -8928,10 +8734,8 @@ function SlotsOverChat({ ctx }) {
         odds,
         paytable: (snapshot && snapshot.paytable) || [],
         compact: false,
-        // The copy over the chat is the same machine as the one in the wait pane, points card and
-        // printed glass included (owner's ask, 2026-11-09: "should have points and all, and look the
-        // same"). `chat` draws the full machine with the dismissal controls; `bare` would have shown
-        // the cabinet alone.
+        // The copy is the same machine as the one in the wait pane, points card and printed glass
+        // included (owner's ask, 2026-11-09), with its dismissal controls (`chat: true`).
         bare: false,
         chat: true,
         cabinetRef,
@@ -8940,105 +8744,81 @@ function SlotsOverChat({ ctx }) {
         scaleOverride: 1,
         onClose: off,
         onShow: off
-        })
       })
     })
   })
 }
 
-// ---- 19-jackpot2-layer.js: JACKPOT v2 over the chat — the layer, its switch and the full view
+// ---- 19-jackpot2-layer.js: JACKPOT v2 in the composer's own slot — its switch and the full view
 //
 // JACKPOT v2 is a second slot machine beside the old one (18-slot-machine.js / 18-slots.js /
-// 19-jackpot-overlay.js, which are NOT touched by this part). This part owns three things and no
-// others: the see-through machine that floats over the conversation, the switch and sliders that
-// turn it on and size it, and the full-screen view the Games page opens.
+// 19-jackpot-overlay.js, which are NOT touched by this part). This part owns the switch and the look
+// sliders, the cabinet as it appears over the conversation, and the full-screen view the Games page
+// opens.
 //
-// THE MACHINE IS NOT HERE. It is 18-jackpot2-machine.js — JackpotMachine({ ctx, mode }) — designed
-// at ONE fixed size, 560x720. Everything in this file only ever scales the box the machine sits in,
-// with a CSS transform, so the machine itself never has to know how big it is. When a bundle is
-// built without that part (the lanes are written side by side) the layer still builds, mounts and
-// can be tested: it draws a plain "not in this build yet" plate in the machine's place.
+// THE MACHINE IS NOT HERE. It is 18-jackpot2-machine.js — JackpotMachine({ ctx, mode }) — designed at
+// ONE fixed size, 560x720. Everything in this file only ever scales the box the machine sits in, with a
+// CSS transform, so the machine itself never has to know how big it is. When a bundle is built without
+// that part (the lanes are written side by side) the copy still builds and can be tested: it draws a
+// plain "not in this build yet" plate in the machine's place.
 //
-// HOW THE MACHINE GETS INTO THE LAYER (worth reading before changing anything below). The layer is
-// a plain div, created with document.createElement, appended to document.body at z-index
-// 2147483000, click-through except for the machine's own controls — the way Aura mounts its
-// backdrop. A div the app's React tree does not own can only be filled by react-dom, and a Hermes
-// plugin cannot import it: tools/build_plugin.py and tests/test_plugin_bundle.py allow only
-// @hermes/plugin-sdk, react and react/jsx-runtime, and the desktop loader refuses every other
-// specifier at runtime. So jp2LDOMlib() looks for a host copy of react-dom and uses it when one
-// exists (createRoot into the layer, or a portal), and when there is none — which is the shipped
-// case — the status item draws the same machine as a fixed-position copy in our own tree.
+// WHERE THE COPY IS DRAWN (review, 2026-11-12). Not in a div of our own appended to document.body, not
+// measured against the app's own markup, and with no stylesheet pushed into the app's <head>: all three
+// were "the plugin over-chat machine reaches into the app's own markup", and the review is right that a
+// plugin must live inside SDK surfaces so an app update can neither break it nor be broken by it.
 //
-// THE COPY MUST NOT DEPEND ON THE BODY DIV (owner's release blocker, 2026-11-11; the three
-// independent analyses in .q/overchat-why/ agree on this). It used to: the numbers came out of
-// jp2LApply(), which measured only after jp2LEnsureLayer() had created and appended the div — so a
-// host where that div cannot be created, or where only the status item's own tree renders, drew
-// NOTHING over the chat while the pane's own machine worked. Jackpot2StatusItem now measures the
-// frame itself, exactly the way the OLD over-chat machine does (JP_chatColumn: the first textarea,
-// then the first ancestor wider than half the window), and draws the cabinet as a position:fixed
-// child of its own status span. No body node, no createRoot and no createPortal is needed for it to
-// appear. The layer div is still created and removed by the switch, and when a host react-dom can
-// fill it the machine is drawn there INSTEAD — one mounted machine, never two.
+// The copy is a contribution to the composer's `composer.underside` slot and is rendered in our own
+// tree by 78-overchat-slot.js, which owns the strip, the layout and the width each machine is given.
+// Three things follow, and they are the reason this shape is better rather than merely compliant:
 //
-// TESTABLE SURFACE (tests/jackpot2_harness.cjs):
-//   jp2LApply(ctx, on, { alpha, size, notify }) -> { on, node, geo, root }   create/remove + paint
-//   jp2LLayerNode()            the div, or null while the switch is off
-//   jp2LEnsureLayer()          create it now (idempotent)
-//   jp2LRemoveLayer()          remove it now
-//   jp2LFrame()                the box it floats over: the chat column, else the right third
-//   jp2LOverlayGeometry(frame, size) -> { scale, width, height, left, top }; scale floored at 0.35
-//   jp2LSharedGeometry(frame, size, shared)  the same numbers ASKED BY THE COPY: the frame it floats
-//                              over, the size, and then the position offsets applied (0 = today)
-//   jp2LPositioned(geo, frame) the offsets, clamped inside the frame and above the composer
-//   jp2LComposerTop()          the top of the composer to keep clear of, or null when there is none
-//   jp2LFitGeometry(frame, size)     -> the full view: fits BOTH ways, nothing clipped, no floor
+//   - "only over the conversation" is now structural. The slot belongs to the chat composer, so it does
+//     not exist on the Games page, in Settings or on another plugin's page. No route sniffing and no
+//     DOM test is needed to keep the machine off those screens.
+//   - the size comes from the slot. The strip measures ITS OWN box and hands this copy its share of the
+//     width (jp2LSlotScale); nothing here reads window.innerWidth or another element's rect, so a docked
+//     pane, a narrow window or a split layout all size the copy correctly with no measurement of the
+//     app at all.
+//   - the look (see-through, size, colour) is still one stored setting shared by every surface, and it
+//     still lives in ctx.storage: 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size',
+//     'jackpot2.hue', 'jackpot2.gradient', read live through JP2L_STORE.
+//
+// The tint is a stylesheet of ours, scoped to the cabinet's published root class INSIDE OUR OWN STAGE
+// (`[data-jp2-stage][data-jp2-tint] .jp2-machine`) and rendered as a <style> element in the stage's own
+// children, so it leaves with the stage and never touches the document. The values ride on the stage as
+// CSS custom properties (jp2LTintVars), so one static rule serves every hue. The cabinet's own text
+// shadow is left alone: the tint only ever moves the frost's hue, at the frost's own saturation and
+// lightness, so the contrast the shadow was chosen for does not change.
+//
+// There is no "where" setting any more, and that is deliberate: a copy that lives in a slot has a place,
+// and the old left-right / up-down offsets moved it across a frame it no longer owns. The stored keys
+// 'jackpot2.posx' / 'jackpot2.posy' are simply not read; nothing has to migrate.
+//
+// TESTABLE SURFACE (tests/jackpot2_harness.cjs, tests/jackpot2_look_harness.cjs):
+//   jp2LSlotScale(width, size) -> scale       the copy fitted into its share of the slot
+//   jp2LOverChatCopy({ ctx, width })          the copy, drawn at that scale (null while the switch is off)
+//   jp2LStyleRules(tint) -> css text          the tint and the watch-only rules, scoped to our stage
+//   jp2LStage(ctx, geo, mode)                 the scaled stage (machine + tint + the dismissal control)
+//   jp2LMachine(ctx, mode)                    the cabinet, or the honest plate
+//   jp2LFitGeometry(frame, size)              the full view: fits BOTH ways, nothing clipped
 //   jp2LSetOverchat(on, ctx) / jp2LSetAlpha(value, ctx) / jp2LSetSize(value, ctx)
-//   jp2LSetPosition(x, y, ctx) / jp2LSetHue(value, ctx) / jp2LSetGradient(id, ctx) / jp2LResetLook(ctx)
+//   jp2LSetHue(value, ctx) / jp2LSetGradient(id, ctx) / jp2LResetLook(ctx)
 //   jp2LTint(gradient?, hue?) -> { gradient, hue, active }   active = not the look it always had
 //   jp2LTintPalette(tint) -> { background, edge, glow }      the three colours the frame is painted
 //   jp2LTintVars(tint)         the CSS values for the tint, or null at the default
-//   Jackpot2OverChatControls({ ctx, tone })   the switch, the sliders, the position and the colour
-//   Jackpot2StatusItem, Jackpot2Full, Jackpot2Tile
+//   Jackpot2OverChatControls({ ctx, tone })   the switch, the sliders and the colour
+//   Jackpot2Full, Jackpot2Tile, jp2LPlayTiles
 // A word on names, because it has bitten this feature once already: tools/build_plugin.py puts every
 // part in ONE module scope, so two parts that declare the same name overwrite each other in silence
 // (the last one wins). The first cut of this part declared jp2Publish(), which the machine's part
 // owns — the machine's own publish would have run this part's instead. The name is jp2LPublish now,
-// and the published surface above is exactly what tests/jackpot2_harness.cjs asks for, so a clash
-// with a later part shows up as a harness failure rather than as a machine that quietly does
-// nothing. Check before adding a plain jp2Foo() here.
-// Defaults and key names: alpha 0.7 (range 0.25 - 1, step 0.05), size 1 (range 0.5 - 2), position
-// 0/0 (range -1 - 1, step 0.05), hue 170 (range 0 - 360), gradient 'teal', stored in ctx.storage as
-// 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size', 'jackpot2.posx', 'jackpot2.posy',
-// 'jackpot2.hue', 'jackpot2.gradient'. Every one of them is read live through JP2L_STORE, so a
-// change is on screen without a reload.
-//
-// THE POSITION AND THE COLOUR (owner's ask, 2026-11-11) are both defined so their DEFAULT is exactly
-// the copy as it was before they existed: offsets 0 hand back the very same geometry
-// jp2LOverlayGeometry() answers (jp2LPositioned returns its argument untouched), and hue 170 is the
-// teal the cabinet already wears — #3ee0c5 is hue 170 exactly. Only when one of them moves does the
-// tint paint anything at all.
-//
-// The tint cannot be part of the machine: the cabinet is 18-jackpot2-machine.js, which this lane does
-// not touch. So the tint is a stylesheet of our own (jp2LLayerStyle), scoped to the cabinet's
-// published root class INSIDE OUR OWN STAGE — `[data-jp2-tint] .jp2-machine` — and it names the root
-// element and nothing under it, which is what keeps the reels and the symbol art their own colours.
-// The values ride on the stage element as CSS custom properties (jp2LTintVars), so the same static
-// rule serves every hue. The cabinet's own text shadow is left alone: the tint only ever moves the
-// frost's hue, at the frost's own saturation and lightness, so the contrast the shadow was chosen
-// for does not change.
+// and the published surface above is exactly what the harnesses ask for, so a clash with a later part
+// shows up as a harness failure rather than as a machine that quietly does nothing. Check before
+// adding a plain jp2Foo() here.
+// Defaults and key names: alpha 0.25 (range 0.25 - 1, step 0.05), size 1 (range 0.25 - 2), hue 170
+// (range 0 - 360), gradient 'teal'.
 
-// The machine's one design size. The layer scales this box; it never resizes the machine.
 const JP2L_SIZE = { width: 560, height: 720 }
-// Above every piece of the app's own chrome (Aura's bar sits at 999998): the machine floats over
-// the conversation, not inside a pane.
-const JP2L_Z = 2147483000
-// The floor from the shared interface: below this the cabinet is a smudge, not a machine.
-const JP2L_MIN_SCALE = 0.35
-// The frame is never allowed to be nothing. A zero-sized frame is the one shape that would make the
-// copy invisible while every number "looks" fine (owner's release rule, 2026-11-11: it must never be
-// zero-sized), so a frame smaller than this is measured as this instead.
-const JP2L_MIN_FRAME = { width: 240, height: 200 }
-// The layer is also a tile and a full view; all three name the machine the same way.
+// The copy is also a tile and a full view; all three name the machine the same way.
 const JP2L_ID = 'jackpot2'
 const JP2L_SUMMARY = 'A second cabinet on the same wallet: futuristic reels, real spin effects.'
 
@@ -9048,32 +8828,17 @@ const JP2L_SIZE_KEY = 'jackpot2.size'
 const JP2L_ALPHA_MIN = 0.25
 const JP2L_ALPHA_MAX = 1
 const JP2L_ALPHA_STEP = 0.05
-// See-through by default: the machine is over the conversation, and the conversation has to stay
-// readable around it. Fully opaque is allowed, and so is fading it back to a quarter — the floor is
-// 0.25, never fully transparent, so the machine can never be there-but-invisible (owner's release
-// rule, 2026-11-11).
+// See-through by default: the machine sits under the composer, and the conversation around it has to
+// stay readable. Fully opaque is allowed, and so is fading it back to a quarter — the floor is 0.25,
+// never fully transparent, so the machine can never be there-but-invisible (owner's release rule,
+// 2026-11-11).
 // As see-through as it goes by default (owner, 2026-11-11: "default see thru should be the most").
 const JP2L_ALPHA_DEFAULT = JP2L_ALPHA_MIN
 const JP2L_SIZE_MIN = 0.25
 const JP2L_SIZE_MAX = 2
-// Half size by default (owner, 2026-11-11: "default size should be 50%").
-const JP2L_SIZE_DEFAULT = 0.5
-
-// Where the copy floats: an offset from the place it has always had (centred over the chat column),
-// never a coordinate, so the default is today's position on any frame and any window. -1 and +1 are
-// the ends of the travel the frame allows, not a fixed distance: on a wide column the same slider
-// position is a longer move than on a narrow one, and no slider position can push the copy out of the
-// conversation.
-const JP2L_POSX_KEY = 'jackpot2.posx'
-const JP2L_POSY_KEY = 'jackpot2.posy'
-const JP2L_POS_MIN = -1
-const JP2L_POS_MAX = 1
-const JP2L_POS_STEP = 0.05
-const JP2L_POS_DEFAULT = 0
-// Where the copy starts up-down: the top of the conversation, centred left-right (owner, 2026-11-11:
-// "move the default place for the jackpot out to the middle top"). -1 is the highest place the clamp allows.
-const JP2L_POSY_DEFAULT = -1
-
+// Full size by default. "100%" is now the largest the composer's slot allows rather than the whole chat
+// column, which is a smaller box: keeping the old 50% would have halved the machine twice (review, 2026-11-12).
+const JP2L_SIZE_DEFAULT = 1
 // What colour the copy's frosted frame is. The hue of the cabinet's own accent, #3ee0c5, is 170.0
 // exactly — so 170 IS "the current teal", and it is the default.
 const JP2L_HUE_KEY = 'jackpot2.hue'
@@ -9118,17 +8883,11 @@ const JP2L_GRADIENT_DEFAULT = 'teal'
 const JP2L_RANGES = {
   alpha: { min: JP2L_ALPHA_MIN, max: JP2L_ALPHA_MAX, step: JP2L_ALPHA_STEP },
   size: { min: JP2L_SIZE_MIN, max: JP2L_SIZE_MAX, step: 0.05 },
-  posx: { min: JP2L_POS_MIN, max: JP2L_POS_MAX, step: JP2L_POS_STEP },
-  posy: { min: JP2L_POS_MIN, max: JP2L_POS_MAX, step: JP2L_POS_STEP },
   hue: { min: JP2L_HUE_MIN, max: JP2L_HUE_MAX, step: 1 }
 }
 
 function jp2LWin() {
   return typeof window === 'undefined' ? null : window
-}
-
-function jp2LDoc() {
-  return typeof document === 'undefined' ? null : document
 }
 
 // Round a scale DOWN, never up. A scale rounded up is a copy a fraction of a pixel larger than the
@@ -9155,16 +8914,6 @@ function jp2LClampSize(value) {
 
 function jp2LBool(value) {
   return value === true || value === 1 || value === '1' || value === 'true' || value === 'on'
-}
-
-// The position and the colour, clamped the way alpha and size are: a stored value that is nonsense
-// (a string from an old host, a drag that ended off the end) comes back as the default rather than as
-// a copy somewhere strange.
-function jp2LClampPosition(value) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return JP2L_POS_DEFAULT
-  const stepped = Math.round(number / JP2L_POS_STEP) * JP2L_POS_STEP
-  return Number(Math.min(JP2L_POS_MAX, Math.max(JP2L_POS_MIN, stepped)).toFixed(2))
 }
 
 function jp2LClampHue(value) {
@@ -9287,24 +9036,19 @@ const JP2L_STORE = {
   overchat: false,
   alpha: JP2L_ALPHA_DEFAULT,
   size: JP2L_SIZE_DEFAULT,
-  posx: JP2L_POS_DEFAULT,
-  posy: JP2L_POSY_DEFAULT,
   hue: JP2L_HUE_DEFAULT,
   gradient: JP2L_GRADIENT_DEFAULT,
   listeners: new Set()
 }
 
-// Read the shelf's stored choices, once per context. Called from the hooks themselves rather than
-// from an effect: the status item is the only thing that can turn the layer on, and it must read
-// the real value before its first paint, not one render later.
+// Read the shelf's stored choices, once per context. Called from the hooks themselves rather than from
+// an effect, so a surface reads the real value before its first paint instead of one render later.
 function jp2LAdopt(ctx) {
   if (!ctx || JP2L_STORE.ctx === ctx) return
   JP2L_STORE.ctx = ctx
   JP2L_STORE.overchat = jp2LBool(jp2LStored(ctx, JP2L_OVERCHAT_KEY, false))
   JP2L_STORE.alpha = jp2LClampAlpha(jp2LStored(ctx, JP2L_ALPHA_KEY, JP2L_ALPHA_DEFAULT))
   JP2L_STORE.size = jp2LClampSize(jp2LStored(ctx, JP2L_SIZE_KEY, JP2L_SIZE_DEFAULT))
-  JP2L_STORE.posx = jp2LClampPosition(jp2LStored(ctx, JP2L_POSX_KEY, JP2L_POS_DEFAULT))
-  JP2L_STORE.posy = jp2LClampPosition(jp2LStored(ctx, JP2L_POSY_KEY, JP2L_POSY_DEFAULT))
   JP2L_STORE.hue = jp2LClampHue(jp2LStored(ctx, JP2L_HUE_KEY, JP2L_HUE_DEFAULT))
   JP2L_STORE.gradient = jp2LGradientId(jp2LStored(ctx, JP2L_GRADIENT_KEY, JP2L_GRADIENT_DEFAULT))
 }
@@ -9336,22 +9080,6 @@ function jp2LSetSize(value, ctx) {
   jp2LPublish()
   return size
 }
-
-// The two offsets, written together: they are one setting to a person ("where is it"), and one of
-// them alone is not a position. -1 is the left / the top end of the travel the frame allows, +1 the
-// right / the bottom end, 0 the centre the copy has always had.
-function jp2LSetPosition(x, y, ctx) {
-  const posx = jp2LClampPosition(x)
-  const posy = jp2LClampPosition(y)
-  JP2L_STORE.posx = posx
-  JP2L_STORE.posy = posy
-  const store = ctx || JP2L_STORE.ctx
-  jp2LSave(store, JP2L_POSX_KEY, posx)
-  jp2LSave(store, JP2L_POSY_KEY, posy)
-  jp2LPublish()
-  return { x: posx, y: posy }
-}
-
 function jp2LSetHue(value, ctx) {
   const hue = jp2LClampHue(value)
   JP2L_STORE.hue = hue
@@ -9368,13 +9096,12 @@ function jp2LSetGradient(value, ctx) {
   return gradient
 }
 
-// Reset look: every LOOK setting back to its default — how see-through, how big, where, and what
-// colour. The over-chat switch is not a look: it is left exactly where the person put it, so resetting
-// the look can never make the cabinet vanish (or appear) as a side effect.
+// Reset look: every LOOK setting back to its default — how see-through, how big, and what colour. The
+// over-chat switch is not a look: it is left exactly where the person put it, so resetting the look can
+// never make the cabinet vanish (or appear) as a side effect.
 function jp2LResetLook(ctx) {
   jp2LSetAlpha(JP2L_ALPHA_DEFAULT, ctx)
   jp2LSetSize(JP2L_SIZE_DEFAULT, ctx)
-  jp2LSetPosition(JP2L_POS_DEFAULT, JP2L_POSY_DEFAULT, ctx)
   jp2LSetHue(JP2L_HUE_DEFAULT, ctx)
   jp2LSetGradient(JP2L_GRADIENT_DEFAULT, ctx)
   return true
@@ -9418,22 +9145,6 @@ function useJp2LSize(ctx) {
   return [size, value => jp2LSetSize(value, ctx)]
 }
 
-// The offsets and the colour, on the same pattern as the two sliders above: read once from the store,
-// then kept in step by the store's listeners, and written with the setters that save them. That is
-// what makes a change live — the status item, the cabinet's panel and both Settings views all draw
-// this same setting and all see the same value the moment it moves.
-function useJp2LPosition(ctx) {
-  jp2LAdopt(ctx)
-  const [position, setPosition] = useState({ x: JP2L_STORE.posx, y: JP2L_STORE.posy })
-  useEffect(() => {
-    const listener = () => setPosition({ x: JP2L_STORE.posx, y: JP2L_STORE.posy })
-    JP2L_STORE.listeners.add(listener)
-    listener()
-    return () => JP2L_STORE.listeners.delete(listener)
-  }, [])
-  return [position, (x, y) => jp2LSetPosition(x, y, ctx)]
-}
-
 function useJp2LTint(ctx) {
   jp2LAdopt(ctx)
   const [tint, setTint] = useState(jp2LTint())
@@ -9450,234 +9161,44 @@ function useJp2LTint(ctx) {
   }]
 }
 
-// ---- where the layer goes ----------------------------------------------------
-// The box the machine floats over: the chat column, found the way the old over-chat machine finds
-// it (19-jackpot-overlay.js, JP_chatColumn — an ancestor of the composer that spans most of the
-// window) with one difference: when a docked pane squeezes the conversation below half the window,
-// the innermost ancestor that is still a column (240 px or more) is the better answer than the
-// right third of the window, which would sit over the panes instead of over the conversation. Read
-// locally rather than borrowed, so this machine's geometry cannot be changed by the old one's.
-// The conversation's composer: the first textarea that is NOT inside a Game Center surface. A
-// "Play while you code" pane (or a table) can hold the first textarea on the page - its table chat -
-// and treating that as the composer dropped the copy onto the pane (owner's screenshot, 2026-11-11).
-// ONE finder, used for the chat column and for the composer limit alike, so they cannot disagree.
-function jp2LComposerNode(doc) {
-  if (!doc || typeof doc.querySelector !== 'function') return null
-  const inGames = node => typeof node.closest === 'function' && Boolean(node.closest('.games-play-table, .games-wait-pane'))
-  const all = typeof doc.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('textarea') || []) : []
-  const composer = all.length ? all.find(node => !inGames(node)) : doc.querySelector('textarea')
-  return composer && !inGames(composer) ? composer : null
+
+// ---- where the copy is drawn: its share of the composer's underside slot -------------
+// The slot hands each machine a width (78-overchat-slot.js measures the strip's own box and splits it),
+// and this is the whole of the sizing: fill that share at the person's size, never wider than the share,
+// and never taller than the strip's height budget at the default size. No window, no rect, no column.
+// The cabinet is a fixed 560x720 design, so "its own size" is a constant and the whole rule is the one
+// both machines share (overchatFitScale, 19-jackpot-overlay.js).
+function jp2LSlotScale(width, size) {
+  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size))
+  return scale > 0 ? jp2LFloor(scale) : 0
 }
 
-function jp2LChatColumn() {
-  const doc = jp2LDoc()
-  if (!doc || typeof doc.querySelector !== 'function') return null
-  // The conversation's composer is the first textarea that is NOT inside a Game Center surface. A
-  // "Play while you code" pane (or a table) can hold the first textarea on the page - its table chat -
-  // and treating that as "no chat column" dropped the copy onto the fallback third, i.e. ON the pane
-  // (owner's screenshot, 2026-11-11 08:1x). So skip those, and only give up when no other is left.
-  const composer = jp2LComposerNode(doc)
-  if (!composer) return null
-  const win = jp2LWin()
-  const viewport = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : 0
-  const viewHeight = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
-  // The conversation is TALL as well as wide. A composer's own bar can already be wider than half the
-  // window while only ~60 px high, and taking it drew a tiny machine on the composer at the bottom
-  // (owner's screenshot, 2026-11-11 08:03). So the walk wants an ancestor that is wide AND at least 40%
-  // of the window high; the old wide-only answer is kept only as a last resort.
-  const tall = height => viewHeight <= 0 || height >= viewHeight * 0.4
-  let node = composer.parentElement
-  let column = null
-  let wideOnly = null
-  while (node && node !== doc.body) {
-    if (typeof node.getBoundingClientRect === 'function') {
-      const rect = node.getBoundingClientRect()
-      const width = rect ? Number(rect.width) || 0 : 0
-      const height = rect ? Number(rect.height) || 0 : 0
-      if (viewport > 0 && width > viewport * 0.5) {
-        if (tall(height)) return node
-        if (!wideOnly) wideOnly = node
-      }
-      if (!column && width >= 240 && tall(height)) column = node
-    }
-    node = node.parentElement
-  }
-  return column || wideOnly
-}
-
-function jp2LFrame() {
-  const win = jp2LWin()
-  const viewWidth = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : 0
-  const viewHeight = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
-  const column = jp2LChatColumn()
-  const box = column && typeof column.getBoundingClientRect === 'function' ? column.getBoundingClientRect() : null
-  if (box && Number(box.width) > 0 && Number(box.height) > 0) {
-    return {
-      left: Math.max(0, Number(box.left) || 0),
-      top: Math.max(0, Number(box.top) || 0),
-      width: Number(box.width),
-      height: Number(box.height)
-    }
-  }
-  if (viewWidth > 0 && viewHeight > 0) {
-    const width = Math.max(1, Math.round(viewWidth / 3))
-    return { left: Math.max(0, viewWidth - width), top: 0, width, height: viewHeight }
-  }
-  // Nothing measurable at all (a headless shell, a stub document): the design size, so the numbers
-  // are never nonsense and the machine still paints at 100%.
-  return { left: 0, top: 0, width: JP2L_SIZE.width, height: JP2L_SIZE.height }
-}
-
-// The copy's own position: an offset from the centre, read live from the store.
-function jp2LPosition() {
-  return { x: jp2LClampPosition(JP2L_STORE.posx), y: jp2LClampPosition(JP2L_STORE.posy) }
-}
-
-// The top of the composer — a limit the copy must not cross — or null when the frame is not a
-// conversation at all (the start screen, a games pane), because then there is no composer to keep
-// clear of. It is the first textarea, the very element the chat column is found from, and it is only
-// trusted when that column WAS found: a textarea inside a games pane cannot push the copy around on
-// the conversation, and jp2LChatColumn() already answers null for one.
-function jp2LComposerTop() {
-  const doc = jp2LDoc()
-  if (!doc || typeof doc.querySelector !== 'function') return null
-  if (!jp2LChatColumn()) return null
-  const composer = jp2LComposerNode(doc)
-  if (!composer || typeof composer.getBoundingClientRect !== 'function') return null
-  const rect = composer.getBoundingClientRect()
-  const top = rect ? Number(rect.top) : 0
-  return Number.isFinite(top) && top > 0 ? top : null
-}
-
-// The offsets, applied to the numbers jp2LOverlayGeometry() answered. Offsets of 0 — the default —
-// hand that answer straight back, which is what makes "the default is where it has always been" true
-// on any frame, window and size. Otherwise the copy is moved by a share of the room it actually has:
-// the travel is the smaller of the room on the two sides, so -1 and +1 are both reachable and the
-// centre stays the centre, and the destination is clamped so the whole machine stays inside the
-// conversation and never lies over the composer. Where there is no room on an axis (the machine is as
-// tall as the conversation, or taller than the part above the composer) there is nothing to travel
-// and that axis does not move at all.
-function jp2LPositioned(geo, frame) {
-  const position = jp2LPosition()
-  if (!geo || (position.x === 0 && position.y === 0)) return geo
-  const box = frame || jp2LFrame()
-  const left = Number(box.left) || 0
-  const top = Number(box.top) || 0
-  const width = Math.max(0, Number(box.width) || 0)
-  const height = Math.max(0, Number(box.height) || 0)
-  const composer = jp2LComposerTop()
-  const ceiling = composer === null ? top + height : Math.min(top + height, composer)
-  const minLeft = left
-  const maxLeft = Math.max(minLeft, left + width - geo.width)
-  const maxTop = Math.max(top, ceiling - geo.height)
-  // Each direction travels as far as ITS side allows: -1 reaches the top (or left) edge of the
-  // conversation and +1 the composer (or right edge), even when the centred copy sits nearer one side.
-  // (A shared, symmetric travel stopped "top middle" short whenever the composer was close below.)
-  const along = (at, low, high, amount) => {
-    const room = amount < 0 ? at - low : high - at
-    return room > 0 ? Math.min(high, Math.max(low, at + amount * room)) : at
-  }
-  const movedX = along(geo.left, minLeft, maxLeft, position.x)
-  const movedY = along(geo.top, top, maxTop, position.y)
-  return { scale: geo.scale, width: geo.width, height: geo.height, left: Math.round(movedX), top: Math.round(movedY) }
-}
-
-// ---- the two machines on one conversation ------------------------------------
-// The owner keeps BOTH machines (2026-11-11) and both switches may be on at once. Then the
-// conversation is shared rather than fought over: the ORIGINAL slot machine keeps the left half of
-// the chat column, from its top-left corner, and this one keeps the right half, from its bottom-right.
-// Two copies that each stay inside their own half of the column cannot touch, whatever size they draw
-// at, which is what makes "they must not overlap" true by construction. The other machine's switch is
-// only ever READ here: the two switches stay separate, and turning this one off never turns the
-// original off.
-function jp2LSlotsOverchat() {
-  try {
-    return Boolean(typeof SM_OVERCHAT !== 'undefined' && SM_OVERCHAT && SM_OVERCHAT.on)
-  } catch (error) {
-    // Before 18-slot-machine.js has run, or in a build without it: nothing to share.
-    return false
-  }
-}
-
-function useJp2LSlotsOverchat() {
-  const [on, setOn] = useState(jp2LSlotsOverchat)
-  useEffect(() => {
-    if (typeof SM_OVERCHAT === 'undefined' || !SM_OVERCHAT || !SM_OVERCHAT.listeners) return undefined
-    const listener = value => setOn(Boolean(value))
-    SM_OVERCHAT.listeners.add(listener)
-    setOn(jp2LSlotsOverchat())
-    return () => { SM_OVERCHAT.listeners.delete(listener) }
-  }, [])
-  return on
-}
-
-// The frame this machine floats over: its own half of the chat column when the original machine is up
-// as well, the whole column otherwise - and the right third of the window when the shell exposes no
-// column at all (the start screen), which is what jp2LFrame() already answers.
-function jp2LSharedFrame(shared) {
-  const frame = jp2LFrame()
-  if (!shared) return frame
-  const half = Math.max(1, frame.width / 2)
-  return {
-    left: frame.left + Math.max(0, frame.width - half),
-    top: frame.top,
-    width: half,
-    height: frame.height
-  }
-}
-
-// ...and the numbers inside it: bottom-right of the frame it shares, centred in a frame it has to
-// itself. The scale floor that keeps a lone copy visible is deliberately NOT applied while sharing:
-// on a column narrow enough that even half of it is below the floor, a copy at the floor would spill
-// past its own half and onto the other machine, and not overlapping is the firmer promise.
-function jp2LSharedGeometry(frame, size, shared) {
-  const box = frame || jp2LFrame()
-  if (!shared) return jp2LPositioned(jp2LOverlayGeometry(box, size), box)
-  const factor = jp2LClampSize(size)
-  const room = Math.min(box.width / JP2L_SIZE.width, box.height / JP2L_SIZE.height)
-  // Floored first, then the box is derived from the number the stage is actually transformed by, so
-  // the drawn machine and its layout box stay the same size.
-  const scale = jp2LFloor(Math.max(0.05, Math.min(room, room * factor)))
-  const width = JP2L_SIZE.width * scale
-  const height = JP2L_SIZE.height * scale
-  return jp2LPositioned({
-    scale,
-    width,
-    height,
-    left: Math.round(box.left + Math.max(0, box.width - width)),
-    top: Math.round(box.top + Math.max(0, box.height - height))
-  }, box)
-}
-
-// The one door every part of this file reads the copy's numbers through, so the status item's own
-// measurement, the layer the react-dom hosts paint into, and the frame announcement can never
-// disagree about where the machine is.
-function jp2LOverchatGeometry(shared) {
-  return jp2LSharedGeometry(jp2LSharedFrame(shared), JP2L_STORE.size, shared)
-}
-
-// The owner's ask (2026-11-11): when the machine does not appear, the reason has to be readable
-// without a debugger. So the copy says which frame it chose, in the console, once per distinct
-// frame — console.info, prefixed so it is easy to filter. It is deliberately not an error and not a
-// warning: the machine appearing is not a problem, and a noisy log is its own defect.
-let JP2L_TOLD = ''
-
-function jp2LTellFrame(frame, geo) {
-  const box = frame || { left: 0, top: 0, width: 0, height: 0 }
-  const line = `${Math.round(Number(box.left) || 0)},${Math.round(Number(box.top) || 0)} `
-    + `${Math.round(Number(box.width) || 0)}x${Math.round(Number(box.height) || 0)}`
-    + ` -> ${Math.round(Number(geo && geo.width) || 0)}x${Math.round(Number(geo && geo.height) || 0)}`
-    + ` at scale ${geo && geo.scale}`
-  if (JP2L_TOLD === line) return line
-  JP2L_TOLD = line
-  try {
-    if (typeof console !== 'undefined' && console && typeof console.info === 'function') {
-      console.info(`[jackpot2] over chat: frame ${line}`)
-    }
-  } catch (error) {
-    // A shell with no console: the frame is still chosen, it just cannot be announced.
-  }
-  return line
+// The copy itself: the cabinet at its design size inside the box the slot gave it. It is mounted by the
+// strip only while the switch is on, so being mounted is being shown.
+function jp2LOverChatCopy({ ctx, width }) {
+  const [on] = useJp2LOverchat(ctx)
+  const [alpha] = useJp2LAlpha(ctx)
+  const [size] = useJp2LSize(ctx)
+  // The tint is subscribed to as well as read: a colour change publishes on the store, and a hook that
+  // only ever set the same alpha would let React skip the render, leaving the old hue on the stage.
+  const [tint] = useJp2LTint(ctx)
+  const scale = jp2LSlotScale(width, size)
+  if (!on || !scale) return null
+  const geo = { scale, width: JP2L_SIZE.width * scale, height: JP2L_SIZE.height * scale }
+  return jsx('div', {
+    'data-jp2-surface': 'copy',
+    style: {
+      width: geo.width,
+      height: geo.height,
+      opacity: jp2LClampAlpha(alpha),
+      // Watching, not clicking: the copy must never take a click the conversation wanted. The machine's
+      // own dismissal controls opt back in through the stage's own rules (jp2LStyleRules).
+      pointerEvents: 'none',
+      boxSizing: 'border-box',
+      overflow: 'hidden'
+    },
+    children: jp2LStage(ctx, geo, 'overlay', tint)
+  })
 }
 
 function jp2LCentreIn(frame, scale) {
@@ -9692,209 +9213,18 @@ function jp2LCentreIn(frame, scale) {
   }
 }
 
-// The over-chat copy: it fits the column AND the window, at the size the slider asks for, and is
-// never smaller than the floor — a copy below that is invisible, which is worse than a big one. The
-// frame itself is floored too, so a host that reports a zero-sized column (a chat that has not laid
-// out yet, the start screen) still gets a machine instead of a 0x0 box.
-function jp2LOverlayGeometry(frame, size) {
-  const measured = frame || jp2LFrame()
-  const box = {
-    left: Number(measured && measured.left) || 0,
-    top: Number(measured && measured.top) || 0,
-    width: Math.max(JP2L_MIN_FRAME.width, Number(measured && measured.width) || 0),
-    height: Math.max(JP2L_MIN_FRAME.height, Number(measured && measured.height) || 0)
-  }
-  const factor = jp2LClampSize(size)
-  const win = jp2LWin()
-  const viewWidth = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : box.width
-  const viewHeight = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : box.height
-  const fit = Math.min(box.width / JP2L_SIZE.width, box.height / JP2L_SIZE.height)
-  const room = Math.min(viewWidth / JP2L_SIZE.width, viewHeight / JP2L_SIZE.height)
-  const scale = Math.max(JP2L_MIN_SCALE, Math.min(fit * factor, Math.max(JP2L_MIN_SCALE, room)))
-  const geo = jp2LCentreIn(box, jp2LFloor(scale))
-  // Belt and braces: whatever a stub host answered, the numbers handed to a caller are a box that
-  // can be seen. This is the promise the owner's release rule asks for, so it is checked, not
-  // assumed.
-  if (!(geo.width > 0) || !(geo.height > 0)) {
-    return jp2LCentreIn({ left: 0, top: 0, width: JP2L_SIZE.width, height: JP2L_SIZE.height }, 1)
-  }
-  return geo
-}
-
-// The full view: the same machine, as large as its frame allows and no larger. There is no floor
-// here — the promise for this one is that NOTHING is clipped, in any frame, and a floor would break
-// that promise on a short frame. The slider only ever shrinks it.
+// The full view: the same machine, as large as its frame allows and no larger. There is no floor here —
+// the promise for this one is that NOTHING is clipped, in any frame, and a floor would break that
+// promise on a short frame. The slider only ever shrinks it.
 function jp2LFitGeometry(frame, size) {
-  const box = frame || jp2LFrame()
+  const box = frame || { width: JP2L_SIZE.width, height: JP2L_SIZE.height }
   const factor = jp2LClampSize(size)
   const fit = Math.min(box.width / JP2L_SIZE.width, box.height / JP2L_SIZE.height)
   const scale = Math.max(0.05, Math.min(fit, fit * factor))
   return jp2LCentreIn(box, jp2LFloor(scale))
 }
 
-// ---- the layer itself --------------------------------------------------------
-const JP2L_LAYER = {
-  ctx: null,
-  node: null,
-  root: null,
-  element: null,
-  geo: null,
-  column: null,
-  observer: null,
-  onResize: null,
-  style: null,
-  notify: null,
-  // The tint the layer's own stage was last painted with, so a colour change repaints it and a resize
-  // that changes nothing does not.
-  tint: null,
-  // Whether the original machine is over the chat too, so this one keeps to its half of the column.
-  shared: false
-}
-
-function jp2LLayerNode() {
-  return JP2L_LAYER.node
-}
-
-// One stylesheet, injected once: the layer is a window, not a wall. Everything in it passes the
-// pointer through to the conversation underneath except the machine's own controls, which opt in by
-// being buttons, inputs, selects or anything marked data-jp2-control.
-function jp2LLayerStyle() {
-  if (JP2L_LAYER.style) return JP2L_LAYER.style
-  const doc = jp2LDoc()
-  if (!doc || !doc.head || typeof doc.createElement !== 'function' || typeof doc.head.appendChild !== 'function') return null
-  const el = doc.createElement('style')
-  el.setAttribute('id', 'jp2-layer-style')
-  doc.head.appendChild(el)
-  el.textContent = `
-    [data-jp2-layer], [data-jp2-surface] { pointer-events: none; }
-    [data-jp2-layer] button, [data-jp2-layer] input, [data-jp2-layer] select, [data-jp2-layer] textarea, [data-jp2-layer] [data-jp2-control],
-    [data-jp2-surface] button, [data-jp2-surface] input, [data-jp2-surface] select, [data-jp2-surface] textarea, [data-jp2-surface] [data-jp2-control] { pointer-events: auto; }
-    /* Over the chat the machine is to WATCH (owner, 2026-11-11): its spin, lever, bet, machine picker and
-       other buttons do not take a click there - only the X, the sound switch and the look controls
-       (see-through, size, place, colour) do. Scoped to the over-chat layer, so the cabinet in the pane
-       and on the Games page plays exactly as before. */
-    [data-jp2-layer] .jp2-machine button:not([data-jp2-sound]):not([data-jp2-close]),
-    [data-jp2-surface] .jp2-machine button:not([data-jp2-sound]):not([data-jp2-close]) { pointer-events: none !important; cursor: default !important; }
-    [data-jp2-layer] .jp2-machine [data-jp2="overchat-row"] button,
-    [data-jp2-surface] .jp2-machine [data-jp2="overchat-row"] button { pointer-events: auto !important; cursor: pointer !important; }
-    [data-jp2-tint] .jp2-machine {
-      background: var(--jp2-tint-bg) !important;
-      border-color: var(--jp2-tint-edge) !important;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), 0 18px 60px rgba(2, 4, 10, .8), 0 0 60px var(--jp2-tint-glow) !important;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      [data-jp2-layer] *, [data-jp2-surface] * { animation: none !important; transition: none !important; }
-    }
-  `
-  JP2L_LAYER.style = el
-  return el
-}
-
-function jp2LEnsureLayer() {
-  if (JP2L_LAYER.node) return JP2L_LAYER.node
-  const doc = jp2LDoc()
-  if (!doc || !doc.body || typeof doc.createElement !== 'function' || typeof doc.body.appendChild !== 'function') return null
-  const node = doc.createElement('div')
-  node.setAttribute('data-jp2-layer', 'overlay')
-  node.setAttribute('data-jp2-surface', 'layer')
-  node.setAttribute('role', 'presentation')
-  node.setAttribute('aria-label', 'Jackpot over chat')
-  if (node.style) {
-    Object.assign(node.style, {
-      position: 'fixed',
-      left: '0px',
-      top: '0px',
-      width: '0px',
-      height: '0px',
-      zIndex: String(JP2L_Z),
-      pointerEvents: 'none',
-      opacity: String(JP2L_STORE.alpha),
-      boxSizing: 'border-box',
-      visibility: 'visible'
-    })
-  }
-  doc.body.appendChild(node)
-  JP2L_LAYER.node = node
-  jp2LLayerStyle()
-  return node
-}
-
-// Take the div off the page, by every door there is. Each step is guarded and none of them is
-// trusted to have worked: a shell (or a test double) whose `remove()` is a no-op, or whose
-// appendChild never set parentNode, still ends up with the layer gone, which is the whole promise
-// of switching it off.
-function jp2LDetach(node) {
-  if (!node) return
-  try {
-    if (typeof node.remove === 'function') node.remove()
-  } catch (error) {
-    // fall through: the parent still knows how
-  }
-  try {
-    const parent = node.parentNode
-    if (parent && typeof parent.removeChild === 'function') parent.removeChild(node)
-  } catch (error) {
-    // already gone
-  }
-  try {
-    const doc = jp2LDoc()
-    if (doc && doc.body && typeof doc.body.removeChild === 'function') doc.body.removeChild(node)
-  } catch (error) {
-    // not a child of the body any more, which is what we wanted
-  }
-}
-
-function jp2LRemoveLayer() {
-  const node = JP2L_LAYER.node
-  const root = JP2L_LAYER.root
-  JP2L_LAYER.node = null
-  JP2L_LAYER.root = null
-  JP2L_LAYER.element = null
-  JP2L_LAYER.geo = null
-  JP2L_LAYER.notify = null
-  JP2L_LAYER.tint = null
-  // Switching it off is a fresh start: the next turn-on announces the frame it chose again.
-  JP2L_TOLD = ''
-  jp2LUnwatch()
-  if (root && typeof root.unmount === 'function') {
-    try { root.unmount() } catch (error) { /* a dead root is not worth an error */ }
-  }
-  if (node && typeof node.removeChild === 'function') {
-    while (node.firstChild) node.removeChild(node.firstChild)
-  }
-  jp2LDetach(node)
-  return true
-}
-
-function jp2LApplyStyle(node, geo) {
-  if (!node || !node.style || !geo) return
-  node.style.left = `${geo.left}px`
-  node.style.top = `${geo.top}px`
-  node.style.width = `${geo.width}px`
-  node.style.height = `${geo.height}px`
-  node.style.opacity = String(JP2L_STORE.alpha)
-  node.style.visibility = 'visible'
-}
-
-// The host's react-dom, if this build has one on any global it can see. Never imported: see the
-// note at the top of this file.
-function jp2LDOMlib() {
-  const found = []
-  try { if (typeof ReactDOM !== 'undefined' && ReactDOM) found.push(ReactDOM) } catch (error) { /* not a global here */ }
-  try { const global = typeof globalThis === 'undefined' ? null : globalThis; if (global && global.ReactDOM) found.push(global.ReactDOM) } catch (error) { /* not a global here */ }
-  try { const win = jp2LWin(); if (win && win.ReactDOM) found.push(win.ReactDOM) } catch (error) { /* not a global here */ }
-  return found.find(lib => lib && (typeof lib.createRoot === 'function' || typeof lib.createPortal === 'function')) || null
-}
-
-// The same library, asked only for the portal door. Kept apart from jp2LDOMlib() because a host that
-// can do both is already served by the root, and a host that can only portal is not a root host.
-function jp2LDomlibForPortals() {
-  const lib = jp2LDOMlib()
-  return lib && typeof lib.createPortal === 'function' ? lib : null
-}
-
-// The machine, or the honest plate that says the machine is not in this bundle. The layer is this
-// part's job; the cabinet is 18-jackpot2-machine.js's.
+// The machine, or the honest plate that says the machine is not in this bundle.
 function jp2LMachine(ctx, mode) {
   const Machine = typeof JackpotMachine === 'function' ? JackpotMachine : null
   if (Machine) return jsx(Machine, { ctx, mode: mode || 'overlay' })
@@ -9909,20 +9239,38 @@ function jp2LMachine(ctx, mode) {
   })
 }
 
+// The stage's own rules: the tint, and "watching, not clicking", both scoped to a stage of ours. They
+// used to be a stylesheet appended to the app's <head>; they are now a <style> element rendered inside
+// the stage (jp2LStage), so they apply to our subtree alone and leave with it.
+function jp2LStyleRules(tint) {
+  const active = tint && tint.active
+  return [
+    '[data-jp2-stage] { pointer-events: none; }',
+    '[data-jp2-stage] button, [data-jp2-stage] input, [data-jp2-stage] select, [data-jp2-stage] textarea,',
+    '[data-jp2-stage] [data-jp2-control] { pointer-events: auto; }',
+    // Over the chat the machine is to WATCH (owner, 2026-11-11): its spin, lever, bet, machine picker and
+    // other buttons do not take a click there - only the X, the sound switch and the look controls do.
+    '[data-jp2-stage] .jp2-machine button:not([data-jp2-sound]):not([data-jp2-close]) { pointer-events: none !important; cursor: default !important; }',
+    '[data-jp2-stage] .jp2-machine [data-jp2="overchat-row"] button { pointer-events: auto !important; cursor: pointer !important; }',
+    active
+      ? '[data-jp2-stage][data-jp2-tint] .jp2-machine {'
+        + ' background: var(--jp2-tint-bg) !important;'
+        + ' border-color: var(--jp2-tint-edge) !important;'
+        + ' box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), 0 18px 60px rgba(2, 4, 10, .8), 0 0 60px var(--jp2-tint-glow) !important; }'
+      : '',
+    '@media (prefers-reduced-motion: reduce) { [data-jp2-stage] * { animation: none !important; transition: none !important; } }'
+  ].filter(Boolean).join('\n')
+}
+
 // The scaled stage: the machine at its design size inside a box that is transform-scaled from the
-// top-left corner, which is the only thing the caller is allowed to do to it.
-function jp2LStage(ctx, geo, mode) {
+// top-left corner, which is the only thing the caller is allowed to do to it. The <style> child is the
+// stage's own rules — a document-wide stylesheet is exactly what the review asked us to stop doing.
+function jp2LStage(ctx, geo, mode, tintNow) {
   const scale = geo && Number.isFinite(geo.scale) ? geo.scale : 1
   const overlay = (mode || 'overlay') === 'overlay'
-  // The colour of the frame. Only the over-chat copy is frosted, so only it is tinted: the full view
-  // in the Games page is the cabinet's own drawing. A tinted copy also makes sure the one static rule
-  // it needs is on the page, wherever this stage is drawn — including a host where the layer's own
-  // div could not be created and the copy is a child of the status span.
-  const tint = overlay ? jp2LTint() : null
+  // The caller may hand its own (subscribed) tint; otherwise the stored one is read here.
+  const tint = overlay ? (tintNow || jp2LTint()) : null
   const tintVars = tint && tint.active ? jp2LTintVars(tint) : null
-  // The over-chat copy always needs the static rules (tint, and its watch-only buttons), wherever
-  // it is drawn - the layer's own div or a child of the status span.
-  if (overlay) jp2LLayerStyle()
   return jsxs('div', {
     'data-jp2-stage': '1',
     'data-jp2-tint': tintVars ? tint.gradient : undefined,
@@ -9933,306 +9281,35 @@ function jp2LStage(ctx, geo, mode) {
       transformOrigin: 'top left',
       ...(tintVars || {})
     },
-    children: [jp2LMachine(ctx, mode || 'overlay'), (mode || 'overlay') === 'overlay' ? jsx('button', {
-      type: 'button', 'data-jp2-close': '1', 'aria-label': 'Close Slots over chat',
-      onClick: () => jp2LSetOverchat(false, ctx),
-      style: { position: 'absolute', right: 12, top: 12, zIndex: 10, pointerEvents: 'auto', cursor: 'pointer', border: '1px solid #3ee0c5', borderRadius: 6, background: '#173044', color: '#fff', fontSize: 20 },
-      children: '×'
-    }) : null]
-  })
-}
-
-// Draw the machine into the layer with a host react-dom root, when there is one. Returns the root,
-// or null when this build has no react-dom at all — the status item then draws the machine in our
-// own tree, over the layer's numbers (never both: the machine is mounted once).
-function jp2LPaint(ctx) {
-  const node = JP2L_LAYER.node
-  if (!node || !JP2L_LAYER.geo) return null
-  const element = jp2LStage(ctx || JP2L_LAYER.ctx, JP2L_LAYER.geo, 'overlay')
-  JP2L_LAYER.element = element
-  const lib = jp2LDOMlib()
-  if (lib && typeof lib.createRoot === 'function') {
-    try {
-      if (!JP2L_LAYER.root) JP2L_LAYER.root = lib.createRoot(node)
-      JP2L_LAYER.root.render(element)
-      return JP2L_LAYER.root
-    } catch (error) {
-      JP2L_LAYER.root = null
-    }
-  }
-  return null
-}
-
-function jp2LMeasure() {
-  const node = JP2L_LAYER.node
-  if (!node) return null
-  const before = JP2L_LAYER.geo
-  // The same numbers the status item draws its own copy at: one shape, one measurement, whichever
-  // door this host offers (see jp2LOverchatGeometry).
-  const geo = jp2LOverchatGeometry(Boolean(JP2L_LAYER.shared))
-  JP2L_LAYER.geo = geo
-  jp2LApplyStyle(node, geo)
-  // Repaint only when something the stage is PAINTED with moved: the size, or the tint. A wider or
-  // shorter window is what a resize tick brings, and re-rendering the machine for one of those would
-  // restart its spin; the position is not in here because the layer's own box is moved by
-  // jp2LApplyStyle above, which needs no re-render at all.
-  const tint = jp2LTintSignature(jp2LTint())
-  const repaint = !before || Math.abs(before.scale - geo.scale) > 0.001 || JP2L_LAYER.tint !== tint
-  JP2L_LAYER.tint = tint
-  if (repaint) jp2LPaint(JP2L_LAYER.ctx)
-  return geo
-}
-
-function jp2LRemeasure() {
-  const geo = jp2LMeasure()
-  if (geo && typeof JP2L_LAYER.notify === 'function') JP2L_LAYER.notify(geo)
-  return geo
-}
-
-// Kept aligned by a ResizeObserver on the column it sits over, plus the window's own resize: the
-// column can change without the window doing so (a pane opening beside the chat).
-function jp2LWatch() {
-  const column = jp2LChatColumn()
-  if (JP2L_LAYER.column !== column) {
-    if (JP2L_LAYER.observer && typeof JP2L_LAYER.observer.disconnect === 'function') JP2L_LAYER.observer.disconnect()
-    JP2L_LAYER.observer = null
-    JP2L_LAYER.column = column
-  }
-  if (!JP2L_LAYER.observer && column && typeof ResizeObserver !== 'undefined') {
-    try {
-      JP2L_LAYER.observer = new ResizeObserver(() => jp2LRemeasure())
-      JP2L_LAYER.observer.observe(column)
-    } catch (error) {
-      JP2L_LAYER.observer = null
-    }
-  }
-  const win = jp2LWin()
-  if (!JP2L_LAYER.onResize && win && typeof win.addEventListener === 'function') {
-    JP2L_LAYER.onResize = () => { jp2LWatch(); jp2LRemeasure() }
-    win.addEventListener('resize', JP2L_LAYER.onResize)
-  }
-}
-
-function jp2LUnwatch() {
-  if (JP2L_LAYER.observer && typeof JP2L_LAYER.observer.disconnect === 'function') JP2L_LAYER.observer.disconnect()
-  JP2L_LAYER.observer = null
-  JP2L_LAYER.column = null
-  const win = jp2LWin()
-  if (JP2L_LAYER.onResize && win && typeof win.removeEventListener === 'function') {
-    win.removeEventListener('resize', JP2L_LAYER.onResize)
-  }
-  JP2L_LAYER.onResize = null
-}
-
-// The one door: on creates the layer, sizes it to the conversation and paints the machine; off
-// removes it and everything it started. Nothing else in the plugin creates or removes the layer, so
-// the switch alone decides whether it exists.
-function jp2LApply(ctx, on, options = {}) {
-  if (ctx) {
-    JP2L_LAYER.ctx = ctx
-    jp2LAdopt(ctx)
-  }
-  if (Number.isFinite(Number(options.alpha))) JP2L_STORE.alpha = jp2LClampAlpha(options.alpha)
-  if (Number.isFinite(Number(options.size))) JP2L_STORE.size = jp2LClampSize(options.size)
-  if (typeof options.notify === 'function') JP2L_LAYER.notify = options.notify
-  if (!on) {
-    jp2LRemoveLayer()
-    return { on: false, node: null, geo: null, root: null }
-  }
-  const node = jp2LEnsureLayer()
-  if (!node) return { on: true, node: null, geo: null, root: null }
-  jp2LWatch()
-  const geo = jp2LMeasure()
-  if (geo && typeof JP2L_LAYER.notify === 'function') JP2L_LAYER.notify(geo)
-  return { on: true, node, geo, root: JP2L_LAYER.root }
-}
-
-// ---- the status bar: the switch, the sliders, and the machine while it floats ----
-function jp2LSliderRow(alpha, size, setAlpha, setSize) {
-  const slider = (label, key, value, onChange) => jsx('input', {
-    type: 'range',
-    min: key === 'alpha' ? JP2L_ALPHA_MIN : JP2L_SIZE_MIN,
-    max: key === 'alpha' ? JP2L_ALPHA_MAX : JP2L_SIZE_MAX,
-    step: key === 'alpha' ? JP2L_ALPHA_STEP : 0.05,
-    value,
-    'aria-label': label,
-    title: label,
-    'data-jp2-range': key,
-    onChange: event => onChange(Number(event.target.value)),
-    style: { width: 58, margin: 0, accentColor: '#3ee0c5', cursor: 'pointer' }
-  })
-  const readout = (key, value) => jsx('span', {
-    'data-jp2-value': key,
-    style: { fontSize: 10, color: text.tertiary, minWidth: 28, textAlign: 'right' },
-    children: `${Math.round(value * 100)}%`
-  })
-  return jsxs('span', {
-    'data-jp2': 'prefs',
-    style: { display: 'inline-flex', alignItems: 'center', gap: 6, pointerEvents: 'auto' },
     children: [
-      slider('Jackpot over chat: how see-through', 'alpha', alpha, setAlpha),
-      slider('Jackpot over chat: how big', 'size', size, setSize)
+      overlay ? jsx('style', { children: jp2LStyleRules(tint) }, 'rules') : null,
+      jp2LMachine(ctx, mode || 'overlay'),
+      overlay ? jsx('button', {
+        type: 'button', 'data-jp2-close': '1', 'aria-label': 'Close Slots over chat',
+        onClick: () => jp2LSetOverchat(false, ctx),
+        style: { position: 'absolute', right: 12, top: 12, zIndex: 10, pointerEvents: 'auto', cursor: 'pointer', border: '1px solid #3ee0c5', borderRadius: 6, background: '#173044', color: '#fff', fontSize: 20 },
+        children: '×'
+      }, 'close') : null
     ]
   })
 }
 
-// ---- only over the conversation -----------------------------------------------
-// The copy floats over the CHAT and nowhere else: not the Games page, not another plugin's page, not
-// Settings (owner's screenshot, 2026-11-11 08:36: it sat on top of Game Center). Hermes routes by hash
-// (react-router HashRouter): the chat is "/" (a new chat) or "/<sessionId>", one segment that carries
-// digits ("local-4e8e...", "20261109_194547_20a0a5"). Every app page and every plugin page is a word
-// ("/games", "/settings", "/omniscience"). ROUTE ONLY - no DOM rule (a DOM rule once hid the copy on
-// the real chat, see 9433891 / 1bc6cd7).
-function jp2LOnChatRoute() {
-  try {
-    const win = jp2LWin()
-    const hash = String((win && win.location && win.location.hash) || '').replace(/^#/, '')
-    const path = hash.split('?')[0]
-    if (!path || path === '/') return true
-    const segment = path.replace(/^\//, '')
-    if (!segment || segment.includes('/')) return false
-    return /\d/.test(segment)
-  } catch {
-    return true
-  }
-}
-
-// The same answer as React state. hashchange is not enough on its own (a navigation can replace the
-// route without one), so it is re-read on a light 600 ms timer as well.
-function useJp2LOnChatRoute() {
-  const [onChat, setOnChat] = useState(jp2LOnChatRoute)
-  useEffect(() => {
-    const win = jp2LWin()
-    const read = () => setOnChat(jp2LOnChatRoute())
-    if (win && typeof win.addEventListener === 'function') win.addEventListener('hashchange', read)
-    const timer = setInterval(read, 600)
-    return () => {
-      if (win && typeof win.removeEventListener === 'function') win.removeEventListener('hashchange', read)
-      clearInterval(timer)
-    }
-  }, [])
-  return onChat
-}
-
-function Jackpot2StatusItem({ ctx }) {
-  SM_API.rest = (path, opts) => ctx.rest(path, opts)
-  const [switchOn, setOn] = useJp2LOverchat(ctx)
-  // The switch is the person's choice; whether the copy is DRAWN also needs the chat on screen.
-  const onChatRoute = useJp2LOnChatRoute()
-  const on = switchOn && onChatRoute
-  const [alpha, setAlpha] = useJp2LAlpha(ctx)
-  const [size, setSize] = useJp2LSize(ctx)
-  // The copy's own position and colour are read here as well, because both change what is drawn:
-  // the offsets move it and the tint paints it. A change to either re-runs the effect below, which
-  // measures again and (for a colour) repaints, so the copy follows the sliders without a reload.
-  const [position] = useJp2LPosition(ctx)
-  const [tint] = useJp2LTint(ctx)
-  // The other machine over the chat: when the original slot machine's switch is on as well, this one
-  // keeps to the right half of the conversation so the two can never draw over each other (owner's
-  // ask, 2026-11-11 - see the note above jp2LSharedFrame).
-  const shared = false
-  // The numbers, measured HERE, in our own tree. They must not come out of jp2LApply: that only
-  // measures once the body div exists, so on a host where the div cannot be created the machine
-  // never appeared over the chat at all (owner's release blocker, 2026-11-11 — see the note at the
-  // top of this file). This is the OLD machine's own method, kept whole: measure the frame, then
-  // draw a position:fixed child of this span.
-  const [geo, setGeo] = useState(null)
-  const [hosted, setHosted] = useState(false)
-  const measure = () => {
-    const frame = jp2LSharedFrame(shared)
-    const next = jp2LSharedGeometry(frame, size, shared)
-    jp2LTellFrame(frame, next)
-    setGeo(next)
-    return next
-  }
-  useEffect(() => {
-    // The layer's own div is still created and removed by the switch alone — the shipped host and
-    // the harness both rely on it — and a host react-dom fills it when it has one. It is told which
-    // frame to keep, so the layer and this span's own copy are the same shape.
-    JP2L_LAYER.shared = shared
-    const painted = jp2LApply(ctx, on, { alpha, size })
-    setHosted(Boolean(painted && painted.root))
-    if (!on) {
-      setGeo(null)
-      return undefined
-    }
-    const next = measure()
-    if (painted && painted.node) jp2LApplyStyle(painted.node, next)
-    // Kept aligned by the column it sits over, and by the window itself: a docked pane changes the
-    // column without the window changing at all.
-    const column = jp2LChatColumn()
-    let observer = null
-    if (column && typeof ResizeObserver !== 'undefined') {
-      try {
-        observer = new ResizeObserver(() => measure())
-        observer.observe(column)
-      } catch (error) {
-        observer = null
-      }
-    }
-    const win = jp2LWin()
-    if (win && typeof win.addEventListener === 'function') win.addEventListener('resize', measure)
-    // One more look after the first paint: the chat column only has its real width once the shell
-    // has laid out, and the old machine re-measures at zero delay for the same reason.
-    const settle = setTimeout(measure, 0)
-    return () => {
-      if (observer && typeof observer.disconnect === 'function') observer.disconnect()
-      if (win && typeof win.removeEventListener === 'function') win.removeEventListener('resize', measure)
-      clearTimeout(settle)
-    }
-    // position and tint are in the list because moving a slider has to measure again and a colour
-    // change has to repaint; they are read as values, so a change to either is a change here.
-  }, [ctx, on, alpha, size, shared, position.x, position.y, tint.gradient, tint.hue])
-  // A plugin reload while the machine is up must not leave its div behind on the page.
-  useEffect(() => () => jp2LRemoveLayer(), [])
-  const toggle = () => setOn(!switchOn)
-  // ONE machine, whichever door this host offers:
-  //   createRoot   -> drawn into the layer's own div (jp2LApply did it above);
-  //   createPortal -> drawn into the layer's own div through the portal door;
-  //   neither      -> drawn here, as a fixed child of this span, at the numbers measured above.
-  // The third door is the one the owner's release blocker was about: it needs no body div at all,
-  // so the cabinet appears even where jp2LEnsureLayer() can create nothing.
-  const lib = jp2LDomlibForPortals()
-  const portal = on && !hosted && geo && JP2L_LAYER.node && lib
-    ? lib.createPortal(jp2LStage(ctx, geo, 'overlay'), JP2L_LAYER.node)
-    : null
-  const mirror = on && !hosted && !portal && geo
-    ? jsx('div', {
-      'data-jp2-surface': 'mirror',
-      style: {
-        position: 'fixed', left: geo.left, top: geo.top, width: geo.width, height: geo.height,
-        zIndex: JP2L_Z, opacity: jp2LClampAlpha(alpha), pointerEvents: 'none', visibility: 'visible'
-      },
-      children: jp2LStage(ctx, geo, 'overlay')
-    })
-    : null
-  // NOTHING visible in the status bar (owner, 2026-11-11: "remove the status bar for the slots
-  // completely"). The span stays, zero-sized and unclickable, ONLY as the anchor the over-chat copy is
-  // a fixed child of (the 9433891 method). The switch and sliders live in the cabinet's own panel and
-  // in Settings (Jackpot2OverChatControls).
-  void toggle
-  return jsx('span', {
-    'data-jp2': 'status-wrap',
-    style: { display: 'inline-block', width: 0, height: 0, overflow: 'visible', padding: 0, margin: 0 },
-    children: portal || mirror
-  })
-}
-
-// ---- one switch, one panel of sliders, every surface ------------------------
-// The owner's ask (2026-11-11): the switch that floats the machine over the chat is ONE setting, so
-// it is drawn from one component and every surface shows that component — the cabinet's own panel
-// beside Auto-spin/Auto-bet, the Games app's Settings, and the play-while-you-wait pane's Settings
-// (which is the same Settings panel). All of them read and write 'jackpot2.overchat',
-// 'jackpot2.alpha', 'jackpot2.size', 'jackpot2.posx', 'jackpot2.posy', 'jackpot2.hue' and
-// 'jackpot2.gradient' through the hooks above, so there is no second copy of the choice and no
-// surface that can drift from another. The status-bar toggle is that same switch too.
+// ---- one switch, one panel of sliders, every surface --------------------------
+// The switch that shows the cabinet over the conversation is ONE setting, so it is drawn from one
+// component and every surface shows that component — the cabinet's own panel beside Auto-spin/Auto-bet,
+// the Games app's Settings, and the play-while-you-wait pane's Settings (which is the same Settings
+// panel). All of them read and write 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size',
+// 'jackpot2.hue' and 'jackpot2.gradient' through the hooks above, so there is no second copy of the
+// choice and no surface that can drift from another.
+//
+// There is no "where it is" row: the copy lives in the composer's underside slot now, so its place is
+// the slot's and the old left-right / up-down offsets would move it across a frame it does not own.
 //
 // tone: 'cabinet' draws it inside the dark machine; anything else draws it on the light panels.
 function Jackpot2OverChatControls({ ctx, tone }) {
   const [on, setOn] = useJp2LOverchat(ctx)
   const [alpha, setAlpha] = useJp2LAlpha(ctx)
   const [size, setSize] = useJp2LSize(ctx)
-  const [position, setPosition] = useJp2LPosition(ctx)
   const [tint, tintActions] = useJp2LTint(ctx)
   const dark = tone === 'cabinet'
   const ink = dark ? JP2_INK : text.primary
@@ -10294,10 +9371,6 @@ function Jackpot2OverChatControls({ ctx, tone }) {
       color: dark ? JP2_ION : '#0f6b5c'
     }
   }, key)
-  // Where the copy is, in one line: 'centre' for the place it starts at, otherwise the two offsets as
-  // signed shares of the travel they have. + is right and down, exactly as the sliders move.
-  const share = value => (value === 0 ? '0%' : `${value > 0 ? '+' : '−'}${Math.round(Math.abs(value) * 100)}%`)
-  const offsetText = (x, y) => (x === 0 && y === JP2L_POSY_DEFAULT ? 'top middle' : `${share(x)} / ${share(y)}`)
   const swatch = item => jsx('button', {
     type: 'button',
     'data-jp2-oc-swatch': String(item.hue),
@@ -10344,7 +9417,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
               jsx('span', { children: 'Show over chat' }, 'text')
             ]
           }, 'toggle'),
-          button('reset', 'Reset look', 'Restore every look setting: see-through, size, position and colour. The over-chat switch itself is left as it is.', () => tintActions.reset())
+          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The over-chat switch itself is left as it is.', () => tintActions.reset())
         ]
       }, 'switch'),
       row('alpha', 'See-through', [
@@ -10354,16 +9427,6 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         slider('size', 'size', size, setSize),
         readout('size', `${Math.round(size * 100)}%`)
       ], dark ? 64 : 74),
-      // Where it floats. Both sliders are offsets from the centre the copy has always had, clamped to
-      // the conversation: nothing here can put it outside the chat column or over the composer.
-      row('position', 'Position', [
-        tag('Left-right', 'lr'),
-        slider('posx', 'left-right (0 is centred, + is right)', position.x, value => setPosition(value, position.y)),
-        tag('Up-down', 'ud'),
-        slider('posy', 'up-down (0 is centred, + is down)', position.y, value => setPosition(position.x, value)),
-        readout('position', offsetText(position.x, position.y)),
-        button('centre', 'Top middle', 'Put the copy back at its starting place: the top of the conversation, centred.', () => setPosition(JP2L_POS_DEFAULT, JP2L_POSY_DEFAULT))
-      ]),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.
       row('colour', 'Colour', [
@@ -23926,6 +22989,109 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
   })
 }
 
+// ---- 78-overchat-slot.js: the see-through machines, in the composer's own slot
+//
+// Both slot machines have a "show it over the conversation" switch: the original cabinet
+// (18-slot-machine.js / 19-jackpot-overlay.js) and Jackpot v2 (19-jackpot2-layer.js). This part is the
+// one place they are put on screen, and it is the review's fix (2026-11-12).
+//
+// WHAT IT REPLACED. Each machine used to put itself over the app: a position:fixed div appended to
+// document.body, a stylesheet appended to <head>, and a measurement of the app's own markup — scan every
+// <textarea>, walk their ancestors until one was wider than half the window, call that "the chat column",
+// and read the route's hash to guess which screen was showing. A plugin that does that can be broken by
+// an app update and can break the app, which is exactly what the review asked us to stop.
+//
+// WHAT THIS IS. One contribution to `COMPOSER_AREAS.underside`, the composer's chrome-free strip below
+// the input — a real Desktop SDK surface, registered like any other contribution:
+//
+//   - the slot decides WHERE. It is part of the conversation's composer, so it exists exactly while the
+//     conversation is on screen: no route sniffing, no DOM test, nothing to keep the machine off the
+//     Games page, Settings or another plugin's page.
+//   - the slot decides HOW WIDE. This component measures ITS OWN box (the one element it is allowed to
+//     measure) and hands each machine its share: the whole width for one, the two halves for both.
+//   - the machines decide their own look. Each copy fits itself into that share, keeps its own opacity,
+//     and is watch-only (it must never take a click the conversation wanted).
+//
+// The strip is drawn only while at least one switch is on, so its height is zero — and the composer's
+// underside is empty — whenever nobody asked for a machine.
+const OVERCHAT_GAP = 10
+
+// What one machine's slot looks like. `minWidth: 0` matters: without it a flex item refuses to shrink
+// below its content, and a wide cabinet would push the strip past the composer instead of being fitted.
+const OVERCHAT_SLOT = { minWidth: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+
+// The strip's own width, read from the element it owns. Read on every render rather than kept in state:
+// one property, one element of ours, and a ResizeObserver only has to ask for a new render.
+function overchatStripWidth(ref) {
+  const node = ref && ref.current
+  if (!node) return 0
+  if (typeof node.getBoundingClientRect === 'function') {
+    const rect = node.getBoundingClientRect()
+    const width = rect ? Number(rect.width) || 0 : 0
+    if (width > 0) return width
+  }
+  return Number(node.clientWidth) || 0
+}
+
+function OverChatStrip({ ctx }) {
+  const [slotsOn] = useSmOverchat()
+  const [jackpotOn] = useJp2LOverchat(ctx)
+  const box = useRef(null)
+  const [, setResized] = useState(0)
+
+  // Our own box, and nothing else. A ResizeObserver rather than a window listener: the composer changes
+  // width when a pane opens, when the window moves between screens and when the person drags a sash —
+  // all of those are the same event to this element.
+  useJpLayoutEffect(() => {
+    // One render after mount: the ref is only filled in once the tree is committed, so the first render
+    // cannot see the box at all. (A strip that is already its final width fires no resize event.)
+    setResized(count => count + 1)
+    const node = box.current
+    if (typeof ResizeObserver === 'undefined' || !node) return undefined
+    let watcher = null
+    try {
+      watcher = new ResizeObserver(() => setResized(count => count + 1))
+      watcher.observe(node)
+    } catch {
+      return undefined
+    }
+    return () => { if (watcher && typeof watcher.disconnect === 'function') watcher.disconnect() }
+  }, [])
+
+  const width = overchatStripWidth(box)
+  const on = Boolean(slotsOn || jackpotOn)
+  if (!on) return null
+  const both = Boolean(slotsOn && jackpotOn)
+  const share = both ? Math.max(0, width - OVERCHAT_GAP) / 2 : width
+  return jsx('div', {
+    'data-overchat': 'strip',
+    ref: box,
+    style: {
+      width: '100%',
+      minWidth: 0,
+      display: 'flex',
+      gap: OVERCHAT_GAP,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      // The strip is a picture: nothing in it may take a click from the conversation. Each machine's own
+      // dismissal controls opt back in (19-jackpot2-layer.js, jp2LStyleRules).
+      pointerEvents: 'none'
+    },
+    children: [
+      slotsOn ? jsx('div', {
+        'data-overchat': 'slots',
+        style: { ...OVERCHAT_SLOT, width: share ? share : '100%' },
+        children: jsx(SlotsOverChatCopy, { ctx, width: share })
+      }, 'slots') : null,
+      jackpotOn ? jsx('div', {
+        'data-overchat': 'jackpot',
+        style: { ...OVERCHAT_SLOT, width: share ? share : '100%' },
+        children: jsx(jp2LOverChatCopy, { ctx, width: share })
+      }, 'jackpot') : null
+    ]
+  })
+}
+
 // ---- 79-version.js: the version chip, so the install on screen can be identified at a glance
 /**
  * One source: the plugin's own backend (/v1/version -> version_stamp), never a number typed into
@@ -23946,36 +23112,33 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
 // How long the chip wears "Copied". Long enough to see, short enough not to look stuck.
 const CHIP_COPIED_MS = 1500
 
-// Where the async clipboard is missing or refuses (an older desktop, a page without the permission),
-// a hidden textarea and the old copy command are the fallback, so a copy never silently does nothing.
-function copyWithTextarea(text) {
+// Copies one line and resolves true once it is on the clipboard, through the app's own door first.
+//
+// `ctx.os.writeClipboard` is the SDK's curated clipboard and the only one a plugin should use: it is
+// attributed to the plugin, it resolves false (never throws) where the capability is missing, and it
+// needs nothing of the document. What it replaced was a hidden <textarea> appended to the app's <body>
+// and an execCommand — the same reach into the app's markup the review asked us to stop doing
+// (2026-11-12), for a copy that the browser's own clipboard API already does.
+function copyChipText(text, ctx) {
   try {
-    if (typeof document === 'undefined' || !document.body || typeof document.createElement !== 'function') return false
-    const box = document.createElement('textarea')
-    box.value = text
-    box.setAttribute('readonly', '')
-    box.style.position = 'fixed'
-    box.style.top = '-1000px'
-    box.style.opacity = '0'
-    document.body.appendChild(box)
-    box.select()
-    const done = typeof document.execCommand === 'function' ? document.execCommand('copy') : false
-    document.body.removeChild(box)
-    return done !== false
-  } catch (error) {
-    return false
-  }
+    const door = ctx && ctx.os && typeof ctx.os.writeClipboard === 'function' ? ctx.os : null
+    if (door) {
+      return Promise.resolve(door.writeClipboard(text)).then(done => {
+        if (done !== false) return true
+        return copyWithNavigator(text)
+      }, () => copyWithNavigator(text))
+    }
+  } catch (error) { /* fall through to the browser's own clipboard */ }
+  return copyWithNavigator(text)
 }
 
-// Copies one line and resolves true once it is on the clipboard, whichever door worked.
-function copyChipText(text) {
+function copyWithNavigator(text) {
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      return Promise.resolve(navigator.clipboard.writeText(text))
-        .then(() => true, () => copyWithTextarea(text))
+      return Promise.resolve(navigator.clipboard.writeText(text)).then(() => true, () => false)
     }
-  } catch (error) { /* fall through to the textarea */ }
-  return Promise.resolve(copyWithTextarea(text))
+  } catch (error) { /* no clipboard on this host */ }
+  return Promise.resolve(false)
 }
 
 function GamesVersionChip({ ctx, style }) {
@@ -24006,9 +23169,11 @@ function GamesVersionChip({ ctx, style }) {
     build.source ? 'read from ' + build.source : '',
     'Click to copy the version'
   ].filter(Boolean).join('\n')
-  // The chip copies its own text — the same line it shows, so what is pasted is what was read.
+  // The chip copies its own text — the same line it shows, so what is pasted is what was read. It only
+  // says "Copied" when the copy actually happened: a host with no clipboard at all must not claim one.
   const copy = () => {
-    Promise.resolve(copyChipText(line)).then(() => {
+    Promise.resolve(copyChipText(line, ctx)).then(done => {
+      if (!done) return
       setCopied(true)
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => setCopied(false), CHIP_COPIED_MS)
@@ -24121,13 +23286,14 @@ export default {
         render: () => jsx(GamesStatusItem, { ctx })
       },
       {
-        // JACKPOT v2. The item is the switch, the two sliders and — on a host with no react-dom for
-        // the layer's own div — the machine itself (see 19-jackpot2-layer.js). It is registered
-        // here, always: the machine over the chat must be reachable without opening Game Center.
-        id: 'jackpot2',
-        area: STATUSBAR_AREAS.right,
-        order: 142,
-        render: () => jsx(Jackpot2StatusItem, { ctx })
+        // The two see-through machines, in the composer's own slot (78-overchat-slot.js). A slot, not an
+        // overlay: the app owns where it goes and how wide it is, so an app update cannot break it and it
+        // cannot break the app (review, 2026-11-12). The strip draws only while a switch is on, and the
+        // switches themselves live where they always did — the Slots table, the cabinet's own panel and
+        // Settings.
+        id: 'overchat',
+        area: COMPOSER_AREAS.underside,
+        render: () => jsx(OverChatStrip, { ctx })
       }
     ])
   }

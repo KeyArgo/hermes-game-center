@@ -1,6 +1,6 @@
 # Development
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
 
 Repo layout, how to build the Desktop bundle, how to run each suite, and what CI does.
 
@@ -48,9 +48,11 @@ python -m pytest tests -q -p no:cacheprovider   # the Python suite
 python3 tools/build_plugin.py                    # the bundle CI grades
 node tests/table_ui_harness.cjs                  # Desktop page state machine
 node tests/jackpot_overlay_harness.cjs           # over-chat slot cabinet
+node tests/jackpot2_harness.cjs                  # Jackpot v2 copy, switch and fit
+node tests/jackpot2_look_harness.cjs             # Jackpot v2 tint and contrast
 ```
 
-`scripts/test.sh` runs the build, both Node harnesses, the Chrome fit check (unless `--fast`) and the pytest suite in one pass. The Chrome check needs a binary (`CHROME_BIN`, else `google-chrome`, else `/opt/google/chrome/chrome`) and the pinned React modules; `online/web/vendor/` has a copy and `GAMESHELF_REACT_ASSETS` points the QA server at it.
+`scripts/test.sh` runs the build, every Node harness, the Chrome fit check (unless `--fast`) and the pytest suite in one pass. The Chrome check needs a binary (`CHROME_BIN`, else `google-chrome`, else `/opt/google/chrome/chrome`) and the pinned React modules; `online/web/vendor/` has a copy and `GAMESHELF_REACT_ASSETS` points the QA server at it.
 
 The Python suite is offline: no model, no network, no GPU. Two opt-in groups are skipped unless asked for:
 

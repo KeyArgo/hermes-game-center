@@ -20,6 +20,8 @@ First public release.
 
 The hackathon entry pins commit `ccfe915` ([NousResearch/hermes-agent#154026](https://github.com/NousResearch/hermes-agent/pull/154026), tag `hackathon-submission`). 1.0.0 is the commit the catalog accepts; these changes came after the submission:
 
+- **The catalog review's four fixes.** (1) The Doctrine "author a card" run is no longer a child process: the card is written through `ctx.llm.complete`, so there is no `hermes chat` invocation, no `--toolsets ""` (which Hermes reads as "not set") and no inherited approval-mode environment. (2) The see-through slot machines are a `composer.underside` slot contribution instead of a `position: fixed` div appended to the app's `<body>` with a stylesheet in its `<head>` and a scan of its textareas: the slot owns the place and the width, and nothing measures the app. (3) `HERMES_GAMESHELF_BOT_KEY` and `HERMES_GAMESHELF_STAFF_KEY` are declared in `config_schema` as `type: secret`, beside `lobby_key`. (4) The developer key and the egg-force file live in the profile's plugin data folder, so a cheat armed in one profile no longer arms another.
+
 - **Tournament seats ask the right model.** A lambda in the champion loop captured the loop variable late; it now binds each entrant.
 - **A flaky test is now deterministic.** The blackjack seating test dealt a random shoe; when a natural ended the hand early, the dealer's model was never asked to play, about one run in ten. It now deals a fixed hand.
 - **The checkers strength test measures search, not the clock.** On a busy CI runner the clock-bounded expert could lose a seeded game; that test now runs the bot's deterministic node budget.

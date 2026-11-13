@@ -302,6 +302,9 @@ export const PALETTE_AREA = 'palette'
 export const ROUTES_AREA = 'routes'
 export const SIDEBAR_NAV_AREA = 'nav'
 export const STATUSBAR_AREAS = { right: 'right' }
+// The composer's seams. The QA host draws the underside strip below its stub composer, the way the
+// real Desktop does, which is where both see-through machines live (review, 2026-11-12).
+export const COMPOSER_AREAS = { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
 export const host = {
   state: { busy },
   onEvent(type, fn) {
@@ -371,11 +374,14 @@ body{font-family:system-ui;background:#0b1220;color:#e8edf4}
     <div class="bubble mine">Refactor the shelf tests, then run the full suite. Say "ok continue" when the plan is ready.</div>
     <div class="bubble theirs">Plan: split test_center.py, add a fixture for the catalog. Running the suite now.</div>
     <div id="chat-turn">nothing is running</div>
-    <!-- The conversation's composer, as a real textarea: the over-chat copies find the chat column
-         by walking up from the first textarea that is not one of the games' (see JP_chatColumn /
-         jp2LChatColumn), and a stub chat with no composer could not test that at all. -->
+    <!-- The conversation's composer, as a real textarea, and the slot below it where the see-through
+         machines are drawn. The plugin never measures this element: it renders into the slot and the
+         slot's own width is the frame (review, 2026-11-12). -->
     <textarea id="composer" rows="2" aria-label="Message Hermes" placeholder="Message Hermes"
       style="width:100%;resize:none;font:inherit;font-size:13px;padding:8px 10px;border-radius:10px;border:1px solid #394656;background:#101820;color:#e8edf4"></textarea>
+    <!-- The composer's underside slot, as the Desktop draws it: the chrome-free strip below the
+         composer that both see-through machines are contributed to (composer.underside). -->
+    <div id="composer-slot" aria-label="Composer underside"></div>
     <div class="controls">
       <button id="working">Start a Hermes turn</button>
       <button id="finished">Finish the Hermes turn</button>
@@ -416,6 +422,20 @@ const ctx = {
     // (or no status item) is normal, and treating it as an error stopped the whole bar from drawing.
     const pane = entries.find(entry => entry && entry.area === 'panes')
     if (pane) createRoot(document.getElementById('pane')).render(React.createElement(pane.render))
+    // The composer's underside slot: the same seam the Desktop gives a plugin, drawn below the stub
+    // composer. Without it the see-through machines have nowhere to go, which is what the review asked
+    // for - a slot, not an overlay the plugin floats itself.
+    const underside = entries.filter(entry => entry && entry.area === 'composer.underside')
+    for (const entry of underside) {
+      const slot = document.getElementById('composer-slot')
+      if (!slot) continue
+      try {
+        createRoot(slot).render(React.createElement(entry.render))
+      } catch (error) {
+        console.error('QA: composer slot item ' + entry.id + ' failed: ' + (error && error.message))
+        throw error
+      }
+    }
     // EVERY status-bar item the plugin contributes, each in its own holder. The real desktop
     // renders them all in one bar (useStatusbarContributions reads the whole area); a QA page that
     // keeps only the first one hides whatever the later items draw - including the see-through slot

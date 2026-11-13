@@ -329,11 +329,12 @@ if (broke && broke.button) {
 }
 
 // ---------------------------------------------------------------- over-chat copy, and the pane
-// Two surfaces, one switch. The see-through copy belongs over the conversation, never over the
-// games: it is kept off the Games page by its route, and - since the game page stays mounted behind
-// the chat in the real shell - by the fact that a Games page with the main area to itself has no
-// conversation on screen (see JP_composer/JP_chatColumn in 19-jackpot-overlay.js). The same cabinet
-// in the narrow pane has to be fitted to the pane, not drawn at 1183 px.
+// Two surfaces, one switch. The see-through copy is drawn INSIDE the composer's underside slot now
+// (review, 2026-11-12): the slot is part of the conversation's composer, so it exists exactly while the
+// conversation is on screen and the copy can never be over the Games page, Settings or another plugin's
+// page. What this page can prove is the shape of that: the copy is inside the slot the host draws, and it
+// has no fixed position of its own. The same cabinet in the narrow pane has to be fitted to the pane,
+// not drawn at 1183 px.
 const setOverchat = on => {
   const held = JSON.parse(fs.readFileSync(WALLET, 'utf8'))
   held.overchat = on
@@ -345,21 +346,26 @@ setOverchat(true)
 await cdp('Page.reload', {})
 await sleep(6000)
 await openSlots()
-const onGames = await evaluate(`(() => {
+const inSlot = await evaluate(`(() => {
+  const slot = document.querySelector('#composer-slot')
   const node = document.querySelector('[data-jackpot="overchat"]')
-  // This QA page is the Games page itself (its route page fills the main area and there is no
-  // conversation of its own), which is exactly the host the copy must stay off.
-  const conversation = document.querySelector('#composer')
+  const host = slot && slot.firstElementChild
+  const style = node ? getComputedStyle(node) : null
   return {
     gamesPage: !!document.querySelector('.games-center-layout'),
-    conversation: !!conversation,
+    slot: !!slot,
+    strip: !!(host && host.getAttribute('data-overchat') === 'strip'),
     overlay: !!node,
-    visible: node ? getComputedStyle(node).visibility : 'absent'
+    insideSlot: !!(node && slot && slot.contains(node)),
+    // A copy in the slot is laid out by its parent: no fixed position, no coordinates of its own.
+    position: style ? style.position : null,
+    left: style ? style.left : null
   }
 })()`)
-check('the over-chat copy stays off the games page',
-  onGames && onGames.gamesPage && (onGames.overlay === false || onGames.visible === 'hidden'),
-  JSON.stringify(onGames))
+check('the over-chat copy is drawn inside the composer slot, not floated over the page',
+  inSlot && inSlot.slot && inSlot.strip && inSlot.overlay && inSlot.insideSlot
+    && inSlot.position !== 'fixed' && (inSlot.left === 'auto' || inSlot.left === '0px'),
+  JSON.stringify(inSlot))
 
 await cdp('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false })
 await cdp('Page.navigate', { url: `${URL_BASE}pane` })
@@ -419,11 +425,10 @@ if (!paneFacts.pane || !paneFacts.machine) {
   check('the pane cabinet fits the column width',
     paneFacts.width <= paneFacts.paneWidth + 1 && paneFacts.left >= paneFacts.paneLeft - 2 && paneFacts.right <= paneFacts.paneRight + 4,
     `copy ${Math.round(paneFacts.width)} across ${Math.round(paneFacts.left)}..${Math.round(paneFacts.right)} in pane ${Math.round(paneFacts.paneLeft)}..${Math.round(paneFacts.paneRight)} scale ${paneFacts.scale.toFixed(3)}`)
-  // Beside the chat the pane is open, and the copy is still wanted: it belongs over the chat column,
-  // which is everything left of the pane. This page has a real composer and no Games page at all, so
-  // the copy must be there and inside the conversation - the owner's release blocker (2026-11-11) was
-  // exactly that it was not, in the real app.
-  check('the over-chat copy is drawn over the conversation beside the pane',
+  // Beside the chat the pane is open, and the copy is still wanted: it is drawn in the composer's slot,
+  // which is inside the conversation column and left of the pane. The release blocker (2026-11-11) was
+  // that it did not appear at all in the real app; the slot is what makes that structural.
+  check('the over-chat copy is drawn in the composer slot, inside the conversation',
     Boolean(paneFacts.overlay && paneFacts.copyWidth > 0
       && paneFacts.copyLeft >= paneFacts.chatLeft - 2 && paneFacts.copyRight <= paneFacts.chatRight + 2),
     `copy ${paneFacts.copyWidth && Math.round(paneFacts.copyWidth)} across ${paneFacts.copyLeft && Math.round(paneFacts.copyLeft)}..${paneFacts.copyRight && Math.round(paneFacts.copyRight)} in chat ${paneFacts.chatLeft && Math.round(paneFacts.chatLeft)}..${paneFacts.chatRight && Math.round(paneFacts.chatRight)}`)

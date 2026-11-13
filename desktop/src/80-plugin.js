@@ -75,13 +75,14 @@ export default {
         render: () => jsx(GamesStatusItem, { ctx })
       },
       {
-        // JACKPOT v2. The item is the switch, the two sliders and — on a host with no react-dom for
-        // the layer's own div — the machine itself (see 19-jackpot2-layer.js). It is registered
-        // here, always: the machine over the chat must be reachable without opening Game Center.
-        id: 'jackpot2',
-        area: STATUSBAR_AREAS.right,
-        order: 142,
-        render: () => jsx(Jackpot2StatusItem, { ctx })
+        // The two see-through machines, in the composer's own slot (78-overchat-slot.js). A slot, not an
+        // overlay: the app owns where it goes and how wide it is, so an app update cannot break it and it
+        // cannot break the app (review, 2026-11-12). The strip draws only while a switch is on, and the
+        // switches themselves live where they always did — the Slots table, the cabinet's own panel and
+        // Settings.
+        id: 'overchat',
+        area: COMPOSER_AREAS.underside,
+        render: () => jsx(OverChatStrip, { ctx })
       }
     ])
   }
