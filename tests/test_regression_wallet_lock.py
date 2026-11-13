@@ -8,11 +8,18 @@ Two defects this pins:
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import sys
 import threading
 from pathlib import Path
+
+import pytest
+
+# Windows has no advisory file locks, and the wallet is written to say so: `shelf/wallet.py` imports fcntl
+# behind a guard and simply proceeds unlocked there (pinned by tests/test_windows_import.py). This module
+# proves the LOCK works, so it needs a platform that has one — skips with that reason instead of failing to
+# import, which is what it did on the first Windows run (2026-11-13).
+fcntl = pytest.importorskip("fcntl", reason="advisory file locks are POSIX-only; the wallet is guarded")
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
