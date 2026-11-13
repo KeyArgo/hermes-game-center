@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/brand/mark.svg" width="88" height="88" alt="Game Center"></p>
 <h1 align="center">Game Center</h1>
-<p align="center"><em>Eleven curated Play games — from eighteen rule engines — and a referee that refuses an illegal move out loud.</em></p>
+<p align="center"><em>Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
 _Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
@@ -26,7 +26,7 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
 ## What it is
 
-Eleven curated Play games, from eighteen rule engines — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
+Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
 
 Eleven of them are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on or open the pet gallery in **Experimental** (which reads one public list of pets, nothing about you).
 
