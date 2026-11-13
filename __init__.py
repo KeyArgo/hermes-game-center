@@ -170,79 +170,6 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             names=book,
         )
 
-    # ---- the egg cheat, armed by a file rather than shipped on ----------------------------------
-    # `/eggs` exists only on a machine that carries the developer key or the egg force file. Delete
-    # the file and the command is gone at the next reload: the hunt goes back to being a surprise
-    # (owner's ask, 2026-11-09: "give me cheats so I can search for them and find them easily and
-    # test them, then we can remove the cheats so its harder").
-    def _eggs_module():
-        here = Path(__file__).resolve().parent / "shelf"
-        return load_fresh("hermes_gameshelf_eggs", here / "eggs.py")
-
-    def _egg_cheat_armed() -> bool:
-        try:
-            here = Path(__file__).resolve().parent / "shelf"
-            devgrant = load_fresh("hermes_gameshelf_devgrant", here / "devgrant.py")
-            if devgrant.armed():
-                return True
-        except Exception:
-            log.debug("the dev-grant cheat check could not be read", exc_info=True)
-        try:
-            # Both files live in this profile's plugin data folder, never in the person's home
-            # directly (review, 2026-11-12): a cheat armed in one profile must not arm another.
-            return _eggs_module().force_path(root()).exists()
-        except Exception:
-            log.debug("the egg-force cheat check could not be read", exc_info=True)
-            return False
-
-    if _egg_cheat_armed():
-        def on_eggs(raw: str = "", **kwargs: Any) -> str:
-            here = Path(__file__).resolve().parent / "shelf"
-            eggs = _eggs_module()
-            wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
-            wallet = wallets.Wallet(wallets.wallet_path(root()))
-            words = str(raw or "").split()
-            action = words[0] if words else "list"
-            found = set(wallet.eggs_found())
-            live = eggs.current()
-            if action == "list":
-                rows = [f"{'LIVE' if live and live['id'] == e['id'] else '    '} "
-                        f"{'FOUND' if e['id'] in found else '     '} {e['points']:>6}  {e['id']:<22} {e['hint']}"
-                        for e in eggs.EGGS]
-                head = f"showing: {live['id']} ({live['points']} pts){' [forced]' if live.get('forced') else ''}" if live else "showing: nothing this hour"
-                return "\n".join([head, f"found {len(found)}/{len(eggs.EGGS)}", *rows])
-            if action == "show" and len(words) > 1:
-                if not eggs.find(words[1]):
-                    return f"No egg called {words[1]}."
-                force = eggs.force_path(root())
-                force.parent.mkdir(parents=True, exist_ok=True)
-                force.write_text(words[1] + "\n", encoding="utf-8")
-                return f"Forced {words[1]} — open the machine, the mark is at the top-left of the cabinet."
-            if action == "clear":
-                try:
-                    eggs.force_path(root()).unlink()
-                    return "Force cleared: back to the hourly schedule."
-                except FileNotFoundError:
-                    return "No force was set."
-            if action == "claim" and len(words) > 1:
-                if not live or live["id"] != words[1]:
-                    return f"{words[1]} is not the egg showing."
-                answer = wallet.claim_egg(words[1], eggs.points_for(words[1]))
-                return f"+{answer['points']} points (total {answer['bonus']})" if answer["claimed"] else "Already found."
-            if action == "reset":
-                with wallet._held() as data:
-                    data["eggs_found"] = []
-                return "Finds cleared: every egg can be found again."
-            return "Usage: /eggs list | show <id> | clear | claim <id> | reset"
-
-        ctx.register_command(
-            "eggs",
-            on_eggs,
-            "Easter-egg cheat (developer). /eggs list | show <id> | clear | claim <id> | reset",
-            args_hint="list | show the-argo-stamp | claim the-argo-stamp | reset",
-            argument_mode="text",
-        )
-
     ctx.register_command(
         "games",
         on_games,
@@ -335,7 +262,16 @@ def _style(prompt: str) -> tuple[str, int]:
 
 
 def _complete(ctx: Any, settings):
+    """The model door, or None when this context has no LLM surface at all.
+
+    Quality review, 2026-11-13: this returned a closure unconditionally, so on a context without
+    ``ctx.llm`` the call raised AttributeError deep inside whatever asked for a completion, and the
+    Doctrine author turned that into "That profile did not answer." — advice about a profile that was
+    never involved. None is the honest answer, and every caller already has a sentence for it.
+    """
     del settings
+    if getattr(ctx, "llm", None) is None:
+        return None
 
     def complete(prompt: str, max_tokens: int = 0) -> dict[str, Any]:
         system, budget = _style(prompt)
