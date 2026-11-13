@@ -154,5 +154,13 @@
     "markers": [
       "pytest"
     ]
+  },
+  "docs/HERMES-ISSUES.md": {
+    "code": [
+      "shelf/pet.py"
+    ],
+    "markers": [
+      "pet api"
+    ]
   }
 }

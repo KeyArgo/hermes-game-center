@@ -1,6 +1,6 @@
 # Reference
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
 
 Every tool, command, hook, HTTP route and config key the plugin exposes, in tables. The prose for each setting is in [CONFIGURATION.md](CONFIGURATION.md).
 

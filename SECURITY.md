@@ -1,5 +1,5 @@
 # SECURITY
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
 
 What this plugin does to your machine and your network, and how to stop it. Sourced from
 README.md ("What this plugin does on your machine"), `plugin.yaml`, and the Desktop table code.
@@ -36,8 +36,10 @@ do not open a public issue with a working exploit in it.
 
 - **No telemetry. No phone-home. No update checks. No remote code loading. No binaries.**
   Updates arrive only when you install a newer version yourself. Code is MIT.
-- The plugin makes no network calls of its own. The one exception is online play, which is **off
-  until you turn it on**.
+- The plugin makes no network calls of its own. Two exceptions, and neither happens unless you ask
+  for it: online play, which is **off until you turn it on**, and the **Experimental** pet gallery,
+  which while it is open reads the public Petdex manifest (`https://petdex.dev/api/manifest`, the
+  same document Hermes's own pet picker reads) with nothing about you in the request.
 - With online play **on**, it contacts exactly one address — `lobby_url`, default
   `https://games.hermesnet.xyz` — and sends: your display name, your recovery key when you sign in,
   which game you are waiting for, the moves you make, and for the bot ladder your bot's name and the
