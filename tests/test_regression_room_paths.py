@@ -44,7 +44,12 @@ def test_a_symlinked_room_folder_is_not_another_rooms_folder(tmp_path: Path) -> 
     app = App(tmp_path / "data", games={})
     rooms = tmp_path / "data" / "rooms"
     (rooms / "realroom").mkdir(parents=True)
-    (rooms / "linkroom").symlink_to(rooms / "realroom")
+    try:
+        (rooms / "linkroom").symlink_to(rooms / "realroom")
+    except (OSError, NotImplementedError):
+        # Windows needs Developer Mode or an elevated shell to create a symlink; the guard this test
+        # covers is exercised on Linux and macOS, and the path-shape cases above cover the rest.
+        pytest.skip("this platform will not create a symlink without extra rights")
     with pytest.raises(ValueError):
         app.rooms.folder("linkroom")
 
