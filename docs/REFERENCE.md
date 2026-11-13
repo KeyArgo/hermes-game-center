@@ -19,7 +19,7 @@ The handler runs the line through `shelf/commands.py` with `source="tool"`. Cons
 | Command | Registered by | What it does |
 |---|---|---|
 | `/games` | `__init__.py` | The shelf. Bare `/games` lists the games; `/games <game> <line>` routes to the game. |
-| `/eggs` | `__init__.py`, only when a developer key or `~/.hermes/gameshelf-egg-force` is present | Developer Easter-egg cheat: `list`, `show <id>`, `clear`, `claim <id>`, `reset`. Not shipped armed. |
+| `/eggs` | `__init__.py`, only when a developer key or an egg-force file is present in the profile's plugin data folder | Developer Easter-egg cheat: `list`, `show <id>`, `clear`, `claim <id>`, `reset`. Not shipped armed. |
 
 ### `／games` verbs
 

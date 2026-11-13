@@ -7,8 +7,9 @@
     scripts/dev-eggs.py reset          # forget every find, so the same eggs can be tested again
 
 It is inert on a machine without the developer key: exactly like ``scripts/dev-grant.py``, the first
-thing it does is refuse without ``~/.hermes/gameshelf-dev.key``. Removing the cheat for everyone is
-two deletions - this file and the force file it writes - because no part of the plugin knows about it.
+thing it does is refuse without the key file in the active profile's plugin data folder
+(``plugin_data_dir("hermes-gameshelf")/gameshelf-dev.key``). Removing the cheat for everyone is two
+deletions - this file and the force file it writes - because no part of the plugin knows about it.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _load(name: str, path: Path):
@@ -39,12 +42,14 @@ devgrant = _load("hermes_gameshelf_devgrant", ROOT / "shelf" / "devgrant.py")
 eggs = _load("hermes_gameshelf_eggs", ROOT / "shelf" / "eggs.py")
 wallet_mod = _load("hermes_gameshelf_wallet", ROOT / "shelf" / "wallet.py")
 
-FORCE = Path.home() / ".hermes" / "gameshelf-egg-force"
+# The one definition of that path lives in shelf/eggs.py, so the plugin and this script agree.
+FORCE = eggs.force_path()
 
 
 def live_wallet():
-    for folder in (Path.home() / ".hermes" / "plugin-data" / "hermes-gameshelf",
-                   Path.home() / ".hermes" / "plugins" / "hermes-gameshelf",
+    data = FORCE.parent
+    for folder in (data,
+                   data.parent.parent / "plugins" / "hermes-gameshelf",
                    ROOT):
         if (folder / "wallet.json").exists():
             return wallet_mod.Wallet(folder / "wallet.json")
