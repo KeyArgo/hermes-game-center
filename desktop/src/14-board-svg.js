@@ -17,6 +17,33 @@ function chessPiece(mark, x, y, cell, key) {
   }, key)
 }
 
+// What a screen reader says about a board. The engine's sides are called white and black because that is
+// chess's vocabulary, but most of the shelf is not chess: a Connect Four player whose board announced
+// "connect4 board, white to move" was being told about a game they were not playing, in the wrong name
+// (bug found walking the shelf on a fresh profile, 2026-11-13). So: the game's title, and who holds the
+// side that is to move, when the picture says.
+function boardLabel(picture) {
+  const pic = picture || {}
+  const title = String(pic.title || pic.game || pic.view || 'Game').trim()
+  const seatFor = side => (Array.isArray(pic.seats) ? pic.seats.find(seat => seat && seat.side === side) : null)
+  const actor = () => {
+    const seat = pic.turn ? seatFor(pic.turn) : null
+    if (!seat) return ''
+    if (seat.open) return 'waiting for an opponent'
+    const name = String(seat.name || '').trim()
+    if (name) return `${name} to move`
+    if (seat.kind === 'local') return 'the computer to move'
+    if (seat.kind === 'agent') return 'your agent to move'
+    return 'a player to move'
+  }
+  const parts = [`${title} board`]
+  const who = actor()
+  if (who) parts.push(who)
+  else if (pic.turn) parts.push('in play')
+  if (pic.last) parts.push(`last move ${pic.last}`)
+  return parts.join(', ')
+}
+
 function BoardSvg({ picture, height, interactive, onMove, flat, pending, onPending, coachArrows }) {
   const [picked, setPicked] = useState([])
   const [hover, setHover] = useState(null)
@@ -315,7 +342,7 @@ function BoardSvg({ picture, height, interactive, onMove, flat, pending, onPendi
     },
     children: jsxs('svg', {
       role: 'img',
-      'aria-label': `${picture.game || picture.view} board${picture.turn ? `, ${picture.turn} to move` : ''}${picture.last ? `, last move ${picture.last}` : ''}`,
+      'aria-label': boardLabel(picture),
       viewBox: `0 0 ${drawn.w} ${drawn.h}`,
       preserveAspectRatio: 'xMidYMid meet',
       onPointerDown: start,
