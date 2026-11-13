@@ -46,8 +46,6 @@ Index of every document. Start with the README if you just want to play; start w
 | [../PROVENANCE.md](../PROVENANCE.md) | How the repository came to be, and what is unverified. |
 | [../THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) | Vendored code and artwork, with licences. |
 | [../CHANGELOG.md](../CHANGELOG.md) | Release history. |
-| [../BACKLOG.md](../BACKLOG.md) | Known work and what is deliberately not built. |
-| [HERMES-ISSUES.md](HERMES-ISSUES.md) | Issue text for Hermes itself, ready to file (a public pet API). |
 | [../SHIP-GATE.md](../SHIP-GATE.md) | The release gate and its per-surface checks. |
 
 The documentation stamps are checked by `tests/test_docs_current.py`; run `python3 tools/doc_stamp.py --write` after reviewing a change, then `--check` before a release.

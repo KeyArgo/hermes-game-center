@@ -26,7 +26,7 @@ In `wallet.json` under Game Center's plugin data folder. **Chips** are play mone
 
 ## Why is the Champions tab empty?
 
-It is a placeholder in this version. Champions and tournaments have machinery in `shelf/champions.py` and `shelf/tournament.py`, but the matches they need do not run here, so the page says so and nothing is created. Play and Experimental are unaffected. [BACKLOG.md](../BACKLOG.md) tracks the work.
+It is a placeholder in this version. Champions and tournaments have machinery in `shelf/champions.py` and `shelf/tournament.py`, but the matches they need do not run here, so the page says so and nothing is created. Play and Experimental are unaffected.
 
 ## Why are the Experimental cards locked?
 
