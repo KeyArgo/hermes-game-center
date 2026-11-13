@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/brand/mark.svg" width="88" height="88" alt="Game Center"></p>
 <h1 align="center">Game Center</h1>
-<p align="center"><em>Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
+<p align="center"><em>Eleven curated Play games — from eighteen rule engines — and a referee that refuses an illegal move out loud.</em></p>
 
 _Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
@@ -26,7 +26,7 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
 ## What it is
 
-Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
+Eleven curated Play games, from eighteen rule engines — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
 
 Eleven of them are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on or open the pet gallery in **Experimental** (which reads one public list of pets, nothing about you).
 
@@ -38,7 +38,7 @@ Eleven of them are curated **Play** games with seats, turns, a clear winner, a r
 
 ## Features
 
-- **Real rules engines, and a referee that says no.** Eighteen game folders, each with its own rules; the referee settles every move.
+- **Real rules engines, and a referee that says no.** Eleven Play games drawn from eighteen rule engines, each with its own rules; the referee settles every move.
 - **Play people, inside Hermes.** Online play joins one shared lobby — the Hall — with a chat, a list of who is here, and play requests. It is off until you turn it on.
 - **Your Hermes model as an opponent.** Give a seat to your own model: it gets the board and the legal moves and must answer with one legal move. Any provider works, including a free one.
 - **Slots over the chat.** One Slots game on the Jackpot cabinet, which can float over the conversation.
