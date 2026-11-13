@@ -47,13 +47,23 @@ function OverChatStrip({ ctx }) {
   const [jackpotOn] = useJp2LOverchat(ctx)
   const box = useRef(null)
   const [, setResized] = useState(0)
+  const on = Boolean(slotsOn || jackpotOn)
 
   // Our own box, and nothing else. A ResizeObserver rather than a window listener: the composer changes
   // width when a pane opens, when the window moves between screens and when the person drags a sash —
   // all of those are the same event to this element.
+  //
+  // It depends on `on` and no other value, and that is the whole fix for review, 2026-11-13: the strip's
+  // div exists ONLY while a switch is on, so a mount with both switches off has no element to observe.
+  // With `[]` the effect ran once against `null`, never attached, and never ran again — turning a machine
+  // on afterwards rendered it at width 0 for good (the Jackpot v2 copy draws nothing at 0). Depending on
+  // `on` re-runs the effect on the switch, and because React commits before effects run, the element is
+  // there to be measured and watched.
   useJpLayoutEffect(() => {
-    // One render after mount: the ref is only filled in once the tree is committed, so the first render
-    // cannot see the box at all. (A strip that is already its final width fires no resize event.)
+    if (!on) return undefined
+    // One render after the switch, because the ref is only filled in once the tree is committed: this
+    // render asked for the div, the next one can read its width. (A strip already at its final width
+    // fires no resize event, so nothing else would ask.)
     setResized(count => count + 1)
     const node = box.current
     if (typeof ResizeObserver === 'undefined' || !node) return undefined
@@ -65,10 +75,9 @@ function OverChatStrip({ ctx }) {
       return undefined
     }
     return () => { if (watcher && typeof watcher.disconnect === 'function') watcher.disconnect() }
-  }, [])
+  }, [on])
 
   const width = overchatStripWidth(box)
-  const on = Boolean(slotsOn || jackpotOn)
   if (!on) return null
   const both = Boolean(slotsOn && jackpotOn)
   const share = both ? Math.max(0, width - OVERCHAT_GAP) / 2 : width
