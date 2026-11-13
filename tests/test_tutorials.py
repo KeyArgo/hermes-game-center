@@ -56,7 +56,7 @@ def test_required_games_have_learn_files():
 
 
 def test_every_game_has_a_learn_file():
-    # 18 while Backgammon is hidden (backgammon/HIDDEN.md); 19 again when its game.json is back.
+    # 18 while Backgammon is hidden (its manifest is game.json.future); 19 again when its game.json is back.
     assert len(GAMES) == 18
     assert not [game for game in GAMES if not any(path.is_file() for path in learn_paths(game))]
 
