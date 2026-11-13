@@ -6652,3 +6652,39 @@ async function gcextrasContract() {
   reset()
   console.log('gcextras: backgammon cover, project link row and the copyable version chip: passed')
 }
+
+// ---- the board's name for the side to move (bug found on a fresh profile, 2026-11-13) ---------------
+// The engine calls its sides white and black because that is chess's vocabulary. On a Connect Four board
+// that reached the person as "connect4 board, white to move": the wrong game's name and the wrong words.
+{
+  const label = picture => evaluate(`boardLabel(${JSON.stringify(picture)})`)
+  const seat = (side, kind, name, open) => ({ side, kind, name, open })
+  assert.equal(
+    label({ game: 'connect4', view: 'connect4', title: 'Connect Four', turn: 'white',
+      seats: [seat('white', 'human', 'Ada', false), seat('black', 'local', '', false)] }),
+    'Connect Four board, Ada to move',
+    'the board names the game and the person to move'
+  )
+  assert.equal(
+    label({ game: 'connect4', title: 'Connect Four', turn: 'black', seats: [seat('black', 'local', '', false)] }),
+    'Connect Four board, the computer to move',
+    'a computer seat says so'
+  )
+  assert.equal(
+    label({ game: 'gomoku', title: 'Gomoku', turn: 'white', seats: [seat('white', 'human', '', true)] }),
+    'Gomoku board, waiting for an opponent',
+    'an empty seat says it is waiting'
+  )
+  assert.equal(
+    label({ game: 'chessboard', title: 'Chess', turn: 'white', last: 'e2e4', seats: [] }),
+    'Chess board, in play, last move e2e4',
+    'with no seat rows it still describes the position'
+  )
+  for (const picture of [
+    { game: 'connect4', title: 'Connect Four', turn: 'white', seats: [seat('white', 'human', 'Ada', false)] },
+    { game: 'hex', title: 'Hex', turn: 'black', seats: [seat('black', 'agent', '', false)] }
+  ]) {
+    assert.ok(!/\bwhite\b|\bblack\b/i.test(label(picture)), `no colour word on a board that has none: ${label(picture)}`)
+  }
+  console.log('board label: the game\'s own words for the side to move: passed')
+}
