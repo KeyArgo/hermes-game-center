@@ -353,25 +353,37 @@ def test_catalog_finds_and_plays_doctrine(tmp_path):
     assert catalog.picture("doctrine", complete=lambda prompt, max_tokens=80: "x")["doctrine"]["improve_ready"] is True
 
 
-def test_profile_author_refuses_private(game):
-    assert "private" in game.command("author private").lower()
-    assert "lowercase" in game.command("author Bad/Name").lower()
+def test_a_signature_must_look_like_one_name(game):
+    """The input is a signature, so it is validated as a name — not as a Hermes profile.
+
+    The quality review (2026-11-13) found the field pretending to name a profile that was never used,
+    which is why `private` is no longer special here: no profile is ever run in this path (see
+    test_the_author_path_starts_no_process_and_inherits_no_environment), so nothing has to be carved out.
+    """
     assert "Usage" in game.command("author")
+    assert "one word" in game.command("author Bad/Name").lower()
+    assert "at most 32" in game.command("author " + "x" * 40).lower()
+    # Extra words after the name are the flavour, so a spaced name is refused by the validator itself.
+    assert "one word" in (game.profiles.problem("two words") or "").lower()
+    assert "signed private" in game.command(
+        "author private", complete=lambda prompt, max_tokens=0: {"move": json.dumps(STRONG)}
+    )
 
 
-def test_profile_author_reads_the_model_door_and_signs_the_card(game):
+def test_the_prompt_carries_the_signature_and_the_model_is_asked_for_it(game):
     seen = {}
 
     def fake_complete(prompt, max_tokens=0):
         seen.update(prompt=prompt, max_tokens=max_tokens)
         return {"move": json.dumps(STRONG), "remark": "", "tokens": 12}
 
-    reply, error = game.profiles.author("test-profile", "write a card", complete=fake_complete)
+    text = game.profiles.prompt("test-profile", "a careful fighter")
+    reply, error = game.profiles.author("test-profile", text, complete=fake_complete)
     assert error == "" and "Probe Winner" in reply
-    assert "write a card" in seen["prompt"]
+    # The signature reaches the model, in the prompt and in the one field it may sign.
+    assert '"author":"test-profile"' in seen["prompt"]
+    assert "a careful fighter" in seen["prompt"]
     assert seen["max_tokens"] == game.profiles.MAX_TOKENS
-    refused, why = game.profiles.author("private", "x", complete=fake_complete)
-    assert refused is None and "private" in why
 
 
 def test_the_author_path_starts_no_process_and_inherits_no_environment(game, monkeypatch):
@@ -406,10 +418,19 @@ def test_authoring_without_a_model_says_so_instead_of_starting_one(game):
     assert "Probe Winner" not in picture(game)["your_card"]["name"]
 
 
-def test_profile_author_command(game, monkeypatch):
-    monkeypatch.setattr(game, "complete", lambda prompt, max_tokens=0: {"move": json.dumps(STRONG)})
+def test_the_card_is_signed_with_the_name_and_nothing_claims_a_profile(game, monkeypatch):
+    seen = {}
+
+    def fake_complete(prompt, max_tokens=0):
+        seen["prompt"] = prompt
+        return {"move": json.dumps(STRONG)}
+
+    monkeypatch.setattr(game, "complete", fake_complete)
     answer = game.command("author test-profile", complete=game.complete)
-    assert "wrote Probe Winner" in answer
+    # "signed", not "Profile wrote": the card is written by this person's own model.
+    assert answer.startswith("Wrote Probe Winner, signed test-profile.")
+    assert "signed test-profile" in answer
+    assert '"author":"test-profile"' in seen["prompt"]
     shown = picture(game)
     assert shown["your_card"]["name"] == "Probe Winner"
     assert shown["your_card"]["author"] == "test-profile"

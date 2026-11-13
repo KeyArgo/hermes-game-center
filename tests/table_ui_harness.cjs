@@ -914,7 +914,7 @@ async function doctrineContract() {
   findButton(docTree, 'Import JSON').props.onClick()
   await new Promise(resolve => setImmediate(resolve))
   assert.ok(docCalls.some(call => Array.isArray(call) && call[0] === 'import'), 'import uses the large-file door, not one command line')
-  assert.equal(findButton(docTree, 'Author with profile').props.disabled, true, 'a profile name is required')
+  assert.equal(findButton(docTree, 'Write a card').props.disabled, true, 'a signature is required')
   findButton(docTree, 'Hide share').props.onClick()
   docTree = doctrineRender()
   findButton(docTree, 'Card JSON').props.onClick()

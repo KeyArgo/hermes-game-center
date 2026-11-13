@@ -215,8 +215,8 @@ class Doctrine:
             state["notice"] = "Board cleared."
             self._save(state)
             return "Board cleared. doctrine play starts a new 1v1."
-        if head == "profile":
-            return self.profiles.problem(" ".join(rest)) or "That profile can author a card: doctrine author <profile>"
+        if head == "signature":
+            return self.profiles.problem(" ".join(rest)) or "That name can sign a card: doctrine author <name>"
         return self.help()
 
     def help(self) -> str:
@@ -236,7 +236,7 @@ class Doctrine:
             "/games doctrine export [replay]            export your card or the last replay",
             "/games doctrine ladder                     your card against all four house cards",
             "/games doctrine improve                    ask your model for a better card",
-            "/games doctrine author <profile>           write a card, signed with a named profile",
+            "/games doctrine author <name>              your model writes a card, signed with a name you type",
             "/games doctrine tree                       your card's family tree",
             "/games doctrine reset                      clear the board",
         ])
@@ -462,10 +462,14 @@ class Doctrine:
         return state["notice"]
 
     def _author(self, state: dict, rest: list[str]) -> str:
-        profile = (rest[0] if rest else "").strip().lower()
-        if not profile:
-            return "Usage: doctrine author <profile>"
-        why = self.profiles.problem(profile)
+        # A SIGNATURE, not a profile: the name is written into the card's author field and nothing else.
+        # The model that writes the card is the person's own (see doctrine/profiles.py). The quality
+        # review (2026-11-13) was right that announcing a profile as the author was a claim we could not
+        # keep — no profile is ever run.
+        signature = self.profiles.clean(rest[0] if rest else "")
+        if not signature:
+            return "Usage: doctrine author <name> - the name to sign the card with"
+        why = self.profiles.problem(signature)
         if why:
             return why
         if self.complete is None:
@@ -474,19 +478,20 @@ class Doctrine:
         flavour = " ".join(rest[1:]) or state["your_card"].get("personality", "")
         # The card comes from the person's own model through Hermes's plugin LLM door: text only, no
         # child process, no tool set and no environment to inherit (review, 2026-11-12).
-        reply, error = self.profiles.author(profile, self.profiles.prompt(flavour), complete=self.complete)
+        reply, error = self.profiles.author(signature, self.profiles.prompt(signature, flavour),
+                                           complete=self.complete)
         if error:
             return error
         candidate, problems = self.card_mod.validate(_extract_json(reply) or reply.strip())
         if problems:
-            return f"{profile}'s reply was not a valid card: " + "; ".join(problems[:3])
-        candidate["author"] = profile
+            return "The reply was not a valid card: " + "; ".join(problems[:3])
+        candidate["author"] = signature
         entry = {"id": uuid.uuid4().hex[:10], "name": candidate["name"], "parent": "",
                  "generation": 1, "card": candidate, "record": {}, "seeds": [], "created": _now()}
         state["lineage"] = [*state["lineage"], entry][-40:]
         state["your_card"] = candidate
         state["ladder"] = []
-        state["notice"] = f"{profile} wrote {candidate['name']}. It is your card now."
+        state["notice"] = f"Wrote {candidate['name']}, signed {signature}. It is your card now."
         self._save(state)
         return state["notice"]
 
