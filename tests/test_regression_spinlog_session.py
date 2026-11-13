@@ -47,7 +47,7 @@ def test_the_log_records_the_session_that_paid(tmp_path: Path) -> None:
     wallet = _wallet(tmp_path)
     row = slotplay.spin(wallet, bet=25, machine=MACHINE)
     assert row is not None
-    line = json.loads((tmp_path / "spins.jsonl").read_text().strip().splitlines()[-1])
+    line = json.loads((tmp_path / "spins.jsonl").read_text(encoding="utf-8").strip().splitlines()[-1])
     assert line["session"]["pays"] == row["session"]["pays"]
     assert line["session"]["blanks"] == row["session"]["blanks"]
 
@@ -59,7 +59,7 @@ def test_every_logged_payout_re_derives_without_disagreement(tmp_path: Path) -> 
         assert slotplay.spin(wallet, bet=25, machine=MACHINE) is not None
 
     rows = [json.loads(line) for line in
-            (tmp_path / "spins.jsonl").read_text().splitlines() if line.strip()]
+            (tmp_path / "spins.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     assert len(rows) == 60
     for row in rows:
         spec = reels.SPECS[row["machine"]]

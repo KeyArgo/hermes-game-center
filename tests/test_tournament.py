@@ -347,12 +347,21 @@ def test_a_capped_doctrine_call_limit_still_plays_a_finished_battle():
 
 
 def test_a_tournament_can_be_stopped_and_keeps_finished_games(tmp_path):
+    """Stopped means stopped: the run is held INSIDE a move when stop() is called.
+
+    The version of this test that shipped waited for the first finished game and then stopped, which on a
+    fast machine (macOS in CI, 2026-11-13) meant it stopped after the whole two-game tournament had already
+    finished — the run reported "done" and the test failed for a reason that had nothing to do with
+    stopping. The match now blocks in `ask` with a gate the test opens only after it has called stop(), so
+    the tournament is provably mid-flight, on every platform and every machine speed.
+    """
     rules = rules_for("connect4")
-    calls = [0]
-    stop_after = 6
+    asked = threading.Event()
+    gate = threading.Event()
 
     def ask(entrant, system, prompt):
-        calls[0] += 1
+        asked.set()
+        assert gate.wait(timeout=30), "the test never released the move it was holding"
         return {"move": prompt.split("Legal moves: ", 1)[-1].splitlines()[0].split(", ")[0]}
 
     people = [entrant(champion("A")), entrant(champion("B"))]
@@ -360,10 +369,9 @@ def test_a_tournament_can_be_stopped_and_keeps_finished_games(tmp_path):
     run = tournament.Tournament(tmp_path, {"connect4": rules, "gomoku": rules_for("gomoku")},
                                 ask, pool, people)
     assert run.start() == ""
-    deadline = time.monotonic() + 30
-    while run.status()["played"] < 1 and time.monotonic() < deadline:
-        time.sleep(0.02)
-    run.stop()
+    assert asked.wait(timeout=30), "the tournament never asked for a move"
+    run.stop()          # while a move is in flight, not after the last one
+    gate.set()          # let the held move return, so the loop can see the stop flag
     status = wait_done(run)
     assert status["status"] == "stopped"
     assert status["played"] < status["total"]
