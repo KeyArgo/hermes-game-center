@@ -1,20 +1,24 @@
-"""Ask one named Hermes profile for a Doctrine card, only when a person names it.
+"""Ask for a Doctrine card in the voice of one named Hermes profile.
 
-This is the one place Doctrine starts another program. It is never used by the
-battle engine. A person types the profile name; this module refuses ``private``,
-refuses anything that is not a plain profile name, and runs that profile's own
-Hermes with tools disabled so the only thing that can come back is text.
+A person types the profile name; this module refuses ``private``, refuses anything that is not a plain
+profile name, and then writes the card with the model that person already has selected in Hermes —
+``ctx.llm.complete``, the plugin LLM door, which only ever returns text and cannot run a tool, start a
+process, read a file or reach the network. There is no child process here at all (review, 2026-11-12).
+
+The profile name is kept for two reasons: it is validated (a name that cannot be a profile is refused
+before any model is asked), and it is written into the card as its author, so a card says whose voice
+wrote it.
 """
 
 from __future__ import annotations
 
-import os
 import re
-import subprocess
-from pathlib import Path
+from typing import Any, Callable
 
 NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,31}\Z")
 REFUSED = "That profile cannot author a card."
+# What the card author is allowed to spend on one card. A card is 2 KB of JSON; this is generous.
+MAX_TOKENS = 900
 
 PROMPT = """You are authoring one Doctrine battle bot card. A card is DATA, never code.
 Reply with one JSON object and nothing else (no prose, no code fences).
@@ -46,45 +50,43 @@ def problem(profile: object) -> str | None:
 
 
 def prompt(flavour: str = "a balanced fighter") -> str:
-    """The authoring prompt sent to the named profile."""
+    """The authoring prompt sent to the person's model."""
     return PROMPT.format(flavour=str(flavour or "a balanced fighter")[:120])
 
 
-def author(profile: str, text: str, home: Path | None = None, runner=None) -> tuple[str | None, str]:
-    """Run one named profile and return its reply text, or a friendly error.
+def _reply_text(answer: Any) -> str:
+    """The text of a model answer, in either shape a seat hands back."""
+    if isinstance(answer, dict):
+        return str(answer.get("move") or answer.get("text") or "")
+    return str(answer or "")
 
-    ``runner`` is injectable so tests never start a real Hermes process.
+
+def author(profile: str, text: str, complete: Callable[..., Any] | None = None) -> tuple[str | None, str]:
+    """Write one card with the person's own model, or return a friendly error.
+
+    ``complete`` is the plugin's model door (``ctx.llm.complete`` behind a small adapter): one prompt in,
+    text out. Nothing here starts a program, so there is no environment, no flag and no tool set to get
+    wrong. ``None`` means this surface has no model at all — the browser page, for instance — and the
+    person is told so instead of being asked to check a profile that was never going to run.
     """
     name = str(profile or "").strip().lower()
     why = problem(name)
     if why:
         return None, why
-    run = runner or _run
+    if not callable(complete):
+        return None, ("Writing a card needs one model, and none is reachable from here. "
+                      "Pick one in Settings → Models → \"Game Shelf opponent\". Everything else still works.")
     try:
-        reply, error = run(name, text, home)
-    except Exception:  # a missing CLI, a timeout, a killed process
-        return None, "That profile did not answer. Check that Hermes can run it."
-    if error:
-        return None, str(error)[:300]
-    clean = str(reply or "").strip()
+        answer = complete(text, max_tokens=MAX_TOKENS)
+    except TypeError:
+        # A seat that takes only the prompt (kit's older shape).
+        try:
+            answer = complete(text)
+        except Exception:  # a broken or slow model must cost a card, not the game
+            return None, "That profile did not answer. Try again in a moment."
+    except Exception:
+        return None, "That profile did not answer. Try again in a moment."
+    clean = _reply_text(answer).strip()
     if not clean:
         return None, "That profile returned nothing."
     return clean, ""
-
-
-def _run(profile: str, text: str, home: Path | None) -> tuple[str | None, str]:
-    """The real runner: one headless turn of that profile, tools disabled."""
-    env = dict(os.environ)
-    if home is not None:
-        env["HERMES_HOME"] = str(home)
-    command = [
-        "hermes", "-p", profile, "chat",
-        "--query-file", "-", "--oneshot", "-Q", "--no-restore-cwd",
-        "--toolsets", "",
-    ]
-    done = subprocess.run(
-        command, input=text, capture_output=True, text=True, timeout=240, env=env, check=False,
-    )
-    if done.returncode != 0:
-        return None, (done.stderr or done.stdout or "the profile exited with an error").strip()
-    return done.stdout, ""

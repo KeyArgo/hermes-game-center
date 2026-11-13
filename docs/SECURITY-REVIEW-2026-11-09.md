@@ -18,7 +18,14 @@ in `tests/`, `tools/`, `proof/` and `.lanes/`.
 |---|---|---|
 | `chessboard/analysis.py::_Engine` | `[shutil.which("stockfish")]` | fixed list, no shell; `open_engine()` returns `None` when Stockfish is absent |
 | `chessboard/coach.py::_Engine` | `[path]` where `path = shutil.which('stockfish')` | fixed list, no shell |
-| `doctrine/profiles.py::_run` | `["hermes", "-p", profile, "chat", "--query-file", "-", "--oneshot", "-Q", "--no-restore-cwd", "--toolsets", ""]` | fixed list; `profile` is checked against `[a-z0-9][a-z0-9-]{0,31}` and `private` is refused; the prompt arrives on **stdin**, never as an argument |
+
+> **Update, 2026-11-12 (the review before listing).** The third site — `doctrine/profiles.py::_run`,
+> which ran `hermes -p <profile> chat … --toolsets ""` — is **gone**. Hermes treats an empty
+> `--toolsets` as "not set", so that child inherited the profile's default tools and any
+> approval-mode variable in the environment. The card is now written through `ctx.llm.complete`
+> (the plugin LLM door: text only, no process, no tool set, no inherited environment), and
+> `tests/test_doctrine.py::test_the_author_path_starts_no_process_and_inherits_no_environment` pins
+> that no `subprocess` call is left in the authoring path. Counts below are the 2026-11-09 ones.
 
 Nothing is built from a room id, player name, save path or `game.json`.
 

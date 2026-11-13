@@ -54,9 +54,10 @@
 - **Card balance is tight.** Iron Vanguard is close to the strongest house card: 120 random weight sets
   only beat it 6-4 over ten seeded games at best. More archetypes or a per-match handicap would give
   "Improve my bot" more room to show a real gain.
-- **Profile authoring runs the Hermes CLI.** `doctrine author <profile>` starts one headless turn of that
-  profile with an empty toolset and reads the reply as text. A direct model-only route would be faster and
-  would not depend on the CLI's `--toolsets ""` meaning "none".
+- **~~Profile authoring runs the Hermes CLI.~~** Done (review, 2026-11-12): `doctrine author <profile>` writes
+  the card through `ctx.llm.complete` — text only, no child process, no tool set — and the profile name is
+  validated and written into the card as its author. `tests/test_doctrine.py` pins that no subprocess is left
+  in the authoring path.
 - **The import door is Doctrine-specific.** `POST /doctrine/import` exists because `/command` caps a line
   at 300 characters and a replay is ~40 KB. Other card games that share files will want one general
   import route instead of a per-game one.
