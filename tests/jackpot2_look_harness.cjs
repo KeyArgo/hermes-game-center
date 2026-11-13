@@ -118,8 +118,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
 const FRAME = { left: 350, top: 0, width: 800, height: 900 }
 
 for (const name of ['jp2LTint', 'jp2LTintPalette', 'jp2LTintVars', 'jp2LRgba', 'jp2LClampHue',
-  'jp2LClampPosition', 'jp2LSetPosition', 'jp2LSetHue', 'jp2LSetGradient', 'jp2LResetLook',
-  'jp2LPositioned', 'jp2LComposerTop', 'jp2LSharedGeometry', 'useJp2LPosition', 'useJp2LTint']) {
+  'jp2LSetHue', 'jp2LSetGradient', 'jp2LResetLook', 'jp2LStyleRules', 'jp2LSlotScale', 'useJp2LTint']) {
   assert.equal(evaluate(`typeof ${name}`), 'function', `${name} is in the built bundle (run python3 tools/build_plugin.py first)`)
 }
 
@@ -200,19 +199,18 @@ console.log('jackpot2 look: four gradients, four looks, flat teal by default and
 // ---- every value through the shelf's own drawer -------------------------------
 const store = {}
 sandbox.lookCtx = { storage: { get: (key, fallback) => (key in store ? store[key] : fallback), set: (key, value) => { store[key] = value } } }
+// The offsets are gone (review, 2026-11-12): a copy in a slot has a place, so a stored 'jackpot2.posx'
+// is simply not read — old values in a drawer must not move anything.
 store['jackpot2.posx'] = 0.5
 store['jackpot2.posy'] = -0.25
 store['jackpot2.hue'] = '300'
 store['jackpot2.gradient'] = 'sunset'
 evaluate('jp2LAdopt(lookCtx)')
-assert.equal(evaluate('JP2L_STORE.posx'), 0.5, 'a stored left-right comes back as the number it was saved as')
-assert.equal(evaluate('JP2L_STORE.posy'), -0.25, 'and the up-down')
+assert.equal(evaluate('typeof JP2L_STORE.posx'), 'undefined', 'a stored left-right is not read at all')
+assert.equal(evaluate('typeof JP2L_STORE.posy'), 'undefined', 'and neither is the up-down')
 assert.equal(evaluate('JP2L_STORE.hue'), 300, 'a stored hue as a string is read as a number')
 assert.equal(evaluate('JP2L_STORE.gradient'), 'sunset', 'and the stored gradient')
 
-evaluate('jp2LSetPosition(-0.4, 0.6, lookCtx)')
-assert.equal(store['jackpot2.posx'], -0.4, 'writing the position saves jackpot2.posx')
-assert.equal(store['jackpot2.posy'], 0.6, 'and jackpot2.posy')
 evaluate('jp2LSetHue(275, lookCtx)')
 assert.equal(store['jackpot2.hue'], 275, 'the hue saves under jackpot2.hue')
 evaluate('jp2LSetGradient("violet", lookCtx)')
@@ -229,18 +227,20 @@ assert.equal(store['jackpot2.gradient'], 'teal', 'a gradient that is not one of 
 const bad = { 'jackpot2.posx': 'left', 'jackpot2.posy': {}, 'jackpot2.hue': 'teal', 'jackpot2.gradient': 'plaid' }
 sandbox.badCtx = { storage: { get: (key, fallback) => (key in bad ? bad[key] : fallback), set: (key, value) => { bad[key] = value } } }
 evaluate('jp2LAdopt(badCtx)')
-assert.equal(evaluate('JP2L_STORE.posx'), 0, 'a word where a number belongs is the centre')
-assert.equal(evaluate('JP2L_STORE.posy'), 0, 'both axes')
+assert.equal(evaluate('typeof JP2L_STORE.posx'), 'undefined', 'a word where a position belongs moves nothing')
 assert.equal(evaluate('JP2L_STORE.hue'), 170, 'and a word where a hue belongs is the cabinet\'s own teal')
 assert.equal(evaluate('JP2L_STORE.gradient'), 'teal', 'with the default gradient')
 console.log('jackpot2 look: every value round-trips through ctx.storage, and nonsense falls back to the default: passed')
 
 // ---- the tint touches the frame and nothing else ------------------------------
-const sheet = String(evaluate('jp2LLayerStyle().textContent'))
+// A tint that is actually on: at the default the rule is not emitted at all (nothing is painted).
+const sheet = String(evaluate('jp2LStyleRules(jp2LTint("teal", 248))'))
+assert.ok(!String(evaluate('jp2LStyleRules(jp2LTint())')).includes('--jp2-tint'),
+  'at the default the stylesheet carries no tint rule, so the cabinet is untouched')
 const painting = sheet.split('}').map(part => part.trim()).filter(Boolean).filter(part => part.includes('--jp2-tint'))
 assert.equal(painting.length, 1, 'exactly one rule paints the tint')
-assert.equal(painting[0].split('{')[0].trim(), '[data-jp2-tint] .jp2-machine',
-  'and it names the cabinet\'s root element and nothing under it, so the reels and the symbol art keep their colours')
+assert.equal(painting[0].split('{')[0].trim(), '[data-jp2-stage][data-jp2-tint] .jp2-machine',
+  'and it names the cabinet\'s root element, inside our own stage, and nothing under it: the reels and the symbol art keep their colours')
 assert.ok(/background:\s*var\(--jp2-tint-bg\)/.test(painting[0]), 'the frost is the tint variable')
 assert.ok(/border-color:\s*var\(--jp2-tint-edge\)/.test(painting[0]), 'the border is the tint variable')
 assert.ok(/box-shadow:[^;]*var\(--jp2-tint-glow\)/.test(painting[0]), 'the glow is the tint variable')
@@ -267,32 +267,19 @@ assert.equal(nodes(fullStage).find(node => node.props && node.props['data-jp2-st
   'the full view on the Games page is the cabinet\'s own drawing, untinted')
 console.log('jackpot2 look: one rule on the cabinet\'s root, no filter, no text shadow, the art untouched: passed')
 
-// ---- the offsets travel about the centre --------------------------------------
-evaluate('jp2LSetPosition(0, 0, lookCtx)')
-assert.equal(evaluate('jp2LComposerTop()'), 700, 'the composer is found as the limit')
-const placedAt = (x, y) => {
-  evaluate(`jp2LSetPosition(${x}, ${y}, lookCtx)`)
-  return plain(evaluate(`jp2LSharedGeometry(${JSON.stringify(FRAME)}, 0.5, false)`))
-}
-const centre = placedAt(0, 0)
-const left = placedAt(-1, 0)
-const right = placedAt(1, 0)
-assert.equal((left.left + right.left) / 2, centre.left, 'the left-right travel is symmetric about the centre')
-assert.equal(left.top, centre.top, 'and moving sideways does not move it up or down')
-assert.equal(left.left, FRAME.left, 'the far left is the left edge of the conversation')
-assert.equal(right.left + right.width, FRAME.left + FRAME.width, 'and the far right is its right edge')
-const up = placedAt(0, -1)
-const down = placedAt(0, 1)
-assert.equal(up.top, FRAME.top, 'the far up is the top edge of the conversation, however close the composer is below')
-assert.equal(up.left, centre.left, 'and moving up or down does not move it sideways')
-assert.equal(down.top + down.height, 700, 'the far down is the composer\'s top edge: it never lies over it')
-const diagonal = placedAt(1, 1)
-assert.deepEqual([diagonal.left, diagonal.top], [right.left, down.top], 'and both axes together are where each one alone would be')
-evaluate('jp2LSetPosition(0, 0, lookCtx)')
-assert.deepEqual(plain(evaluate(`jp2LSharedGeometry(${JSON.stringify(FRAME)}, 0.5, false)`)),
-  plain(evaluate(`jp2LOverlayGeometry(${JSON.stringify(FRAME)}, 0.5)`)),
-  'and the centre is the exact geometry the copy had before any of this existed')
-console.log('jackpot2 look: the offsets reach each edge of the conversation, never past the composer: passed')
+// ---- the place is the slot's, and the fit follows the share --------------------
+// The offsets are gone with the overlay they moved the copy across. What is left is the one rule the
+// copy is sized by, and it is a rule about the slot it is given: a narrower share is a smaller machine.
+evaluate('jp2LSetHue(170, lookCtx)')
+const fitWide = evaluate('jp2LSlotScale(760, 1)')
+const fitHalf = evaluate('jp2LSlotScale(380, 1)')
+const fitNarrow = evaluate('jp2LSlotScale(190, 1)')
+assert.equal(fitWide, fitHalf, 'a share wider than the strip budget stops growing the copy: it is height-capped')
+assert.ok(fitHalf > fitNarrow, `and below that, a narrower share is a smaller copy (${fitHalf} > ${fitNarrow})`)
+assert.ok(720 * fitHalf <= evaluate('OVERCHAT_MAX_HEIGHT') + 0.5, 'never taller than the strip budget')
+assert.ok(560 * fitNarrow <= 190 + 0.5, 'and never wider than the share it was given')
+assert.equal(evaluate('jp2LSlotScale(0, 1)'), 0, 'with no share there is nothing to draw')
+console.log('jackpot2 look: the copy is sized by its share of the slot, and nothing else: passed')
 
 // ---- the panel keeps its footprint --------------------------------------------
 // Measured in a real browser against this repo's own QA pane (headless Chrome, the pane's Slots tile):
@@ -307,29 +294,28 @@ sandbox.panelProps = { ctx: sandbox.lookCtx, tone: 'cabinet' }
 sandbox.panelSettingsProps = { ctx: sandbox.lookCtx, tone: 'settings' }
 const cabinetPanel = panelFor('cabinet')
 const rows = nodes(cabinetPanel).find(node => node.props && node.props['data-jp2-oc'] === 'controls').props.children.filter(Boolean)
-assert.equal(rows.length, 4, 'the cabinet panel is four rows: the switch, then one row per setting')
+assert.equal(rows.length, 3, 'the cabinet panel is three rows: the switch, then one row per setting')
 assert.equal(rows[0].props['data-jp2-oc'], 'switch-row', 'the switch and Reset look share the first row')
 assert.ok(rows.slice(1).every(row => row.type === 'label'), 'and each setting is one row of its own')
 assert.equal(nodes(cabinetPanel).some(node => node.props && node.props['data-jp2-oc'] === 'why'), false,
   'with no why line inside the cabinet: there is no room for one that does not cost the reels')
-for (const key of ['alpha', 'size', 'posx', 'posy', 'hue']) {
+for (const key of ['alpha', 'size', 'hue']) {
   assert.ok(nodes(cabinetPanel).some(node => node.props && node.props['data-jp2-oc-range'] === key), `the cabinet panel still offers the ${key} slider`)
 }
+assert.ok(!nodes(cabinetPanel).some(node => node.props && node.props['data-jp2-oc-range'] === 'posx'),
+  'and no left-right slider: the slot owns the place')
 assert.equal(nodes(cabinetPanel).filter(node => node.props && node.props['data-jp2-oc-swatch']).length, 6, 'and all six swatches')
 assert.ok(nodes(cabinetPanel).some(node => node.props && node.props['data-jp2-oc-select'] === 'gradient'), 'and the gradient choice')
 const namedButtons = nodes(cabinetPanel)
   .filter(node => node.type === 'button' && typeof node.props.children === 'string')
   .map(node => node.props.children).sort()
-assert.deepEqual(plain(namedButtons), ['Reset look', 'Top middle'],
+assert.deepEqual(plain(namedButtons), ['Reset look'],
   'and both buttons say what they are — an empty button is a defect the panel layout hides')
 assert.ok(words(rows[1]).includes('See-through') && words(rows[1]).includes('Size'),
   `both sliders on the shared row keep their name (${words(rows[1]).trim()})`)
-assert.ok(words(rows[2]).includes('Left-right') && words(rows[2]).includes('Up-down'),
-  `the position row names both sliders (${words(rows[2]).trim()})`)
-assert.ok((words(rows[2]).includes('top middle') || words(rows[2]).includes(' / ')) && words(rows[2]).includes('Top middle'), `reads where it is, and offers the way back to the top middle (${words(rows[2]).trim()})`)
-assert.ok(words(rows[3]).includes('Colour') && words(rows[3]).includes('Teal (current)'),
-  `the colour row names the setting and the gradient (${words(rows[3]).trim()})`)
-assert.ok(words(rows[3]).includes(`${evaluate('jp2LTint().hue')}°`),
+assert.ok(words(rows[2]).includes('Colour') && words(rows[2]).includes('Teal (current)'),
+  `the colour row names the setting and the gradient (${words(rows[2]).trim()})`)
+assert.ok(words(rows[2]).includes(`${evaluate('jp2LTint().hue')}°`),
   'and reads the hue that is actually set')
 const settingsPanel = panelFor('settings')
 assert.ok(nodes(settingsPanel).some(node => node.props && node.props['data-jp2-oc'] === 'why'),

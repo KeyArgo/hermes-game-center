@@ -1,6 +1,6 @@
 # Testing
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
 
 _Applies to Game Center 1.0.0 · last revised 2026-11-11 (b2a67f2)_
 
@@ -13,12 +13,14 @@ python3 -m pytest tests -q -p no:cacheprovider   # the Python suite, offline
 python3 tools/build_plugin.py                    # the committed bundle must match desktop/src/
 node tests/table_ui_harness.cjs                  # the Desktop page's state machine
 node tests/jackpot_overlay_harness.cjs           # the over-chat slot cabinet
+node tests/jackpot2_harness.cjs                  # the Jackpot v2 copy, its switch and the fit
+node tests/jackpot2_look_harness.cjs             # the Jackpot v2 tint, and the ink it keeps readable
 node tests/slot_fit_regression.mjs               # fits the page, in real headless Chrome
 scripts/test.sh                                  # all of the above, plus the Chrome fit check
 scripts/test.sh --fast                           # skip the Chrome fit check
 ```
 
-CI (`.github/workflows/tests.yml`) runs the pytest suite and the two Node harnesses on Python 3.13. The Chrome fit check is a local/owner check, not a CI step.
+CI (`.github/workflows/tests.yml`) runs the pytest suite and the four Node harnesses on Python 3.13. The Chrome fit check is a local/owner check, not a CI step.
 
 ## Counts at this commit
 

@@ -22,3 +22,5 @@ jobs:
           python3 tools/build_plugin.py
           node tests/table_ui_harness.cjs
           node tests/jackpot_overlay_harness.cjs
+          node tests/jackpot2_harness.cjs
+          node tests/jackpot2_look_harness.cjs

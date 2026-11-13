@@ -229,10 +229,13 @@ def test_the_bundle_carries_the_three_extras_the_owner_asked_for():
     assert "jsx(GameCenterLinks," in home, "the main screen does not draw the link row"
     assert "openInBrowser(ctx, link.href, onNote)" in library, "the links use the shared browser door"
 
-    # 3. The chip copies its own line, with the async clipboard, a textarea fallback and a key.
-    assert "function copyChipText(" in version and "function copyWithTextarea(" in version
-    assert "navigator.clipboard.writeText" in version
-    assert "execCommand('copy')" in version, "the fallback the owner asked for is missing"
+    # 3. The chip copies its own line, through the SDK's clipboard door with the browser's own as a
+    #    fallback — never a hidden textarea appended to the app's <body> (review, 2026-11-12) — and a key
+    #    reaches it too.
+    assert "function copyChipText(" in version and "function copyWithNavigator(" in version
+    assert "ctx.os.writeClipboard" in version, "the SDK's own clipboard door is not used"
+    assert "navigator.clipboard.writeText" in version, "the browser's clipboard is not the fallback"
+    assert "execCommand('copy')" not in version, "no hidden-textarea copy: a plugin does not write to the app's body"
     assert "'Click to copy the version'" in bundle, "the chip's tooltip does not say what a click does"
     assert "CHIP_COPIED_MS" in version, "the chip has no \"Copied\" window"
     assert "onKeyDown" in version, "the chip is not reachable from the keyboard"

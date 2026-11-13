@@ -40,6 +40,8 @@ run() {
 run "build the bundle" "$PY" tools/build_plugin.py
 run "desktop page harness" node tests/table_ui_harness.cjs
 run "jackpot overlay harness" node tests/jackpot_overlay_harness.cjs
+run "jackpot2 harness" node tests/jackpot2_harness.cjs
+run "jackpot2 look harness" node tests/jackpot2_look_harness.cjs
 if [[ $fast -eq 0 ]]; then
   run "slot cabinet fit (headless Chrome)" node tests/slot_fit_regression.mjs
 else

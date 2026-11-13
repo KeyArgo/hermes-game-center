@@ -71,9 +71,11 @@ def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
     assert "data-games-version-row" not in bundle, "the masthead version row is gone"
     assert "data-games-version-footer" not in bundle, "and so is the pane's version footer"
     assert "id: 'version'" not in bundle, "the version is not a status-bar item"
-    # The other status-bar items: status and the one Slots machine (jackpot2); the old Slots item
-    # was retired when Slots became one game on the Jackpot machine.
-    assert bundle.count("area: STATUSBAR_AREAS.right") == 2
+    # The other status-bar items: one, the Slots chip. The old Slots item was retired when Slots became
+    # one game on the Jackpot machine, and the Jackpot v2 item went with the overlay it existed to anchor:
+    # both see-through machines are a composer-slot contribution now (review, 2026-11-12).
+    assert bundle.count("area: STATUSBAR_AREAS.right") == 1
     assert "id: 'status'" in bundle
     assert "id: 'jackpot'" not in bundle
-    assert "id: 'jackpot2'" in bundle
+    assert "id: 'jackpot2'" not in bundle
+    assert "area: COMPOSER_AREAS.underside" in bundle

@@ -1,6 +1,6 @@
 # Configuration
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (98b7528b)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
 
 Every setting, environment variable and stored preference the code reads, with the default it uses.
 
@@ -32,9 +32,9 @@ All three credential fields are `type: secret`: Hermes shows them in Settings as
 | `setup.json` | `paused` | `false` | "Pause all of these" on Settings. |
 | `setup.json` | `ai` | `null` | `true`/`false` pins the AI-seat choice; `null` follows `allow_ai`. |
 | `wallet.json` | `bet` | `25` | The last slot bet (minimum 25 chips). |
-| `wallet.json` | `overchat` | `false` | Whether the see-through slot cabinet is shown over the chat. |
+| `wallet.json` | `overchat` | `false` | Whether the see-through slot cabinet is shown in the composer's underside strip. |
 | `wallet.json` | `overchat_alpha` | `0.2` | Over-chat opacity; accepted values are 0.05–0.6. |
-| `wallet.json` | `overchat_scale` | `1.0` | Over-chat size; accepted values are 0.1–3.0. |
+| `wallet.json` | `overchat_scale` | `1.0` | Over-chat size; accepted values are 0.1–3.0, as a share of the room the slot gives it. |
 | `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or the Olympus machine. |
 | `online.json` | `on` | `false` | Whether online play is on. |
 | `gameshelf-egg-force` | — | absent | A developer cheat: the egg id to show now instead of waiting for its hour. Absent means the real schedule. |
