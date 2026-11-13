@@ -1,5 +1,5 @@
 # The Stock League — design and stub
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
 
 **State: design-only.** `GET /api/stock-league` answers `{"state": "design-only", …}` and the Lobby tab
 shows a greyed row badged *Labs · experiment · needs a server-side model*. There is no league to join yet,

@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
@@ -28,7 +28,7 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-12 (54c502d6)_
 
 Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
 
-Eleven of them are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on.
+Eleven of them are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on or open the pet gallery in **Experimental** (which reads one public list of pets, nothing about you).
 
 ### Why it's different
 
@@ -183,7 +183,7 @@ Everything that is not curated Play — the installed talking tables and experim
 hermes plugins install KeyArgo/hermes-game-center --yes-deps --enable
 ```
 
-That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on.
+That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on or open the pet gallery in **Experimental**.
 
 **Requirements:** Hermes Agent 0.23.0 or later. The plugin is Python and JavaScript with no compiled binaries; the tests run on Python 3.13. Online play, if you turn it on, needs the network; everything else does not.
 
@@ -265,7 +265,7 @@ The Desktop page never judges a move. It sends the move to `dashboard/plugin_api
 - **Writes** only its own data folder (one folder per game, plus `players.json`, `champions/`, `ratings.json`, `tournaments/` and `online.json` for the online preferences). Nothing outside it, and no Hermes config. The one exception is the online recovery key, which goes through Hermes's credential route and nowhere else.
 - **Reads** the game folders that ship with the plugin, and the `game.json` of any installed, enabled plugin in the Hermes home's `plugins` folder (or beside this plugin). Nothing else is claimed.
 - **Model calls go only through Hermes** (never to a provider directly) and only when a person chose them: an AI seat you agreed to (`allow-ai`), a hint you asked for (your model adds one short reason), a Doctrine card you asked the model to improve or a named profile you asked to author one, or a bot-ladder game you started. No model call happens on its own. Prompts carry game data only — boards, moves, bot weights — plus the one name you typed yourself.
-- **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. The one exception is online play, which is off until you turn it on. With online play on it talks to that one address (or the `lobby_url` you set) and nothing else; **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser.
+- **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. Two things are the exception, and neither happens unless you ask for it. **Online play**, off until you turn it on: it talks to that one address (or the `lobby_url` you set) and nothing else, and **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser. **The pet gallery** in **Experimental**, only while you have it open: it reads the public Petdex manifest (`https://petdex.dev/api/manifest`, the same list Hermes's own pet picker reads, through the host's client when this build has one) to show which pets exist. That request carries nothing about you, your files, your keys or your play.
 - **No telemetry, no self-update, no remote code loading, no binaries.** Updates arrive only when you install a newer version, and the code is MIT.
 
 ### Online play and the bot ladder (opt-in)
