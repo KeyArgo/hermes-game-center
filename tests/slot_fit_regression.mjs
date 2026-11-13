@@ -346,29 +346,17 @@ setOverchat(true)
 await cdp('Page.reload', {})
 await sleep(6000)
 await openSlots()
-const inSlot = await evaluate(`(() => {
-  const slot = document.querySelector('#composer-slot')
-  const node = document.querySelector('[data-jackpot="overchat"]')
-  const host = slot && slot.firstElementChild
-  const style = node ? getComputedStyle(node) : null
-  return {
-    gamesPage: !!document.querySelector('.games-center-layout'),
-    slot: !!slot,
-    strip: !!(host && host.getAttribute('data-overchat') === 'strip'),
-    overlay: !!node,
-    insideSlot: !!(node && slot && slot.contains(node)),
-    // A copy in the slot is laid out by its parent: no fixed position, no coordinates of its own.
-    position: style ? style.position : null,
-    left: style ? style.left : null
-  }
-})()`)
-check('the over-chat copy is drawn inside the composer slot, not floated over the page',
-  inSlot && inSlot.slot && inSlot.strip && inSlot.overlay && inSlot.insideSlot
-    && inSlot.position !== 'fixed' && (inSlot.left === 'auto' || inSlot.left === '0px'),
-  JSON.stringify(inSlot))
+// NOTE: this page (/ · the Games page) has no composer and therefore no composer slot — the copy is
+// STRUCTURALLY absent here, which is the point of the slot. The slot check runs on /pane, the page that
+// does have a conversation.
 
 await cdp('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false })
 await cdp('Page.navigate', { url: `${URL_BASE}pane` })
+await sleep(6000)
+// The copy's switch, in the one place the QA page's SDK keeps plugin storage: its own localStorage.
+// (The wallet's `overchat` flag is the shelf's copy of the same setting; this page has no shelf.)
+await evaluate(`(() => { localStorage.setItem('gameshelf.slots.overchat', '1'); return true })()`)
+await cdp('Page.reload', {})
 await sleep(6000)
 await evaluate(`(() => {
   const node = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Continue')
@@ -389,7 +377,8 @@ await evaluate(`(() => { const b = document.querySelector('[data-sm-spin]'); if 
 await sleep(2500)
 const paneFacts = await evaluate(`(() => {
   const pane = document.querySelector('.games-wait-pane')
-  const machine = pane && pane.querySelector('.sm-machine')
+  // The pane's cabinet is Jackpot v2 (class jp2-machine); sm-machine is the original machine's class.
+  const machine = pane && (pane.querySelector('.jp2-machine') || pane.querySelector('.sm-machine'))
   const overlay = document.querySelector('[data-jackpot="overchat"]')
   const copyMachine = overlay ? overlay.querySelector('.sm-machine') : null
   const chat = document.querySelector('#chat')
@@ -397,8 +386,17 @@ const paneFacts = await evaluate(`(() => {
   const o = overlay ? overlay.getBoundingClientRect() : null
   const c = copyMachine ? copyMachine.getBoundingClientRect() : null
   const h = chat ? chat.getBoundingClientRect() : null
+  // The composer's underside slot: the only place a see-through copy is drawn. It is checked HERE,
+  // because this is the page with a conversation on it.
+  const slot = document.querySelector('#composer-slot')
+  const strip = slot && slot.firstElementChild
+  const style = overlay ? getComputedStyle(overlay) : null
   const copy = {
     overlay: !!overlay,
+    slot: !!slot,
+    strip: !!(strip && strip.getAttribute('data-overchat') === 'strip'),
+    insideSlot: !!(overlay && slot && slot.contains(overlay)),
+    position: style ? style.position : null,
     copyWidth: c ? c.width : null,
     copyLeft: c ? c.left : null,
     copyRight: c ? c.right : null,
@@ -422,6 +420,11 @@ if (!paneFacts.pane || !paneFacts.machine) {
   console.log('pane-diagnostics:', JSON.stringify(paneFacts), 'opened:', openedInPane)
   check('the pane shows the slot cabinet', false, JSON.stringify(paneFacts))
 } else {
+  check('the over-chat copy is drawn inside the composer slot, not floated over the page',
+    Boolean(paneFacts.slot && paneFacts.strip && paneFacts.overlay && paneFacts.insideSlot
+      && paneFacts.position !== 'fixed'),
+    `slot ${paneFacts.slot}, strip ${paneFacts.strip}, overlay ${paneFacts.overlay}, ` +
+      `inside ${paneFacts.insideSlot}, position ${paneFacts.position}`)
   check('the pane cabinet fits the column width',
     paneFacts.width <= paneFacts.paneWidth + 1 && paneFacts.left >= paneFacts.paneLeft - 2 && paneFacts.right <= paneFacts.paneRight + 4,
     `copy ${Math.round(paneFacts.width)} across ${Math.round(paneFacts.left)}..${Math.round(paneFacts.right)} in pane ${Math.round(paneFacts.paneLeft)}..${Math.round(paneFacts.paneRight)} scale ${paneFacts.scale.toFixed(3)}`)
