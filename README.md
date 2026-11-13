@@ -15,6 +15,10 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
   <a href="https://github.com/KeyArgo/hermes-game-center/stargazers"><img src="https://img.shields.io/github/stars/KeyArgo/hermes-game-center?style=flat-square&color=f5b301" alt="GitHub stars"></a>
 </p>
 
+<p align="center">
+  <img src="docs/media/gc-battleship.gif" width="100%" alt="Game Center beside a Hermes chat: pick Sea Battle and fire at enemy waters while the agent works">
+</p>
+
 ![The Play shelf at this commit: eleven curated games, the lobby beside them](screenshots/game-center-home.png)
 <p align="center"><em>The Play shelf at this commit: eleven curated games, the lobby beside them.</em></p>
 
