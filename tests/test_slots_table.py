@@ -156,9 +156,23 @@ def test_the_two_machines_draw_their_own_chance(tmp_path: Path) -> None:
     for machine, drawn in (("fruit9", fruit), ("robot3", robot)):
         low, high = _window(machine)
         assert low <= drawn["win_chance"] <= high, drawn
-    # Independent draws: the same seed cannot give both machines the same number by design
-    # unless it does by chance, so compare the targets the reels were tuned to.
-    assert fruit["target"] != robot["target"]
+    # Independence: the draw is seeded with the machine's own name, so each machine gets its own roll
+    # rather than one number copied onto both. The claim is checked across seeds, not on this session's
+    # single draw — two draws from 0.50-0.52 to four decimal places land on the same value by chance
+    # about once in two hundred sessions, which failed CI on 2026-11-13 and was read as a defect.
+    reels = slotplay.reels
+    original = reels.SESSION_SEED
+    try:
+        pairs = []
+        for seed in ("review-seed-a", "review-seed-b", "review-seed-c"):
+            reels.SESSION_SEED = seed
+            reels.target_chance.cache_clear()
+            pairs.append((reels.target_chance("fruit9"), reels.target_chance("robot3")))
+        assert any(pair[0] != pair[1] for pair in pairs), pairs
+        assert len(set(pairs)) > 1, f"and the seed is what moves the draw: {pairs}"
+    finally:
+        reels.SESSION_SEED = original
+        reels.target_chance.cache_clear()
 
 
 def test_a_spin_from_the_sidebar_shows_on_the_table(tmp_path: Path) -> None:
