@@ -330,19 +330,6 @@ class Wallet:
             data["bonus"] = int(data.get("bonus") or 0) + points
             return {"claimed": True, "points": points, "bonus": int(data["bonus"])}
 
-    def grant(self, chips: int) -> dict:
-        """A developer top-up: play chips added to the stack, nothing else touched.
-
-        Deliberately not reachable from the plugin's HTTP surface or from any hook - the only caller
-        is ``scripts/dev-grant.py``, which refuses to run without the developer key file in the
-        person's own home directory. No passphrase, key or hash lives in this repository, so a copy
-        of the source confers nothing on anyone else's machine.
-        """
-        chips = max(0, int(chips))
-        with self._held() as data:
-            data["chips"] += chips
-        return data
-
     def topup(self, floor: int, stack: int = START_CHIPS) -> int:
         """A fresh stack when the player cannot cover the smallest bet.
 

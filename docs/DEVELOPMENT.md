@@ -19,7 +19,7 @@ Repo layout, how to build the Desktop bundle, how to run each suite, and what CI
 | `tests/` | Pytest files plus the Node UI harnesses and the browser harnesses. |
 | `tools/` | The bundle build, the ship gate, the browser proofs and offline generators. |
 | `docs/` | This documentation; `docs/doc-map.json` maps each document to the code it describes. |
-| `scripts/` | `test.sh` (all checks), `deploy.sh`, `verify-served.py`, `slot-audit.py`, developer helpers. |
+| `scripts/` | `test.sh` (all checks), `deploy.sh`, `verify-served.py`, `slot-audit.py`. |
 | `examples/` | A minimal game plugin and a match-ready game plugin. |
 
 ## Build the Desktop bundle
