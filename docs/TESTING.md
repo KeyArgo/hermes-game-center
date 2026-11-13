@@ -1,8 +1,6 @@
 # Testing
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
-
-_Applies to Game Center 1.0.0 · last revised 2026-11-11 (b2a67f2)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
 How to run every suite, what each one covers, and the counts measured on this commit.
 
@@ -33,6 +31,7 @@ Measured locally on 2026-11-11 with `python3 -m pytest tests -q -p no:cacheprovi
 | Over-chat slot harness | `node tests/jackpot_overlay_harness.cjs` | **7 checks passed, 0 failed** |
 | Combined badge count | pytest + the two harnesses | **1642 passing** |
 | Slot fit regression (not in CI) | `node tests/slot_fit_regression.mjs` | one headless-Chrome check; see below |
+| Over-chat live render | `node tests/overchat_slot_live.mjs` (or `pytest tests/test_overchat_slot_live.py`) | real React: off -> on, resize, off |
 
 The 28 skips are opt-in groups and environment-gated tests, reported as skips, not failures. The one failure in this tree is `tests/test_blackjack_table.py::test_the_table_controls_seat_the_computer_and_the_model`, the red blackjack test a separate lane is fixing; it passes when run alone and fails in the full run. No other test failed.
 
@@ -42,6 +41,7 @@ The 28 skips are opt-in groups and environment-gated tests, reported as skips, n
 - **Desktop page harness (`tests/table_ui_harness.cjs`).** The built `desktop/plugin.js` is imported and its pure helpers and rendered contracts are checked: shelves, seats, referee badges, talking tables, the lobby, the model picker, the library and the version chip.
 - **Over-chat slot harness (`tests/jackpot_overlay_harness.cjs`).** The see-through cabinet is drawn only over the conversation, its settings persist, the size slider scales, and there is one centered layer.
 - **Slot fit regression (`tests/slot_fit_regression.mjs`).** Real headless Chrome checks that the cabinet fits the Games page. Needs Chrome; not run by CI.
+- **Over-chat live render (`tests/overchat_slot_live.mjs`).** The one check a stubbed-hooks harness cannot make: it opens the pane with both see-through switches off, clicks the cabinet's own switch (a real React state change, no reload), expects the machine inside the composer slot at a visible size, resizes narrower than the height cap and back, then turns it off. `tests/test_overchat_slot_live.py` runs it from the suite and skips — naming the missing piece — when there is no node, no Chrome or no `uvicorn` for the QA server. GitHub's runner has the first two but not `uvicorn`, so CI skips it; a developer machine runs it.
 
 ## Opt-in suites
 

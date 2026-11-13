@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eighteen games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
@@ -264,7 +264,7 @@ The Desktop page never judges a move. It sends the move to `dashboard/plugin_api
 
 - **Writes** only its own data folder (one folder per game, plus `players.json`, `champions/`, `ratings.json`, `tournaments/` and `online.json` for the online preferences). Nothing outside it, and no Hermes config. The one exception is the online recovery key, which goes through Hermes's credential route and nowhere else.
 - **Reads** the game folders that ship with the plugin, and the `game.json` of any installed, enabled plugin in the Hermes home's `plugins` folder (or beside this plugin). Nothing else is claimed.
-- **Model calls go only through Hermes** (never to a provider directly) and only when a person chose them: an AI seat you agreed to (`allow-ai`), a hint you asked for (your model adds one short reason), a Doctrine card you asked the model to improve or a named profile you asked to author one, or a bot-ladder game you started. No model call happens on its own. Prompts carry game data only — boards, moves, bot weights — plus the one name you typed yourself.
+- **Model calls go only through Hermes** (never to a provider directly) and only when a person chose them: an AI seat you agreed to (`allow-ai`), a hint you asked for (your model adds one short reason), a Doctrine card you asked the model to write, signed with a name you typed, or a bot-ladder game you started. No model call happens on its own. Prompts carry game data only — boards, moves, bot weights — plus the one name you typed yourself.
 - **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. Two things are the exception, and neither happens unless you ask for it. **Online play**, off until you turn it on: it talks to that one address (or the `lobby_url` you set) and nothing else, and **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser. **The pet gallery** in **Experimental**, only while you have it open: it reads the public Petdex manifest (`https://petdex.dev/api/manifest`, the same list Hermes's own pet picker reads, through the host's client when this build has one) to show which pets exist. That request carries nothing about you, your files, your keys or your play.
 - **No telemetry, no self-update, no remote code loading, no binaries.** Updates arrive only when you install a newer version, and the code is MIT.
 

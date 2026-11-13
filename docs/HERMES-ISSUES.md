@@ -1,6 +1,6 @@
 # Hermes issues to open
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-12 (43be8583)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
 
 Requested by the catalog review of 2026-11-12. The plugin does not open these itself; they are written
 here, ready to file, so a reviewer can see what was asked for and why.
