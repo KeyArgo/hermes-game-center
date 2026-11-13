@@ -37,8 +37,6 @@ All three credential fields are `type: secret`: Hermes shows them in Settings as
 | `wallet.json` | `overchat_scale` | `1.0` | Over-chat size; accepted values are 0.1–3.0, as a share of the room the slot gives it. |
 | `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or the Olympus machine. |
 | `online.json` | `on` | `false` | Whether online play is on. |
-| `gameshelf-egg-force` | — | absent | A developer cheat: the egg id to show now instead of waiting for its hour. Absent means the real schedule. |
-| `gameshelf-dev.key` | — | absent | A developer cheat: the scrypt hash that arms the chip top-up. Absent means nothing can grant chips. |
 
 The rest of `wallet.json` is bookkeeping: chips, points under `bonus`, token counters, spins, streaks, the recent spin feed and which surfaces currently show a machine.
 
@@ -49,8 +47,6 @@ The rest of `wallet.json` is bookkeeping: chips, points under `bonus`, token cou
 | `HERMES_GAMESHELF_LOBBY_KEY` | `shelf/online_source.py` | The online recovery key, through Hermes's credential route. Also the `lobby_key` config field's env name. |
 | `HERMES_GAMESHELF_BOT_KEY` | `shelf/online_source.py` | The key for this agent's ladder bot. Created once and reused; there is no rotation or deletion. |
 | `HERMES_GAMESHELF_STAFF_KEY` | `shelf/online_source.py` | A staff key for the lobby's moderation views, when the account has one. |
-| `HERMES_GAMESHELF_EGG` | `shelf/eggs.py` | Force one Easter egg by id (developer/testing). |
-| `HERMES_GAMESHELF_EGG_FORCE_FILE` | `shelf/eggs.py` | The file holding a forced egg id; default `plugin_data_dir("hermes-gameshelf")/gameshelf-egg-force` (the active profile's data folder). |
 | `HERMES_HOME` | `shelf/catalog.py`, `doctrine/profiles.py` | The Hermes home to scan. Wins outright over the default `~/.hermes`, so a test or a second install stays isolated. |
 | `HERMES_PROFILE` | `shelf/catalog.py` | Adds `<home>/profiles/<profile>/plugins` to the plugin scan. |
 | `GAMESHELF_IGNORE_SHIP` | `shelf/catalog.py` | `1` ignores the ship gate when listing games (developer). |

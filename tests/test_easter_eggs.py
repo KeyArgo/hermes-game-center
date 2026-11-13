@@ -29,14 +29,7 @@ def test_every_egg_pays_between_one_and_ten_thousand_points() -> None:
     assert len({egg["id"] for egg in eggs.EGGS}) == len(eggs.EGGS), "ids are unique"
 
 
-def _no_force(monkeypatch, tmp_path: Path) -> None:
-    """Prove the real schedule: point the developer force at a file that does not exist."""
-    monkeypatch.setenv("HERMES_GAMESHELF_EGG", "")
-    monkeypatch.setenv("HERMES_GAMESHELF_EGG_FORCE_FILE", str(tmp_path / "no-force-file"))
-
-
-def test_the_same_hour_always_shows_the_same_answer(monkeypatch, tmp_path: Path) -> None:
-    _no_force(monkeypatch, tmp_path)
+def test_the_same_hour_always_shows_the_same_answer() -> None:
     """Refreshing cannot reroll the schedule: the hour is the unit of the draw."""
     hour = 486_000
     first = eggs.current(hour)
@@ -46,8 +39,7 @@ def test_the_same_hour_always_shows_the_same_answer(monkeypatch, tmp_path: Path)
         assert first["ends_at"] == (hour + 1) * 3600
 
 
-def test_about_one_hour_in_eight_has_an_egg(monkeypatch, tmp_path: Path) -> None:
-    _no_force(monkeypatch, tmp_path)
+def test_about_one_hour_in_eight_has_an_egg() -> None:
     hours = [eggs.current(hour) for hour in range(486_000, 486_000 + 4000)]
     out = sum(1 for egg in hours if egg is not None)
     share = out / len(hours)
