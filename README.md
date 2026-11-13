@@ -18,6 +18,9 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 ![The Play shelf at this commit: eleven curated games, the lobby beside them](screenshots/game-center-home.png)
 <p align="center"><em>The Play shelf at this commit: eleven curated games, the lobby beside them.</em></p>
 
+<p align="center"><img src="docs/media/gc-battleship.gif" alt="Game Center: Sea Battle in the strip beside the Hermes chat, firing at enemy waters" width="100%"/>
+<br/><sub><b>Battleship while you code.</b> Pick Sea Battle and fire at enemy waters right beside the chat.</sub></p>
+
 <p align="center"><img src="docs/media/game-center-demo.gif" alt="Game Center in Hermes Desktop: picking how to play, then Connect Four against the computer" width="100%"/></p>
 
 <p align="center"><sub><b>Game Center inside Hermes Desktop.</b> Pick a game and how to play, then play it on a real board. <a href="https://x.com/MHArgonaut/status/2120634664704528466">Watch the full demo ▶</a></sub></p>
