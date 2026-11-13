@@ -3,7 +3,7 @@
   "schema_version": 1,
   "plugin": "hermes-gameshelf",
   "title": "Slots",
-  "summary": "Slot machines (Classic nine-window fruit machine and Hermes Robots) on fixed reel strips with exact published odds. Chips from the same wallet as every other table.",
+  "summary": "Slot machines (Classic nine-window fruit machine and Hermes Olympus) on fixed reel strips with exact published odds. Chips from the same wallet as every other table.",
   "entry": "game.py",
   "factory": "create",
   "bots": true,
