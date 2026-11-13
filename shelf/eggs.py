@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from pathlib import Path
 
 # The catalogue. ``points`` is what finding it pays; ``hint`` is shown once someone is close enough
 # to see it, in the owner's voice. Keep ids stable forever: they are the record of who found what.
@@ -71,23 +72,40 @@ def slot(hour: int | None = None) -> int:
     return int(time.time() // 3600) if hour is None else int(hour)
 
 
+def force_path(root: Path | None = None) -> Path:
+    """The file a developer drops an egg id in: the active profile's plugin data folder.
+
+    ``root`` stands in for that folder where a caller already knows it (the plugin's own ``root()``);
+    left out, it follows the active profile. Read-only: the folder is created by whoever writes the
+    file, never by looking for it. The path used to be built from ``Path.home() / ".hermes"``, which
+    ignored the active profile (review, 2026-11-12).
+    """
+    import os
+
+    override = (os.environ.get("HERMES_GAMESHELF_EGG_FORCE_FILE") or "").strip()
+    if override:
+        return Path(override)
+    from shelf import paths
+
+    return (Path(root) if root is not None else paths.data_dir()) / "gameshelf-egg-force"
+
+
 def _forced() -> dict | None:
     """A developer override: show this egg now, whatever the hour says.
 
-    Set ``HERMES_GAMESHELF_EGG`` to an id, or drop the id in ``~/.hermes/gameshelf-egg-force``. It
-    is a local switch with no secret in it - anyone who sets it only affects their own machine - and
-    it exists so a new egg can be looked at without waiting for its hour (owner's ask, 2026-11-09).
+    Set ``HERMES_GAMESHELF_EGG`` to an id, or drop the id in the plugin's own data folder
+    (``plugin_data_dir("hermes-gameshelf")/gameshelf-egg-force``; see :func:`force_path`). It is a
+    local switch with no secret in it - anyone who sets it only affects their own machine - and it
+    exists so a new egg can be looked at without waiting for its hour (owner's ask, 2026-11-09).
     """
     import os
-    from pathlib import Path
 
     wanted = (os.environ.get("HERMES_GAMESHELF_EGG") or "").strip()
     if not wanted:
         # The path is overridable so a test can prove the schedule without a developer's force file
         # standing in the way; production never sets it.
-        path = os.environ.get("HERMES_GAMESHELF_EGG_FORCE_FILE") or str(Path.home() / ".hermes" / "gameshelf-egg-force")
         try:
-            wanted = Path(path).read_text(encoding="utf-8").strip()
+            wanted = force_path().read_text(encoding="utf-8").strip()
         except OSError:
             return None
     egg = find(wanted)

@@ -175,6 +175,10 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
     # the file and the command is gone at the next reload: the hunt goes back to being a surprise
     # (owner's ask, 2026-11-09: "give me cheats so I can search for them and find them easily and
     # test them, then we can remove the cheats so its harder").
+    def _eggs_module():
+        here = Path(__file__).resolve().parent / "shelf"
+        return load_fresh("hermes_gameshelf_eggs", here / "eggs.py")
+
     def _egg_cheat_armed() -> bool:
         try:
             here = Path(__file__).resolve().parent / "shelf"
@@ -183,15 +187,20 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
                 return True
         except Exception:
             log.debug("the dev-grant cheat check could not be read", exc_info=True)
-        return (Path.home() / ".hermes" / "gameshelf-egg-force").exists()
+        try:
+            # Both files live in this profile's plugin data folder, never in the person's home
+            # directly (review, 2026-11-12): a cheat armed in one profile must not arm another.
+            return _eggs_module().force_path(root()).exists()
+        except Exception:
+            log.debug("the egg-force cheat check could not be read", exc_info=True)
+            return False
 
     if _egg_cheat_armed():
         def on_eggs(raw: str = "", **kwargs: Any) -> str:
             here = Path(__file__).resolve().parent / "shelf"
-            eggs = load_fresh("hermes_gameshelf_eggs", here / "eggs.py")
+            eggs = _eggs_module()
             wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
-            force = Path.home() / ".hermes" / "gameshelf-egg-force"
             words = str(raw or "").split()
             action = words[0] if words else "list"
             found = set(wallet.eggs_found())
@@ -205,12 +214,13 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             if action == "show" and len(words) > 1:
                 if not eggs.find(words[1]):
                     return f"No egg called {words[1]}."
+                force = eggs.force_path(root())
                 force.parent.mkdir(parents=True, exist_ok=True)
                 force.write_text(words[1] + "\n", encoding="utf-8")
                 return f"Forced {words[1]} — open the machine, the mark is at the top-left of the cabinet."
             if action == "clear":
                 try:
-                    force.unlink()
+                    eggs.force_path(root()).unlink()
                     return "Force cleared: back to the hourly schedule."
                 except FileNotFoundError:
                     return "No force was set."

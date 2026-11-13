@@ -1,4 +1,5 @@
-"""The developer top-up's lock: a key file in the person's home, none of it in this repository.
+"""The developer top-up's lock: a key file in the plugin's own data folder, none of it in this
+repository.
 
 Why it is built this way (owner's ask, 2026-11-09: "add a developer cheat ... has to be hackproof for
 anyone who downloads the source code, so the password must not be seen in the repo"):
@@ -6,9 +7,10 @@ anyone who downloads the source code, so the password must not be seen in the re
 - **Nothing secret is in the source.** No passphrase, no default key, no hash. A downloaded copy of
   this repo can create every file it likes and still only reach the wallet of the machine it is
   running on.
-- **The key file is the only thing that arms it.** It lives outside the repository, under
-  ``~/.hermes/``, is written with mode 600, and holds a scrypt hash rather than the passphrase, so
-  even reading it does not hand anyone the passphrase.
+- **The key file is the only thing that arms it.** It lives outside the repository, in the active
+  profile's plugin data folder (``plugin_data_dir("hermes-gameshelf")``, see ``shelf/paths.py``), is
+  written with mode 600, and holds a scrypt hash rather than the passphrase, so even reading it does
+  not hand anyone the passphrase.
 - **There is no remote door.** The plugin registers no route, no hook and no command for this. The
   only caller is ``scripts/dev-grant.py``, run by hand on the machine that owns the wallet.
 
@@ -29,11 +31,22 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+KEY_FILE = "gameshelf-dev.key"
 
-def key_path(home: Path | None = None) -> Path:
-    """Where the developer key lives. Never inside a repository."""
-    base = Path(home) if home is not None else Path.home()
-    return base / ".hermes" / "gameshelf-dev.key"
+
+def key_path(root: Path | None = None) -> Path:
+    """Where the developer key lives: the profile's data folder, never inside a repository.
+
+    ``root`` stands in for that folder in a test; production passes nothing and follows the active
+    profile, so a key armed in one profile does not arm another.
+    """
+    if root is None:
+        # Imported here, not at module level: this file is also loaded by path from scripts/ and by
+        # the plugin's own loader, where the ``shelf`` package may not be on the path yet.
+        from shelf import paths
+
+        return paths.data_dir() / KEY_FILE
+    return Path(root) / KEY_FILE
 
 
 def _derive(passphrase: str, salt: bytes) -> bytes:
@@ -42,7 +55,7 @@ def _derive(passphrase: str, salt: bytes) -> bytes:
     return hashlib.scrypt(passphrase.encode("utf-8"), salt=salt, n=2 ** 14, r=8, p=1, dklen=32)
 
 
-def make_key(passphrase: str, home: Path | None = None) -> Path:
+def make_key(passphrase: str, root: Path | None = None) -> Path:
     """Write a new key file for ``passphrase`` and return its path. Overwrites an old one."""
     if not passphrase or len(passphrase) < 8:
         raise ValueError("the passphrase must be at least 8 characters")
@@ -54,7 +67,7 @@ def make_key(passphrase: str, home: Path | None = None) -> Path:
         "salt": base64.b64encode(salt).decode("ascii"),
         "hash": base64.b64encode(_derive(passphrase, salt)).decode("ascii"),
     }
-    path = key_path(home)
+    path = key_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     try:
@@ -64,10 +77,10 @@ def make_key(passphrase: str, home: Path | None = None) -> Path:
     return path
 
 
-def read_key(home: Path | None = None) -> dict | None:
+def read_key(root: Path | None = None) -> dict | None:
     """The key file's contents, or None when there is no key (which means: dev mode is off)."""
     try:
-        raw = json.loads(key_path(home).read_text(encoding="utf-8"))
+        raw = json.loads(key_path(root).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if not isinstance(raw, dict) or raw.get("kind") != "hermes-gameshelf-dev":
@@ -75,14 +88,14 @@ def read_key(home: Path | None = None) -> dict | None:
     return raw
 
 
-def armed(home: Path | None = None) -> bool:
+def armed(root: Path | None = None) -> bool:
     """Whether this machine has a developer key at all. Without one, nothing can grant chips."""
-    return read_key(home) is not None
+    return read_key(root) is not None
 
 
-def check(passphrase: str, home: Path | None = None) -> bool:
+def check(passphrase: str, root: Path | None = None) -> bool:
     """Whether ``passphrase`` opens the key on this machine. False when there is no key."""
-    raw = read_key(home)
+    raw = read_key(root)
     if not raw or not passphrase:
         return False
     try:

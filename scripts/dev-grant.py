@@ -5,8 +5,10 @@
     scripts/dev-grant.py --chips 50000     # add 50,000 play chips, after the passphrase
     scripts/dev-grant.py --status          # is this machine armed?
 
-The lock lives in ``~/.hermes/gameshelf-dev.key``: a scrypt hash of the passphrase you choose, mode
-600, outside every repository. There is no passphrase, key or hash in the source, no HTTP route and
+The lock lives in the active profile's plugin data folder
+(``plugin_data_dir("hermes-gameshelf")/gameshelf-dev.key``, i.e. ``~/.hermes/plugin-data/
+hermes-gameshelf/`` by default): a scrypt hash of the passphrase you choose, mode 600, outside every
+repository and out of the way of Hermes's own files. There is no passphrase, key or hash in the source, no HTTP route and
 no Hermes command for this - a copy of the repo gives nobody access to another machine's wallet.
 """
 
@@ -15,10 +17,14 @@ from __future__ import annotations
 import argparse
 import getpass
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# So the shelf modules can import each other (``from shelf import paths``) when loaded by path.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _load(name: str, path: Path):
@@ -38,9 +44,13 @@ wallet = _load("hermes_gameshelf_wallet", ROOT / "shelf" / "wallet.py")
 
 def live_wallet_path() -> Path:
     """The wallet the running plugin writes: its data root, not the repo's working copy."""
+    if name := os.environ.get("HERMES_HOME", "").strip():
+        home = Path(os.path.expanduser(os.path.expandvars(name)))
+    else:
+        home = Path.home() / ".hermes"
     candidates = [
-        Path.home() / ".hermes" / "plugin-data" / "hermes-gameshelf",
-        Path.home() / ".hermes" / "plugins" / "hermes-gameshelf",
+        home / "plugin-data" / "hermes-gameshelf",
+        home / "plugins" / "hermes-gameshelf",
         ROOT,
     ]
     for folder in candidates:
