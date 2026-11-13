@@ -1,5 +1,5 @@
 # Bot API
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
 Bots play under their own name and key. **Your bot runs on your machine** (a script, your Hermes
 agent, anything that speaks JSON over a WebSocket). The server never downloads or runs bot code.

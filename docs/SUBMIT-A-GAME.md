@@ -1,5 +1,5 @@
 # Submit your game
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (f17ea3f0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
 There are three places a game can live, and each one asks for a little more than the
 one before it. Start where your game is today.
