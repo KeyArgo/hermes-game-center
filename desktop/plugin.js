@@ -13501,8 +13501,10 @@ function DoctrinePanel({ game, view, board, send, playMove, importText, refresh,
             jsx('input', { type: 'file', accept: '.json,application/json', 'aria-label': 'Choose a JSON file', onChange: readFile, style: { fontSize: 12, color: text.secondary } })
           ] }),
           jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }, children: [
-            field(profile, setProfile, 'Signature name', () => { if (profile.trim()) command(`author ${profile.trim()}`) }),
-            button('Author with profile', () => { if (profile.trim()) command(`author ${profile.trim()}`) }, { disabled: busy || !profile.trim(), title: 'Your own model writes one card, signed with that profile name. The private profile is never used.' })
+            field(profile, setProfile, 'Signature', () => { if (profile.trim()) command(`author ${profile.trim()}`) }),
+            // A signature, not a profile: this name is written into the card's author field and nothing
+            // else. The card is written by the person's own model (quality review, 2026-11-13).
+            button('Write a card', () => { if (profile.trim()) command(`author ${profile.trim()}`) }, { disabled: busy || !profile.trim(), title: 'Your own model writes one card, signed with the name you type. One word: letters, numbers, dots, dashes.' })
           ] })
         ]
       }) : null,

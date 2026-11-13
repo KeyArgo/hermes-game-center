@@ -1,13 +1,16 @@
-"""Ask for a Doctrine card in the voice of one named Hermes profile.
+"""Write a Doctrine card with the person's own model, signed with a name they type.
 
-A person types the profile name; this module refuses ``private``, refuses anything that is not a plain
-profile name, and then writes the card with the model that person already has selected in Hermes —
-``ctx.llm.complete``, the plugin LLM door, which only ever returns text and cannot run a tool, start a
-process, read a file or reach the network. There is no child process here at all (review, 2026-11-12).
+A card carries an ``author`` field. That field is a SIGNATURE: the name the person typed, written into the
+card as they asked, the way a drawing is signed. The model that writes the card is the one they already
+have selected in Hermes, through ``ctx.llm.complete`` — the plugin LLM door, which returns text and cannot
+run a tool, start a process, read a file or reach the network.
 
-The profile name is kept for two reasons: it is validated (a name that cannot be a profile is refused
-before any model is asked), and it is written into the card as its author, so a card says whose voice
-wrote it.
+It is deliberately NOT "ask another Hermes profile to write this". The first version of this module ran
+``hermes -p <profile> chat`` and the catalog review (2026-11-12) was right that the child inherited that
+profile's tools; the second version wrote the card with the person's own model but still announced it as
+the named profile's work, and the quality review (2026-11-13) was right that a name in a field is not
+authorship. So the input is a signature, every surface says "signed", and nothing here claims a profile
+ran.
 """
 
 from __future__ import annotations
@@ -15,16 +18,20 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,31}\Z")
-REFUSED = "That profile cannot author a card."
-# What the card author is allowed to spend on one card. A card is 2 KB of JSON; this is generous.
+# A signature a person types: up to 32 characters, letters, numbers, dots, dashes or underscores, starting
+# with a letter or a number. One word on purpose: the command line is ``doctrine author <name> [flavour]``,
+# so a space would make the name and the flavour impossible to tell apart. Anything else is refused before
+# a model is asked, with the reason.
+SIGNATURE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
+MAX_LENGTH = 32
+# What one card is allowed to spend. A card is 2 KB of JSON; this is generous.
 MAX_TOKENS = 900
 
 PROMPT = """You are authoring one Doctrine battle bot card. A card is DATA, never code.
 Reply with one JSON object and nothing else (no prose, no code fences).
 
 Required shape:
-{{"schema":"doctrine-card/1","name":"<1-40 chars>","author":"<profile name>",
+{{"schema":"doctrine-card/1","name":"<1-40 chars>","author":"{signature}",
 "personality":"<one short sentence>","weights":{{
 "aggression":<0-100>,"safety":<0-100>,"objective":<0-100>,"focus":<0-100>,
 "cohesion":<0-100>,"center":<0-100>,"mobility":<0-100>,"endurance":<0-100>}}}}
@@ -35,23 +42,40 @@ objective holds beacons, focus finishes weak enemies, cohesion stays near allies
 center moves toward the middle, mobility prefers open ground, endurance keeps
 healthy units out of trouble. The card must be at most 2048 bytes.
 
+The author field is the signature the person chose: write it exactly as "{signature}".
+
 Flavour for this card: {flavour}
 """
 
 
-def problem(profile: object) -> str | None:
-    """Why this profile name cannot be used, or None when it can."""
-    text = str(profile or "").strip().lower()
-    if text == "private":
-        return "The private profile can never author a card."
-    if not NAME.fullmatch(text):
-        return "Profile names are lowercase letters, numbers and dashes."
+def problem(signature: object) -> str | None:
+    """Why this signature cannot be used, or None when it can."""
+    text = clean(signature)
+    if not text:
+        return "Type the name to sign the card with."
+    if len(text) > MAX_LENGTH:
+        return f"A signature is at most {MAX_LENGTH} characters."
+    if not SIGNATURE.fullmatch(text):
+        return ("A signature is one word of up to 32 characters: letters, numbers, dots, dashes or "
+                "underscores, starting with a letter or a number.")
     return None
 
 
-def prompt(flavour: str = "a balanced fighter") -> str:
-    """The authoring prompt sent to the person's model."""
-    return PROMPT.format(flavour=str(flavour or "a balanced fighter")[:120])
+def clean(signature: object) -> str:
+    """The signature as typed, trimmed and with runs of space collapsed — never shortened.
+
+    Silently cutting a long name to 32 characters would sign the card with a name the person did not
+    type, so a long one is refused by ``problem()`` instead.
+    """
+    return " ".join(str(signature or "").split())
+
+
+def prompt(signature: str = "you", flavour: str = "a balanced fighter") -> str:
+    """The authoring prompt sent to the person's model, carrying their signature."""
+    return PROMPT.format(
+        signature=(clean(signature) or "you")[:MAX_LENGTH],
+        flavour=" ".join(str(flavour or "a balanced fighter").split())[:120] or "a balanced fighter",
+    )
 
 
 def _reply_text(answer: Any) -> str:
@@ -61,7 +85,7 @@ def _reply_text(answer: Any) -> str:
     return str(answer or "")
 
 
-def author(profile: str, text: str, complete: Callable[..., Any] | None = None) -> tuple[str | None, str]:
+def author(signature: str, text: str, complete: Callable[..., Any] | None = None) -> tuple[str | None, str]:
     """Write one card with the person's own model, or return a friendly error.
 
     ``complete`` is the plugin's model door (``ctx.llm.complete`` behind a small adapter): one prompt in,
@@ -69,7 +93,7 @@ def author(profile: str, text: str, complete: Callable[..., Any] | None = None) 
     wrong. ``None`` means this surface has no model at all — the browser page, for instance — and the
     person is told so instead of being asked to check a profile that was never going to run.
     """
-    name = str(profile or "").strip().lower()
+    name = clean(signature)
     why = problem(name)
     if why:
         return None, why
@@ -83,10 +107,10 @@ def author(profile: str, text: str, complete: Callable[..., Any] | None = None) 
         try:
             answer = complete(text)
         except Exception:  # a broken or slow model must cost a card, not the game
-            return None, "That profile did not answer. Try again in a moment."
+            return None, "The model did not answer. Try again in a moment."
     except Exception:
-        return None, "That profile did not answer. Try again in a moment."
-    clean = _reply_text(answer).strip()
-    if not clean:
-        return None, "That profile returned nothing."
-    return clean, ""
+        return None, "The model did not answer. Try again in a moment."
+    reply = _reply_text(answer).strip()
+    if not reply:
+        return None, "The model returned nothing."
+    return reply, ""
