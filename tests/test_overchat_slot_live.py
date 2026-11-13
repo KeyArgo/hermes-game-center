@@ -10,16 +10,17 @@ drives the built bundle in headless Chrome against the QA server:
   composer slot at a visible size; resize narrower than the height cap -> it re-measures; turn it off ->
   both go.
 
-Chrome is not installed on the CI runner, so this skips there with a reason (the same way the other
-browser checks are opt-in). Where Chrome exists it is part of the suite and fails loudly.
+It skips where the pieces are missing — no node, no Chrome, or no uvicorn for the QA server — with the
+missing piece named, and fails loudly everywhere else. GitHub's runner has node and Chrome but no
+uvicorn, so CI skips it; a machine with all three runs it as part of the suite.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -50,6 +51,10 @@ def test_the_machine_appears_when_the_switch_is_turned_on_live():
         pytest.skip("node is not installed, so the browser check cannot run")
     if chrome is None:
         pytest.skip("no Chrome/Chromium binary, so the browser check cannot run (CHROME_BIN sets one)")
+    # The QA server needs uvicorn. GitHub's runner has Chrome but not this, so the check skips there rather
+    # than failing a build over a missing test dependency (which is exactly what it did on 2026-11-13).
+    if importlib.util.find_spec("uvicorn") is None:
+        pytest.skip("the QA server needs uvicorn, which is not installed here")
     assert SCRIPT.is_file(), "tests/overchat_slot_live.mjs is missing"
     result = subprocess.run(
         [node, str(SCRIPT)],
@@ -60,6 +65,8 @@ def test_the_machine_appears_when_the_switch_is_turned_on_live():
         env={**os.environ, "CHROME_BIN": chrome},
     )
     output = result.stdout + result.stderr
+    if result.returncode == 77:
+        pytest.skip(f"the browser check could not run here: {output.strip().splitlines()[0]}")
     assert result.returncode == 0, output
     assert "all over-chat live checks passed" in output, output
     # The three beats the review asked for are in that output by name; a run that skipped them is not a pass.
