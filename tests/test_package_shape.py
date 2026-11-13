@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # The root keeps only what a reader of the plugin needs.
 ROOT_DOCS = {
-    "README.md", "LICENSE", "LICENSE.md", "THIRD-PARTY-NOTICES.md", "BACKLOG.md",
+    "README.md", "LICENSE", "LICENSE.md", "THIRD-PARTY-NOTICES.md",
     "VERIFY.md", "LIMITS.md", "PROVENANCE.md", "SECURITY.md", "CONTRIBUTORS.md",
     "SHIP-GATE.md",  # written there by tools/ship_gate; it is the per-game evidence
     "CHANGELOG.md",  # root by convention: the 1.0.0 identity lane put it where people look

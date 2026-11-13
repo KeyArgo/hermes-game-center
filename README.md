@@ -257,7 +257,6 @@ The Desktop page never judges a move. It sends the move to `dashboard/plugin_api
 | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) | Vendored code and artwork, with licences. |
 | [PROVENANCE.md](PROVENANCE.md) | How the repository came to be, and what is unverified. |
 | [CHANGELOG.md](CHANGELOG.md) | Release history. |
-| [BACKLOG.md](BACKLOG.md) | Known work and what is deliberately not built. |
 | [SHIP-GATE.md](SHIP-GATE.md) | The release gate and its per-surface checks. |
 
 ## Privacy & security

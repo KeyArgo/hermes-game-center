@@ -72,7 +72,7 @@ _CONFIG_NOTICE = (
 )
 
 # Where "Submit your game" goes. The page on the site must exist before release: the item is
-# tracked in BACKLOG.md ("Before release: the submission page must exist"). Empty means the guide
+# the submission guide gate: empty means the guide
 # link is used instead.
 SUBMIT_URL = "https://games.hermesnet.xyz/submit"
 
