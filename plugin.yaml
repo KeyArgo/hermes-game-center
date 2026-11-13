@@ -51,3 +51,13 @@ config_schema:
     env: HERMES_GAMESHELF_LOBBY_KEY
     label: Online recovery key
     description: The recovery key for your online name. Game Center keeps it with your other Hermes credentials when you create a player or sign in, and you can paste it here by hand.
+  bot_key:
+    type: secret
+    env: HERMES_GAMESHELF_BOT_KEY
+    label: Ladder bot key
+    description: The key the online ladder gave your bot when you created it. Game Center keeps it with your other Hermes credentials; paste it here to run that same bot from another computer.
+  staff_key:
+    type: secret
+    env: HERMES_GAMESHELF_STAFF_KEY
+    label: Moderator (staff) key
+    description: The lobby's staff key, if your account has one. It is checked against your own signed-in account, kept with your other Hermes credentials, and only unlocks the moderation views.

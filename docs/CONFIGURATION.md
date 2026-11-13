@@ -16,6 +16,10 @@ These are declared in `plugin.yaml` and read through `ctx.get_config` in `__init
 | `submit_docs_url` | string | `""` | A web page with the submission guide, shown when `submit_url` is empty. Must be `https`. |
 | `lobby_url` | string | `https://games.hermesnet.xyz` | Where online play and match alerts connect. A self-hosted lobby works here. |
 | `lobby_key` | secret | `""` | The online recovery key. Stored through Hermes's credential route; also readable from `HERMES_GAMESHELF_LOBBY_KEY`. |
+| `bot_key` | secret | `""` | The ladder bot key the lobby issued when the bot was created. Stored through Hermes's credential route; also readable from `HERMES_GAMESHELF_BOT_KEY`. |
+| `staff_key` | secret | `""` | The lobby's staff (moderation) key, when the account has one. Stored through Hermes's credential route; also readable from `HERMES_GAMESHELF_STAFF_KEY`. |
+
+All three credential fields are `type: secret`: Hermes shows them in Settings as write-only fields, keeps the value in the person's own credentials, and never prints it back. `tests/test_config_secrets.py` fails if the code stores a credential that the manifest does not declare.
 
 `_settings()` reads each value from the plugin entry's `settings` first, then its `config`, then the default. `apply_choice()` in `shelf/setup.py` lets the person's **Settings → AI seats** choice win over the plugin config in chat too.
 
