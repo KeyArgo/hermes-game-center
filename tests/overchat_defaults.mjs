@@ -10,9 +10,10 @@
 // The bundle is loaded once per world, because both switches are read at load time.
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 
-const ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname))
+const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const source = fs.readFileSync(path.join(ROOT, 'desktop', 'plugin.js'), 'utf8')
   .replace(/^import .*$/gm, '').replace(/^export \{.*\}$/gm, '').replace('export default {', 'const plugin = {')
 

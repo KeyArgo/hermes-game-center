@@ -10,6 +10,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const args = process.argv.slice(2)
 const arg = (name, fallback) => {
@@ -17,7 +18,7 @@ const arg = (name, fallback) => {
   return index >= 0 && args[index + 1] ? args[index + 1] : fallback
 }
 
-const ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname))
+const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const PORT = Number(arg('port', '18864'))
 const OUT = arg('out', path.join(ROOT, 'screenshots', 'referee-refusal.png'))
 const MAX_BYTES = 300 * 1024
