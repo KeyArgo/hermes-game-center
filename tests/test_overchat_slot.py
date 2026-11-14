@@ -98,7 +98,7 @@ def test_the_copy_is_sized_from_the_slot_not_the_window():
     layer = _read(SRC / "19-jackpot2-layer.js")
     for name, text in (("19-jackpot-overlay.js", overlay), ("19-jackpot2-layer.js", layer)):
         code = _code_only(text)
-        assert re.search(r"function SlotsOverChatCopy\(\{ ctx, width \}\)", code) or name != "19-jackpot-overlay.js"
+        assert re.search(r"function SlotsOverChatCopy\(\{ ctx, width(?:, height)? \}\)", code) or name != "19-jackpot-overlay.js"
         assert "window.innerWidth" not in code, f"{name} still measures the window"
         assert "location.hash" not in code, f"{name} still reads the route to decide where it is"
     assert "overchatFitScale" in overlay, "one fit rule, taking the width it was given"

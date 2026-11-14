@@ -406,26 +406,27 @@ function useJp2LTint(ctx) {
 
 
 // ---- where the copy is drawn: its share of the composer's underside slot -------------
-// The slot hands each machine a width (78-overchat-slot.js measures the strip's own box and splits it),
-// and this is the whole of the sizing: fill that share at the person's size, never wider than the share,
-// and never taller than the strip's height budget at the default size. No window, no rect, no column.
+// The slot hands each machine a width and, at the top of the window, the height it may use
+// (78-overchat-slot.js measures the anchor's own box and splits it), and this is the whole of the sizing:
+// fill that share at the person's size, never wider than the share, and never taller than the height it
+// was given. No window, no rect, no column.
 // The cabinet is a fixed 560x720 design, so "its own size" is a constant and the whole rule is the one
 // both machines share (overchatFitScale, 19-jackpot-overlay.js).
-function jp2LSlotScale(width, size) {
-  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size))
+function jp2LSlotScale(width, size, height) {
+  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height)
   return scale > 0 ? jp2LFloor(scale) : 0
 }
 
 // The copy itself: the cabinet at its design size inside the box the slot gave it. It is mounted by the
 // strip only while the switch is on, so being mounted is being shown.
-function jp2LOverChatCopy({ ctx, width }) {
+function jp2LOverChatCopy({ ctx, width, height }) {
   const [on] = useJp2LOverchat(ctx)
   const [alpha] = useJp2LAlpha(ctx)
   const [size] = useJp2LSize(ctx)
   // The tint is subscribed to as well as read: a colour change publishes on the store, and a hook that
   // only ever set the same alpha would let React skip the render, leaving the old hue on the stage.
   const [tint] = useJp2LTint(ctx)
-  const scale = jp2LSlotScale(width, size)
+  const scale = jp2LSlotScale(width, size, height)
   if (!on || !scale) return null
   const geo = { scale, width: JP2L_SIZE.width * scale, height: JP2L_SIZE.height * scale }
   return jsx('div', {

@@ -483,32 +483,34 @@ function JackpotOverlay({ ctx, onClose, data }) {
 
 // ---- the see-through machine, in the composer's own slot ---------------------
 //
-// WHERE IT IS DRAWN. Not over the app's markup, and not by measuring it: the copy is rendered inside
-// the composer's `composer.underside` slot (78-overchat-slot.js), which is a real surface of the
-// Desktop SDK. That slot belongs to the conversation's composer, so it exists exactly while the
-// conversation is on screen. There is no route sniffing here, no scan of the app's textareas, no walk
-// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body>, so an
-// app update can neither break this machine nor be broken by it.
+// WHERE IT IS DRAWN. Not over the app's markup, and not by measuring it: the copy is rendered inside a
+// stage that 78-overchat-slot.js hangs off the composer's `composer.underside` slot, and that slot is a
+// real surface of the Desktop SDK. It belongs to the conversation's composer, so it exists exactly while
+// the conversation is on screen. There is no route sniffing here, no scan of the app's textareas, no walk
+// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body>, so an app
+// update can neither break this machine nor be broken by it.
 //
-// HOW BIG IT IS. The strip that owns the slot measures its own box and hands each machine its share of
-// the width; this component fits the cabinet into that share and then applies the person's own size
-// slider on top, capped by the same share. Nothing here reads window.innerWidth, a textarea's
-// position, or another element's rect.
+// HOW BIG IT IS. The stage measures the anchor's own box and hands each machine its share of the width —
+// and, at the top of the window, the height it may use. This component fits the cabinet into that share
+// and then applies the person's own size slider on top, capped by the same share. Nothing here reads
+// window.innerWidth, a textarea's position, or another element's rect.
 //
-// The height budget both copies share. A machine in the composer's underside pushes the composer up,
-// so "as big as its share allows" would eat the conversation; this keeps it a picture of a machine.
+// The height budget both copies share, at most. A see-through machine over the conversation is a picture
+// over it: this is the tallest it may be, whatever room its share of the width would allow.
 const OVERCHAT_MAX_HEIGHT = 320
 
-// Fit a cabinet of `natural` size into `room` pixels of slot width. "100%" is the largest the slot
-// allows — whichever runs out first, the width share or the strip's height budget — and the person's own
-// size slider multiplies it from there, still never past the width share. 0 while either number is
-// unknown (the first paint, before the cabinet has been laid out).
-function overchatFitScale(natural, room, multiplier) {
+// Fit a cabinet of `natural` size into `room` pixels of width. "100%" is the largest the room allows —
+// whichever runs out first, the width or the height budget (`ceiling`, OVERCHAT_MAX_HEIGHT when the
+// caller has no budget of its own) — and the person's own size slider multiplies it from there, still
+// never past the width. 0 while either number is unknown (the first paint, before the cabinet has been
+// laid out).
+function overchatFitScale(natural, room, multiplier, ceiling) {
   const width = Math.max(0, Number(room) || 0)
+  const budget = Number(ceiling) > 0 ? Number(ceiling) : OVERCHAT_MAX_HEIGHT
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
-  const byHeight = OVERCHAT_MAX_HEIGHT / natural.height
+  const byHeight = budget / natural.height
   const scale = Math.min(Math.min(byWidth, byHeight) * factor, byWidth)
   // Below two percent is not a small copy, it is an invisible one: draw nothing rather than a smudge.
   return scale > 0.02 ? Math.floor(scale * 10000) / 10000 : 0
@@ -526,7 +528,7 @@ function overchatNatural(ref) {
   return width > 0 && height > 0 ? { width, height } : null
 }
 
-function SlotsOverChatCopy({ ctx, width }) {
+function SlotsOverChatCopy({ ctx, width, height }) {
   const [on] = useSmOverchat()
   const [snapshot, setSnapshot] = useState(JP_LAST)
   const cabinetRef = useRef(null)
@@ -585,7 +587,7 @@ function SlotsOverChatCopy({ ctx, width }) {
   }, [])
 
   const natural = overchatNatural(cabinetRef)
-  const scale = overchatFitScale(natural, width, overchatScale)
+  const scale = overchatFitScale(natural, width, overchatScale, height)
   if (!on) return null
   // The machine is drawn even before it has been measured — at 100%, clipped to nothing — because its own
   // size is what the measurement is of. One frame, and the box below takes the fitted size.

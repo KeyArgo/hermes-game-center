@@ -32,7 +32,7 @@ All three credential fields are `type: secret`: Hermes shows them in Settings as
 | `setup.json` | `paused` | `false` | "Pause all of these" on Settings. |
 | `setup.json` | `ai` | `null` | `true`/`false` pins the AI-seat choice; `null` follows `allow_ai`. |
 | `wallet.json` | `bet` | `25` | The last slot bet (minimum 25 chips). |
-| `wallet.json` | `overchat` | `false` | Whether the see-through slot cabinet is shown in the composer's underside strip. |
+| `wallet.json` | `overchat` | `false` | Whether the see-through slot cabinet is shown over the conversation, anchored to the composer's underside slot and drawn at the top of the chat column. |
 | `wallet.json` | `overchat_alpha` | `0.2` | Over-chat opacity; accepted values are 0.05–0.6. |
 | `wallet.json` | `overchat_scale` | `1.0` | Over-chat size; accepted values are 0.1–3.0, as a share of the room the slot gives it. |
 | `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or the Olympus machine. |

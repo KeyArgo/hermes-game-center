@@ -69,7 +69,12 @@ def test_the_machine_appears_when_the_switch_is_turned_on_live():
         pytest.skip(f"the browser check could not run here: {output.strip().splitlines()[0]}")
     assert result.returncode == 0, output
     assert "all over-chat live checks passed" in output, output
-    # The three beats are in that output by name; a run that skipped them is not a pass.
+    # The beats are in that output by name; a run that skipped them is not a pass.
     for beat in ("both switches off at mount", "turning it on draws the copy",
-                 "a narrower window re-measures the copy", "turning it off takes the copy"):
+                 "the copy is drawn at the top of the window",
+                 "and centred over the composer slot it hangs off",
+                 "a narrower window re-measures the copy",
+                 "both switches on draws both machines",
+                 "a host that traps fixed positioning",
+                 "turning it off takes the copy"):
         assert beat in output, f"the live run never reported '{beat}':\n{output}"

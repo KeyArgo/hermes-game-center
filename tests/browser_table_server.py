@@ -345,7 +345,7 @@ const ctx={os:{openExternal(url){qa.external=(qa.external||[]).concat([url]);let
 </script>'''.replace('__QA_PET_THUMB__', pet_thumb))
 
     @app.get('/pane')
-    def pane_page(w: int = 400):
+    def pane_page(w: int = 400, trap: int = 0):
         # The pane beside a stub chat. Only the SDK is stubbed: the pane component,
         # the board and every command are the real ones, and the chat itself is a
         # drawing, because the native Desktop cannot be opened here.
@@ -384,8 +384,11 @@ body{font-family:system-ui;background:#0b1220;color:#e8edf4}
     <textarea id="composer" rows="2" aria-label="Message Hermes" placeholder="Message Hermes"
       style="width:100%;resize:none;font:inherit;font-size:13px;padding:8px 10px;border-radius:10px;border:1px solid #394656;background:#101820;color:#e8edf4"></textarea>
     <!-- The composer's underside slot, as the Desktop draws it: the chrome-free strip below the
-         composer that both see-through machines are contributed to (composer.underside). -->
-    <div id="composer-slot" aria-label="Composer underside"></div>
+         composer that both see-through machines are contributed to (composer.underside).
+         `?trap=1` gives the slot a transform, which makes it the containing block for a fixed
+         child — the one thing a host can do that stops a fixed box reaching the top of the window,
+         and the case the fallback layout exists for. -->
+    <div id="composer-slot" aria-label="Composer underside"__SLOT_STYLE__></div>
     <div class="controls">
       <button id="working">Start a Hermes turn</button>
       <button id="finished">Finish the Hermes turn</button>
@@ -464,7 +467,8 @@ const fire = type => (qa.listeners[type] || []).forEach(fn => fn({ type }))
 document.getElementById('working').onclick = () => { host.state.busy.set(true); document.getElementById('chat-turn').textContent = 'Hermes is working' }
 document.getElementById('finished').onclick = () => { host.state.busy.set(false); fire('message.complete'); document.getElementById('chat-turn').textContent = 'Hermes finished' }
 document.getElementById('approval').onclick = () => { fire('approval.request'); document.getElementById('chat-turn').textContent = 'waiting for an approval' }
-</script>'''.replace('__PANE_W__', str(pane_width)))
+</script>'''.replace('__PANE_W__', str(pane_width)).replace(
+            '__SLOT_STYLE__', ' style="transform:translateZ(0)"' if trap else ''))
 
     @app.get('/favicon.ico')
     def favicon():

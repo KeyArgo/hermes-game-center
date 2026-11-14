@@ -1,13 +1,13 @@
-"""Guards for the catalog reviewer's five requests, reviewed at ccfe9157.
+"""Guards for five rules the catalog entry must keep.
 
-Each request was a defect in the copy the review saw. Fixing a defect is not the same as keeping it
-fixed, so every request gets a test that fails on that commit and passes on this tree:
+Each rule stands for a defect that a shipped build once had. Fixing a defect is not the same as
+keeping it fixed, so each rule is a test that fails on the old code and passes on this tree:
 
-1. A Doctrine card comes from the model the person already has, through ``ctx.llm.complete``. The
-   reviewed tree ran ``hermes -p <profile> chat`` as a child process with a copy of ``os.environ``,
-   so a card could reach whatever that profile's tools reached, and the module docstring said
-   "tools disabled" about a run that was only asked to disable them.
-2. The Desktop plugin must not reach into the host app's markup. The reviewed tree found the chat
+1. A Doctrine card comes from the model the person already has, through ``ctx.llm.complete``, in this
+   process. A child ``hermes -p <profile> chat`` with a copy of ``os.environ`` is a second Hermes: a
+   card could reach whatever that profile's tools reached, and the run was only *asked* to disable
+   its tools. No docstring may call that "tools disabled".
+2. The Desktop plugin must not reach into the host app's markup. An earlier build found the chat
    column by enumerating every ``<textarea>`` in the app, walking its ancestors to the widest one and
    appending a ``position: fixed`` div to ``document.body``; an app update could break it and it
    could break the app. Now the over-chat machines render in ``COMPOSER_AREAS.underside``.
@@ -43,7 +43,7 @@ MANIFEST = ROOT / "plugin.yaml"
 README = ROOT / "README.md"
 
 # Directories that are not shipped code: tests, build tooling, sample games, vendored copies and
-# the lane's own notes. Everything else in the tree runs on a person's machine.
+# recorded evidence. Everything else in the tree runs on a person's machine.
 _NOT_SHIPPED = {"tests", "tools", "examples", "docs", "third_party", "vendor", "node_modules",
                 ".git", "assets", "screenshots", "proof", "test-artifacts", "scripts", "build",
                 "dist", "__pycache__"}
@@ -183,7 +183,7 @@ def _doctrine_violations(path: Path) -> list[str]:
 def test_doctrine_starts_no_program_and_copies_no_environment():
     """A card is written by the person's own model in-process, never by a child Hermes.
 
-    The reviewed tree built ``["hermes", "-p", profile, "chat", ...]``, copied ``os.environ`` into it
+    An earlier build created ``["hermes", "-p", profile, "chat", ...]``, copied ``os.environ`` into it
     and ran it. That is a second Hermes with its own tool set, reached from a card request.
     """
     offenders: list[str] = []

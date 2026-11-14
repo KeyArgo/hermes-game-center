@@ -2089,6 +2089,46 @@ async function paneContract() {
   boardPicture = picture
   reset()
 
+  // A picture that did not come from the shelf is not a read. The pane draws a starting picture for a
+  // game whose board has not arrived, and for Backgammon - as for Sea Battle and Blackjack - that
+  // picture carries an idle status of its own: a deal that trusted the status skipped the resign, and
+  // the shelf's game in progress refused the deal. The shelf's pictures carry a schema_version.
+  reset()
+  const savedPlayForDrawn = view.play
+  view.play = [{ id: 'backgammon', title: 'Backgammon', kind: 'table', installed: true, bots: true }]
+  const drawnPicture = { view: 'backgammon', game: 'backgammon', preview: true, status: 'idle', phase: 'move', seats: [], legal: [] }
+  boardPicture = drawnPicture
+  const drawnCtx = makeCtx({ 'pane-game': 'backgammon' })
+  const dealPairs = () => drawnCtx.asked.filter(line => typeof line === 'string' && (line.startsWith('allow-ai') || line.startsWith('backgammon')))
+  const dealInDrawnPane = async () => {
+    await findButton(tree, 'New game').props.onClick()
+    tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+    nodes(tree).find(node => node.props && node.props['data-deal-choice'] === 'computer').props.onChange()
+    tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+    await findButton(tree, 'Start').props.onClick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+  }
+  tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+  assert.ok(findButton(tree, 'New game'), 'a table the pane has only drawn still offers the door')
+  await dealInDrawnPane()
+  assert.deepEqual(dealPairs(), ['backgammon resign', 'allow-ai backgammon black=local level=intermediate'],
+    'a drawn picture is not a read: the deal resigns first, because the shelf can hold a game this pane has not seen')
+  // The same picture as the shelf answers it - it carries a schema_version - deals in one press.
+  drawnCtx.asked.length = 0
+  boardPicture = { ...drawnPicture, schema_version: 2 }
+  tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  tree = draw('WaitPane(paneProps)', { ctx: drawnCtx.ctx })
+  await dealInDrawnPane()
+  assert.deepEqual(dealPairs(), ['allow-ai backgammon black=local level=intermediate'],
+    'a picture the shelf answered is a read: one press deals, with nothing to resign')
+  view.play = savedPlayForDrawn
+  boardPicture = picture
+  reset()
+
   // Blackjack in the pane: its dealer seat can be the built-in
   // player or the person's own model, so a solo table that seats one is offered the same
   // two buttons every board game has - the pane had no way to start a new game at all.

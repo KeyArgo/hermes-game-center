@@ -227,6 +227,33 @@ async function main() {
   assert.ok(huge.length <= 6000, 'the address stays under 6000 characters, got ' + huge.length)
   assert.equal(query(huge).get('template'), 'submit-community-game.yml', 'and still names the right form')
   assert.ok(query(huge).get('summary').length > 0, 'with as much of the answer as fits')
+  // The worst case is not one long box but every box full of the widest characters a URL escapes:
+  // three bytes apiece is nine characters each once percent-encoded. Emptying the free-text box is
+  // not enough there, so the cap holds only if the other answers shrink too.
+  const widest = euro => '€'.repeat(euro)
+  const worst = url({
+    ...community,
+    title: widest(200),
+    link: 'https://example.org/' + widest(500),
+    author: widest(200),
+    licence: widest(200),
+    summary: widest(2000)
+  })
+  assert.ok(worst.length <= 6000, 'an all-escape draft stays under 6000 characters, got ' + worst.length)
+  assert.equal(query(worst).get('template'), 'submit-community-game.yml', 'and still names the right form')
+  assert.ok(query(worst).get('game-title').length > 0, 'keeping as much of the title as fits')
+  assert.ok(!/[\uD800-\uDFFF]/.test(decodeURIComponent(worst.split('?')[1])), 'every escape is whole: no half a character')
+  // The other form, where the free-text box is the short one: the repository link carries the weight.
+  const worstCenter = url({
+    ...center,
+    title: widest(200),
+    repo: 'https://example.org/' + widest(500),
+    author: widest(200),
+    checks: everyTick,
+    checked: true
+  })
+  assert.ok(worstCenter.length <= 6000, 'an all-escape Game Center draft stays under 6000, got ' + worstCenter.length)
+  assert.equal(query(worstCenter).get('template'), 'submit-game-center-game.yml', 'and still names the right form')
 }
 
 main().then(() => {

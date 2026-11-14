@@ -129,10 +129,21 @@ function submitIssueUrl(draft) {
     return GAMES_REPO + '/issues/new?' + pairs.map(pair => pair[0] + '=' + encodeURIComponent(pair[1])).join('&')
   }
   let url = build()
-  // The free-text box is the only one that can grow without limit; halving it is enough to fit.
-  const longest = kind === 'center' ? 'contract' : 'summary'
-  while (url.length > SUBMIT_URL_CAP && answers[longest]) {
-    answers[longest] = answers[longest].slice(0, Math.floor(answers[longest].length / 2)).trim()
+  // The free-text box is the only answer that can grow without limit, so it is the one that shrinks
+  // first. Should the rest still not fit - every character escaping to three bytes apiece - the
+  // answers are halved in turn, widest first, until the address is inside the cap. Halving whole
+  // characters keeps encodeURIComponent from meeting half a surrogate pair, and a form whose answers
+  // are all empty is still a valid address, so the loop always ends inside the cap.
+  while (url.length > SUBMIT_URL_CAP) {
+    let widest = ''
+    let widestSize = 0
+    SUBMIT_FIELDS[kind].forEach(name => {
+      const size = encodeURIComponent(answers[name]).length
+      if (size > widestSize) { widest = name; widestSize = size }
+    })
+    if (!widest) break
+    const characters = Array.from(answers[widest])
+    answers[widest] = characters.slice(0, Math.floor(characters.length / 2)).join('').trim()
     url = build()
   }
   return url

@@ -1,23 +1,25 @@
-// tests/overchat_slot_live.mjs -- the over-chat strip, in a REAL React render, off -> on and resized.
+// tests/overchat_slot_live.mjs -- the over-chat machines, in a REAL React render: off -> on, resized, both
+// on, and a host that traps fixed positioning.
 //
 //   node tests/overchat_slot_live.mjs [--port 18831] [--shots DIR]
 //
-// The strip that holds the two see-through machines attaches its ResizeObserver in an effect. With `[]` deps that effect ran once, at a mount where both
-// switches were off and the strip's div did not exist yet; turning a machine on afterwards rendered it at
-// width 0 for ever, and the Jackpot v2 copy (which needs a width to fit itself) drew nothing at all.
-//
-// A stubbed-hooks harness cannot see that: those harnesses call components and read the tree they return,
-// so a ref they fill in by hand is always "there". Only a real commit can show the difference, so this
-// script drives the real module in headless Chrome against tests/browser_table_server.py:
+// The machines are contributed to `COMPOSER_AREAS.underside`, and 78-overchat-slot.js hangs a fixed stage
+// off that slot's own box so the cabinets draw at the top of the window, over the conversation, as wide as
+// the composer and centred on it. None of that can be checked by reading the source: it is layout, and
+// layout only exists after a real commit. This script drives the built bundle in headless Chrome against
+// tests/browser_table_server.py:
 //
 //   1. the pane page opens with both switches off: no strip, no copy;
 //   2. the switch is turned on by CLICKING the cabinet's own "Show over chat" checkbox — a real React
-//      state change, no reload;
-//   3. the copy must appear, inside the composer's underside slot, at a size a person can see;
-//   4. the window is resized: the copy must re-measure to the new slot width (the observer is attached);
-//   5. the switch is turned off again: the copy and the strip must both go.
+//      state change, no reload — and the copy must be drawn at the TOP of the window, centred over the
+//      slot it hangs off, and at least 200 px tall at 1280x800;
+//   3. the window is resized: the copy must re-measure to the new slot width and follow its centre;
+//   4. both switches on: two machines, side by side, still at the top;
+//   5. a host whose slot has a transform traps fixed positioning inside itself: the placement check has to
+//      see that and fall back to drawing in the slot, where the copy is still visible;
+//   6. the switch is turned off again: the copy and the strip must both go.
 //
-// Exit code 1 means the machine really did not appear (or did not follow a resize).
+// Exit code 1 means the machines really did not appear (or did not follow a resize).
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -123,30 +125,91 @@ const shot = async name => {
   const taken = await cdp('Page.captureScreenshot', { format: 'png' })
   if (taken && taken.data) fs.writeFileSync(path.join(SHOTS, `${name}.png`), Buffer.from(taken.data, 'base64'))
 }
+const resize = async (width, height) => {
+  await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+  await sleep(2500)
+}
 
-// One read of the strip, the copy and the two boxes the checks compare.
+// One read of the slot, the anchor, the stage, both cells and the copy — the boxes the checks compare.
 const FACTS = `(() => {
   const slot = document.querySelector('#composer-slot')
   const strip = document.querySelector('[data-overchat="strip"]')
+  const stage = document.querySelector('[data-overchat="stage"]')
   const copy = document.querySelector('[data-jp2-surface="copy"]')
   const box = copy ? copy.getBoundingClientRect() : null
   const slotBox = slot ? slot.getBoundingClientRect() : null
+  const anchor = strip ? strip.getBoundingClientRect() : null
+  const stageBox = stage ? stage.getBoundingClientRect() : null
+  const cells = [...document.querySelectorAll('[data-overchat="slots"], [data-overchat="jackpot"]')].map(node => {
+    const rect = node.getBoundingClientRect()
+    const inner = node.querySelector('[data-jp2-surface="copy"], [data-jackpot="overchat"]')
+    const innerBox = inner ? inner.getBoundingClientRect() : null
+    return {
+      kind: node.getAttribute('data-overchat'),
+      left: rect.left, right: rect.right, width: rect.width,
+      copy: innerBox ? { left: innerBox.left, right: innerBox.right, top: innerBox.top, width: innerBox.width, height: innerBox.height } : null
+    }
+  })
   return {
     slot: Boolean(slot),
     strip: Boolean(strip),
+    place: strip ? strip.getAttribute('data-overchat-place') : null,
     stripWidth: strip ? Math.round(strip.getBoundingClientRect().width) : 0,
+    anchorLeft: anchor ? anchor.left : null,
+    anchorRight: anchor ? anchor.right : null,
+    anchorHeight: anchor ? Math.round(anchor.height) : null,
+    stage: Boolean(stage),
+    stageTop: stageBox ? stageBox.top : null,
+    stageLeft: stageBox ? stageBox.left : null,
+    stageWidth: stageBox ? Math.round(stageBox.width) : 0,
+    stageHeight: stageBox ? Math.round(stageBox.height) : 0,
+    stagePosition: stage ? getComputedStyle(stage).position : null,
+    cells,
     copy: Boolean(copy),
     copyWidth: box ? Math.round(box.width) : 0,
     copyHeight: box ? Math.round(box.height) : 0,
+    copyTop: box ? box.top : null,
+    copyBottom: box ? box.bottom : null,
+    copyLeft: box ? box.left : null,
+    copyRight: box ? box.right : null,
     copyInsideSlot: Boolean(copy && slot && slot.contains(copy)),
     copyPosition: copy ? getComputedStyle(copy).position : null,
+    // The cabinet is a picture: the scale it is drawn at has to be the same in both axes, so nothing is
+    // stretched into a squashed machine. Read from the transform matrix, which is what is really applied.
+    copyScale: (() => {
+      const stage = copy ? copy.querySelector('[data-jp2-stage]') : null
+      const matrix = stage ? getComputedStyle(stage).transform : 'none'
+      if (!matrix || matrix === 'none') return null
+      const parsed = new DOMMatrixReadOnly(matrix)
+      return { x: parsed.a, y: parsed.d, design: [stage.offsetWidth, stage.offsetHeight] }
+    })(),
+    slotTop: slotBox ? slotBox.top : null,
     slotWidth: slotBox ? Math.round(slotBox.width) : 0,
+    view: { width: innerWidth, height: innerHeight },
     switchOn: Boolean(document.querySelector('[data-jp2-oc-box="overchat"]'))
       ? document.querySelector('[data-jp2-oc-box="overchat"]').checked
       : null,
     errors: (window.qa && window.qa.errors) || []
   }
 })()`
+
+const middle = (left, right) => (Number(left) + Number(right)) / 2
+
+// The pane opens on its own lobby: pick Slots inside it, the way a person does, so the cabinet (and its
+// own Show over chat switch) is on the page before anything is measured.
+const openPane = async () => {
+  const opened = await evaluate(`(() => {
+    const cont = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Continue')
+    if (cont) cont.click()
+    const pane = document.querySelector('.games-wait-pane')
+    const card = pane && [...pane.querySelectorAll('button')].find(b => (b.textContent || '').includes('Slots'))
+    if (!card) return 'no Slots card in the pane'
+    card.click()
+    return 'picked'
+  })()`)
+  await sleep(3000)
+  return opened
+}
 
 // ---------------------------------------------------------------- 1. both switches off at mount
 // The pane page keeps plugin storage in its own localStorage, so this is the state a person has on a
@@ -157,27 +220,15 @@ await evaluate(`(() => { localStorage.removeItem('qa.jackpot2.overchat'); localS
 await cdp('Page.navigate', { url: `${URL_BASE}pane` })
 await sleep(7000)
 
-// The pane opens on its own lobby: pick Slots inside it, the way a person does, so the cabinet (and its
-// own Show over chat switch) is on the page before anything is measured.
-const opened = await evaluate(`(() => {
-  const cont = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Continue')
-  if (cont) cont.click()
-  const pane = document.querySelector('.games-wait-pane')
-  const card = pane && [...pane.querySelectorAll('button')].find(b => (b.textContent || '').includes('Slots'))
-  if (!card) return 'no Slots card in the pane'
-  card.click()
-  return 'picked'
-})()`)
-await sleep(3000)
-
+const opened = await openPane()
 const offAtMount = await evaluate(FACTS)
 check('the pane drew the cabinet with its switches', opened === 'picked', String(opened))
 check('both switches off at mount: no strip and no copy', Boolean(offAtMount && offAtMount.slot
   && !offAtMount.strip && !offAtMount.copy), JSON.stringify(offAtMount))
 
 // ---------------------------------------------------------------- 2. the switch, clicked like a person
-// This is the case that was broken: the component mounted with no strip to measure, and the effect never
-// ran again. Clicking the cabinet's own checkbox flips the stored switch through the real hook.
+// 1280x800 is the window the size requirement is written against.
+await resize(1280, 800)
 const clicked = await evaluate(`(() => {
   const box = document.querySelector('[data-jp2-oc-box="overchat"]')
   if (!box) return 'no switch on the page'
@@ -194,34 +245,60 @@ check('turning it on draws the copy inside the composer slot, at a size a person
   Boolean(onNow && onNow.strip && onNow.copy && onNow.copyInsideSlot
     && onNow.copyWidth > 40 && onNow.copyHeight > 40 && onNow.copyPosition !== 'fixed'),
   JSON.stringify(onNow))
-// The fit has TWO limits and the tighter one wins: its share of the slot's width, or the strip's height
-// budget (320 px, which for the 560x720 cabinet is 249 px wide). A wide slot is therefore height-capped
-// — that is the design, not a miss — and what must hold at every size is "inside the slot, never zero".
+// The fit has TWO limits and the tighter one wins: its share of the slot's width, or the height budget the
+// stage hands it. A wide slot is therefore height-capped — that is the design, not a miss — and what must
+// hold at every size is "inside the slot, never zero".
 check('and it is fitted to the slot it was given: inside its share, capped by the height budget',
   Boolean(onNow && onNow.stripWidth > 0 && onNow.copyWidth > 40
     && onNow.copyWidth <= Math.min(onNow.stripWidth, 249) + 1
     && onNow.copyHeight <= 321),
   `copy ${onNow && onNow.copyWidth}x${onNow && onNow.copyHeight} in strip ${onNow && onNow.stripWidth}`)
+// The point of the anchor: the machines are drawn at the TOP of the window, over the conversation, not in
+// the composer's underside where the slot happens to sit.
+check('the copy is drawn at the top of the window, over the conversation',
+  Boolean(onNow && onNow.stage && onNow.stagePosition === 'fixed' && onNow.place === 'top'
+    && onNow.copyTop !== null && onNow.copyTop < onNow.view.height / 2
+    && Math.abs(onNow.stageTop - 56) <= 4),
+  `place ${onNow && onNow.place}, stage top ${onNow && onNow.stageTop}, copy top ${onNow && onNow.copyTop} of ${onNow && onNow.view.height}`)
+check('and centred over the composer slot it hangs off, within 4px',
+  Boolean(onNow && onNow.copy && onNow.anchorLeft !== null
+    && Math.abs(middle(onNow.copyLeft, onNow.copyRight) - middle(onNow.anchorLeft, onNow.anchorRight)) <= 4),
+  `copy centre ${onNow && middle(onNow.copyLeft, onNow.copyRight)}, anchor centre ${onNow && middle(onNow.anchorLeft, onNow.anchorRight)}`)
+check('and large enough to be worth looking at: at least 200px tall at 1280x800',
+  Boolean(onNow && onNow.view.width === 1280 && onNow.view.height === 800 && onNow.copyHeight >= 200),
+  `copy ${onNow && onNow.copyWidth}x${onNow && onNow.copyHeight} in ${onNow && onNow.view.width}x${onNow && onNow.view.height}`)
+// A picture, not a box: the cabinet is scaled by the same factor on both axes, and its box keeps the
+// cabinet's own 560x720 proportions. Stretching it to fill the slot is the regression this pins.
+check('and the cabinet keeps its own proportions instead of being stretched to fill the slot',
+  Boolean(onNow && onNow.copyScale && onNow.copyScale.design[0] === 560 && onNow.copyScale.design[1] === 720
+    && Math.abs(onNow.copyScale.x - onNow.copyScale.y) < 0.002
+    && Math.abs(onNow.copyHeight / onNow.copyWidth - 720 / 560) < 0.02),
+  JSON.stringify(onNow && { scale: onNow.copyScale, copy: [onNow.copyWidth, onNow.copyHeight] }))
 await shot('overchat-on')
 
 // ---------------------------------------------------------------- 3. a resize, after the switch
-// The observer is what makes a later width change reach the copy: without it the machine keeps the size
-// it happened to be measured at.
-// A resize only shows in the copy once the slot is NARROWER than the height-capped width (249 px for
-// this cabinet), because above that the height budget is what decides. So the test goes there: a window
-// narrow enough that the width is the binding limit, then back.
+// The observer and the window listener are what make a later width change reach the copy: without them the
+// machine keeps the size it happened to be measured at.
+// A resize only shows in the copy's WIDTH once the slot is narrower than the height-capped width (249 px
+// for this cabinet), because above that the height budget decides. So the test goes there: a window narrow
+// enough that the width is the binding limit. What must hold whatever happens is that the copy follows the
+// anchor: same centre, inside its width.
 const widthBefore = onNow ? onNow.copyWidth : 0
-await cdp('Emulation.setDeviceMetricsOverride', { width: 520, height: 880, deviceScaleFactor: 1, mobile: false })
-await sleep(2500)
+await resize(520, 880)
 const narrower = await evaluate(FACTS)
 check('a narrower window re-measures the copy instead of leaving it at the old width',
   Boolean(narrower && narrower.copy && widthBefore > 0 && narrower.copyWidth > 0
     && narrower.copyWidth < widthBefore && narrower.copyWidth <= narrower.stripWidth + 1),
   `before ${widthBefore}, after ${narrower && narrower.copyWidth}, strip ${narrower && narrower.stripWidth}`)
-await shot('overchat-narrower')
+check('and the copy follows the slot to its new centre, still in the top half',
+  Boolean(narrower && narrower.copy && Math.abs(narrower.stageLeft - narrower.anchorLeft) <= 1
+    && Math.abs(middle(narrower.copyLeft, narrower.copyRight) - middle(narrower.anchorLeft, narrower.anchorRight)) <= 4
+    && narrower.copyTop < narrower.view.height / 2),
+  `stage left ${narrower && narrower.stageLeft}, anchor left ${narrower && narrower.anchorLeft}, ` +
+    `copy centre ${narrower && middle(narrower.copyLeft, narrower.copyRight)}, copy top ${narrower && narrower.copyTop}`)
+await shot('overchat-resized-narrow')
 
-await cdp('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false })
-await sleep(2500)
+await resize(1400, 900)
 const wider = await evaluate(FACTS)
 check('and a wider one grows it back',
   Boolean(wider && wider.copy && wider.copyWidth > (narrower ? narrower.copyWidth : 0)),
@@ -239,6 +316,51 @@ const offAgain = await evaluate(FACTS)
 check('turning it off takes the copy and the strip away',
   clickedOff === 'clicked' && Boolean(offAgain && !offAgain.copy && !offAgain.strip),
   JSON.stringify(offAgain))
+
+// ---------------------------------------------------------------- 5. both machines at once
+// Two switches, one stage: each machine gets its own cell, so two of them can never draw over each other.
+await resize(1280, 800)
+await evaluate(`(() => { localStorage.setItem('gameshelf.slots.overchat', '1'); localStorage.setItem('qa.jackpot2.overchat', 'true'); return true })()`)
+await cdp('Page.navigate', { url: `${URL_BASE}pane` })
+await sleep(7000)
+const bothOpened = await openPane()
+const both = await evaluate(FACTS)
+const bothCells = (both && both.cells) || []
+check('both switches on draws both machines, each in its own cell',
+  bothOpened === 'picked' && Boolean(both && both.strip && both.place === 'top')
+    && bothCells.length === 2 && bothCells.every(cell => cell.width > 40),
+  JSON.stringify(both && { place: both.place, cells: bothCells.map(cell => [cell.kind, Math.round(cell.width)]) }))
+check('and both are at the top of the window with the slot, not stacked on each other',
+  Boolean(both && both.cells.length === 2
+    && both.cells.every(cell => !cell.copy || cell.copy.top < both.view.height / 2)
+    && both.cells[0].right <= both.cells[1].left + 1
+    && both.cells.every(cell => cell.copy ? cell.copy.left >= both.stageLeft - 2
+      && cell.copy.right <= both.stageLeft + both.stageWidth + 2 : true)),
+  JSON.stringify(both && both.cells.map(cell => [cell.kind, Math.round(cell.left), Math.round(cell.right),
+    cell.copy && Math.round(cell.copy.left), cell.copy && Math.round(cell.copy.right)])))
+await shot('overchat-both')
+
+// ---------------------------------------------------------------- 6. a host that traps fixed positioning
+// `?trap=1` puts a transform on the slot, which makes the slot the containing block for the fixed stage, so
+// the stage lands beside the composer instead of at the top of the window. The placement check has to
+// notice from the stage's own rect and fall back to drawing in the slot — visible, just not at the top.
+await cdp('Page.navigate', { url: `${URL_BASE}pane?trap=1` })
+await sleep(7000)
+const trappedOpened = await openPane()
+const trappedNow = await evaluate(FACTS)
+check('a host that traps fixed positioning is noticed and the slot layout takes over',
+  trappedOpened === 'picked' && Boolean(trappedNow && trappedNow.strip && trappedNow.copy
+    && trappedNow.place === 'slot'),
+  `place ${trappedNow && trappedNow.place}, stage ${trappedNow && trappedNow.stage}, ` +
+    `cells ${trappedNow && trappedNow.cells.length}`)
+check('and the machines are still drawn: in the slot, visible, inside it',
+  Boolean(trappedNow && trappedNow.copy && trappedNow.copyInsideSlot
+    && trappedNow.copyWidth > 40 && trappedNow.copyHeight > 40
+    && trappedNow.copyPosition !== 'fixed'),
+  `copy ${trappedNow && trappedNow.copyWidth}x${trappedNow && trappedNow.copyHeight} ` +
+    `at ${trappedNow && trappedNow.copyTop}, inside ${trappedNow && trappedNow.copyInsideSlot}, ` +
+    `place ${trappedNow && trappedNow.place}`)
+await shot('overchat-trap-fallback')
 
 const errors = await evaluate('(window.qa && window.qa.errors) || []')
 check('the page logged no JavaScript error through all of that',
