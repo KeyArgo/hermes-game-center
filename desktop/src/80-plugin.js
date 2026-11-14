@@ -19,7 +19,7 @@ export default {
         dock: { pane: 'workspace', pos: 'right' },
         width: PANE_WIDTH,
         minWidth: '300px',
-        maxWidth: '560px',
+        maxWidth: '1200px',
         defaultCollapsed: true,
         hideOnly: true
       },
