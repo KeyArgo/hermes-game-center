@@ -18498,7 +18498,7 @@ const SDK_HOST = typeof host === 'undefined' ? null : host
 const PANE_ID = 'hermes-gameshelf:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
-const PANE_WIDTH = '360px'
+const PANE_WIDTH = '720px'
 // The four quick games. Order is the order they are offered.
 const QUICK_GAMES = ['connect4', 'reversi', 'gomoku', 'breakthrough']
 const QUICK_LEVEL = 'intermediate'
@@ -23250,7 +23250,7 @@ export default {
         dock: { pane: 'workspace', pos: 'right' },
         width: PANE_WIDTH,
         minWidth: '300px',
-        maxWidth: '560px',
+        maxWidth: '1200px',
         defaultCollapsed: true,
         hideOnly: true
       },
