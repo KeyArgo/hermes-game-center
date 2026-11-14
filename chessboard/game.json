@@ -1,7 +1,7 @@
 {
   "id": "chessboard",
   "schema_version": 1,
-  "plugin": "hermes-gameshelf",
+  "plugin": "hermes-game-center",
   "title": "Chess",
   "summary": "Full chess rules: castling, en passant, promotion, draws by repetition and fifty moves. A built-in player can take a seat after you agree.",
   "entry": "game.py",

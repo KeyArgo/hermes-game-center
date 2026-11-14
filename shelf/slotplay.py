@@ -28,9 +28,9 @@ def _load(name: str, path: Path):
     return sys.modules[name]
 
 
-reels = _load("hermes_gameshelf_reels", _ROOT / "shelf" / "reels.py")
-autobet = _load("hermes_gameshelf_autobet", _ROOT / "shelf" / "autobet.py")
-spinlog = _load("hermes_gameshelf_spinlog", _ROOT / "shelf" / "spinlog.py")
+reels = _load("hermes_game_center_reels", _ROOT / "shelf" / "reels.py")
+autobet = _load("hermes_game_center_autobet", _ROOT / "shelf" / "autobet.py")
+spinlog = _load("hermes_game_center_spinlog", _ROOT / "shelf" / "spinlog.py")
 
 # Chips only: a spin costs the bet the player picked, and the bet is split over the machine's lines.
 MIN_BET = reels.MIN_BET

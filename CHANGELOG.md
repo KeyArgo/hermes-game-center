@@ -15,6 +15,7 @@ First public release.
 - **Lessons and hints** on real positions, replayed through the game's own rules, so a lesson can never teach an illegal move.
 - **Online play is optional and off by default.** One shared lobby with chat and play requests when you turn it on. Everything else works offline.
 - **People play first.** A model calling the tool can never take a seat for someone. The other person joins with `/games <game> join`.
+- **Plugin id is now hermes-game-center; saves from hermes-gameshelf are copied over on first run.** The manifest name, the data folder and the Desktop storage keys follow the id; the old `plugin-data/hermes-gameshelf/` folder is copied into the new one once and left untouched, so points, names and saved tables arrive with you.
 
 ### After the 1.0.0 submission
 

@@ -299,7 +299,7 @@ def _file_lock():
     import importlib.util
     import sys
 
-    name = "hermes_gameshelf_filelock"
+    name = "hermes_game_center_filelock"
     found = sys.modules.get(name)
     if found is not None:
         return found.file_lock

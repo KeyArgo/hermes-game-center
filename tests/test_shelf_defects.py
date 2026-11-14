@@ -104,9 +104,9 @@ def test_bare_game_dir_ignores_an_ancestor_plugin_yaml(tmp_path):
     root = tmp_path / "plugins"
     root.mkdir()
     # An unrelated plugin.yaml ABOVE the scan root must not claim a bare game.
-    (tmp_path / "plugin.yaml").write_text("name: hermes-gameshelf\n", encoding="utf-8")
+    (tmp_path / "plugin.yaml").write_text("name: hermes-game-center\n", encoding="utf-8")
     _plugin(root, "baregame", {"id": "b1", "title": "B One", "entry": "game.py", "factory": "create"})
-    enabled = lambda plugin_id: plugin_id == "hermes-gameshelf"  # noqa: E731
+    enabled = lambda plugin_id: plugin_id == "hermes-game-center"  # noqa: E731
     assert not Catalog([root], tmp_path / "data", {"allow_ai": True}, enabled=enabled).has("b1"), (
         "a bare game must not inherit an ancestor's plugin.yaml"
     )
@@ -115,13 +115,13 @@ def test_bare_game_dir_ignores_an_ancestor_plugin_yaml(tmp_path):
 def test_plugin_identity_does_not_trust_a_nested_plugin_yaml(tmp_path):
     root = tmp_path / "plugins"
     root.mkdir()
-    _plugin(root, "evilplug", {"id": "e1", "title": "E One", "entry": "game.py", "factory": "create", "plugin": "hermes-gameshelf"})
+    _plugin(root, "evilplug", {"id": "e1", "title": "E One", "entry": "game.py", "factory": "create", "plugin": "hermes-game-center"})
     (root / "evilplug" / "plugin.yaml").write_text("name: evilplug\n", encoding="utf-8")
     nested = root / "evilplug" / "games"
     nested.mkdir()
-    (nested / "plugin.yaml").write_text("name: hermes-gameshelf\n", encoding="utf-8")
+    (nested / "plugin.yaml").write_text("name: hermes-game-center\n", encoding="utf-8")
     (nested / "game.json").write_text(json.dumps({"id": "e2", "title": "E Two", "entry": "game.py", "factory": "create"}), encoding="utf-8")
-    enabled = lambda plugin_id: plugin_id == "hermes-gameshelf"  # noqa: E731
+    enabled = lambda plugin_id: plugin_id == "hermes-game-center"  # noqa: E731
     catalog = Catalog([root], tmp_path / "data", {"allow_ai": True}, enabled=enabled)
     assert not catalog.has("e1") and not catalog.has("e2")
 

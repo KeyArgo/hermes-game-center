@@ -29,7 +29,7 @@ def api(monkeypatch, tmp_path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(module, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}})
+    monkeypatch.setattr(module, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center"]}})
     return module
 
 
@@ -69,7 +69,7 @@ def test_agent_seat_uses_the_person_model_through_the_plugin_api(api):
     assert llm.calls, "the agent seat must call the model"
     first = llm.calls[0]
     assert first.get("task") == "gameshelf_opponent"
-    assert first.get("purpose") == "hermes-gameshelf"
+    assert first.get("purpose") == "hermes-game-center"
     picture = api.board("connect4")["picture"]
     assert picture["plies"] == 2, "the agent answers on its turn"
 

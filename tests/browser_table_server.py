@@ -157,7 +157,7 @@ def main():
     api._data_root = lambda: root / 'data'
     api._config = lambda: {
         **({'model': {'default': 'Hermes-4-70B', 'provider': 'nous'}} if args.fake_model else {}),
-        'plugins': {'entries': {'hermes-gameshelf': {'settings': {
+        'plugins': {'entries': {'hermes-game-center': {'settings': {
             'allow_ai': True, **({'lobby_url': args.lobby_url} if args.lobby_url else {})}}}},
         **({'display': {'pet': {'enabled': True, 'slug': args.pet, 'scale': 0.5}}} if args.pet else {}),
     }

@@ -1,7 +1,7 @@
 {
   "id": "hex",
   "schema_version": 1,
-  "plugin": "hermes-gameshelf",
+  "plugin": "hermes-game-center",
   "title": "Hex",
   "summary": "Join your two sides of the board before your opponent joins theirs. No draws. A built-in player can take a seat after you agree.",
   "entry": "game.py",

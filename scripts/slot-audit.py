@@ -43,7 +43,7 @@ def hermes_home() -> pathlib.Path:
     return pathlib.Path(get_hermes_home())
 
 
-DATA = hermes_home() / "plugin-data" / "hermes-gameshelf" / "spins.jsonl"
+DATA = hermes_home() / "plugin-data" / "hermes-game-center" / "spins.jsonl"
 
 
 def load(path: pathlib.Path, limit: int | None, machine: str | None) -> list[dict]:

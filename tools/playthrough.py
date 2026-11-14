@@ -40,7 +40,7 @@ def load_api(data_root: Path):
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)
     api._data_root = lambda: data_root  # type: ignore[assignment]
-    api._config = lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}}  # type: ignore[assignment]
+    api._config = lambda: {"plugins": {"enabled": ["hermes-game-center"]}}  # type: ignore[assignment]
     return api
 
 

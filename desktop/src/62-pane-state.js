@@ -12,7 +12,7 @@
 // server, and the pane remembers which game it was, so leaving and coming back
 // resumes it.
 const SDK_HOST = typeof host === 'undefined' ? null : host
-const PANE_ID = 'hermes-gameshelf:pane'
+const PANE_ID = 'hermes-game-center:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
 const PANE_WIDTH = '720px'

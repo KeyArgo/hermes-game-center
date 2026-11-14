@@ -80,7 +80,7 @@ def test_known_installed_and_disabled(tmp_path: Path, monkeypatch) -> None:
         folder = home / "plugins" / name
         folder.mkdir()
         (folder / "plugin.yaml").write_text(f"name: {name}\n", encoding="utf-8")
-    api = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-gameshelf", "agent-hold-em"]}})
+    api = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-game-center", "agent-hold-em"]}})
     view = api.view()
     games = {card["id"]: card for card in view["your_games"]}
     suggestions = {card["id"]: card for card in view["your_suggestions"]}
@@ -90,7 +90,7 @@ def test_known_installed_and_disabled(tmp_path: Path, monkeypatch) -> None:
     assert suggestions["tamahermes"]["state"] == "installed-off"
     assert suggestions["tamahermes"]["line"] == OFF
     assert len(view["makers"]["items"]) == 6
-    off_view = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-gameshelf"]}}).view()
+    off_view = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-game-center"]}}).view()
     assert "tamahermes" not in {card["id"] for card in off_view["your_games"]}
     off = {card["id"]: card for card in off_view["your_suggestions"]}["tamahermes"]
     assert off["state"] == "installed-off" and off["line"] == OFF

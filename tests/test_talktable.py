@@ -699,7 +699,7 @@ def api(monkeypatch, tmp_path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(module, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}})
+    monkeypatch.setattr(module, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center"]}})
     return module
 
 
@@ -1683,7 +1683,7 @@ def test_the_import_door_reports_another_owners_table_as_a_refusal(tmp_path, mon
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(module, "_config", lambda: {"plugins": {"entries": {"hermes-gameshelf": {
+    monkeypatch.setattr(module, "_config", lambda: {"plugins": {"entries": {"hermes-game-center": {
         "settings": {"allow_ai": True}}}}})
     catalog = Catalog([ROOT], tmp_path / "data", {"allow_ai": True})
     owner = Player("desktop:owner", "Owner", "desktop")

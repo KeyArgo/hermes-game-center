@@ -1,7 +1,7 @@
 """Game Center Online: rooms, invites, spectators, chat and a leaderboard over one WebSocket.
 
 Run: python -m online.server --data DIR [--host 127.0.0.1] [--port 8790] [--trust-proxy]
-(from plugins/hermes-gameshelf). Put nginx in front for TLS.
+(from plugins/hermes-game-center). Put nginx in front for TLS.
 """
 
 from __future__ import annotations

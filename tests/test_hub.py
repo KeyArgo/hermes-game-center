@@ -74,9 +74,9 @@ def test_an_isolated_hermes_home_ignores_the_default_home(tmp_path: Path, monkey
 
 
 def test_a_symlinked_install_still_sees_the_other_plugins(tmp_path: Path, monkeypatch) -> None:
-    real = tmp_path / "somewhere" / "else" / "hermes-gameshelf"
+    real = tmp_path / "somewhere" / "else" / "hermes-game-center"
     real.mkdir(parents=True)
-    (real / "plugin.yaml").write_text("name: hermes-gameshelf\n", encoding="utf-8")
+    (real / "plugin.yaml").write_text("name: hermes-game-center\n", encoding="utf-8")
     (real / "connect4").mkdir()
     (real / "connect4" / "game.json").write_text(
         (ROOT / "connect4" / "game.json").read_text(encoding="utf-8"), encoding="utf-8"
@@ -86,7 +86,7 @@ def test_a_symlinked_install_still_sees_the_other_plugins(tmp_path: Path, monkey
     )
     home = tmp_path / "home"
     (home / "plugins").mkdir(parents=True)
-    (home / "plugins" / "hermes-gameshelf").symlink_to(real, target_is_directory=True)
+    (home / "plugins" / "hermes-game-center").symlink_to(real, target_is_directory=True)
     foreign = _plugin(
         home / "plugins",
         "my-plugin",
@@ -100,7 +100,7 @@ def test_a_symlinked_install_still_sees_the_other_plugins(tmp_path: Path, monkey
         plugin_roots(),
         tmp_path / "data",
         {"allow_ai": True},
-        enabled=lambda name: name in {"hermes-gameshelf", "my-plugin"},
+        enabled=lambda name: name in {"hermes-game-center", "my-plugin"},
     )
     assert catalog.has("connect4"), "a symlinked install must not hide the games"
     assert catalog.has("my-game"), "another plugin in $HERMES_HOME/plugins is found"
@@ -283,7 +283,7 @@ def test_our_own_folder_beats_a_copy_in_the_plugins_folder(tmp_path: Path, monke
     installed = tmp_path / "home" / "plugins"
     _plugin(
         installed,
-        "hermes-gameshelf",
+        "hermes-game-center",
         {"id": "stale-game", "title": "Stale", "entry": "game.py", "kind": "table"},
         game_py="def create(root, settings):\n    return None\n",
     )
@@ -346,7 +346,7 @@ def test_a_sibling_plugin_cannot_take_a_shipped_game_id(tmp_path: Path, monkeypa
     catalog = Catalog([plugins, ROOT], tmp_path / "data", {"allow_ai": True})
     assert catalog.title("connect4") == "Connect Four"
     card = catalog.card("connect4")
-    assert card is not None and card["plugin_id"] == "hermes-gameshelf"
+    assert card is not None and card["plugin_id"] == "hermes-game-center"
 
 
 def test_a_better_copy_keeps_all_its_games_after_an_id_clash(tmp_path: Path, monkeypatch) -> None:
@@ -391,7 +391,7 @@ def test_the_enabled_state_accepts_the_folder_name_too(tmp_path: Path, monkeypat
 
     fake.APIRouter = APIRouter  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "fastapi", fake)
-    spec = importlib.util.spec_from_file_location("hermes_gameshelf_api_hub", ROOT / "dashboard" / "plugin_api.py")
+    spec = importlib.util.spec_from_file_location("hermes_game_center_api_hub", ROOT / "dashboard" / "plugin_api.py")
     assert spec and spec.loader
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)

@@ -15,12 +15,13 @@ node tests/jackpot2_harness.cjs                  # the Jackpot v2 copy, its swit
 node tests/jackpot2_look_harness.cjs             # the Jackpot v2 tint, and the ink it keeps readable
 node tests/timers_harness.cjs                    # every surface closes its clocks
 node tests/submit_harness.cjs                    # add your own game: the form and the issue it builds
+node tests/legacy_storage_harness.cjs            # old plugin-id storage keys follow the new id
 node tests/slot_fit_regression.mjs               # fits the page, in real headless Chrome
 scripts/test.sh                                  # all of the above, plus the Chrome fit check
 scripts/test.sh --fast                           # skip the Chrome fit check
 ```
 
-CI (`.github/workflows/tests.yml`) runs the pytest suite and the six Node harnesses on Python 3.13: `table_ui_harness.cjs`, `jackpot_overlay_harness.cjs`, `jackpot2_harness.cjs`, `jackpot2_look_harness.cjs`, `timers_harness.cjs` and `submit_harness.cjs`. The Chrome fit check is a local/owner check, not a CI step.
+CI (`.github/workflows/tests.yml`) runs the pytest suite and the seven Node harnesses on Python 3.13: `table_ui_harness.cjs`, `jackpot_overlay_harness.cjs`, `jackpot2_harness.cjs`, `jackpot2_look_harness.cjs`, `timers_harness.cjs`, `submit_harness.cjs` and `legacy_storage_harness.cjs`. The Chrome fit check is a local/owner check, not a CI step.
 
 ## Counts at this commit
 

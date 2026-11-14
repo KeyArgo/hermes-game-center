@@ -67,7 +67,7 @@ def main() -> int:
         failures = 0
         for game in GAMES:
             catalog = Catalog([ROOT], Path(tempfile.mkdtemp(prefix="agent-seat-")),
-                              {"allow_ai": True}, enabled=lambda name: name == "hermes-gameshelf")
+                              {"allow_ai": True}, enabled=lambda name: name == "hermes-game-center")
             status, plies = play(catalog, game, complete)
             failures += status not in {"win", "draw"}
             print(f"  {game:11s} {status:26s} plies={plies}", flush=True)

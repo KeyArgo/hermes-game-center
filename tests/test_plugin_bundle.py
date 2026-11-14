@@ -80,7 +80,8 @@ def test_the_bundle_still_lands_a_plugin_object_and_the_shared_drawing():
     # The UI harness and the website both strip these lines, so their shape matters.
     assert re.search(r"^export default \{$", source, re.MULTILINE), "the plugin object is one export default"
     assert re.search(r"^export \{ BoardSvg, coverArt, startingPicture, tableAccess \}$", source, re.MULTILINE)
-    assert "id: 'hermes-gameshelf'," in source
+    assert "const PLUGIN_ID = 'hermes-game-center'" in source, "the plugin names its id once"
+    assert "id: PLUGIN_ID," in source, "and the object it registers wears that id"
 
 
 def test_the_bundle_says_it_is_built_so_nobody_edits_it_by_hand():

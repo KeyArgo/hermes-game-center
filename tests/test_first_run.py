@@ -24,7 +24,7 @@ from shelf.setup import MAX_ROWS, RATE_SECONDS, Setup, looking_now  # noqa: E402
 from shelf.who import NameBook, Player, identify, name_problem, suggest_name  # noqa: E402
 
 _CONFIG = {
-    "plugins": {"entries": {"hermes-gameshelf": {"settings": {"allow_ai": True}}}},
+    "plugins": {"entries": {"hermes-game-center": {"settings": {"allow_ai": True}}}},
 }
 
 
@@ -41,7 +41,7 @@ def _api(tmp_path: Path, monkeypatch, config: dict | None = None):
     fake = types.ModuleType("fastapi")
     fake.APIRouter = APIRouter  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "fastapi", fake)
-    spec = importlib.util.spec_from_file_location("hermes_gameshelf_first_run_api", ROOT / "dashboard" / "plugin_api.py")
+    spec = importlib.util.spec_from_file_location("hermes_game_center_first_run_api", ROOT / "dashboard" / "plugin_api.py")
     assert spec and spec.loader
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)
@@ -400,7 +400,7 @@ def test_no_network_and_no_config_write(tmp_path, monkeypatch):
 
 def _plugin_module(tmp_path: Path):
     """The plugin's own __init__.py, loaded the way Hermes loads it."""
-    name = "hermes_gameshelf_first_run_plugin"
+    name = "hermes_game_center_first_run_plugin"
     for stale in [key for key in sys.modules if key == name or key.startswith(name + ".")]:
         del sys.modules[stale]
     spec = importlib.util.spec_from_file_location(name, ROOT / "__init__.py", submodule_search_locations=[str(ROOT)])

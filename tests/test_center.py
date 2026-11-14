@@ -94,7 +94,7 @@ def test_disabled_plugin_stays_off_the_shelf(tmp_path: Path) -> None:
 
 
 def test_loads_the_way_hermes_loads_a_plugin(tmp_path: Path) -> None:
-    module_name = "hermes_plugins.hermes_gameshelf"
+    module_name = "hermes_plugins.hermes_game_center"
     parent = "hermes_plugins"
     if parent not in sys.modules:
         namespace = types.ModuleType(parent)
@@ -124,7 +124,7 @@ def test_loads_the_way_hermes_loads_a_plugin(tmp_path: Path) -> None:
             return {"allow_ai": True}.get(key, default)
 
         def has_plugin(self, plugin_id: str) -> bool:
-            return plugin_id in {"hermes-gameshelf", "classic-games"}
+            return plugin_id in {"hermes-game-center", "classic-games"}
 
         def register_command(self, name, handler, description="", **_kwargs):
             self.commands[name] = handler
@@ -232,12 +232,12 @@ def test_desktop_backend_runs_lines_as_the_person_at_the_desktop(tmp_path: Path,
 
     fake.APIRouter = APIRouter  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "fastapi", fake)
-    spec = importlib.util.spec_from_file_location("hermes_gameshelf_plugin_api", ROOT / "dashboard" / "plugin_api.py")
+    spec = importlib.util.spec_from_file_location("hermes_game_center_plugin_api", ROOT / "dashboard" / "plugin_api.py")
     assert spec and spec.loader
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)
     monkeypatch.setattr(api, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf", "classic-games"]}})
+    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center", "classic-games"]}})
     view = api.view()
     ids = [game["id"] for game in view["games"]]
     # Every game that ships with Game Center is already in the library; only games from
@@ -270,7 +270,7 @@ def test_desktop_backend_runs_lines_as_the_person_at_the_desktop(tmp_path: Path,
 
 
 def test_shelf_ships_default_games_and_names_the_ones_you_can_install(tmp_path: Path) -> None:
-    catalog = Catalog([ROOT], tmp_path / "data", {"allow_ai": True}, enabled=lambda name: name == "hermes-gameshelf")
+    catalog = Catalog([ROOT], tmp_path / "data", {"allow_ai": True}, enabled=lambda name: name == "hermes-game-center")
     listed = catalog.list_text()
     # Shipped games are in the library on the first run: no Get step, they just play.
     assert "Library is empty" not in listed
@@ -345,12 +345,12 @@ def test_board_picture_is_a_clickable_2d_grid(tmp_path: Path, monkeypatch) -> No
 
     fake.APIRouter = APIRouter  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "fastapi", fake)
-    spec = importlib.util.spec_from_file_location("hermes_gameshelf_plugin_api_picture", ROOT / "dashboard" / "plugin_api.py")
+    spec = importlib.util.spec_from_file_location("hermes_game_center_plugin_api_picture", ROOT / "dashboard" / "plugin_api.py")
     assert spec and spec.loader
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)
     monkeypatch.setattr(api, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf", "classic-games"]}})
+    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center", "classic-games"]}})
     preview = api.board("connect4")
     assert preview["picture"]["view"] == "connect4"
     assert preview["picture"]["preview"] is True

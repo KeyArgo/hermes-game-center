@@ -178,7 +178,7 @@ def test_the_two_machines_draw_their_own_chance(tmp_path: Path) -> None:
 def test_a_spin_from_the_sidebar_shows_on_the_table(tmp_path: Path) -> None:
     state = start(tmp_path)
     slotplay = importlib.import_module("shelf.slotplay")
-    slotplay._load("hermes_gameshelf_wallet", ROOT / "shelf/wallet.py")
+    slotplay._load("hermes_game_center_wallet", ROOT / "shelf/wallet.py")
     row = slotplay.spin(Wallet(tmp_path / "wallet.json"), bet=25)
     pic = game.picture(state, player=ME)
     assert list(pic["reels"]) == list(row["reels"]), (pic["reels"], row["reels"])

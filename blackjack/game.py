@@ -11,7 +11,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 # Load this plugin's own kit.py under a name no other plugin can claim. A plain
 # `import kit` would hand us another plugin's module when both ship a kit.py.
-_KIT_NAME = "hermes_gameshelf_kit"
+_KIT_NAME = "hermes_game_center_kit"
 if _KIT_NAME not in sys.modules:
     _kit_spec = importlib.util.spec_from_file_location(_KIT_NAME, _ROOT / "kit.py")
     _kit_module = importlib.util.module_from_spec(_kit_spec)
@@ -19,7 +19,7 @@ if _KIT_NAME not in sys.modules:
     _kit_spec.loader.exec_module(_kit_module)
 kit = sys.modules[_KIT_NAME]
 
-_FRESH_NAME = "hermes_gameshelf_fresh"
+_FRESH_NAME = "hermes_game_center_fresh"
 if _FRESH_NAME not in sys.modules:
     _fresh_spec = importlib.util.spec_from_file_location(_FRESH_NAME, _ROOT / "shelf" / "fresh.py")
     _fresh_module = importlib.util.module_from_spec(_fresh_spec)
@@ -27,7 +27,7 @@ if _FRESH_NAME not in sys.modules:
     _fresh_spec.loader.exec_module(_fresh_module)
 # Shared helpers reload when their file changes, so an update never mixes old and new code.
 load_fresh = sys.modules[_FRESH_NAME].load_fresh
-wallet = load_fresh("hermes_gameshelf_wallet", _ROOT / "shelf" / "wallet.py")
+wallet = load_fresh("hermes_game_center_wallet", _ROOT / "shelf" / "wallet.py")
 
 ID = "blackjack"
 TITLE = "Blackjack"

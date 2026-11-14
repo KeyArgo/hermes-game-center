@@ -49,7 +49,7 @@ def _shelf(tmp_path: Path, *roots: Path) -> Catalog:
         [ROOT, *roots],
         tmp_path / "data",
         {"allow_ai": True},
-        enabled=lambda name: name in {"hermes-gameshelf", "hello-game"},
+        enabled=lambda name: name in {"hermes-game-center", "hello-game"},
     )
 
 

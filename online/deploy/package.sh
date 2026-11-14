@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the Game Center Online release tarball: the server, every table game (game.json kind table), the shared
 # referee (kit.py) and the board drawing (desktop/plugin.js). Nothing else from the plugin.
-# Usage: online/deploy/package.sh OUT_DIR   (run from plugins/hermes-gameshelf)
+# Usage: online/deploy/package.sh OUT_DIR   (run from plugins/hermes-game-center)
 set -eu
 out=${1:?usage: package.sh OUT_DIR}
 here=$(cd "$(dirname "$0")/../.." && pwd)

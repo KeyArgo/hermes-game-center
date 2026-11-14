@@ -1,7 +1,7 @@
 {
   "id": "blackjack",
   "schema_version": 1,
-  "plugin": "hermes-gameshelf",
+  "plugin": "hermes-game-center",
   "title": "Blackjack",
   "tagline": "Beat the dealer",
   "summary": "Play one hand of blackjack against the house dealer, betting chips from the Jackpot wallet.",

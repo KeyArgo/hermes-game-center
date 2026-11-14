@@ -285,7 +285,7 @@ def test_a_known_plugin_is_not_a_shop(tmp_path: Path, monkeypatch) -> None:
 def test_the_view_serves_play_your_games_and_a_submit_link(tmp_path: Path, monkeypatch) -> None:
     home = _home(tmp_path, monkeypatch)
     _plugin(home / "plugins", "other-game", _table("other", "other-game"))
-    api = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-gameshelf", "other-game"]}})
+    api = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-game-center", "other-game"]}})
     view = api.view()
     play = [card["id"] for card in view["play"]]
     assert play == curated_games()["games"]
@@ -300,7 +300,7 @@ def test_the_submit_button_falls_back_to_the_guide_when_unset(tmp_path: Path, mo
     config = {
         "plugins": {
             "entries": {
-                "hermes-gameshelf": {
+                "hermes-game-center": {
                     "settings": {"submit_url": "", "submit_docs_url": "https://example.org/submit-guide"}
                 }
             }
@@ -315,7 +315,7 @@ def test_a_submit_link_must_be_https(tmp_path: Path, monkeypatch) -> None:
     config = {
         "plugins": {
             "entries": {
-                "hermes-gameshelf": {
+                "hermes-game-center": {
                     "settings": {"submit_url": "javascript:alert(1)", "submit_docs_url": "http://example.org/x"}
                 }
             }
@@ -328,7 +328,7 @@ def test_a_submit_link_must_be_https(tmp_path: Path, monkeypatch) -> None:
 def test_a_third_party_table_game_never_enters_a_tournament(tmp_path: Path, monkeypatch) -> None:
     home = _home(tmp_path, monkeypatch)
     _plugin(home / "plugins", "other-game", _table("other", "other-game"))
-    api = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-gameshelf", "other-game"]}})
+    api = _api(monkeypatch, tmp_path, {"plugins": {"enabled": ["hermes-game-center", "other-game"]}})
     catalog = Catalog([home / "plugins", ROOT], tmp_path / "data", {"allow_ai": True})
     catalog.library.add("other")
     games = [row["id"] for row in api._tournament_games(catalog)]

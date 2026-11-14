@@ -1,4 +1,4 @@
-"""Game Center backend for the Hermes Desktop storefront. Mounted at /api/plugins/hermes-gameshelf/.
+"""Game Center backend for the Hermes Desktop storefront. Mounted at /api/plugins/hermes-game-center/.
 
 Every action is a /games line run as the person at this Desktop, the same as typing it.
 The page never applies a move or seats an AI on its own.
@@ -41,6 +41,7 @@ from shelf import online_hall  # noqa: E402
 from shelf import ladder as ladder_lib  # noqa: E402
 from shelf import myth, tutorials  # noqa: E402
 from shelf.fresh import load_fresh  # noqa: E402
+from shelf import pluginid  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ _LINE = 300
 # Must stay in lock-step with MODEL_SLOT in __init__.py: both are the one
 # auxiliary slot the plugin registers so "Your agent" can pick its own model.
 MODEL_SLOT = "gameshelf_opponent"
-_PLUGIN_ID = "hermes-gameshelf"
+_PLUGIN_ID = pluginid.NEW_ID
 
 _CONFIG_NOTICE = (
     "Game Center could not read the Hermes config, so AI seats are off and only "
@@ -86,7 +87,9 @@ def _config() -> dict:
 
 
 def _settings(config: dict) -> dict[str, Any]:
-    entry = ((config.get("plugins") or {}).get("entries") or {}).get("hermes-gameshelf") or {}
+    # A person who set "Allow AI seats" before the rename has it under the old id: keep it.
+    entries = (config.get("plugins") or {}).get("entries") or {}
+    entry = entries.get(pluginid.NEW_ID) or entries.get(pluginid.OLD_ID) or {}
     chosen = (entry.get("settings") or {}).get("allow_ai", (entry.get("config") or {}).get("allow_ai", True))
     doom_wad = (entry.get("settings") or {}).get("doom_wad", (entry.get("config") or {}).get("doom_wad", ""))
     submit_url = (entry.get("settings") or {}).get("submit_url", (entry.get("config") or {}).get("submit_url", SUBMIT_URL))
@@ -146,9 +149,8 @@ def _enabled(config: dict):
 
 
 def _data_root() -> Path:
-    from plugins.plugin_storage import plugin_data_dir
-
-    return plugin_data_dir("hermes-gameshelf")
+    # pluginid.data_dir copies a folder left under the old plugin id on first use.
+    return pluginid.data_dir()
 
 
 # Providers that run on this machine (or the person's own network). Anything else is a cloud
@@ -541,7 +543,7 @@ def _complete():
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ]
-        kwargs: dict[str, Any] = {"messages": messages, "max_tokens": budget, "purpose": "hermes-gameshelf"}
+        kwargs: dict[str, Any] = {"messages": messages, "max_tokens": budget, "purpose": "hermes-game-center"}
         try:
             result = llm.complete(task=MODEL_SLOT, **kwargs)
         except PermissionError:
@@ -688,13 +690,13 @@ def view() -> dict:
 def _jackpot_modules():
     """The wallet and spin helpers, reloaded when their files change (see shelf/fresh.py)."""
     shelf_dir = Path(__file__).resolve().parent.parent / "shelf"
-    return (load_fresh("hermes_gameshelf_wallet", shelf_dir / "wallet.py"),
-            load_fresh("hermes_gameshelf_slotplay", shelf_dir / "slotplay.py"))
+    return (load_fresh("hermes_game_center_wallet", shelf_dir / "wallet.py"),
+            load_fresh("hermes_game_center_slotplay", shelf_dir / "slotplay.py"))
 
 
 def _egg_modules():
     shelf_dir = Path(__file__).resolve().parent.parent / "shelf"
-    return load_fresh("hermes_gameshelf_eggs", shelf_dir / "eggs.py")
+    return load_fresh("hermes_game_center_eggs", shelf_dir / "eggs.py")
 
 
 def _jackpot_wallet():
@@ -1153,10 +1155,10 @@ def _champion_ask(config: dict, *, division: str):
     def complete(messages: list[dict[str, str]], **overrides):
         try:
             return llm.complete(task=MODEL_SLOT, messages=messages,
-                                max_tokens=80, purpose="hermes-gameshelf", **overrides)
+                                max_tokens=80, purpose="hermes-game-center", **overrides)
         except PermissionError:
             return llm.complete(messages=messages, max_tokens=80,
-                                purpose="hermes-gameshelf", **overrides)
+                                purpose="hermes-game-center", **overrides)
 
     def ask(entrant: dict, system: str, prompt: str) -> dict[str, Any]:
         messages = [{"role": "system", "content": system},
@@ -1166,7 +1168,7 @@ def _champion_ask(config: dict, *, division: str):
         if division == "open" and (brain.get("model") or brain.get("provider")):
             try:
                 result = llm.complete(task=MODEL_SLOT, messages=messages, max_tokens=80,
-                                      purpose="hermes-gameshelf",
+                                      purpose="hermes-game-center",
                                       model=brain.get("model") or None,
                                       provider=brain.get("provider") or None)
             except PermissionError:

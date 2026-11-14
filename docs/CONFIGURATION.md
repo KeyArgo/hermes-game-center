@@ -21,7 +21,7 @@ These are declared in `plugin.yaml` and read through `ctx.get_config` in `__init
 
 All three credential fields are `type: secret`: Hermes shows them in Settings as write-only fields, keeps the value in the person's own credentials, and never prints it back. `tests/test_config_secrets.py` fails if the code stores a credential that the manifest does not declare.
 
-`_settings()` reads each value from the plugin entry's `settings` first, then its `config`, then the default. `apply_choice()` in `shelf/setup.py` lets the person's **Settings → AI seats** choice win over the plugin config in chat too.
+`_settings()` reads each value from the plugin entry's `settings` first, then its `config`, then the default. When the new id (`hermes-game-center`) has no entry it falls back to the one under the plugin's previous id (`OLD_ID` in `shelf/pluginid.py`), so an **AI seats** choice made before the rename still applies. `apply_choice()` in `shelf/setup.py` lets the person's **Settings → AI seats** choice win over the plugin config in chat too.
 
 ## Settings saved in the plugin data folder
 

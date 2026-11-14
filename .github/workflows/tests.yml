@@ -40,3 +40,4 @@ jobs:
           node tests/jackpot2_look_harness.cjs
           node tests/timers_harness.cjs
           node tests/submit_harness.cjs
+          node tests/legacy_storage_harness.cjs

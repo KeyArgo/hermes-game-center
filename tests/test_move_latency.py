@@ -129,7 +129,7 @@ def test_the_reply_carries_the_picture_the_page_paints(tmp_path: Path, monkeypat
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)
     monkeypatch.setattr(api, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}})
+    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center"]}})
 
     api.command({"line": "allow-ai connect4 black=local level=intermediate"})
     answer = api.command({"line": "connect4 move 4"})

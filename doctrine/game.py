@@ -30,7 +30,7 @@ HELP = [
     "Write a bot as a card of eight weighted priorities, then send it into a turn-based fight.",
     "You play white by clicking a highlighted hex to move the next unit. Every battle is seeded and replayable.",
 ]
-_PKG = "hermes_gameshelf_doctrine"
+_PKG = "hermes_game_center_doctrine"
 _SEEDS = (1, 2, 3, 4, 5)
 _REPLAY_LIMIT = 262144
 _FRAMES_SHOWN = 240

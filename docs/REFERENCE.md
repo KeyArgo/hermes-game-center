@@ -10,7 +10,7 @@ Registered in `__init__.py` with `ctx.register_tool`.
 
 | Tool | Toolset | Parameters | Returns |
 |---|---|---|---|
-| `games_play` | `hermes_gameshelf` | `game` (string, required), `line` (string, required, such as `move e4`) | JSON `{"ok": true, "text": "<reply>"}`; `{"ok": false, "reason": "bad_args"}` for a non-object argument. |
+| `games_play` | `hermes_game_center` | `game` (string, required), `line` (string, required, such as `move e4`) | JSON `{"ok": true, "text": "<reply>"}`; `{"ok": false, "reason": "bad_args"}` for a non-object argument. |
 
 The handler runs the line through `shelf/commands.py` with `source="tool"`. Consent-only verbs (`new`, `join`, `sit`, `leave`, `resign`, `draw`, `rematch`, `abandon`, `allow-ai`, `lesson`, `learn`, `review`, `hint`) are refused for a tool call.
 

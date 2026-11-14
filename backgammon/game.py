@@ -8,12 +8,12 @@ import importlib.util
 import sys
 
 _ROOT = Path(__file__).resolve().parent.parent
-if 'hermes_gameshelf_kit' not in sys.modules:
-    spec = importlib.util.spec_from_file_location('hermes_gameshelf_kit', _ROOT / 'kit.py')
+if 'hermes_game_center_kit' not in sys.modules:
+    spec = importlib.util.spec_from_file_location('hermes_game_center_kit', _ROOT / 'kit.py')
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-kit = sys.modules['hermes_gameshelf_kit']
+kit = sys.modules['hermes_game_center_kit']
 ID, TITLE, MARKS = 'backgammon', 'Backgammon', ('x', 'o')
 EXAMPLE = 'move 24 18 6'
 MAX_PLIES = 10000

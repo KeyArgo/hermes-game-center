@@ -16,7 +16,9 @@ try:
     from .shelf.setup import apply_choice
     from .shelf.who import NameBook, identify
     from .shelf.fresh import load_fresh
+    from .shelf import pluginid
 except ImportError:
+    from shelf import pluginid
     from shelf.fresh import load_fresh
     from shelf.catalog import Catalog, plugin_roots
     from shelf.commands import run
@@ -37,8 +39,8 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
     def root() -> Path:
         if data_root is not None:
             return data_root
-        from plugins.plugin_storage import plugin_data_dir
-        return plugin_data_dir("hermes-gameshelf")
+        # pluginid.data_dir copies a folder left under the old plugin id on first use.
+        return pluginid.data_dir()
 
     def settings() -> dict[str, Any]:
         # The person's choice in Game Center's Settings wins over the plugin config here
@@ -77,8 +79,8 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             del seen_turns[:-50]
         try:
             here = Path(__file__).resolve().parent / "shelf"
-            wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
-            slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
+            wallets = load_fresh("hermes_game_center_wallet", here / "wallet.py")
+            slots = load_fresh("hermes_game_center_slotplay", here / "slotplay.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
             slots.autospin(wallet, kind="turn")
         except Exception:
@@ -100,7 +102,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             del seen_requests[:-50]
         try:
             here = Path(__file__).resolve().parent / "shelf"
-            wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
+            wallets = load_fresh("hermes_game_center_wallet", here / "wallet.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
             spent = wallets.usage_tokens(kwargs.get("usage") or {})
             if spent > 0:
@@ -108,7 +110,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
                 # The reply was expensive, so it is worth a bigger automatic bet than a turn
                 # starting or a tool running. Same gate as any other
                 # automatic spin: auto-play on and the machine on screen.
-                slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
+                slots = load_fresh("hermes_game_center_slotplay", here / "slotplay.py")
                 slots.autospin(wallet, kind="reply", tokens=spent)
         except Exception:
             log.debug("the automatic spin after a reply did not run", exc_info=True)
@@ -126,8 +128,8 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
         last_tool_spin[0] = now
         try:
             here = Path(__file__).resolve().parent / "shelf"
-            wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
-            slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
+            wallets = load_fresh("hermes_game_center_wallet", here / "wallet.py")
+            slots = load_fresh("hermes_game_center_slotplay", here / "slotplay.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
             slots.autospin(wallet, kind="tool")
         except Exception:
@@ -147,7 +149,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
     def award_win(state: dict) -> None:
         try:
             here = Path(__file__).resolve().parent / "shelf"
-            wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
+            wallets = load_fresh("hermes_game_center_wallet", here / "wallet.py")
             wallets.Wallet(wallets.wallet_path(root())).award_bonus(WIN_BONUS)
         except Exception:
             log.debug("the win bonus was not awarded", exc_info=True)
@@ -189,7 +191,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
 
     ctx.register_tool(
         name="games_play",
-        toolset="hermes_gameshelf",
+        toolset="hermes_game_center",
         schema={
             "name": "games_play",
             "description": (
@@ -281,7 +283,7 @@ def _complete(ctx: Any, settings):
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ]
-        kwargs: dict[str, Any] = {"messages": messages, "max_tokens": budget, "purpose": "hermes-gameshelf"}
+        kwargs: dict[str, Any] = {"messages": messages, "max_tokens": budget, "purpose": "hermes-game-center"}
         if _MODEL_SLOT_REGISTERED:
             kwargs["task"] = MODEL_SLOT
         result = ctx.llm.complete(**kwargs)

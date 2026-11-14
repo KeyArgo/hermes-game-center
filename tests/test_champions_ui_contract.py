@@ -61,7 +61,7 @@ def api(monkeypatch, tmp_path):
         "providers": {"local-fleet": {"base_url": "http://127.0.0.1:8890/v1",
                                       "models": {"house-model": {}}}},
         "display": {"pet": {"enabled": False, "slug": ""}},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     module._plugin_llm = lambda: FakeLlm()
     return module

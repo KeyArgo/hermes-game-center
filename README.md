@@ -181,7 +181,7 @@ Everything that is not curated Play — the installed talking tables and experim
 hermes plugins install KeyArgo/hermes-game-center --yes-deps --enable
 ```
 
-That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on or open the pet gallery in **Experimental**.
+That puts the plugin in `~/.hermes/plugins/hermes-game-center/` and copies the Games page into the Desktop app from the same package. Nothing else is needed — no watch, no server, no model. The eleven Play games run on this computer against the built-in player, and no network call happens unless you turn online play on or open the pet gallery in **Experimental**.
 
 **Requirements:** Hermes Agent 0.23.0 or later. The plugin is Python and JavaScript with no compiled binaries; the tests run on Python 3.13. Online play, if you turn it on, needs the network; everything else does not.
 
@@ -190,13 +190,13 @@ That puts the plugin in `~/.hermes/plugins/hermes-gameshelf/` and copies the Gam
 | No **Games** entry in the Desktop sidebar | Command palette (Ctrl+K), then **Reload desktop plugins** |
 | An AI seat, hint or `Improve` does nothing | Those run through your Hermes model — set one with `hermes model`, or Settings → Models → **Game Shelf opponent** |
 
-The plugin's manifest name is `hermes-gameshelf`; the repository is `hermes-game-center`. `enable`, `disable` and `remove` take the manifest name.
+The plugin's manifest name is `hermes-game-center`, the same as its repository. `enable`, `disable` and `remove` take the manifest name.
 
 ### Upgrade, uninstall, and your data
 
-- **Upgrade:** install again with the same command, then reload desktop plugins. Your data folder, wallet and name stay where they are.
-- **Uninstall:** `hermes plugins remove hermes-gameshelf`. That removes the code, not your data.
-- **Where data lives:** one folder per game, plus `players.json`, `wallet.json`, `champions/`, `ratings.json`, `tournaments/`, `installed.json` and `online.json`, all under Hermes's plugin data directory for `hermes-gameshelf` (`plugins/plugin_storage.py` decides the exact path). Delete that folder to remove everything Game Center remembers, including points and chips.
+- **Upgrade:** install again with the same command, then reload desktop plugins. Your data folder, wallet and name stay where they are. If you played under the plugin's previous id, the first start copies your saves into the new data folder and leaves the old folder in place.
+- **Uninstall:** `hermes plugins remove hermes-game-center`. That removes the code, not your data.
+- **Where data lives:** one folder per game, plus `players.json`, `wallet.json`, `champions/`, `ratings.json`, `tournaments/`, `installed.json` and `online.json`, all under Hermes's plugin data directory for `hermes-game-center` (`plugins/plugin_storage.py` decides the exact path). Delete that folder to remove everything Game Center remembers, including points and chips.
 
 ## Quick start
 

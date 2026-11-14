@@ -2257,7 +2257,7 @@ async function paneContract() {
   assert.equal(paneEntry.data.defaultCollapsed, true, 'it does not reshape a layout unasked')
   assert.equal(paneEntry.data.hideOnly, true, 'and closing it cannot disable the plugin')
   assert.ok(entries.find(item => item.area === 'palette' && item.data.label === 'Play while you code'), 'the palette can open it')
-  assert.ok(entries.find(item => item.area === 'palette' && item.data.id === 'hermes-gameshelf.wait'), 'the palette command keeps its own id')
+  assert.ok(entries.find(item => item.area === 'palette' && item.data.id === 'hermes-game-center.wait'), 'the palette command keeps its own id')
   assert.equal(typeof entries.find(item => item.id === 'status').render, 'function')
 
   // The version: one reusable chip, and it is drawn at the top of Settings —

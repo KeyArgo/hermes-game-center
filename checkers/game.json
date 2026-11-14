@@ -1,7 +1,7 @@
 {
   "id": "checkers",
   "schema_version": 1,
-  "plugin": "hermes-gameshelf",
+  "plugin": "hermes-game-center",
   "title": "Checkers",
   "summary": "English checkers. Captures are required. A built-in player can take a seat after you agree.",
   "entry": "game.py",

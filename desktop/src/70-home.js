@@ -89,7 +89,7 @@ function GameCenterPage({ ctx, onArea }) {
     } catch (failure) {
       const detail = failure && (failure.message || failure.status || failure.error)
       setError(
-        'Game Center is waiting on the Hermes gateway. hermes-gameshelf is already enabled. Stay on this page — it retries every few seconds. If this lasts more than a minute, command palette → Reload desktop plugins.'
+        'Game Center is waiting on the Hermes gateway. hermes-game-center is already enabled. Stay on this page — it retries every few seconds. If this lasts more than a minute, command palette → Reload desktop plugins.'
         + (detail ? ` (${String(detail).slice(0, 120)})` : '')
       )
       return { ok: false, text: detail ? String(detail) : 'Could not refresh the table.' }

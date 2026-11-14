@@ -60,7 +60,7 @@ def test_a_context_with_an_llm_gets_a_door_that_returns_text(tmp_path: Path) -> 
     door = plugin._complete(ctx, None)
     assert door is not None
     assert door("say something", max_tokens=40)["move"] == "ok"
-    assert seen["max_tokens"] == 40 and seen["purpose"] == "hermes-gameshelf"
+    assert seen["max_tokens"] == 40 and seen["purpose"] == "hermes-game-center"
 
 
 def test_authoring_without_an_llm_says_so_instead_of_blaming_a_profile(tmp_path: Path) -> None:

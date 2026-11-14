@@ -59,7 +59,7 @@ def api(monkeypatch, tmp_path):
     monkeypatch.setattr(module, "_data_root", lambda: tmp_path / "data")
     monkeypatch.setattr(module, "_config", lambda: {
         "model": {"default": "Hermes-4-70B", "provider": "nous"},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     module._plugin_llm = lambda: FakeLlm()
     return module
@@ -147,7 +147,7 @@ def test_a_long_or_dirty_subtitle_is_cleaned(tmp_path):
 # The house boss -------------------------------------------------------------
 
 def test_the_house_boss_is_hidden_without_a_model(api, monkeypatch):
-    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}})
+    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center"]}})
     monkeypatch.setattr(api, "_plugin_llm", lambda: None)
     view = api.champions_view()
     assert view["model_ready"] is False
@@ -174,7 +174,7 @@ def test_the_house_boss_is_named_for_the_model_it_runs(api):
 def test_a_local_model_says_where_it_runs(api, monkeypatch):
     monkeypatch.setattr(api, "_config", lambda: {
         "model": {"default": "qwen3-8b", "provider": "local"},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     boss = api._house_bosses(api._config())[0]
     assert boss["runs"] == "Runs qwen3 8b locally on this computer."
@@ -184,7 +184,7 @@ def test_a_very_long_model_name_keeps_the_boss_suffix(api, monkeypatch):
     long_name = "hermes-4-very-long-model-name-that-would-overflow"
     monkeypatch.setattr(api, "_config", lambda: {
         "model": {"default": long_name, "provider": "nous"},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     boss = api._house_bosses(api._config())[0]
     assert boss["name"].endswith(" (boss)")
@@ -196,14 +196,14 @@ def test_the_boss_id_separates_two_local_servers_on_the_same_model(api, monkeypa
         "model": {"default": "qwen3-8b", "provider": "local"},
         "auxiliary": {api.MODEL_SLOT: {"provider": "local", "model": "qwen3-8b",
                                        "base_url": "http://127.0.0.1:8001/v1"}},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     first = api._house_bosses(api._config())[0]["id"]
     monkeypatch.setattr(api, "_config", lambda: {
         "model": {"default": "qwen3-8b", "provider": "local"},
         "auxiliary": {api.MODEL_SLOT: {"provider": "local", "model": "qwen3-8b",
                                        "base_url": "http://127.0.0.1:8002/v1"}},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     second = api._house_bosses(api._config())[0]["id"]
     assert first != second

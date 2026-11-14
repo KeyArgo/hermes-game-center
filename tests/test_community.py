@@ -140,13 +140,13 @@ def _api(tmp_path: Path, monkeypatch):
     fake.APIRouter = APIRouter  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "fastapi", fake)
     spec = importlib.util.spec_from_file_location(
-        "hermes_gameshelf_community_api", ROOT / "dashboard" / "plugin_api.py"
+        "hermes_game_center_community_api", ROOT / "dashboard" / "plugin_api.py"
     )
     assert spec and spec.loader
     api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(api)
     monkeypatch.setattr(api, "_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}})
+    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center"]}})
     return api
 
 

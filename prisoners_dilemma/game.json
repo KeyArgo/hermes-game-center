@@ -1,7 +1,7 @@
 {
   "id": "prisoners-dilemma",
   "schema_version": 1,
-  "plugin": "hermes-gameshelf",
+  "plugin": "hermes-game-center",
   "title": "Prisoner's Dilemma",
   "summary": "A whole field plays every other seat once. Talk, then choose together or sell out. Points add up across every match.",
   "entry": "game.py",

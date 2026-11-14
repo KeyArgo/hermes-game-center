@@ -362,7 +362,7 @@ def test_shelf_load_and_preview(tmp_path):
     manifest = json.loads((ROOT / 'doctrine_arena' / 'game.json').read_text(encoding='utf-8'))
     assert manifest == {
         'id': 'doctrine-arena',
-        'plugin': 'hermes-gameshelf',
+        'plugin': 'hermes-game-center',
         'title': 'Olympus Arena',
         'subtitle': 'The arena of the gods',
         'summary': (

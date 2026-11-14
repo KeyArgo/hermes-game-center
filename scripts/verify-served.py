@@ -27,7 +27,7 @@ def installed() -> Path:
         from hermes_constants import get_hermes_home
 
         home = Path(get_hermes_home())
-    return home / "plugins" / "hermes-gameshelf"
+    return home / "plugins" / "hermes-game-center"
 
 
 # Strings only a recent build carries. Update them when the work moves on.

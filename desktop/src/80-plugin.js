@@ -1,8 +1,10 @@
 // ---- 80-plugin.js: what Hermes loads: the page, the pane, the palette and the badges
 export default {
-  id: 'hermes-gameshelf',
+  id: PLUGIN_ID,
   name: 'Game Center',
   register(ctx) {
+    // Choices this browser saved under the plugin's old id follow it to the new one (01-legacy-storage.js).
+    migrateLegacyStorage()
     // The wait pane is registered on its own so × can take it off the screen (see 62-pane-state.js).
     WAIT_PANE_SLOT.ctx = ctx
     // A fresh load starts clean: the host already disposed the previous load's pane.
@@ -50,7 +52,7 @@ export default {
         id: 'open',
         area: PALETTE_AREA,
         data: {
-          id: 'hermes-gameshelf.open',
+          id: 'hermes-game-center.open',
           label: 'Open Game Center',
           keywords: ['games', 'shelf', 'lobby', 'store', 'install'],
           run: () => host.navigate(ROUTE)
@@ -60,7 +62,7 @@ export default {
         id: 'wait',
         area: PALETTE_AREA,
         data: {
-          id: 'hermes-gameshelf.wait',
+          id: 'hermes-game-center.wait',
           label: 'Play while you code',
           keywords: ['game', 'pane', 'play', 'wait', 'code', 'agent', 'quick', 'side'],
           run: () => openWaitPane()

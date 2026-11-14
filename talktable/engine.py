@@ -30,7 +30,7 @@ from .games import auction, liarsdice, liarsdice_teams, mafia, prisoners
 log = logging.getLogger(__name__)
 
 _ROOT = Path(__file__).resolve().parent.parent
-_KIT_NAME = "hermes_gameshelf_kit"
+_KIT_NAME = "hermes_game_center_kit"
 if _KIT_NAME not in sys.modules:
     _spec = importlib.util.spec_from_file_location(_KIT_NAME, _ROOT / "kit.py")
     _module = importlib.util.module_from_spec(_spec)
@@ -1161,7 +1161,7 @@ class Table:
     def share(self, state: dict) -> dict:
         return {
             "schema": SCHEMA,
-            "plugin": "hermes-gameshelf",
+            "plugin": "hermes-game-center",
             "game": self.id,
             "title": self.game.TITLE,
             "seed": state.get("seed"),

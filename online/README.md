@@ -29,7 +29,7 @@ ever imported or run by the server.
 ## Run locally
 
 ```sh
-cd /path/to/hermes-gameshelf
+cd /path/to/hermes-game-center
 python3 -m online.server --data /tmp/gameshelf-online --port 8790
 # open http://127.0.0.1:8790 in two browser profiles
 ```

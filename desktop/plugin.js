@@ -40,6 +40,42 @@ const fill = 'var(--ui-fill-tertiary, rgba(127,127,127,0.12))'
 const paper = 'var(--ui-bg-editor, var(--ui-bg-solid, #101820))'
 const card = 'var(--ui-bg-elevated, var(--ui-bg-card, #161e28))'
 
+// ---- 01-legacy-storage.js: the plugin's id, and what the browser saved under the old one
+// The host keys everything this plugin registers and stores by its manifest id, and the id changed
+// from the old one below to the new one. Anything saved under a key that carries the old id — the
+// pane's own state, or whatever a later part names after the plugin — would simply never be read
+// again. So on load every key that carries the old id is copied to the same name with the new id.
+// Read the old, write the new, and leave the old key exactly where it is.
+const PLUGIN_ID = 'hermes-game-center'
+const OLD_ID = 'hermes-gameshelf'
+
+// Copies each old key that the new key does not already have. Returns how many it copied: 0 on the
+// second and every later load, which is what makes this safe to call on every register.
+function migrateLegacyStorage(storage) {
+  const store = storage || (typeof window === 'undefined' ? null : window.localStorage)
+  if (!store || typeof store.key !== 'function' || typeof store.getItem !== 'function') return 0
+  let copied = 0
+  try {
+    // Snapshot the keys first: setItem while walking the store moves the indices underfoot.
+    const keys = []
+    for (let index = 0; index < store.length; index += 1) {
+      const key = store.key(index)
+      if (typeof key === 'string' && key.includes(OLD_ID)) keys.push(key)
+    }
+    for (const key of keys) {
+      const renamed = key.split(OLD_ID).join(PLUGIN_ID)
+      if (store.getItem(renamed) !== null) continue // the new key wins; never overwrite it
+      const value = store.getItem(key)
+      if (value === null) continue
+      store.setItem(renamed, value)
+      copied += 1
+    }
+  } catch (failure) {
+    // A browser that refuses storage (private mode, a full quota) still gets a working page.
+  }
+  return copied
+}
+
 // ---- 02-skin.js: the Signal Hall skin and the look the person chose
 //
 // Classic is the look the plugin shipped with: it stays pixel-identical because
@@ -18846,7 +18882,7 @@ function AlertLine({ alerts, onJoin, onDismiss }) {
 // server, and the pane remembers which game it was, so leaving and coming back
 // resumes it.
 const SDK_HOST = typeof host === 'undefined' ? null : host
-const PANE_ID = 'hermes-gameshelf:pane'
+const PANE_ID = 'hermes-game-center:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
 const PANE_WIDTH = '720px'
@@ -21721,7 +21757,7 @@ function GameCenterPage({ ctx, onArea }) {
     } catch (failure) {
       const detail = failure && (failure.message || failure.status || failure.error)
       setError(
-        'Game Center is waiting on the Hermes gateway. hermes-gameshelf is already enabled. Stay on this page — it retries every few seconds. If this lasts more than a minute, command palette → Reload desktop plugins.'
+        'Game Center is waiting on the Hermes gateway. hermes-game-center is already enabled. Stay on this page — it retries every few seconds. If this lasts more than a minute, command palette → Reload desktop plugins.'
         + (detail ? ` (${String(detail).slice(0, 120)})` : '')
       )
       return { ok: false, text: detail ? String(detail) : 'Could not refresh the table.' }
@@ -23786,9 +23822,11 @@ function GamesVersionChip({ ctx, style }) {
 
 // ---- 80-plugin.js: what Hermes loads: the page, the pane, the palette and the badges
 export default {
-  id: 'hermes-gameshelf',
+  id: PLUGIN_ID,
   name: 'Game Center',
   register(ctx) {
+    // Choices this browser saved under the plugin's old id follow it to the new one (01-legacy-storage.js).
+    migrateLegacyStorage()
     // The wait pane is registered on its own so × can take it off the screen (see 62-pane-state.js).
     WAIT_PANE_SLOT.ctx = ctx
     // A fresh load starts clean: the host already disposed the previous load's pane.
@@ -23836,7 +23874,7 @@ export default {
         id: 'open',
         area: PALETTE_AREA,
         data: {
-          id: 'hermes-gameshelf.open',
+          id: 'hermes-game-center.open',
           label: 'Open Game Center',
           keywords: ['games', 'shelf', 'lobby', 'store', 'install'],
           run: () => host.navigate(ROUTE)
@@ -23846,7 +23884,7 @@ export default {
         id: 'wait',
         area: PALETTE_AREA,
         data: {
-          id: 'hermes-gameshelf.wait',
+          id: 'hermes-game-center.wait',
           label: 'Play while you code',
           keywords: ['game', 'pane', 'play', 'wait', 'code', 'agent', 'quick', 'side'],
           run: () => openWaitPane()

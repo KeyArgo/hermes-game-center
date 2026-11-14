@@ -54,7 +54,7 @@ The page never judges a move. The same `kit.py` referee answers a click, a typed
 
 ## Where data lives
 
-`__init__.py` asks Hermes for the plugin data directory (`plugins.plugin_storage.plugin_data_dir("hermes-gameshelf")`). Under that folder:
+`__init__.py` asks Hermes for the plugin data directory (`plugins.plugin_storage.plugin_data_dir("hermes-game-center")`), through `shelf/pluginid.py`. That module also carries the rename: the plugin shipped under another id, which survives in exactly one place — `OLD_ID` in `shelf/pluginid.py`. On the first access it copies whatever the data folder under that old id holds into the new folder: only the names the new folder does not already have, once, ending with a marker file (`.copied-from-old-plugin-id`). The old folder is never moved or deleted, nothing in the new one is overwritten, and a copy that fails writes no marker so the next start retries. Under that folder:
 
 | Path | What it holds |
 |---|---|

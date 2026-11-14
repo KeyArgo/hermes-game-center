@@ -44,6 +44,7 @@ run "jackpot2 harness" node tests/jackpot2_harness.cjs
 run "jackpot2 look harness" node tests/jackpot2_look_harness.cjs
 run "surface clocks (every surface closes its timers)" node tests/timers_harness.cjs
 run "add your own game form (two choices, the issue it builds)" node tests/submit_harness.cjs
+run "old plugin-id storage keys follow the new id" node tests/legacy_storage_harness.cjs
 if [[ $fast -eq 0 ]]; then
   run "slot cabinet fit (headless Chrome)" node tests/slot_fit_regression.mjs
 else

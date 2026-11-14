@@ -53,7 +53,7 @@ def api(monkeypatch, tmp_path):
     monkeypatch.setattr(module, "_data_root", lambda: tmp_path / "data")
     monkeypatch.setattr(module, "_config", lambda: {
         "model": {"default": "test-model", "provider": "nous"},
-        "plugins": {"enabled": ["hermes-gameshelf"]},
+        "plugins": {"enabled": ["hermes-game-center"]},
     })
     module._plugin_llm = lambda: FakeLlm()
     return module
@@ -97,7 +97,7 @@ def test_save_export_import_and_delete(api):
 
 
 def test_no_model_still_lets_the_computer_spar_but_not_champions(api, monkeypatch):
-    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-gameshelf"]}})
+    monkeypatch.setattr(api, "_config", lambda: {"plugins": {"enabled": ["hermes-game-center"]}})
     monkeypatch.setattr(api, "_plugin_llm", lambda: None)
     view = api.champions_view()
     assert view["model_ready"] is False

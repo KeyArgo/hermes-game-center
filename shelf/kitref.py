@@ -13,7 +13,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-KIT_NAME = "hermes_gameshelf_kit"
+KIT_NAME = "hermes_game_center_kit"
 _KIT_PATH = Path(__file__).resolve().parent.parent / "kit.py"
 
 

@@ -36,7 +36,7 @@ def main() -> int:
     spec.loader.exec_module(api)
     # Same scratch wiring tests/browser_table_server.py uses: the real handlers, this root only.
     api._data_root = lambda: root / "data"
-    api._config = lambda: {"plugins": {"entries": {"hermes-gameshelf": {"settings": {"allow_ai": True}}}}}
+    api._config = lambda: {"plugins": {"entries": {"hermes-game-center": {"settings": {"allow_ai": True}}}}}
 
     # The model seat: two illegal replies, exactly the shape kit.py asks a model for.
     replies = iter(["a8a1", "e8e8"])

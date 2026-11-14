@@ -4,7 +4,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Hermes names its own home, so an isolated install or a profile is deployed rather than the default one.
 HERMES_HOME="${HERMES_HOME:-$(python3 -c 'from hermes_constants import get_hermes_home; print(get_hermes_home())')}"
-INSTALLED="$HERMES_HOME/plugins/hermes-gameshelf"
+INSTALLED="$HERMES_HOME/plugins/hermes-game-center"
 cd "$REPO"
 
 VERSION="$(grep -m1 '^version:' plugin.yaml | cut -d: -f2- | tr -d '"' | xargs)"

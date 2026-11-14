@@ -13,7 +13,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 # Load this plugin's own kit.py under a name no other plugin can claim. A plain
 # `import kit` would hand us another plugin's module when both ship a kit.py.
-_KIT_NAME = "hermes_gameshelf_kit"
+_KIT_NAME = "hermes_game_center_kit"
 if _KIT_NAME not in sys.modules:
     _kit_spec = importlib.util.spec_from_file_location(_KIT_NAME, _ROOT / "kit.py")
     _kit_module = importlib.util.module_from_spec(_kit_spec)
@@ -798,7 +798,7 @@ def _king_cell(board: list[list[str]], white: bool) -> dict | None:
 
 def coach():
     """The coach module, imported late: it imports this game back."""
-    name = "hermes_gameshelf_chess_coach"
+    name = "hermes_game_center_chess_coach"
     if name not in sys.modules:
         spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("coach.py"))
         module = importlib.util.module_from_spec(spec)

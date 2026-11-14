@@ -1304,7 +1304,7 @@ class Catalog:
             escape = _entry_problem(directory, manifest["entry"])
             if escape:
                 return f"{title} could not start. {escape}"
-            module_name = f"hermes_gameshelf_game_{game_id.replace('-', '_')}"
+            module_name = f"hermes_game_center_game_{game_id.replace('-', '_')}"
             try:
                 spec = importlib.util.spec_from_file_location(module_name, entry)
                 if spec is None or spec.loader is None:

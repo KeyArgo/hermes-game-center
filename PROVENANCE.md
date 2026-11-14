@@ -33,7 +33,7 @@ read:
   description. Whether the suite passes today, on this machine, is unknown to this document.
 - **The 0.4 s hint-budget margin** and which test file asserts it. We did not open the tests.
 - **`refusal_message` living in `shelf/kitref.py`.** The copy of `shelf/kitref.py` we read contains
-  only the kit loader (`KIT_NAME = "hermes_gameshelf_kit"`, `kit_module()`, `kit = kit_module()`)
+  only the kit loader (`KIT_NAME = "hermes_game_center_kit"`, `kit_module()`, `kit = kit_module()`)
   and no `refusal_message`. It loads `kit.py` by file path, so the referee wording most plausibly
   lives in `kit.py` — a file we were not permitted to read. The refusal *rendering* is confirmed:
   `desktop/src/30-game-page.js` builds the banner from `pictured.refusals` (`refusalBanner`,

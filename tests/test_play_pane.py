@@ -86,8 +86,8 @@ def test_the_pane_is_play_while_you_code_and_wears_an_obvious_door() -> None:
         assert old not in src, f"the old words are still drawn: {old}"
     # 2. The ids stay as they were, so nothing else that points at the pane moves.
     assert "id: 'pane'" in src
-    assert "'hermes-gameshelf.wait'" in src
-    assert "'hermes-gameshelf.open'" in src
+    assert "'hermes-game-center.wait'" in src
+    assert "'hermes-game-center.open'" in src
     # 3. The door: two faces, one state, and the pane's own two functions behind it.
     assert "function paneOnScreen()" in src, "one read says whether the pane is on the screen"
     assert "if (paneChromePref() === 'closed') return false" in src, "a closed session counts as closed"

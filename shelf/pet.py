@@ -98,7 +98,7 @@ def _fallback_manifest():
     # Petdex sits behind a CDN that refuses the bare "Python-urllib" agent, so this asks
     # with a name of its own. Same public, unauthenticated document the Hermes client reads.
     request = Request('https://petdex.dev/api/manifest',
-                      headers={'User-Agent': 'hermes-gameshelf/1.0 (Petdex gallery, read-only)'})
+                      headers={'User-Agent': 'hermes-game-center/1.0 (Petdex gallery, read-only)'})
     with urlopen(request, timeout=8) as response:
         payload = json.load(response)
     if not isinstance(payload, dict) or not isinstance(payload.get('pets'), list):

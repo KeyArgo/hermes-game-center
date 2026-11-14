@@ -61,7 +61,7 @@ def test_pass_and_play_does_not_override_another_persons_seat():
 
 def test_board_exposes_authoritative_viewer_permissions(tmp_path, monkeypatch):
     monkeypatch.setattr(api, '_data_root', lambda: tmp_path / 'data')
-    monkeypatch.setattr(api, '_config', lambda: {'plugins': {'enabled': ['hermes-gameshelf']}})
+    monkeypatch.setattr(api, '_config', lambda: {'plugins': {'enabled': ['hermes-game-center']}})
     assert 'library' in api.command({'line': 'install connect4'})['text'].lower()
     api.command({'line': 'connect4 new'})
     picture = api.board('connect4')['picture']
