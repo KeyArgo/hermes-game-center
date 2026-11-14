@@ -5,8 +5,7 @@
 _Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 <p align="center">
-  <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="docs/TESTING.md"><img src="https://img.shields.io/badge/tests-1667%20passing-2ea44f?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=release/1.0.0" alt="CI"></a>
   <a href="https://github.com/NousResearch/hermes-agent/pull/154026"><img alt="Hermes plugin catalog: in review" src="https://img.shields.io/badge/plugin%20catalog-in%20review-f59e0b?style=flat-square"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f6bff?style=flat-square" alt="Licence: MIT"></a>
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Agent-%E2%89%A5%200.23.0-7c3aed?style=flat-square" alt="Hermes Agent 0.23.0 or later"></a>
@@ -19,8 +18,8 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 ![The Play shelf at this commit: eleven curated games, the lobby beside them](screenshots/game-center-home.png)
 <p align="center"><em>The Play shelf at this commit: eleven curated games, the lobby beside them.</em></p>
 
-<p align="center"><img src="docs/media/gc-battleship.gif" alt="Game Center: Sea Battle in the strip beside the Hermes chat, firing at enemy waters" width="100%"/>
-<br/><sub><b>Battleship while you code.</b> Pick Sea Battle and fire at enemy waters right beside the chat.</sub></p>
+<p align="center"><img src="docs/media/gc-seabattle.gif" alt="Game Center: Sea Battle in the strip beside the Hermes chat, firing at enemy waters" width="100%"/>
+<br/><sub><b>Sea Battle while you code.</b> Pick Sea Battle and fire at enemy waters right beside the chat.</sub></p>
 
 <p align="center"><img src="docs/media/game-center-demo.gif" alt="Game Center in Hermes Desktop: picking how to play, then Connect Four against the computer" width="100%"/></p>
 
