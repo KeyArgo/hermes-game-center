@@ -1,7 +1,6 @@
-"""Review item 3: every credential this plugin stores is declared in plugin.yaml.
+"""Every credential this plugin stores is declared in plugin.yaml.
 
-Nous's review (2026-11-12) found that ``HERMES_GAMESHELF_BOT_KEY`` and
-``HERMES_GAMESHELF_STAFF_KEY`` are written with Hermes's own credential route
+``HERMES_GAMESHELF_BOT_KEY`` and ``HERMES_GAMESHELF_STAFF_KEY`` are written with Hermes's own credential route
 (``save_env_value``), while only ``lobby_key`` was declared in the manifest's
 ``config_schema``. An undeclared secret is invisible: it exists in the person's
 credentials but Settings has no field for it, so it cannot be read back, pasted

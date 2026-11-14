@@ -93,7 +93,7 @@ GAME_PAGE = SRC / "30-game-page.js"
 
 
 def test_the_local_board_game_shell_wears_the_approved_words():
-    """Owner-approved shell (ux/matrix.md, "Proposed game shell"), migration step 1.
+    """The agreed shell (ux/matrix.md, "Proposed game shell"), migration step 1.
 
     The local board-game screen carries one wording for the header, the one opponent line, the
     one status line and the one action row, and it carries no web-browser door any more: online
@@ -194,7 +194,7 @@ def test_the_build_refuses_an_empty_parts_folder(tmp_path):
 
 
 def test_the_bundle_carries_the_three_extras_the_owner_asked_for():
-    """Owner's ask, 2026-11-11, all three in the one shipped file.
+    """Three contracts, all in the one shipped file.
 
     Backgammon's Play tile draws its own board instead of the dark stand-in scene an unknown id
     gets; the main screen carries one row of links out to the project; and the version chip copies
@@ -230,7 +230,7 @@ def test_the_bundle_carries_the_three_extras_the_owner_asked_for():
     assert "openInBrowser(ctx, link.href, onNote)" in library, "the links use the shared browser door"
 
     # 3. The chip copies its own line, through the SDK's clipboard door with the browser's own as a
-    #    fallback — never a hidden textarea appended to the app's <body> (review, 2026-11-12) — and a key
+    #    fallback — never a hidden textarea appended to the app's <body> — and a key
     #    reaches it too.
     assert "function copyChipText(" in version and "function copyWithNavigator(" in version
     assert "ctx.os.writeClipboard" in version, "the SDK's own clipboard door is not used"
@@ -242,7 +242,7 @@ def test_the_bundle_carries_the_three_extras_the_owner_asked_for():
 
 
 def test_close_game_center_sits_top_right_not_bottom():
-    """Owner's ask 2026-11-11: Close Game Center at the top right (the tab row on Games, floated top
+    """Close Game Center at the top right (the tab row on Games, floated top
     right elsewhere), never the old fixed bottom-right corner."""
     home = (SRC / "70-home.js").read_text(encoding="utf-8")
     route = (SRC / "80-plugin.js").read_text(encoding="utf-8")

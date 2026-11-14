@@ -2,8 +2,7 @@
 //
 //   node tests/overchat_slot_live.mjs [--port 18831] [--shots DIR]
 //
-// Why this file exists (quality review, 2026-11-13). The strip that holds the two see-through machines
-// attaches its ResizeObserver in an effect. With `[]` deps that effect ran once, at a mount where both
+// The strip that holds the two see-through machines attaches its ResizeObserver in an effect. With `[]` deps that effect ran once, at a mount where both
 // switches were off and the strip's div did not exist yet; turning a machine on afterwards rendered it at
 // width 0 for ever, and the Jackpot v2 copy (which needs a width to fit itself) drew nothing at all.
 //

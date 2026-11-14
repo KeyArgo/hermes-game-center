@@ -1,9 +1,8 @@
 """No developer cheat ships in this source tree.
 
-Owner's decision (2026-11-13), on the quality review's recommendation: the cheats were removed outright
-rather than hidden. The security they relied on — a scrypt hash, a key file, a force file — was native
-security against a copy of the source, and the owner no longer wants the cheats at all, so there is
-nothing left to protect and nothing left to get wrong.
+The cheats were removed outright rather than hidden. The security they relied on — a scrypt hash, a
+key file, a force file — was native security against a copy of the source, and none of them is wanted
+at all, so there is nothing left to protect and nothing left to get wrong.
 
 What went: `shelf/devgrant.py` (the key and passphrase), `scripts/dev-grant.py` (add play chips),
 `scripts/dev-eggs.py` (list, force and reset eggs), the `/eggs` command, the forced-egg override in

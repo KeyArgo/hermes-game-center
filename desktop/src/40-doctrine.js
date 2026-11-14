@@ -226,7 +226,7 @@ function DoctrinePanel({ game, view, board, send, playMove, importText, refresh,
         children: sentence
       }) : null,
       // Watch it think, Doctrine flavour: the working that led to the card it
-      // just wrote. It is the owner's own card, so only this screen has it.
+      // just wrote. It is the person's own card, so only this screen has it.
       d.prep ? jsxs('section', {
         'aria-label': 'How it wrote this card',
         className: 'games-doctrine-prep',
@@ -388,7 +388,7 @@ function DoctrinePanel({ game, view, board, send, playMove, importText, refresh,
           jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }, children: [
             field(profile, setProfile, 'Signature', () => { if (profile.trim()) command(`author ${profile.trim()}`) }),
             // A signature, not a profile: this name is written into the card's author field and nothing
-            // else. The card is written by the person's own model (quality review, 2026-11-13).
+            // else. The card is written by the person's own model.
             button('Write a card', () => { if (profile.trim()) command(`author ${profile.trim()}`) }, { disabled: busy || !profile.trim(), title: 'Your own model writes one card, signed with the name you type. One word: letters, numbers, dots, dashes.' })
           ] })
         ]

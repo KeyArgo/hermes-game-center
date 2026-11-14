@@ -27,6 +27,10 @@ MARKS = ("x", "o")
 EXAMPLE = "place carrier a1 h"
 HELP = ["Place your five ships, then fire at the opposing fleet.", "Use random or duplicate to place your fleet automatically; use look after handing over the screen."]
 MAX_PLIES = 400
+# The fleet is laid out by the game's own one-move chooser. That is setup, not play: a model seat
+# is not asked ship after ship (one model call per ship, all inside the person's own request).
+SETUP_PHASE = "place"
+SETUP_MOVES = ("random", "duplicate")
 LEVELS = ("beginner", "intermediate", "advanced", "expert")
 LEVEL_LABELS = dict(zip(LEVELS, ("Beginner", "Intermediate", "Advanced", "Expert")))
 _FLEET = (("carrier", 5), ("battleship", 4), ("cruiser", 3), ("submarine", 3), ("destroyer", 2))
@@ -237,7 +241,7 @@ def play(state, move):
     state["shots"][side].append(cell)
     # Who fired, in order. The shot sets alone cannot answer that once both sides have fired at
     # the same square - a membership test then credits the wrong seat, which is how the enemy's
-    # attack came to be drawn on ENEMY WATERS (owner's report, 2026-11-09).
+    # attack came to be drawn on ENEMY WATERS.
     state.setdefault("shot_log", []).append({"side": side, "square": move[1]})
     ship = next ( (s for s in state["fleets"][target] if cell in s["cells"]), None)
     if ship:
@@ -353,9 +357,8 @@ def picture(state, player=None):
         #
         # Only when BOTH seats are human. Against an agent the unbound seat is the machine's, and
         # following the turn flipped the viewer's side on every ply - the boards swapped, so the
-        # person's own hits were drawn on ENEMY WATERS and their water showed the machine's marks.
-        # That is the report "it doesn't show me destroying anything, maybe not even their hits or
-        # my hits" (owner, 2026-11-09).
+        # person's own hits were drawn on ENEMY WATERS and their water showed the machine's marks,
+        # and nothing on either board looked like it had landed.
         seat_kind = getattr(kit, "seat_kind", None)
         both_human = bool(seat_kind) and all(
             seat_kind(str(state.get(who) or "")) == "human" for who in ("white", "black")

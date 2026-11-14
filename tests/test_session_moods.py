@@ -1,8 +1,7 @@
 """The session a machine draws: 50-52% usually, 2% bonus (60%), 2% cold (40%).
 
-The usual window is the owner's ask of 2026-11-11: about 51% of spins should pay the bet back, so it
-is two points wide and centred on 51 (it was 50-55% from 2026-11-09). The bonus and cold draws are
-unchanged - they are the other, older ask, and they still move the chance on purpose.
+The usual window: about 51% of spins should pay the bet back, so it is two points wide and centred on
+51 (it was 50-55%). The bonus and cold draws are unchanged - they still move the chance on purpose.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from shelf import reels
 
 
 def test_the_usual_window_is_50_to_52() -> None:
-    """The owner's band, 2026-11-11: the machine wins about half its spins, and never more than 52%."""
+    """The band: the machine wins about half its spins, and never more than 52%."""
     assert reels.CHANCE_LOW == 0.50 and reels.CHANCE_HIGH == 0.52
 
 
@@ -53,10 +52,9 @@ def test_the_solver_reaches_a_bonus_and_a_cold_target() -> None:
                 # The return stays the player's: a bad session is fewer wins, not worse payouts.
                 # It is a floor, not an exact number: when the small pays alone already beat the
                 # target the jackpot bottoms out at one chip and the session overshoots, which
-                # gains the player something rather than costing them (owner's ask, 2026-11-09:
-                # "even out the slot machine, I need to not go broke"). The picker quotes the
+                # gains the player something rather than costing them. The picker quotes the
                 # session's own measured return, so nothing is published that is not paid.
-                # Measured under these two forced targets on 2026-11-10: 1.1000 (robot3 cold),
+                # Measured under these two forced targets: 1.1000 (robot3 cold),
                 # 1.1305 (fruit9 cold), 1.1651 (fruit9 bonus), 1.2015 (robot3 bonus). The old ceiling
                 # of 1.16 predated the everyday-pays tuning and failed on robot3's bonus draw; 1.22
                 # keeps the guard against runaway generosity without pinning a solved number.

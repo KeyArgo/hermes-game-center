@@ -16,7 +16,7 @@ const PANE_ID = 'hermes-gameshelf:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
 const PANE_WIDTH = '360px'
-// The four the owner named for a quick game. Order is the order they are offered.
+// The four quick games. Order is the order they are offered.
 const QUICK_GAMES = ['connect4', 'reversi', 'gomoku', 'breakthrough']
 const QUICK_LEVEL = 'intermediate'
 const IDLE_CHAT = { get: () => false, subscribe: () => () => {} }
@@ -89,7 +89,7 @@ function paneAlerts(ctx) {
 
 function alertsOn(ctx, gameId) {
   // The status-bar count is a quiet readout, not an alert drop: it stays. What ALERTS_OFF silences
-  // is anything that pops up or notifies (owner's ask, 2026-11-09).
+  // is anything that pops up or notifies.
   const settings = paneAlerts(ctx)
   return Boolean(gameId && !settings.paused && settings.games[gameId])
 }
@@ -119,8 +119,7 @@ function matchFound(lobby, name) {
   return games.find(game => othersLooking(lobby, game, name).length) || ''
 }
 
-// Whose move it is, in one line. The pane and the full table say it in the same words (owner's
-// ask, 2026-11-11):
+// Whose move it is, in one line. The pane and the full table say it in the same words:
 //   - a Hermes model's seat is "Hermes is thinking…" the moment the board says it is that seat's
 //     turn: the model works outside the request the person made, so the wait is real from the start;
 //   - the built-in computer is "Computer is thinking…" only while a request that will answer it is
@@ -154,7 +153,7 @@ function agentOnMove(picture) {
 }
 
 // The seconds on a wait line, counted from the moment the wait began: a line that reads "0s" is
-// telling the person the clock is running (owner's ask, 2026-11-11).
+// telling the person the clock is running.
 function waitSecondsWords(seconds) {
   const whole = Math.floor(Number(seconds))
   return `${Number.isFinite(whole) && whole > 0 ? whole : 0}s`
@@ -505,7 +504,7 @@ function ladderLine(ladder) {
   return (ladder && ladder.text) || 'The ladder game is over.'
 }
 
-// ----- Out of the way: minimize, close, Esc (owner, 12:35) -------------------
+// ----- Out of the way: minimize, close, Esc -----------------------------------
 //
 // The pane must leave easily and come back at once. Both are one session state,
 // remembered in sessionStorage: 'min' collapses the pane to a slim strip, 'closed'
@@ -553,8 +552,8 @@ function paneOnScreen() {
   return Boolean(WAIT_PANE_SLOT.dispose)
 }
 
-// The same read, as state a component re-renders on (owner's ask, 2026-11-11: the way back
-// in must be visible, not only in the command palette).
+// The same read, as state a component re-renders on: the way back in must be visible, not only in
+// the command palette.
 function usePaneOnScreen() {
   const [onScreen, setOnScreen] = useState(paneOnScreen)
   useEffect(() => {
@@ -662,7 +661,7 @@ function useOutsideDone(open, ref, onDone) {
   }, [open, ref, onDone])
 }
 
-// The four strengths, in the owner's words. /opponents carries the same ids with
+// The four strengths, in the product's own words. /opponents carries the same ids with
 // the server's own labels; this fallback keeps the pane honest on an older host.
 const LEVEL_CHOICES = [
   { id: 'beginner', label: 'Beginner' },

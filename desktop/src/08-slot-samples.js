@@ -1,6 +1,6 @@
-// ---- 07b-slot-samples.js: real recorded slot-machine sounds
-// Recorded sounds rather than a synthesiser, because a cabinet is a physical thing and the owner
-// could hear the difference ("getting closer to the casino sound but you're not using real sounds").
+// ---- 08-slot-samples.js: real recorded slot-machine sounds
+// Recorded sounds rather than a synthesiser, because a cabinet is a physical thing and a synthesiser
+// does not sound like one.
 // Eight short clips, mono 22 kHz Vorbis, embedded as data URIs so the plugin stays one file and the
 // install keeps working. Source: Mixkit free sound effects (Mixkit License - free to use in a
 // project, no attribution required; credited in THIRD-PARTY-NOTICES.md anyway).

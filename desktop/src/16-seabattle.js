@@ -289,7 +289,7 @@ function SeaBoard({ title, badge, cells, fog, hulls, cell, interactive, onCell, 
 // A ship drawn as a ship, not as a row of squares: hull with a raked bow, a deck line, the
 // superstructure and turrets that grow with the class, a funnel and a mast. It is the picture on
 // the tray chip and on the shipyard strip, so the setup phase looks like a navy yard instead of a
-// list of words (owner's ask, 2026-11-09).
+// list of words.
 function SeaShipArt({ name = 'cruiser', size = 3, width = 96, lit = false, tone = '' }) {
   const height = Math.max(18, Math.round(width * 0.26))
   // In the end-of-game review a hull is red when it went down and grey when it survived; anywhere
@@ -345,7 +345,7 @@ function SeaShipArt({ name = 'cruiser', size = 3, width = 96, lit = false, tone 
 
 // The end-of-game review: five hulls a side, the ones that went down in red, the survivors grey.
 // Your kills are drawn in the enemy's waters, your losses in your own, so the picture answers
-// "what did I get, what did they get" at a glance (owner's ask, 2026-11-09).
+// "what did I get, what did they get" at a glance.
 function SeaFleetReview({ ships, where, label }) {
   if (!ships || !ships.length) return null
   return jsxs('div', {
@@ -497,7 +497,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
   const boardRef = useRef(null)
   // Whether this table is actually on screen. A table that is mounted somewhere hidden (a route the
   // app keeps alive, a collapsed pane) must never make a sound or a banner: that was the periodic
-  // firing the owner heard with no game open (2026-11-09).
+  // firing that a hidden table used to make with no game open.
   const [onScreen, setOnScreen] = useState(true)
   useEffect(() => {
     const node = boardRef.current
@@ -520,17 +520,17 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
   const shotKey = shotsNow.map(shotStamp).join('|')
   // Which shots have been announced, and whether this mount has taken its first look at the board.
   // The old effect replayed the newest shot whenever the pass card lifted, staggered the banners
-  // 520 ms apart, and could re-announce what it had already said - the owner's report, 2026-11-09:
-  // "it tells me things late or after it already told me, and seems random". One shot, once, now:
+  // 520 ms apart, and could re-announce what it had already said - late, twice, and in no order
+  // anyone could follow. One shot, once, now:
   // only the newest unannounced hit is spoken, immediately, and a shot that lands behind the pass
   // card is spoken when the card lifts.
   const seenShots = useRef(new Set())
   const primed = useRef(false)
   // The square the shot landed on, and the waters it landed in, measured at the moment the flash is
   // played, inside the frame that draws that fleet's water: a hit blooms on the square that was
-  // fired at and the lettering sits in those waters, never in the gap between the two boards
-  // (bughunter, 2026-11-09). Null when there is no layout to measure (a test host, a hidden pane);
-  // the render then falls back to the middle of that board.
+  // fired at and the lettering sits in those waters, never in the gap between the two boards. Null
+  // when there is no layout to measure (a test host, a hidden pane); the render then falls back to
+  // the middle of that board.
   const seaTargets = shot => {
     const node = boardRef.current
     if (!node || !node.getBoundingClientRect || !node.querySelector) return { cell: null, waters: null }
@@ -562,7 +562,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
     if (!fresh.length) return undefined
     // The biggest news among the new shots, not merely the newest: the computer answers a shot at
     // once, so the person's own sinking shot usually arrives with a reply miss behind it and was
-    // being dropped (owner's report, 2026-11-11). A sinking beats a hit beats a miss; a tie goes
+    // being dropped. A sinking beats a hit beats a miss; a tie goes
     // to the latest.
     const weight = row => (row.result === 'sunk' ? 2 : row.result === 'hit' ? 1 : 0)
     const shot = fresh.reduce((best, row) => (weight(row) >= weight(best) ? row : best), fresh[0])
@@ -576,7 +576,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
     // The lettering belongs over the fleet it is about: a hit on their ship over ENEMY WATERS, a
     // hit on ours over YOUR WATERS. The flash is measured on the square that was fired at, inside
     // that fleet's own frame, so both graphics sit on the board the shot happened on instead of in
-    // the middle of the table (bughunter, 2026-11-09).
+    // the middle of the table.
     const at = seaTargets(shot)
     setBlast({ words, good: mine, big: shot.result === 'sunk', where: mine ? 'enemy' : 'own', at: at.waters })
     gamesSound(shot.result === 'sunk' ? 'sunk' : (mine ? 'hitlight' : 'hit'))
@@ -754,16 +754,15 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
       })
     : null
   // A banner centred on the board it is about. It is rendered inside that board's own column, so it
-  // cannot drift to a corner of the water: the column's centre is where it lands (owner's ask,
-  // 2026-11-09 - a half-width guess put the lettering off to one side).
+  // cannot drift to a corner of the water: the column's centre is where it lands - a half-width
+  // guess put the lettering off to one side.
   // The flash that marks a hit, drawn inside the board it happened on so it is centred on that
   // water rather than on the gap between the two.
   const seaBoom = where => (boom && boom.where === where
     ? jsx('div', {
       'aria-hidden': true,
       'data-sea-boom': where,
-      // Where it was put, so a proof can read the square off the page rather than guess it
-      // (bughunter, 2026-11-09).
+      // Where it was put, so a proof can read the square off the page rather than guess it.
       'data-sea-boom-at': boom.at ? `${boom.at.x},${boom.at.y}` : 'waters',
       style: {
         position: 'absolute', zIndex: 4, pointerEvents: 'none', borderRadius: '50%',
@@ -811,7 +810,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
       })
     : null
 
-  // The result is a band at the top, under the game's own header (owner's ask, 2026-11-09): it was
+  // The result is a band at the top, under the game's own header: it was
   // a card inside the water, which hid the board and read as decoration. Above the boards it is the
   // first thing the eye lands on, on one line, and the water stays visible behind it.
   const result = over
@@ -855,7 +854,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
         : yourTurn ? 'Fire at enemy waters' : 'The computer fires…'
 
   // What to do next, in one line, always on screen: the board is a picture a person has to be told
-  // how to use, and after placement it used to say nothing at all (owner's ask, 2026-11-09).
+  // how to use, and after placement it used to say nothing at all.
   const hint = over
     ? 'The game is over. Play again to lay a new fleet.'
     : cover
@@ -934,14 +933,14 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
         style: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', flex: '1 1 auto', minHeight: 0 },
         children: [
           // Your waters and the ships you still have to place sit in one column, so the tray is
-          // under the board you drag onto instead of under the enemy's (owner's ask, 2026-11-09).
+          // under the board you drag onto instead of under the enemy's.
           jsxs('div', {
             className: 'games-sea-own-column',
             style: { position: 'relative', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', minWidth: 0, maxWidth: '100%' },
             children: [
               // The board and its lettering share one frame the exact size of the water, so "You
               // took a hit!" is centred on YOUR WATERS even when the tray or the fleet review makes
-              // the column taller or wider (owner's report, 2026-11-09).
+              // the column taller or wider.
               jsxs('div', {
                 'data-sea-frame': 'own',
                 style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' },

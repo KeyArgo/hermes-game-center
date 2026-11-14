@@ -3,7 +3,7 @@
 //
 // Real muted headless Chrome, real pointer and key events only (Input.dispatch*);
 // every click audits elementFromPoint at the contact point. Screenshots land in
-// proof/sp/. The lane's browser_table_server.py must already be running (--url).
+// proof/sp/. tests/browser_table_server.py must already be running (--url).
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'

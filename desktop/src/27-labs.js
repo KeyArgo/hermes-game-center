@@ -1,16 +1,16 @@
-// ---- 27-labs.js: the Labs shelf, where a Phase 1 experiment is shown as one
-// Labs is one shelf, one badge and one card shape. Another lane adds its experiment by adding a
-// `labsBlock(...)` inside the shelf, and its cards with `labsCard(...)`; it never adds a second
-// badge, a second heading style or a new colour. Nothing in Labs is Play: no experiment here is
+// ---- 27-labs.js: the Labs shelf, where a Phase 1 experiment is shown
+// Labs is one shelf, one badge and one card shape. An experiment is added as one `labsBlock(...)`
+// inside the shelf, with its cards from `labsCard(...)`; it never adds a second badge, a second
+// heading style or a new colour. Nothing in Labs is Play: no experiment here is
 // reviewed, seated, rated or visible to a lobby, and every card says who made it.
 
 const LABS_BADGE = 'Labs · experiment'
 const LABS_NOTE = 'New experiments that may change or be removed at any time. Nothing here is part of the reviewed Play shelf.'
 
-// ---- The lock on the Experimental section (owner's ask 2026-11-10, #7) -------------------------
+// ---- The lock on the Experimental section ------------------------------------
 // The Experimental section is a shop window, not a door: every game in it stays visible and cannot
 // be opened, so a draft that is not finished never costs the shelf a mark on polish. The lock is
-// one vocabulary written once here - one badge, one tooltip, one dim - so every lane's card reads
+// one vocabulary written once here - one badge, one tooltip, one dim - so every card reads
 // the same and no card invents its own way of saying no.
 const LABS_LOCK_BADGE = '🔒 Coming soon'
 const LABS_LOCK_TITLE = 'Experimental — not open yet. Coming soon.'
@@ -45,7 +45,7 @@ function labsLockStyle(extra) {
   }, extra || {})
 }
 
-// A locked card whose art is drawn by a file this lane does not own (Pet Battles, Mafia Town): the
+// A locked card whose art is drawn by a file this part does not own (Pet Battles, Mafia Town): the
 // card keeps its own picture, and this wrapper takes its doors away. Clicks and keys are stopped in
 // the capture phase, so a button inside never runs its handler - by mouse or by Enter/Space - and
 // the inner copy takes no pointer events at all, so the cursor stays not-allowed over it.
@@ -86,7 +86,7 @@ function labsBadge() {
   })
 }
 
-// The shelf heading, written once so every lane renders the same words in the same place.
+// The shelf heading, written once so every block renders the same words in the same place.
 function labsHeading(note = LABS_NOTE) {
   return jsxs('div', {
     style: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, minWidth: 0 },
@@ -184,8 +184,8 @@ function labsCard(item, ctx, setNote) {
   })
 }
 
-// A Labs card for a game that can be played right here - locked for now (owner's ask 2026-11-10,
-// #7): the same quiet shape as the link-out cards, the same picture and words, and no way in. The
+// A Labs card for a game that can be played right here - locked for now: the same quiet shape as
+// the link-out cards, the same picture and words, and no way in. The
 // `onOpen` a caller still passes is deliberately not wired: a locked card has no handler at all.
 function labsPlayCard(item) {
   return jsxs('div', {
@@ -225,13 +225,13 @@ function labsPlayCard(item) {
   })
 }
 
-// The whole shelf: heading, badge, one note, then the blocks. A lane with nothing to show returns
+// The whole shelf: heading, badge, one note, then the blocks. A block with nothing to show returns
 // null rather than an empty box.
 function labsShelf(children, note = LABS_NOTE, options = {}) {
   const shown = (Array.isArray(children) ? children : [children]).filter(Boolean)
   if (!shown.length) return null
   // Under the Experiments heading the shelf does not repeat its own title: one heading for the
-  // whole area (owner's ask, 2026-11-09).
+  // whole area.
   const withHeading = options.withHeading !== false
   return jsxs('div', {
     'data-labs-section': 'true',
@@ -241,7 +241,7 @@ function labsShelf(children, note = LABS_NOTE, options = {}) {
 }
 
 // A whole Labs block of link-out cards, with its own note under the cards. The Make games shelf is
-// the first user of this; another lane's shelf is the second, and neither needs new styles.
+// the first user of this; a second block is the second, and neither needs new styles.
 function LabsLinks({ title, note, notice, items, ctx }) {
   const [said, setSaid] = useState('')
   if (!items || !items.length) return null

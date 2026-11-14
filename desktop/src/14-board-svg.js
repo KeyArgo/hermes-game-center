@@ -19,9 +19,8 @@ function chessPiece(mark, x, y, cell, key) {
 
 // What a screen reader says about a board. The engine's sides are called white and black because that is
 // chess's vocabulary, but most of the shelf is not chess: a Connect Four player whose board announced
-// "connect4 board, white to move" was being told about a game they were not playing, in the wrong name
-// (bug found walking the shelf on a fresh profile, 2026-11-13). So: the game's title, and who holds the
-// side that is to move, when the picture says.
+// "connect4 board, white to move" was being told about a game they were not playing, in the wrong name.
+// So: the game's title, and who holds the side that is to move, when the picture says.
 function boardLabel(picture) {
   const pic = picture || {}
   const title = String(pic.title || pic.game || pic.view || 'Game').trim()
@@ -418,7 +417,7 @@ function coverArt(id, height) {
   }
   // Backgammon points, bar and off tray are its own board (BackgammonSvg), so it needs its own
   // cover: without this branch the picture below would fall through to BoardSvg's grid renderer and
-  // draw a chess-like grid on the tile. Owner's ask, 2026-11-11.
+  // draw a chess-like grid on the tile.
   if (pictured && pictured.view === 'backgammon') {
     return backgammonCover(160, height || 110)
   }

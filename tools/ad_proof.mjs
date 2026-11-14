@@ -4,7 +4,7 @@
 //
 //   node tools/ad_proof.mjs --out proof/ad
 //
-// The script starts its own lobby on a free port, bootstraps the owner with the
+// The script starts its own lobby on a free port, bootstraps the admin account with the
 // real CLI, drives both sessions, then stops the server it started.
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -190,7 +190,7 @@ async function openBrowser(label) {
 let staff = null
 let player = null
 try {
-  // Player first: they exist before the owner looks anyone up.
+  // Player first: they exist before the admin looks anyone up.
   player = await openBrowser('player')
   await player.type('#name', 'Mallory')
   await player.click('Continue')
@@ -217,7 +217,7 @@ try {
   record('Owner badge on the message', await staff.has('Owner'))
   await staff.shot('04-staff-badge')
 
-  // The owner reports the player's message from the chat (the ⚑ control).
+  // The admin reports the player's message from the chat (the ⚑ control).
   const flagSpot = await staff.evaluate(`(() => {
     const button = [...document.querySelectorAll('.msg button.flag')][0]
     if (!button) return null
@@ -285,7 +285,7 @@ try {
   await player.click('Send')
   record('player can talk again', await player.waitFor(() => player.has('thank you'), 10))
 
-  // Personal block list: Mallory hides the owner's chat, then lets it back.
+  // Personal block list: Mallory hides the admin's chat, then lets it back.
   await player.click('You', { exact: true, wait: 800 })
   record('the block list starts empty', await player.waitFor(() => player.has('Nobody blocked')))
   await player.type('input[aria-label="Name to block"]', 'Owner')
@@ -301,7 +301,7 @@ try {
   await player.click('Lobby', { exact: true, wait: 1400 })
   record('the hidden message comes back', await player.waitFor(async () => (await player.textOf('.log')).includes('Welcome to the lobby'), 12))
 
-  // Suspend: chat stops at once, a fresh sign-in is refused, then the owner lifts it.
+  // Suspend: chat stops at once, a fresh sign-in is refused, then the admin lifts it.
   await staff.click('Look up', { exact: true, wait: 700 })
   await staff.type('input[aria-label="Name to look up"]', 'Mallory')
   await staff.click('Look up', { exact: true, nth: 1, wait: 900 })

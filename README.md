@@ -30,15 +30,9 @@ _Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
 ## What it is
 
-Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
+Game Center is eleven Play games in Hermes, each run by a rules engine and a referee that refuses an illegal move out loud. The model proposes the move, the referee decides, and the refusal is kept in the game record and shown on the board.
 
-Eleven of them are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on or open the pet gallery in **Experimental** (which reads one public list of pets, nothing about you).
-
-### Why it's different
-
-- **The rules are real, and the referee says no.** The model proposes, the referee decides. An illegal move is refused in plain words — the move, then the reason — the built-in player moves instead, and the refusal is kept in the game record and shown on the board.
-- **A person plays first.** A move never silently takes a seat: the other person types `/games <game> join` or `sit black` before they can move. A model calling the tool cannot give that yes.
-- **Online is optional and off by default.** The games, lessons, hints and the computer opponent keep working with the server down.
+The eleven are curated **Play** games with seats, turns, a clear winner, a replay, a computer opponent and the lobby. The rest — four talking tables, two experiments and the workshop prototypes — sit behind one small **Experimental** link. Everything local runs on this computer, and no network call happens unless you turn online play on or open the pet gallery in **Experimental** (which reads one public list of pets, nothing about you). Online play is off by default, so the games, lessons, hints and the computer opponent keep working with the server down.
 
 ## Features
 
@@ -111,7 +105,7 @@ Points convert to chips at **75%** — four points buy three chips. The Jackpot 
 
 **Slots** is one Play game, played on the **Jackpot** cabinet. Every spin costs the bet in chips, from the same wallet Blackjack bets from; pick a bet (25 chips up) and press Spin.
 
-Two machines sit above the reels, and you can switch between them mid-session: **Classic** (nine windows, five paylines) and **Hermes Olympus** (one line, three Greek reels). **The odds favour the player**: each machine draws its chance of winning once per session, uniformly between 50% and 52%, and every win pays at least the bet, and pays back **110%** of what it takes — a person who keeps spinning is slowly up, not slowly down. One session in fifty is a **bonus** at 60% and one in fifty is **cold** at 40%; the picker names that in a single word, never as a number. **The screen prints none of these numbers**: the mechanics run and the odds are drawn and paid, but no percentage appears on either machine.
+Two machines sit above the reels, and you can switch between them mid-session: **Classic** (nine windows, five paylines) and **Hermes Olympus** (one line, three Greek reels). The odds favour the player: each machine draws its chance of winning once per session, uniformly between 50% and 52%, and every win pays at least the bet; over a session the machine pays back **110%** of what it takes, so a person who keeps spinning is slowly up, not slowly down. One session in fifty is a **bonus** at 60% and one in fifty is **cold** at 40%; the picker names that in a single word, never as a number. The screen prints none of these numbers: the mechanics run and the odds are drawn and paid, but no percentage appears on either machine.
 
 **Auto-spin** spins by itself while Hermes is working — one spin per reply and one per tool call, only while a machine is on screen, never on an idle timer. Your points rack up from the tokens you spend. **Auto-bet** sizes each stake by what the reply cost, from the table minimum up a ladder; turn it off in the cabinet's card to bet the lever amount.
 

@@ -1,7 +1,7 @@
 """The comeback loop: a graded rescue tap when the wallet cannot cover a bet.
 
-Owner's ask, 2026-11-09: "come up with a gamification for making quick chips when the user runs out
-so they aren't broke and unable to play ... really gamify this so its addictive to the user".
+It is a small game rather than a refill: a graded tap, a streak that rewards coming back, and a
+premium paid afterwards.
 
 The properties that matter are the ones a player could exploit if they broke: it is refused while
 the wallet can still play, the cooldown holds under a clock, the streak pays for returning on another

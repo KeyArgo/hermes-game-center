@@ -128,10 +128,10 @@ def test_the_picture_publishes_odds_and_no_pulls(tmp_path: Path) -> None:
 
 
 def test_the_machine_pays_more_than_it_takes(tmp_path: Path) -> None:
-    # The owner's rule: the machine should not bleed a player who keeps spinning.
+    # The machine should not bleed a player who keeps spinning.
     state = start(tmp_path)
     pic = game.picture(state, player=ME)
-    # The owner's rule: the machine returns more than it takes, and the chance of winning
+    # The machine returns more than it takes, and the chance of winning
     # is drawn per session somewhere in 50-55% - never a number the house picked to suit it.
     assert round(pic["odds"]["return"], 2) >= 1.02
     # The draw is per session and may be a bonus (to 60%) or cold (to 40%) one; the window the
@@ -159,7 +159,7 @@ def test_the_two_machines_draw_their_own_chance(tmp_path: Path) -> None:
     # Independence: the draw is seeded with the machine's own name, so each machine gets its own roll
     # rather than one number copied onto both. The claim is checked across seeds, not on this session's
     # single draw — two draws from 0.50-0.52 to four decimal places land on the same value by chance
-    # about once in two hundred sessions, which failed CI on 2026-11-13 and was read as a defect.
+    # about once in two hundred sessions, which is a flake and not a defect.
     reels = slotplay.reels
     original = reels.SESSION_SEED
     try:
@@ -255,9 +255,9 @@ def test_robot3_odds_are_its_own() -> None:
     drawn = slotplay.odds("robot3")
     low, high = _window("robot3")
     assert low <= drawn["win_chance"] <= high, drawn
-    # Both machines give back a little more than they take: the owner's ask, 2026-11-09, so a
-    # player is earning rather than losing the longer they play. It is a floor, not a target: since
-    # 2026-11-10 the everyday pays carry the return and the jackpot only tops it up, which lifts the
+    # Both machines give back a little more than they take, so a player is earning rather than losing
+    # the longer they play. It is a floor, not a target: the everyday pays carry the return and the
+    # jackpot only tops it up, which lifts the
     # measured figure slightly above the old 1.10. Asserting equal-to would fail as generosity rose.
     assert round(drawn["return"], 3) >= 1.10, drawn
 
@@ -272,8 +272,7 @@ def test_the_nous_and_wing_symbols_are_on_the_strips_and_pay() -> None:
         assert len(strip) == 20
         assert strip.count(reels.NOUS) == 1 and strip.count(reels.WING) == 1
     robot = reels.SPECS["robot3"]
-    # The Nous stamp is the jackpot on both machines, not just the classic one (owner's ask,
-    # 2026-11-10).
+    # The Nous stamp is the jackpot on both machines, not just the classic one.
     assert robot["jackpot"] == reels.NOUS and fruit["jackpot"] == reels.NOUS
     for strip in robot["strips"]:
         assert len(strip) == 20
@@ -281,18 +280,17 @@ def test_the_nous_and_wing_symbols_are_on_the_strips_and_pay() -> None:
         assert strip.count(reels.CADUCEUS) == 1, "the caduceus replaces the temple"
     # The pays the session actually plays, and the target it still lands on. The everyday pays are
     # scaled by one factor each session to carry the machine's return, so their absolute values move
-    # - asserting 300 or 420 here passes or fails depending on the process's session seed (found
-    # 2026-11-10: this test read SEVEN as 342 in one run and 300 in the next). What must hold every
-    # session is the ORDER the owner asked for, which a single multiplier cannot change.
+    # - asserting 300 or 420 here passes or fails depending on the process's session seed (this test
+    # read SEVEN as 342 in one run and 300 in the next). What must hold every session is the ORDER of
+    # the pays, which a single multiplier cannot change.
     fruit_session = reels.variant("fruit9")
     fruit_pays = fruit_session["pays"]
     assert fruit_pays[reels.NOUS] == fruit_session["jackpot_pay"]
     assert fruit_pays[reels.NOUS] > fruit_pays[reels.WING] > fruit_pays[reels.BAR], fruit_pays
     assert fruit_session["return"] >= 1.10, fruit_session
     # The everyday pays alone must already pay back more than they take, so an ordinary session -
-    # one that never hits the jackpot - still ends up ahead (owner, 2026-11-10: "im still losing
-    # money and not making money"). This is the invariant that keeps the machine from being a
-    # lottery ticket.
+    # one that never hits the jackpot - still ends up ahead. This is the invariant that keeps the
+    # machine from being a lottery ticket.
     spec = reels.SPECS["fruit9"]
     everyday = reels.measure("fruit9", fruit_session["blanks"], tuple(
         (symbol, 0 if symbol == spec["jackpot"] else pay)
@@ -305,7 +303,7 @@ def test_the_nous_and_wing_symbols_are_on_the_strips_and_pay() -> None:
     assert low <= fruit_session["hit"] <= high, fruit_session
     robot_session = reels.variant("robot3")
     pays = robot_session["pays"]
-    # The order the owner asked for on 2026-11-10: Nous stamp, caduceus, wings, then the minor faces.
+    # The order: Nous stamp, caduceus, wings, then the minor faces.
     assert pays[reels.NOUS] == robot_session["jackpot_pay"]
     assert pays[reels.NOUS] > pays[reels.CADUCEUS] > pays[reels.WING] > pays[reels.OWL], pays
     assert robot_session["return"] >= 1.10, robot_session
@@ -367,8 +365,8 @@ def test_the_overchat_look_is_remembered_and_out_of_range_values_refused(tmp_pat
 
 
 def test_the_overchat_copy_alone_earns_a_spin_per_reply(tmp_path: Path) -> None:
-    """Owner's note 2026-11-09: with the machine over the chat they hear it spin while playing
-    Sea Battle - the Slots table does not have to be open. Visibility is all auto-spin needs."""
+    """With the machine over the chat it is heard spinning while a person plays Sea Battle - the
+    Slots table does not have to be open. Visibility is all auto-spin needs."""
     import importlib
 
     play = importlib.import_module("shelf.slotplay")

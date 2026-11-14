@@ -7,7 +7,7 @@
 // tests/browser_table_server.py (scratch config and storage only), so the numbers come
 // from layout, not from a fake DOM. Exit code 1 means a real regression.
 //
-// Why these four checks exist — each is a defect that was shipped and caught in review:
+// Why these four checks exist — each is a defect that shipped once:
 //   fit        the cabinet's bottom was clipped by the page
 //   floor      an empty/very short page produced scale 0, an invisible machine
 //   width      the wrapper forced width:100%, so the cabinet stretched full-bleed and the
@@ -260,8 +260,8 @@ for (const [width, height] of [[700, 520], [800, 600]]) {
 }
 
 // ---------------------------------------------------------------- a broke table
-// The owner's report, 2026-11-10: "spin nor x1, x2 etc allow you to do anything". At 20 chips against
-// a 25 bet the table is legally dead - so it has to say why and offer the one-tap way out.
+// At 20 chips against a 25 bet the table is legally dead - it has to say why and offer the one-tap
+// way out.
 const WALLET = path.join(scratch, 'root', 'data', 'wallet.json')
 const setChips = value => {
   const held = JSON.parse(fs.readFileSync(WALLET, 'utf8'))
@@ -329,8 +329,8 @@ if (broke && broke.button) {
 }
 
 // ---------------------------------------------------------------- over-chat copy, and the pane
-// Two surfaces, one switch. The see-through copy is drawn INSIDE the composer's underside slot now
-// (review, 2026-11-12): the slot is part of the conversation's composer, so it exists exactly while the
+// Two surfaces, one switch. The see-through copy is drawn INSIDE the composer's underside slot now:
+// the slot is part of the conversation's composer, so it exists exactly while the
 // conversation is on screen and the copy can never be over the Games page, Settings or another plugin's
 // page. What this page can prove is the shape of that: the copy is inside the slot the host draws, and it
 // has no fixed position of its own. The same cabinet in the narrow pane has to be fitted to the pane,
@@ -429,8 +429,8 @@ if (!paneFacts.pane || !paneFacts.machine) {
     paneFacts.width <= paneFacts.paneWidth + 1 && paneFacts.left >= paneFacts.paneLeft - 2 && paneFacts.right <= paneFacts.paneRight + 4,
     `copy ${Math.round(paneFacts.width)} across ${Math.round(paneFacts.left)}..${Math.round(paneFacts.right)} in pane ${Math.round(paneFacts.paneLeft)}..${Math.round(paneFacts.paneRight)} scale ${paneFacts.scale.toFixed(3)}`)
   // Beside the chat the pane is open, and the copy is still wanted: it is drawn in the composer's slot,
-  // which is inside the conversation column and left of the pane. The release blocker (2026-11-11) was
-  // that it did not appear at all in the real app; the slot is what makes that structural.
+  // which is inside the conversation column and left of the pane. It used to not appear at all in the
+  // real app; the slot is what makes that structural.
   check('the over-chat copy is drawn in the composer slot, inside the conversation',
     Boolean(paneFacts.overlay && paneFacts.copyWidth > 0
       && paneFacts.copyLeft >= paneFacts.chatLeft - 2 && paneFacts.copyRight <= paneFacts.chatRight + 2),

@@ -179,7 +179,7 @@ def test_the_board_can_never_draw_over_the_header():
 
     With ``flex: 1 1 auto`` and ``minHeight: 0`` the hero box shrank while the
     SVG kept its height: the board floated over the header and a real press on
-    Back landed on the board (owner bug, reproduced with elementFromPoint in
+    Back landed on the board (reproduced with elementFromPoint in
     tests/test_browser_click_play.py). The hero is not a flexible row any more.
     """
     for name in ("30-game-page.js", "45-arena.js"):

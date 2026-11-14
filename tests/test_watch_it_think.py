@@ -4,7 +4,7 @@ Two promises are proved here, and nothing else matters if they fail:
 
 * a seat's working is shown to the person whose bot it is, and to nobody else —
   not to an opponent's screen, not to a watcher, not in a shared game file;
-* a whisper from the owner reaches that seat's next prompt, once a round, and
+* a whisper from the person reaches that seat's next prompt, once a round, and
   the log says plainly that it happened.
 """
 

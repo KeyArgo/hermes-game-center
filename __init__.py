@@ -106,7 +106,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             if spent > 0:
                 wallet.add_tokens(spent)
                 # The reply was expensive, so it is worth a bigger automatic bet than a turn
-                # starting or a tool running (owner's ask, 2026-11-09). Same gate as any other
+                # starting or a tool running. Same gate as any other
                 # automatic spin: auto-play on and the machine on screen.
                 slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
                 slots.autospin(wallet, kind="reply", tokens=spent)
@@ -115,8 +115,8 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
 
     # Tools: the most frequent hook there is, and the cheapest, so it pays the smallest automatic
     # bet. One spin per burst: a run of parallel tool calls is one moment to the ear, and spinning
-    # on each of them turns the machine into a machine gun. Owner's report, 2026-11-09: nothing was
-    # spinning while tools ran, because no tool hook was registered at all.
+    # on each of them turns the machine into a machine gun. Before this hook existed nothing spun
+    # while tools ran: no tool hook was registered at all.
     last_tool_spin = [0.0]
 
     def earn_tool(**kwargs: Any) -> None:
@@ -264,10 +264,10 @@ def _style(prompt: str) -> tuple[str, int]:
 def _complete(ctx: Any, settings):
     """The model door, or None when this context has no LLM surface at all.
 
-    Quality review, 2026-11-13: this returned a closure unconditionally, so on a context without
-    ``ctx.llm`` the call raised AttributeError deep inside whatever asked for a completion, and the
-    Doctrine author turned that into "That profile did not answer." — advice about a profile that was
-    never involved. None is the honest answer, and every caller already has a sentence for it.
+    This once returned a closure unconditionally, so on a context without ``ctx.llm`` the call raised
+    AttributeError deep inside whatever asked for a completion, and the Doctrine author turned that
+    into "That profile did not answer." — advice about a profile that was never involved. None is the
+    honest answer, and every caller already has a sentence for it.
     """
     del settings
     if getattr(ctx, "llm", None) is None:

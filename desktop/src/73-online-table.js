@@ -223,7 +223,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     pictured: picture, status, iWon, machineWon: false,
     sideName: winner === 'black' ? 'Black' : 'White'
   })
-  // The turn line, in the owner's words: your move the moment the server says it is yours;
+  // The turn line: your move the moment the server says it is yours;
   // otherwise it waits, by name. A table that is reconnecting says that instead of pretending.
   const reconnecting = state === 'reconnecting'
   const turnKind = reconnecting ? 'reconnecting' : done ? 'over' : myTurn ? 'mine' : 'theirs'

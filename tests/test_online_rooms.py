@@ -330,9 +330,6 @@ def test_limiter_window():
     assert limit.allow("a")
 
 
-# Codex review findings ----------------------------------------------------------
-
-
 def play_leg(rooms, room, white, black):
     """One move each, in turn order: white first, whoever is seated there."""
     rooms.run(room, white, "move", [legal(rooms, room, white)[0]])

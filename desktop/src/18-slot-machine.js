@@ -12,10 +12,10 @@ const SM_KICK_MS = 140
 const SM_STAGGER_MS = 130
 const SM_LINE_MS = 420
 const SM_GOLD = '#facc15'
-// Casino-style win ladder: what the payout is worth in spectacle. The numbers are the ones the
-// owner named (10, 50, 100, 200, 400, 500, 1000, 10000 chips); a payout climbs to the highest tier
-// it reaches, and the tier decides how long the machine carries on, how many coins fall and whether
-// the alarm goes off. Nothing here changes an outcome - the reels already decided.
+// Casino-style win ladder: what the payout is worth in spectacle. The tiers are 10, 50, 100, 200,
+// 400, 500, 1000 and 10000 chips; a payout climbs to the highest tier it reaches, and the tier
+// decides how long the machine carries on, how many coins fall and whether the alarm goes off.
+// Nothing here changes an outcome - the reels already decided.
 const SM_TIERS = [
   { chips: 10, name: 'CHING!', seconds: 2.6, rain: 18, coins: 6, alarm: 0 },
   { chips: 50, name: 'NICE!', seconds: 3.2, rain: 26, coins: 10, alarm: 0 },
@@ -35,9 +35,9 @@ function SM_tierFor(payout) {
 }
 // How big the see-through copy over the chat is, as a fraction of the cabinet's own size. The table
 // and the Play page keep their fixed size; only the over-chat copy follows this. It starts at 1.00 -
-// the same size the Game Center draws - and the slider only ever makes it SMALLER (owner's ask,
-// 2026-11-09: there should be no larger, and the control was reading backwards). So the stored
-// number is a multiplier of SM_SCALE_TABLE, never an absolute scale.
+// the same size the Game Center draws - and the slider only ever makes it SMALLER: there is no
+// setting above the table's own size, and the first version of the control ran backwards. So the
+// stored number is a multiplier of SM_SCALE_TABLE, never an absolute scale.
 const SM_SCALE_KEY = 'gameshelf.slots.scale'
 const SM_SCALE_DEFAULT = 1
 const SM_SCALE_MIN = 0.1
@@ -134,13 +134,12 @@ function smSetOverchat(value, { save = true } = {}) {
   SM_OVERCHAT.on = on
   SM_writeOverchat(on)
   // Stored on the shelf too, not just in this browser: on/off used to live only in localStorage and
-  // came back switched off after a plugin reload, which read as the machine having vanished
-  // (owner's report, 2026-11-10).
+  // came back switched off after a plugin reload, which read as the machine having vanished.
   if (save && typeof SM_savePrefs === 'function') SM_savePrefs()
   SM_OVERCHAT.listeners.forEach(listener => listener(on))
   // Toggling the see-through copy is also the person's manual escape from a celebration that is
   // still raining: every mounted machine drops its coins at once, so a stuck overlay can never
-  // survive a click on "Show over chat" (owner's ask, 2026-11-09).
+  // survive a click on "Show over chat".
   smClearCelebrations()
 }
 
@@ -179,8 +178,8 @@ function useSmOverchat() {
 
 // How see-through the over-chat copy is. A viewing preference, not a game rule: it lives in
 // this browser, the control sits beside "Show over chat", and every mounted copy of the
-// machine follows it the moment it changes. 20% is the owner's default (2026-11-09), five
-// points more opaque than the 15% it was.
+// machine follows it the moment it changes. The default is 20%, five points more opaque than the
+// 15% it was.
 const SM_ALPHA_KEY = 'gameshelf.slots.overchat_alpha'
 const SM_ALPHA_DEFAULT = 0.2
 const SM_ALPHA_MIN = 0.05
@@ -207,19 +206,34 @@ function SM_readAlpha() {
 SM_ALPHA.value = SM_readAlpha()
 
 // The preferences live on the server as well as in this browser: localStorage alone did not
-// survive a plugin reload for the owner, so every change is also posted to the shelf, and the
-// snapshot's values are adopted on load.
+// survive a plugin reload, so every change is also posted to the shelf, and the snapshot's values
+// are adopted on load.
 let SM_prefsTimer = null
 let SM_prefsTouchedAt = 0
+// The write itself, once: the delayed path and the one on the way out share it, so closing a
+// cabinet can never post a different snapshot from the one the timer would have.
+function SM_postPrefs() {
+  if (typeof slotsSetting === 'function') {
+    slotsSetting('/jackpot/prefs', { on: SM_OVERCHAT.on, alpha: SM_ALPHA.value, scale: SM_SCALE_STATE.value })
+  }
+}
+
 function SM_savePrefs() {
   SM_prefsTouchedAt = Date.now()
   if (SM_prefsTimer) clearTimeout(SM_prefsTimer)
   SM_prefsTimer = setTimeout(() => {
     SM_prefsTimer = null
-    if (typeof slotsSetting === 'function') {
-      slotsSetting('/jackpot/prefs', { on: SM_OVERCHAT.on, alpha: SM_ALPHA.value, scale: SM_SCALE_STATE.value })
-    }
+    SM_postPrefs()
   }, 300)
+}
+
+// A change made just before the person closes the cabinet must still be saved, and the pending
+// write must not outlive the surface that asked for it: post it now instead of on a timer.
+function SM_flushPrefs() {
+  if (!SM_prefsTimer) return
+  clearTimeout(SM_prefsTimer)
+  SM_prefsTimer = null
+  SM_postPrefs()
 }
 
 function SM_adoptPrefs(prefs) {
@@ -279,10 +293,10 @@ const smAccent = () => SM_LOOK.accent || SM_GOLD
 const smShell = () => SM_LOOK.windowShell || SM_LOOK.bg || '#1c1917'
 const smEdge = () => SM_LOOK.windowEdge || SM_LOOK.edge || '#292524'
 // The old red cabinet was the fallback for "no machine yet", so the wait pane painted an orange-red
-// machine for one frame and then re-painted in the session's colours - the flash the owner reported
-// on 2026-11-10 ("you can see the old orange one appear before the teal comes in"). The fallback is
-// now the machine's own dark shell, which reads as the frame being built rather than as another
-// cabinet, and the last theme seen is remembered per machine so a remount never guesses.
+// machine for one frame and then re-painted in the session's colours - a flash of the old orange
+// before the teal arrives. The fallback is now the machine's own dark shell, which reads as the
+// frame being built rather than as another cabinet, and the last theme seen is remembered per
+// machine so a remount never guesses.
 const smBody = () => SM_LOOK.body || SM_LOOK.bg || '#1c1917'
 const smTrim = () => SM_LOOK.trim || '#a8a29e'
 const smLook = (key, fallback) => SM_LOOK[key] || fallback
@@ -471,8 +485,7 @@ function SM_symbol(symbol, size, glowing) {
   if (typeof SM_ART !== 'undefined' && SM_ART && Object.prototype.hasOwnProperty.call(SM_ART, symbol)) {
     // The picture sits on a pale plate. The Nous mark and the wing are dark artwork, and on the
     // machine's dark drum they read as a smudge; a light disc behind them makes the drawn line the
-    // thing the eye lands on (owner's ask, 2026-11-09: "hard to see the nous line here, maybe put on
-    // white background for the circle part").
+    // thing the eye lands on.
     return jsx('span', {
       'data-sm-plate': symbol,
       style: {
@@ -516,8 +529,7 @@ function SM_symbol(symbol, size, glowing) {
 
 // A paytable row is written as symbols separated by spaces ("NOUS NOUS NOUS", "🍒 🍒 –"). Draw each
 // token with its picture: the plain string used to reach the screen as the literal word NOUS three
-// times, while the reels themselves showed the Nous mark (owner's report, 2026-11-09: "replace nous
-// nous nous and wing wing wing and bar bar bar with the images").
+// times, while the reels themselves showed the Nous mark.
 function SM_symbolRun(text, size) {
   const tokens = String(text || '').trim().split(/\s+/).filter(Boolean)
   return jsx('span', {
@@ -562,14 +574,14 @@ function SM_stamp(result) {
 
 // `odds` still arrives and is still the shelf's own draw for this session — it is kept in the
 // signature because the table is what the session belongs to, and the machine no longer prints any
-// of its numbers (owner's release rule, 2026-11-11). Nothing here may start showing them again.
+// of its numbers. Nothing here may start showing them again.
 function SlotMachine({
   machine, machines, result, chips, bet, bets, odds, autoplay, autobet, busy, canSpin, trouble,
   onSpin, onBet, onPickMachine, onAutoplay, onAutobet, compact, paytable, bare, chat, onClose, onShow, cabinetRef,
   rewards, onCashin, onPoints, onBailout, onEgg, scaleOverride
 }) {
   // How the automatic bet is sized, said once, so the tooltip and the note cannot drift from
-// shelf/autobet.py (owner's ask, 2026-11-09).
+// shelf/autobet.py.
 const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k tokens: 2x. Then 3x at 40k, 4x at 80k, 6x at 160k, 8x at 320k and above - 1x is 25 chips, the smallest bet on the table. Never more than the cap, and the odds are identical at every bet: a bigger bet is a bigger swing, not a better chance.'
 // The see-through copy passes its own size; every other copy draws at the fixed table size.
   // scaleOverride is a fraction of the cabinet size: 1 means "the same as the table", 0.6 means
@@ -579,14 +591,13 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const strips = info.strips && info.strips.length ? info.strips : [[], [], []]
   const rows = Number(info.rows) || 3
   // A one-row machine would otherwise be a thin strip: give its single window real presence.
-  // Bigger wheels than the first cabinet: the reels are the machine, so they take the room
-  // (owner's ask, 2026-11-09: "make the wheels bigger and centered").
+  // Bigger wheels than the first cabinet: the reels are the machine, so they take the room.
   const cell = rows === 1 ? (compact ? SM_px(62) : SM_px(94)) : (compact ? SM_px(48) : SM_px(70))
   const reelWidth = Math.round(cell * 1.3)
   const still = SM_reducedMotion()
   // The auto-bet switch is optimistic: it flips under the finger, and the shelf's answer settles
-  // it. The first version read straight from the polled payload, so it never moved - the report
-  // was "auto bet sizes itself check won't turn off stays on" (2026-11-09).
+  // it. The first version read straight from the polled payload, so it never moved and the switch
+  // could not be turned off.
   const autobetOn = autobet !== false
   const [autobetShown, setAutobetShown] = useState(autobetOn)
   const [autobetHelp, setAutobetHelp] = useState(false)
@@ -613,14 +624,12 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const [jackpot, setJackpot] = useState(false)
   const [cashBusy, setCashBusy] = useState(false)
   // Points are the high score, so cashing them in is a slice the person picks rather than an all-in
-  // button: half by default, a quarter for a top-up, all of it only when they say so (owner's ask,
-  // 2026-11-09: "add the ability to pick how many points to convert to cash as their points is their
-  // high score so not ideal, its a penalty to keep playing").
+  // button: half by default, a quarter for a top-up, all of it only when they say so. Spending the
+  // whole score is a penalty for playing on.
   const [cashShare, setCashShare] = useState(0.5)
   // The comeback tap: three quick skill shots when the wallet cannot cover a bet. Deliberately a
   // little arcade rather than a button that hands out chips - a graded shot, a streak that grows
-  // with coming back on another day, and ten premium spins afterwards (owner's ask, 2026-11-09:
-  // "come up with a gamification for making quick chips ... really gamify this so its addictive").
+  // with coming back on another day, and ten premium spins afterwards.
   const [lodder, setLodder] = useState(null)      // { t0, marks: [] }
   const [bailoutResult, setBailoutResult] = useState(null)
   const [bailoutBusy, setBailoutBusy] = useState(false)
@@ -647,9 +656,9 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const timers = useRef([])
   // The celebration is bounded in time, and the bound is a deadline on the overlay itself rather
   // than a timer in `timers` (a new spin wipes that array, which is how the rain once became
-  // permanent). Owner's rule, 2026-11-09: "they never end, but shouldn't last for more than 10
-  // seconds unless jackpot which maybe can last 5 minutes". The effect below enforces it even if
-  // every other path fails, and the ✕ on the overlay ends it early.
+  // permanent). A win never rains longer than ten seconds; a jackpot is allowed five minutes. The
+  // effect below enforces it even if every other path fails, and the ✕ on the overlay ends it
+  // early.
   const counting = useRef(null)
   const settledChips = useRef(Number(chips) || 0)
   // While reels run, the chip total on screen waits for them: the server already knows the win.
@@ -662,10 +671,12 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   useEffect(() => () => {
     timers.current.forEach(clearTimeout)
     if (counting.current) clearInterval(counting.current)
+    // A preference change this machine was still holding is posted on the way out.
+    if (typeof SM_flushPrefs === 'function') SM_flushPrefs()
   }, [])
 
   // The person's manual escape: toggling "Show over chat" clears any celebration this machine is
-  // still drawing, so a stuck rain ends on a click instead of a reload (owner's ask, 2026-11-09).
+  // still drawing, so a stuck rain ends on a click instead of a reload.
   const clearShow = useCallback(() => {
     setCelebrate(null)
     setCoins([])
@@ -788,8 +799,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         const big = Boolean(result && result.jackpot)
         setJackpot(big)
         // Sound and spectacle grow with the win, tier by tier: the chime for a small one, coins for
-        // anything real, and for a jackpot an alarm and twenty seconds of ching-ching (owner's ask,
-        // 2026-11-09).
+        // anything real, and for a jackpot an alarm and twenty seconds of ching-ching.
         const wager = Math.max(1, Number(bet) || 25)
         const scale = Math.max(0.5, Math.min(3, payout / wager))
         const tier = SM_tierFor(payout)
@@ -802,7 +812,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         const show = big || payout >= wager * 4 || payout >= 100
         if (show) {
           // How long the coins may fall. A normal win never outlasts 10 s; the jackpot is allowed up
-          // to five minutes, and the ✕ on the overlay ends either at once (owner's rule, 2026-11-09).
+          // to five minutes, and the ✕ on the overlay ends either at once.
           const hold = big ? Math.min(300, Math.max(20, tier.seconds)) : Math.min(10, tier.seconds)
           setCelebrate({ payout, big, tier, until: Date.now() + hold * 1000, rainSeconds: hold })
         }
@@ -829,12 +839,12 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   // ---- drawing ----
   const windowW = reelWidth * strips.length
   const windowH = cell * rows
-  // The cabinet is as wide as its reels, the shape 9433891 drew (measured then: 284 px of cabinet
-  // around 235 px of reels; the reels filled 71% of it). Everything the machine prints - the pay
-  // strip on the glass and the points card - wraps inside that width instead of stretching the
-  // cabinet: the points card's sentences had grown it to 852 px against 274 px of reels, which is
-  // the elongated cabinet with the reels small at the left (owner's report, 2026-11-10). Measured
-  // here: the deck is the window plus its own border, the line markers and the row's gaps.
+  // The cabinet is as wide as its reels, the shape the first cabinet drew (284 px of cabinet around
+  // 235 px of reels; the reels filled 71% of it). Everything the machine prints - the pay strip on
+  // the glass and the points card - wraps inside that width instead of stretching the cabinet: the
+  // points card's sentences had grown it to 852 px against 274 px of reels, which made an elongated
+  // cabinet with the reels small at the left. Measured here: the deck is the window plus its own
+  // border, the line markers and the row's gaps.
   const deckW = windowW + 2 * (SM_px(4) * 2 + SM_px(16))
   const winCells = new Set()
   shownWins.slice(0, lit).forEach(win => (win.rows || []).forEach((row, reel) => winCells.add(`${row}-${reel}`)))
@@ -862,8 +872,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const cashWant = Math.floor((Number(rewardInfo && rewardInfo.points) || 0) * cashShare / 4) * 4
   const cashGain = Math.floor(cashWant / 4) * 3
   // One function, an explicit number of points: the share buttons above use the chosen slice, and the
-  // "not enough chips" row asks for exactly one spin's worth (found 2026-11-10: at 20 chips against a
-  // 25 bet the table greyed SPIN and every rung with nothing on screen saying why).
+  // "not enough chips" row asks for exactly one spin's worth: at 20 chips against a 25 bet the table
+  // used to grey SPIN and every rung with nothing on screen saying why.
   const cashPointsFor = async want => {
     if (!rewardInfo || want < 4 || cashBusy || typeof onPoints !== 'function') return
     setCashBusy(true)
@@ -886,7 +896,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
 
   // An easter egg, when one is out and this person has not found it. It is deliberately quiet -
   // a small mark on the cabinet that brightens under the cursor - because a find should feel like
-  // noticing something, not like a button the game pushed at you (owner's ask, 2026-11-09).
+  // noticing something, not like a button the game pushed at you.
   const eggNow = (rewards && rewards.egg) || null
   const takeEgg = async () => {
     if (!eggNow || typeof onEgg !== 'function' || cashBusy) return
@@ -896,8 +906,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       const points = Number(answer && answer.points) || 0
       if (answer && answer.claimed && points > 0) {
         // A find is worth seeing: a short full-screen reveal with a burst, then it gets out of the
-        // way by itself (owner's ask, 2026-11-09: "when user finds an easter egg it should tell them
-        // and show an animation").
+        // way by itself.
         setEggHit({ points, id: eggNow.id })
         later(() => setEggHit(null), 5200)
         setCashFlash(`+${SM_chips(points)} points`)
@@ -986,8 +995,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       points: (win.rows || []).map((row, reel) => `${reel * reelWidth + reelWidth / 2},${row * cell + cell / 2}`).join(' '),
       fill: 'none', stroke: smAccent(), strokeWidth: SM_px(2.5), strokeLinecap: 'round', strokeLinejoin: 'round',
       // Light enough that the symbol underneath stays the thing you see: a thick glowing stroke lay
-      // across the reels hid the Nous mark and the wing, which are the jackpot faces
-      // (owner's report, 2026-11-09: "put paylines on lighter background hard to see nous images").
+      // across the reels hid the Nous mark and the wing, which are the jackpot faces.
       opacity: 0.6, strokeDasharray: `${SM_px(6)} ${SM_px(4)}`, mixBlendMode: 'screen',
       style: { filter: `drop-shadow(0 0 ${SM_px(2)}px ${smLook('glow', 'rgba(250,204,21,0.55)')})` }
     }, `line-${index}`))
@@ -1127,8 +1135,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       jsx('style', { children: SM_STYLE }),
       // A found egg says so, loudly and briefly: a burst of sparks, the points, and a line telling the
       // person there are more. Drawn as a fixed layer with pointer-events off, so it can never block
-      // a click and can never leave the machine in a state a reload has to fix (owner's ask,
-      // 2026-11-09: "when user finds an easter egg it should tell them and show an animation").
+      // a click and can never leave the machine in a state a reload has to fix.
       eggHit ? jsxs('div', {
         'data-sm-eggs-found': '1',
         role: 'status',
@@ -1225,7 +1232,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             ]
           }),
           // The way out at any moment: a jackpot is allowed five minutes of rain, and the person
-          // should never have to sit through it (owner's rule, 2026-11-09).
+          // should never have to sit through it.
           jsx('button', {
             type: 'button',
             'data-sm-stop': '1',
@@ -1265,9 +1272,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
           },
           // Each machine draws its own chance when the plugin loads, so the picker still says what
-          // this session holds — in a WORD, never in a percentage (owner's release rule,
-          // 2026-11-11: the mechanics stay, the numbers go). Picking another machine is a real
-          // choice, not a skin (owner's ask, 2026-11-09).
+          // this session holds — in a WORD, never in a percentage: the mechanics stay, the numbers
+          // go. Picking another machine is a real choice, not a skin.
           children: jsxs('span', { style: { display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 } }, { children: [
             jsx('span', { children: item.title }, 'name'),
             jsx('span', {
@@ -1297,13 +1303,11 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           eggNow ? (() => {
             // Some eggs are a picture with a word on it rather than a sparkle: the image and the word
             // come from the catalogue, so a new one is a row in shelf/eggs.py and nothing here.
-            // The word is printed at full size on a pale plaque - readable from the cabinet, which is
-            // the point of this one (owner's ask, 2026-11-09: "make the words clear on it about
-            // rebellion").
+            // The word is printed at full size on a pale plaque, readable from the cabinet, which is
+            // the point of this one.
             // A picture egg is drawn as the artwork itself, nothing printed over it: the Nous stamp
-            // already carries its slogan, so adding a caption would only clutter it (owner's ask,
-            // 2026-11-09: "just the nous image we use in the slots, no need to add anything it already
-            // mentions the slogan on it"). An egg that does want a word still gets one.
+            // already carries its slogan, so adding a caption would only clutter it. An egg that does
+            // want a word still gets one.
             const art = eggNow.art && typeof SM_ART !== 'undefined' && SM_ART && SM_ART[eggNow.art]
             const word = eggNow.word || ''
             return jsxs('button', {
@@ -1390,12 +1394,11 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             ]
           }),
           // The glass: what the machine pays, printed on the cabinet the way a real one does, so
-          // the scoring is decoration rather than something to go looking for (owner's ask,
-          // 2026-11-09: "similar decoration you see on slot machines showing how their points are
-          // scored"). The full table is still behind the Scoring button; this is the headline.
+          // the scoring is decoration rather than something to go looking for. The full table is
+          // still behind the Scoring button; this is the headline.
           (paytable || []).length ? jsxs('div', {
             // Shown in the see-through copy too: the person asked for the same paylines and the same
-            // points on the over-chat machine, not a stripped one (owner's ask, 2026-11-09).
+            // points on the over-chat machine, not a stripped one.
             'data-sm-glass': '1',
             role: 'note',
             'aria-label': 'What this machine pays, in chips per line, across five lines',
@@ -1455,8 +1458,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             title: `You earn 10 points for every 1,000,000 tokens your chats use, in and out, and 100 more for every game you win. Four points turn into three chips.`,
             style: {
               // A loyalty card rather than a line of small print: the balance is the headline, what it
-              // is worth sits beside it, and the earning rule is a footnote under a progress bar
-              // (owner's ask, 2026-11-09: "make the point advertising more clear and look nicer").
+              // is worth sits beside it, and the earning rule is a footnote under a progress bar.
               display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
               gap: `${SM_px(4)}px ${SM_px(8)}px`, marginTop: SM_px(8),
               padding: `${SM_px(6)}px ${SM_px(10)}px`, borderRadius: SM_px(10),
@@ -1512,9 +1514,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                     'data-sm-point-pct': String(pointProgress.pct),
                     // The bar tracks the leaderboard score, not the token remainder: the remainder
                     // fills and empties every few seconds while Hermes talks, so a bar tied to it
-                    // flickered from empty to full and read as broken (owner's report, 2026-11-09:
-                    // "watch the bar graph on the slots it seems not to be working"). Points only go
-                    // up until they are spent, so this one moves in one direction and means something.
+                    // flickered from empty to full and read as broken. Points only go up until they
+                    // are spent, so this one moves in one direction and means something.
                     title: `${SM_chips(rewardInfo.points)} points · ${SM_chips(pointProgress.left)} to ${SM_chips(pointProgress.next)}`,
                     style: {
                       width: SM_px(compact ? 96 : 130), height: SM_px(5), borderRadius: SM_px(999),
@@ -1531,7 +1532,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                   jsx('span', {
                     style: { opacity: 0.85 },
                     // Plain English, because "500 to 500 points" is what the first version printed at
-                    // a zero balance and it means nothing (owner's question, 2026-11-09).
+                    // a zero balance and it means nothing.
                     children: pointProgress.points === 0
                       ? `first mark at ${SM_chips(pointProgress.next)} points`
                       : (pointProgress.left === POINT_STEP
@@ -1563,7 +1564,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                 children: 'Cash in'
               }),
               // The way back from a bad run: points never depend on the cards or the reels, so a
-              // losing streak cannot lock the person out of the machines (owner's ask, 2026-11-09).
+              // losing streak cannot lock the person out of the machines.
               // How much of the score to spend is the person's call.
               jsxs('span', {
                 'data-sm-cash-share': '1',
@@ -1770,8 +1771,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               })
             ]
           }) : null,
-          // The owner asked for the cabinet 20% smaller, with a slider instead of another fixed
-          // number, so the size is theirs to set: 40% to 110%, kept in this browser.
+          // The cabinet sits 20% smaller than it was, with a slider instead of another fixed number,
+          // so the size is theirs to set: 40% to 110%, kept in this browser.
           jsxs('div', {
             'data-sm-scale': '1',
             style: {
@@ -1805,9 +1806,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         children: trouble
       }) : null,
       // A table that cannot spin has to say why and offer the way out. The wallet below the smallest
-      // bet used to leave SPIN and every rung greyed with nothing on screen to explain it (owner's
-      // report, 2026-11-10: "spin nor x1, x2 etc allow you to do anything"). Points convert at four
-      // to three chips, so this asks for just enough to cover one spin.
+      // bet used to leave SPIN and every rung greyed with nothing on screen to explain it. Points
+      // convert at four to three chips, so this asks for just enough to cover one spin.
       (!bare || chat) ? (() => {
         const stake = Number(bet) || Number((bets || [])[0]) || 25
         if (Number(chips) >= stake) return null
@@ -1854,8 +1854,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             'data-sm-bet': amount,
             'aria-pressed': Number(bet) === amount,
             // With auto-bet on the multiplier is not the person's to pick: the machine sizes every
-            // spin itself, so the ladder is greyed out rather than offered and silently ignored
-            // (owner's ask, 2026-11-09).
+            // spin itself, so the ladder is greyed out rather than offered and silently ignored.
             'data-sm-bet-locked': autobetShown ? '1' : undefined,
             disabled: Boolean(busy) || Number(chips) < amount || autobetShown,
             onClick: () => onBet && onBet(amount),
@@ -1875,7 +1874,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         ]
       }) : null,
       // With auto-bet on, the whole ladder is greyed: say so in the open rather than only on hover,
-      // because a locked ladder with no visible reason reads as a broken machine (2026-11-10).
+      // because a locked ladder with no visible reason reads as a broken machine.
       (!bare || chat) && autobetShown ? jsx('div', {
         'data-sm-bet-hint': '1',
         style: {
@@ -1886,8 +1885,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       }) : null,
       // The odds window. The mechanics are untouched — the session's chance and return are still
       // drawn by the shelf and still paid — but no percentage is printed here or anywhere else on
-      // either machine (owner's release rule, 2026-11-11: "keep the mechanics; just do not show the
-      // numbers"). What is left is the one sentence a player has to know before spending.
+      // either machine. What is left is the one sentence a player has to know before spending.
       (!bare || chat) ? jsx('div', {
         'data-sm-odds': '1',
         style: { fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary), textAlign: 'center', maxWidth: '100%', overflowWrap: 'anywhere' },

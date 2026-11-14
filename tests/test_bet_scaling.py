@@ -1,10 +1,9 @@
 """The bet ladder must pay in proportion: a x4 bet wins four times a x1 bet, and the
-numbers the machine publishes must move with it (owner's rule, 2026-11-09).
+numbers the machine publishes must move with it.
 
-"however they do it in real life" = a slot pays per coin per line, so the same physical
-result on a 4-coin bet is worth four times the 1-coin result. These tests pin that, on
-the same stops, so a future change to the pays or the per-line split cannot quietly make
-a bigger bet pay the same as a small one.
+A slot pays per coin per line, so the same physical result on a 4-coin bet is worth four
+times the 1-coin result. These tests pin that, on the same stops, so a future change to the
+pays or the per-line split cannot quietly make a bigger bet pay the same as a small one.
 """
 
 from __future__ import annotations
@@ -55,7 +54,7 @@ def test_the_jackpot_paid_scales_with_the_bet(machine):
 
 @pytest.mark.parametrize("machine", sorted(slotplay.MACHINES))
 def test_the_same_stops_pay_exactly_the_bet_multiple(machine):
-    """The real test of the owner's rule: identical reels, four times the bet."""
+    """The real test of that rule: identical reels, four times the bet."""
     found = reels().variant(machine)
     spec = reels().SPECS[machine]
     one, four = per_line(machine, MIN), per_line(machine, MIN * 4)

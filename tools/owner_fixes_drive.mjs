@@ -1,5 +1,5 @@
 // Drive the real Game Center page with a real headless Chrome over CDP and prove the
-// owner's play-test fixes with the mouse, not with element.click():
+// play-test fixes with the mouse, not with element.click():
 //
 //   node tools/owner_fixes_drive.mjs [--url http://127.0.0.1:18799/] [--out test-artifacts/owner-fixes]
 //
@@ -365,7 +365,7 @@ const freshChessTable = async () => {
       // Somebody is mid-game here; leaving it returns the page to the start screen.
       await pressUntil('Leave seat', () => atStart(), { wait: 700, limit: 12000 }).catch(() => {})
       if (!await atStart() && await evaluate(`Boolean([...document.querySelectorAll('button')].find(node => node.textContent.trim() === 'Keep playing'))`).catch(() => false)) {
-        // A table with another person asks once; answer it the way the owner wrote it.
+        // A table with another person asks once; answer it in the table's own words.
         await press('Leave', { wait: 1200 }).catch(() => {})
       }
     } else if (status !== 'idle' && status !== 'none') {
@@ -435,7 +435,7 @@ try {
     const calls = await evaluate('(window.qa && window.qa.calls) || []').catch(() => [])
     assert(started, 'the computer game did not start')
     await shot('01-chess-in-play')
-    // The owner's bug: opening More options pushed the board over the header.
+    // The bug: opening More options pushed the board over the header.
     await press('More options', { wait: 500 })
     const header = await evaluate(`(() => {
       const bar = [...document.querySelectorAll('.games-play-table > div')][0]

@@ -1,6 +1,6 @@
 """Winning a game is worth 100 bonus points; a draw is not a win.
 
-Bonus points are the second currency the person asked for (2026-11-09): not chips, earned
+Bonus points are the second currency: not chips, earned
 by winning and by spending tokens, converting at 75% either way. These pin the award —
 once per finished game, never for a draw, and never as chips.
 """

@@ -1,4 +1,4 @@
-"""The automatic bet sizes itself by what the hook cost (owner's ask, 2026-11-09)."""
+"""The automatic bet sizes itself by what the hook cost."""
 
 from __future__ import annotations
 

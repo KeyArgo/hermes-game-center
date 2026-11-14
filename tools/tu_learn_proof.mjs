@@ -62,7 +62,7 @@ const chrome = spawn(CHROME, [
   '--window-size=1400,1000', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'
 ], { stdio: 'ignore' })
 // On the way out (success, failure or signal): kill ONLY this Chrome by pid and
-// delete its own profile. Never taskkill /IM chrome.exe - the owner's Chrome is
+// delete its own profile. Never taskkill /IM chrome.exe - the person's own Chrome is
 // open and must not be touched.
 let chromeClosed = false
 const cleanup = () => {

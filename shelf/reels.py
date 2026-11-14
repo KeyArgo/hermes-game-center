@@ -18,12 +18,12 @@ change to the reels, not a hidden veto on a win. The published odds are the sess
 own, enumerated exactly, and the paytable is solved each session so the return to
 player lands on the machine's target.
 
-**A win is a spin that pays back at least the bet** (owner's ask, 2026-11-11). Every
+**A win is a spin that pays back at least the bet.** Every
 paytable in ``SPECS`` is built so that a line pays the whole stake or more, which is
 what makes that number and the machine's own hit rate the same number: no spin is
 called a win for paying five chips on a twenty-five chip bet.
 
-**The return is on target, not above it** (owner's ask, 2026-11-11): the everyday pays
+**The return is on target, not above it**: the everyday pays
 carry as much of the target as they can while the jackpot stays the machine's top
 prize, and the jackpot is then solved to add exactly the remainder. The session
 reports what it measured, so the person is still told the machine's own number.
@@ -42,12 +42,12 @@ MIN_BET = 25
 BETS = tuple(MIN_BET * level for level in range(1, 9))
 
 CHERRY, LEMON, ORANGE, PLUM, BELL, BAR, SEVEN = "🍒", "🍋", "🍊", "🍇", "🔔", "BAR", "7"
-# The second machine's faces are Greek, not workshop props (owner's ask, 2026-11-09: Hermes
-# god and Greek references instead of disks and wrenches). A temple, an owl, an amphora, a
-# drachma, a trident and Zeus' bolt - the things the myths are made of.
+# The second machine's faces are Greek, not workshop props: Hermes god and Greek references instead
+# of disks and wrenches. A temple, an owl, an amphora, a drachma, a trident and Zeus' bolt - the
+# things the myths are made of.
 OWL, AMPHORA, DRACHMA, TRIDENT, ZEUS_BOLT = "🦉", "🏺", "🪙", "🔱", "⚡"
-# The caduceus is Hermes' own staff, and the owner asked for it as the second prize on the Greek
-# machine, above the wing and in place of the temple (2026-11-10: "remove the greek building").
+# The caduceus is Hermes' own staff, the second prize on the Greek machine, above the wing and in
+# place of the temple it replaced.
 CADUCEUS = "⚕️"
 # Plain-string tokens: the desktop draws a picture for each (assets/slots/nous.png, wing.png).
 NOUS, WING = "NOUS", "WING"
@@ -67,8 +67,8 @@ FRUIT_STRIPS = (
 )
 
 # One NOUS per strip, one CADUCEUS per strip (where the temple stood) and one WING per strip, on all
-# three reels. NOUS is the jackpot on every machine now, not just the classic one (owner's ask,
-# 2026-11-10: "make the nous logo the top valued spin on all"). Strip lengths stay at 20.
+# three reels. NOUS is the jackpot on every machine now, not just the classic one. Strip lengths stay
+# at 20.
 OLYMPUS_STRIPS = (
     (NOUS, WING, BLANK, AMPHORA, TRIDENT, OWL, DRACHMA, ZEUS_BOLT, OWL, TRIDENT,
      AMPHORA, DRACHMA, OWL, CADUCEUS, ZEUS_BOLT, TRIDENT, OWL, DRACHMA, ZEUS_BOLT, AMPHORA),
@@ -96,21 +96,20 @@ SPECS = {
         # re-solves it each session, exactly as the 7's was before.
         #
         # Every value here is at or above the stake the five lines share, so a spin that
-        # pays anything at all pays the bet back (owner's ask, 2026-11-11: about half the
-        # spins should give the wager back). The handful of big pays are small next to the
-        # frequent ones on purpose: the return should arrive as money the person sees, not
-        # as one line that has to land (owner's ask, 2026-11-10).
+        # pays anything at all pays the bet back: about half the spins should give the wager
+        # back. The handful of big pays are small next to the frequent ones on purpose: the
+        # return should arrive as money the person sees, not as one line that has to land.
         "pays": {NOUS: 525, WING: 120, BAR: 90, BELL: 60, CHERRY: 40,
                  PLUM: 26, ORANGE: 18, LEMON: 14},
         # A single leading cherry pays the stake back and two pay a little over it; a leading BAR
         # pays the stake as well. These are the machine's frequent wins, and they are what makes a
-        # spin that wins a spin that is not worse off for it (owner's ask, 2026-11-09: "even out the
-        # slot machine, I need to not go broke"). The solver pays for them out of the big pays.
+        # spin that wins a spin that is not worse off for it. The solver pays for them out of the big
+        # pays.
         "short": {CHERRY: {1: 5, 2: 8}},
         "lead": {BAR: 5},
         "jackpot": NOUS,
         # 1.10 rather than 1.03: the person should trend up while playing, not bleed between
-        # jackpots (owner's ask, 2026-11-09).
+        # jackpots.
         "rtp": 1.10,
         "theme": {"bg": "#2a0f3d", "accent": "#facc15", "edge": "#7c2d12", "blank": "🍉"},
     },
@@ -121,8 +120,8 @@ SPECS = {
         "lines": (("The line", (0, 0, 0)),),
         "strips": OLYMPUS_STRIPS,
         # The jackpot pay (NOUS) is re-solved every session; the rest are small so the machine can
-        # pay often (half its spins win something) and still return 110%. The order is the owner's,
-        # 2026-11-10: the Nous stamp first, the caduceus second, the wing third.
+        # pay often (half its spins win something) and still return 110%. The order is the Nous stamp
+        # first, the caduceus second, the wing third.
         "pays": {NOUS: 600, CADUCEUS: 300, WING: 150, OWL: 30, AMPHORA: 18, DRACHMA: 12,
                  TRIDENT: 8, ZEUS_BOLT: 5},
         # Two caduceus from the left pay, and four of the six faces pay a line bet when they
@@ -136,16 +135,15 @@ SPECS = {
     },
 }
 
-# The window a machine's usual session draws its chance from (owner's ask, 2026-11-11: about 51% of
-# spins should pay the bet back, so the window is two points wide and centred on 51).
+# The window a machine's usual session draws its chance from: about 51% of spins should pay the bet
+# back, so the window is two points wide and centred on 51.
 CHANCE_LOW, CHANCE_HIGH = 0.50, 0.52
 # One session in fifty, a machine runs a bonus: 60% for that session. It is drawn with the chance
-# itself, so it lasts exactly as long as the machine's session does (owner's ask, 2026-11-09).
+# itself, so it lasts exactly as long as the machine's session does.
 BONUS_ODDS = 0.02
 BONUS_CHANCE = 0.60
 # And the other face of the same coin: one session in fifty runs cold, 40%. Same draw, same
-# lifetime - a machine that is a bad idea to play this evening is a real thing in a casino
-# (owner's ask, 2026-11-09).
+# lifetime - a machine that is a bad idea to play this evening is a real thing in a casino.
 COLD_ODDS = 0.02
 COLD_CHANCE = 0.40
 # A session may add up to this many blanks to each strip to reach its target.
@@ -327,8 +325,8 @@ def _measure_cached(spec_id: str, blanks: tuple, pays_items: tuple) -> dict:
                 jack += 1
         combos += 1
         # A hit is a spin that pays back the whole bet, not one that pays anything at all: with the
-        # stake split over the machine's lines, that is `paid_lines` line bets (owner's ask,
-        # 2026-11-11). Every paytable in SPECS is built so no line pays less than that, which is why
+        # stake split over the machine's lines, that is `paid_lines` line bets. Every paytable in
+        # SPECS is built so no line pays less than that, which is why
         # this and "pays anything" are the same count on both machines.
         if paid >= paid_lines:
             hits += 1
@@ -360,8 +358,8 @@ def smallest_pay(spec: dict, pays: dict | None = None) -> int:
     return min(values) if values else 0
 
 
-# How far the jackpot has to stand above the best everyday pay to still be the machine's top prize
-# (owner's rule, 2026-11-09: the NOUS logo pays the most on every machine). The jackpot is solved
+# How far the jackpot has to stand above the best everyday pay to still be the machine's top prize -
+# the NOUS logo pays the most on every machine. The jackpot is solved
 # against this, so being the top prize and hitting the machine's return are the same solve.
 MARGIN = 1.25
 # The multiple of the machine's own table the everyday pays play at. Found per session; these are
@@ -372,7 +370,7 @@ SCALE_MIN, SCALE_MAX = 0.10, 8.0
 def _scaled(spec: dict, scale: float) -> dict:
     """The machine's everyday pays at one multiple of its own table.
 
-    One factor for the whole table, so the order the owner asked for cannot change from session to
+    One factor for the whole table, so the order of the pays cannot change from session to
     session. The jackpot is carried through untouched here: the caller zeroes or solves it.
     """
     return {symbol: (value if symbol == spec["jackpot"] else max(1, int(round(value * scale))))
@@ -392,10 +390,9 @@ def _solved_pays(spec_id: str, blanks: tuple, spec: dict) -> dict:
 
     The multiple is the largest one whose solved jackpot still stands MARGIN above the best everyday
     pay - so the everyday pays carry as much of the machine's return as they can while the jackpot
-    stays its top prize - and the jackpot is then solved to add exactly the rest. That is the owner's
-    ask of 2026-11-11 (the return is on target, not above it) worked out in the way that keeps the
-    money where the person can see it (owner's ask, 2026-11-10): an ordinary session, one that never
-    hits the jackpot, still ends up ahead.
+    stays its top prize - and the jackpot is then solved to add exactly the rest. The return is on
+    target rather than above it, worked out so the money lands where the person can see it: an
+    ordinary session, one that never hits the jackpot, still ends up ahead.
 
     Returns the pays and what the solve measured: the everyday return alone, the smallest and
     largest pay, and whether the jackpot had to be lifted instead of solved.
@@ -453,14 +450,14 @@ def _solved_pays(spec_id: str, blanks: tuple, spec: dict) -> dict:
     everyday, best = _everyday(spec_id, blanks, spec, scale)
     remaining = want - everyday["total"]
     # Rounded UP - and the remainder is rounded up BEFORE it is divided: truncating it first left a
-    # session one chip short of its own promise (measured 2026-11-11: a usual fruit9 session paid
-    # 1.09998 where the machine says 1.10, which is exactly one chip on 53,240 line bets). One chip
+    # session one chip short of its own promise (a usual fruit9 session paid 1.09998 where the machine
+    # says 1.10, which is exactly one chip on 53,240 line bets). One chip
     # over is what a whole-chip jackpot costs, and it is a hundredth of a percent on the return.
     jackpot_pay = max(1, -(-math.ceil(remaining) // int(hits))) if hits else 1
     if jackpot_pay <= best:
         # The everyday money has outgrown the jackpot (a session whose small pays already return
         # everything). Then the jackpot is lifted back to the top prize and the return is reported
-        # as measured - a generous session, never a mean one (owner's ask, 2026-11-09).
+        # as measured - a generous session, never a mean one.
         jackpot_pay = max(1, int(round(best * MARGIN)))
     pays = _scaled(spec, scale)
     pays[jackpot] = jackpot_pay
@@ -529,8 +526,8 @@ def variant(spec_id: str) -> dict:
     return {
         "machine": spec_id,
         # A list of three counts - one per reel - because this value is recorded in the spin log and
-        # read back as JSON: a tuple and a list of the same counts compared unequal was a test that
-        # failed on a session that had paid correctly (found 2026-11-11).
+        # read back as JSON: a tuple and a list of the same counts compare unequal, which failed a
+        # session that had paid correctly.
         "blanks": list(blanks),
         "pays": pays,
         "hit": round(tuned["hit"], 4),
@@ -560,8 +557,8 @@ def spin(spec_id: str, stake: int = 1, rng=None) -> dict:
     stops = tuple(pick(len(strip)) for strip in reels)
     out = result(spec, stops, stake, found["blanks"], found["pays"])
     # The session this spin actually used. Without it, a log has to guess, and a guess at the
-    # paytable turns a correct payout into a reported mismatch (found 2026-11-10: 184 of 592
-    # spins "disagreed" only because the log had drawn a second variant of its own).
+    # paytable turns a correct payout into a reported mismatch: 184 of 592 spins "disagreed" only
+    # because the log had drawn a second variant of its own.
     out["session"] = {"hit": found["hit"], "return": found["return"],
                       "blanks": found["blanks"], "pays": found["pays"]}
     return out

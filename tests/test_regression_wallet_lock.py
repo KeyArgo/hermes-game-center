@@ -17,8 +17,8 @@ import pytest
 
 # Windows has no advisory file locks, and the wallet is written to say so: `shelf/wallet.py` imports fcntl
 # behind a guard and simply proceeds unlocked there (pinned by tests/test_windows_import.py). This module
-# proves the LOCK works, so it needs a platform that has one — skips with that reason instead of failing to
-# import, which is what it did on the first Windows run (2026-11-13).
+# proves the LOCK works, so it needs a platform that has one — skips with that reason instead of failing
+# to import.
 fcntl = pytest.importorskip("fcntl", reason="advisory file locks are POSIX-only; the wallet is guarded")
 
 ROOT = Path(__file__).resolve().parents[1]

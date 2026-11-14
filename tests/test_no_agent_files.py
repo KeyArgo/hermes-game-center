@@ -1,10 +1,10 @@
 """The shipped package carries no agent-facing files.
 
-Round-2 item 4: a plugin in the catalog is read by people, so the repo holds what a person needs — the
+A plugin in the catalog is read by people, so the repo holds what a person needs — the
 code, the docs, the brand and the tests — and nothing that was written for an agent to pick up (planning
 backlogs, handover notes, lane notes, briefs, or issue drafts aimed at Hermes itself).
 
-Those live outside the repo: issue text in the reviewer's folder, planning notes in the owner's notes.
+Those live outside the repo: issue text in the maintainer's folder, planning notes in personal notes.
 This test is the fence, so one does not drift back in with a commit that "just adds a note".
 """
 
@@ -21,7 +21,7 @@ BANNED_NAMES = {
     "agents.md", "claude.md", "backlog.md", "handover.md", "brief.md", "notes.md",
     "hermes-issues.md", "todo.md", "roadmap.md", "plan.md", "lane-notes.md", "next-steps.md",
 }
-# Directories that hold lane/agent scratch rather than the plugin.
+# Directories that hold agent scratch rather than the plugin.
 BANNED_DIRS = {".lanes", ".agents", "notes", "briefs", "handovers"}
 
 

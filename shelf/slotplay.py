@@ -59,8 +59,8 @@ def _machines() -> dict:
             "lines": [{"name": name, "rows": list(rows)} for name, rows in spec["lines"]],
             "jackpot": int(session["jackpot_pay"]),
             # The jackpot's own symbol, so the machine can mark the jackpot row on its pay table
-            # without guessing it from the payout (owner's ask, 2026-11-11: what it pays, from the
-            # live table). NOUS on both machines.
+            # without guessing it from the payout - what it pays, from the live table. NOUS on both
+            # machines.
             "jackpot_symbol": spec["jackpot"],
             "theme": theme,
             # The blank stop, drawn as its machine's face so an empty reel looks meant.
@@ -119,7 +119,7 @@ def odds(machine: str = DEFAULT_MACHINE, wallet_path=None) -> dict:
         "target": found["target"],
         # The window this session actually promises: a bonus session runs to 60%, a cold one
         # down to 40%. Quoting the usual 50-55 next to a 0.60 would be a promise contradicted by
-        # the number beside it (found 2026-11-10: odds().range ignored the draw).
+        # the number beside it (odds().range ignored the draw).
         "range": list(reels.chance_window(machine)),
         "draws_when": "when Hermes restarts",
         # What the log shows, when there is enough of it to mean anything. The UI says "promised"
@@ -167,8 +167,7 @@ def spin(wallet, *, bet: int | None = None, auto: bool = False, machine: str | N
     per_line = max(1, stake // lines)
     if not wallet.debit(stake):
         # Nothing is dealt silently any more: an empty wallet is the moment the comeback arcade
-        # belongs to, and a hidden refill would rob the person of the game they were promised
-        # (owner's ask, 2026-11-09: "make my chips run out so I can test the come back arcade").
+        # belongs to, and a hidden refill would rob the person of the game they were promised.
         # The slot and blackjack tables still have their own top-up move; the overlay's answer is
         # the tray tap on the machine.
         return None

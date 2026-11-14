@@ -34,7 +34,7 @@ function WaitPane({ ctx }) {
   const [name, setName] = useState('')
   const [alerts, setAlerts] = useState(() => paneAlerts(ctx))
   const [restarting, setRestarting] = useState(false)
-  // Start over / new game: NOTHING is chosen until the person chooses (owner's ask, 2026-11-11).
+  // Start over / new game: NOTHING is chosen until the person chooses.
   // '' means neither radio, which is also what keeps Start disabled: no game is ever dealt against
   // an opponent the person did not name.
   const [dealWho, setDealWho] = useState('')
@@ -59,8 +59,7 @@ function WaitPane({ ctx }) {
   const [level, setLevel] = useState(QUICK_LEVEL)
   // The move the person has just made, drawn at once (12-board-input.js pendingCells).
   // A model or a search takes its time to answer, and the person's own move must land
-  // the moment they make it, never after the answer (owner's report 2026-11-10: "moving
-  // a piece versus the computer takes noticeably long before the piece lands").
+  // the moment they make it, never after the answer.
   const [preview, setPreview] = useState(null)
   const [boardH, setBoardH] = useState(300)
   // Backgammon's dice have a state of their own (waiting behind Roll, tumbling, spent) that the
@@ -140,7 +139,7 @@ function WaitPane({ ctx }) {
     // plain poll repeats the same intent, so it must not invalidate the read that is already in
     // flight: bumping the generation on every poll made the pane blind whenever /view took longer
     // than the one-second poll — each response was superseded before it landed, so the picker sat on
-    // "No curated games are installed here." for seconds after opening (owner's report, 2026-11-11).
+    // "No curated games are installed here." for seconds after opening.
     // The Games page's own refresh already has this shape: its selection generation moves on a pick.
     const mine = id === undefined ? generation.current : generation.current + 1
     generation.current = mine
@@ -202,8 +201,7 @@ function WaitPane({ ctx }) {
     load()
     // The waiting pane is watched, not glanced at: a three-second poll is why the machine in it
     // moved a beat behind the person. It now reads every second, and the board itself only when the
-    // game changed or three seconds have passed, so the extra reads stay cheap (owner's report,
-    // 2026-11-09: "the slot machine in 'Play while you wait' has latency of a few seconds").
+    // game changed or three seconds have passed, so the extra reads stay cheap.
     const timer = setInterval(() => load(), 1000)
     return () => clearInterval(timer)
   }, [load])
@@ -343,7 +341,7 @@ function WaitPane({ ctx }) {
       if (answer.ok === false) return
       // The move line's own answer carries the board it left behind - the person's move
       // and the computer's answer - so the paint happens here, the moment it arrives,
-      // instead of waiting for the read below (owner's report 2026-11-10).
+      // instead of waiting for the read below.
       if (answer.picture) {
         latest.current = { game: id, board: answer.picture }
         paneWatch.game = id
@@ -364,8 +362,10 @@ function WaitPane({ ctx }) {
     setWorking(true)
     setReply('')
     try {
-      const resigned = await say(`${id} resign`)
-      if (resigned.ok === false) return
+      // The resign is best effort: it ends a game in progress, and says there is nothing to end
+      // when the table is fresh. Either way the deal below answers, and its refusal is what the
+      // person is shown. Bailing out of the resign used to leave the press doing nothing at all.
+      await say(`${id} resign`)
       const started = await say(quickGameLine(id, who, level))
       if (started.ok === false) return
       latest.current = { game: id, board: null }
@@ -414,16 +414,22 @@ function WaitPane({ ctx }) {
   const seatsNobody = gameSeatsNobody(game, pictured)
   const aiSeats = Boolean(!seatsNobody && (!soloGame || (game && game.bots !== false)))
   // The wait line under the board, and its clock: the pane names whose move it is, with the
-  // seconds running, from the moment the wait begins (owner's ask, 2026-11-11).
+  // seconds running, from the moment the wait begins.
   const paneWait = pictured && pictured.status === 'active' ? waitWords(pictured, view, { working }) : ''
   const waited = useWaitSeconds(Boolean(paneWait))
   // "Start over" / "New game": ONE door, and the opponent is chosen inside it - never assumed.
-  // The dialog opens with nothing picked and Start disabled (owner's ask, 2026-11-11), so no game
+  // The dialog opens with nothing picked and Start disabled, so no game
   // is ever dealt against an opponent the person did not name, and the words always match the pick.
   const playedNow = Number((latest.current.board || {}).plies || 0) > 0
   // Whether a deal ends something here: a board game in play, or a solo session with hands behind
   // it. Only then does the confirm resign first; a fresh table is a single press (the server's rule).
   const endsSomething = soloGame ? playedNow : playingNow
+  // Whether this pane has read this game's board from the shelf at all. Until it has, nothing on
+  // screen can say a game is in play - and the shelf can still hold one, so a plain deal would be
+  // refused and the press would look like it did nothing. A picture from the shelf carries a
+  // schema_version; the starting picture drawn before the first read does not.
+  const boardRead = Boolean(board.picture && board.picture.schema_version)
+  const dealEndsFirst = endsSomething || !boardRead
   const dealWords = who => (who === 'agent' ? 'your Hermes model' : 'the computer')
   const dealLine = () => {
     const against = dealWho ? ` against ${dealWords(dealWho)}` : ''
@@ -445,7 +451,7 @@ function WaitPane({ ctx }) {
     const who = dealWho === 'agent' ? 'agent' : 'computer'
     setRestarting(false)
     setDealWho('')
-    return endsSomething ? restart(current, who) : start(current, who)
+    return dealEndsFirst ? restart(current, who) : start(current, who)
   }
   // The routes this Hermes may hand a seat, for the shared ModelPicker. It is read the first time
   // the model choice is opened: a pane that never touches it sends no request. A host without the
@@ -565,10 +571,10 @@ function WaitPane({ ctx }) {
         })
   })
 
-  // The owner's words for the strengths (product rule), whichever ids the server
+  // The strengths' names are the product's own words, whichever ids the server
   // uses; a level the server really has keeps its own name when it is unmapped.
   // A strength press SETS the strength and nothing else: it never deals a game and never
-  // resigns one (owner's ask, 2026-11-11). The strength the next game is dealt at is the one
+  // resigns one. The strength the next game is dealt at is the one
   // lit here, and the deal itself is the dialog's own Start.
   const serverLevels = ((((view || {}).opponents || []).find(item => item.id === 'computer') || {}).levels || [])
     .filter(item => item && item.id && item.label)
@@ -681,7 +687,7 @@ function WaitPane({ ctx }) {
         ref: boardBox,
         style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, width: '100%' },
         children: [
-          // Who is across the board, said above it (owner's ask 2026-11-10). Blackjack
+          // Who is across the board, said above it. Blackjack
           // carries its own label on the felt; Slots has no opponent at all.
           pictured.view === 'blackjack' || pictured.view === 'slots' ? null : jsx(OpponentLine, { pictured, view, solo: soloGame }),
           pictured.view === 'slots' ? jsx(Jackpot2Full, { ctx }) : pictured.view === 'blackjack'
@@ -708,8 +714,7 @@ function WaitPane({ ctx }) {
                 interactive: Boolean(current && access.can_move && !working),
                 // The person's own move is drawn the moment they make it, while the
                 // table's answer is still on its way: a search or a model takes its time,
-                // and a board that sits still reads as a board that did not hear the click
-                // (owner's report 2026-11-10).
+                // and a board that sits still reads as a board that did not hear the click.
                 pending: preview,
                 onPending: mv => { if (access.can_move && !working) setPreview(mv) },
                 onMove: token => move(current, token)
@@ -719,7 +724,7 @@ function WaitPane({ ctx }) {
             style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, fontWeight: 650 },
             children: [
               // Whose move it is, with the seconds running while the other seat works, in the same
-              // words the full table uses (owner's ask, 2026-11-11). On the person's own Backgammon
+              // words the full table uses. On the person's own Backgammon
               // turn the board owns the words (roll, then spend the dice: 14b-backgammon-svg.js).
               jsx('span', {
                 children: (pictured.view === 'backgammon' && myTurn(pictured, view)
@@ -808,8 +813,8 @@ function WaitPane({ ctx }) {
       games.some(item => item.id === 'slots') ? null : jackpotRow,
       // Who takes the other seat, on one row: ONE door, and the choice is made inside it. The
       // dialog opens with NOTHING picked, so a game is never dealt against an opponent the person
-      // did not name - and the words match the pick, never "the computer" for a model game
-      // (owner's ask, 2026-11-11). A solo table that seats a machine gets the same door
+      // did not name - and the words match the pick, never "the computer" for a model game.
+      // A solo table that seats a machine gets the same door
       // (Blackjack's dealer); a table that seats nobody (Slots) gets neither.
       aiSeats ? jsxs('div', {
               'data-pane-opponents': '1',
@@ -1137,7 +1142,7 @@ function WaitPane({ ctx }) {
 }
 
 // ---- One radio of the start-over dialog -------------------------------------
-// The dialog opens with nothing checked (owner's ask, 2026-11-11): the whole point of the control
+// The dialog opens with nothing checked: the whole point of the control
 // is that no opponent is assumed, so a game is never dealt against a seat the person did not name.
 // The radios are real inputs in one named group, so arrow keys and a screen reader work as they do
 // anywhere else, and the label carries the promise each choice makes.
@@ -1164,7 +1169,7 @@ function dealChoiceElement(id, label, note, chosen, onPick) {
   }, id)
 }
 
-// ---- The obvious door (owner's ask, 2026-11-11) -----------------------------
+// ---- The obvious door -------------------------------------------------------
 // The pane used to come back only from the command palette. Two doors now carry it: a
 // button in the Games header, beside the chips, and a status-bar item on the right. Both
 // read the one pane state (usePaneOnScreen) and press the same two functions, so they can
@@ -1225,9 +1230,9 @@ function paneDoorItemElement(onScreen) {
   })
 }
 
-// The ONE status-bar item (owner, 12:25): the pane's door and the news that needs saying —
+// The ONE status-bar item: the pane's door and the news that needs saying —
 // your turn, a match, your bot's result, or people waiting for a game you asked to hear
-// about. The news is quiet while there is nothing to say; the door (owner's ask, 2026-11-11)
+// about. The news is quiet while there is nothing to say; the door
 // stands while the pane is off the screen and hides while it is open. Neither ever takes the
 // keyboard, and a click opens the pane (or the match) instead of nagging.
 function GamesStatusItem({ ctx }) {

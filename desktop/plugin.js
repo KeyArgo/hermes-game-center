@@ -224,7 +224,7 @@ function GameCenterWordmark() {
   ] })
 }
 
-// The small game icon both side-pane doors wear (owner's ask, 2026-11-11): the same pad the
+// The small game icon both side-pane doors wear: the same pad the
 // Game Center mark draws, at status-bar size and in whatever colour the door is set in. It
 // takes no state, so it is a plain function and its element lands in the caller's own tree.
 function paneDoorIconElement(size = 14) {
@@ -556,7 +556,7 @@ class GamesBoundary extends Component {
 
 const SOUND_KEY = 'hermes-games-sound'
 // How loud the table is, 0 to 100. Kept beside the on/off switch so a person can keep the sounds but
-// take the edge off them (owner's ask, 2026-11-09), and applied to every voice - synth and sample.
+// take the edge off them, and applied to every voice - synth and sample.
 const SOUND_VOLUME_KEY = 'hermes-games-sound-volume'
 const SOUND_VOLUME_DEFAULT = 35
 
@@ -600,8 +600,7 @@ function soundAudio() {
 }
 
 // One bus for every voice, synth and sample, with a gentle compressor in front of the speakers: a
-// jackpot stacks a dozen sounds, and without this the sum is the "loud and computerised" peak the
-// owner heard (2026-11-09).
+// jackpot stacks a dozen sounds, and without this the sum is a "loud and computerised" peak.
 let soundBusNode = null
 function soundBus(ctx) {
   if (soundBusNode && soundBusNode.context === ctx) return soundBusNode
@@ -660,7 +659,7 @@ function soundNoise(ctx, { at, length, gain = 0.07, low = 400 }) {
 // A coin landing on a tray. Two things make a coin sound like a coin and not like a bell:
 // the strike is a burst of broadband noise (metal hitting metal, no pitch of its own), and the
 // ring on top of it is very short and very high - a few milliseconds of 4-9 kHz, gone in under a
-// tenth of a second. Long sine partials are what produced the "ting tong" the owner heard.
+// tenth of a second. Long sine partials are what turn a coin into a "ting tong" bell.
 function soundCoin(ctx, { at, freq = 2600, gain = 0.05, length = 0.09 }) {
   const strike = Math.max(1, Math.floor(ctx.sampleRate * 0.006))
   const buffer = ctx.createBuffer(1, strike, ctx.sampleRate)
@@ -755,8 +754,8 @@ function gamesSound(kind, options) {
         break
       }
       case 'ching': {
-        // The sound of coins landing again and again: the person asked for ching-ching-ching for the
-        // length of the celebration, and for it to be coins, not beeps.
+        // The sound of coins landing again and again, for the length of the celebration: coins, not
+        // beeps, and never one held note.
         const count = Math.max(4, Math.min(400, Math.round(Number((options && options.times) || 10))))
         const span = Math.max(0.2, Math.min(20, Number((options && options.seconds) || 2)))
         const step = span / count
@@ -1031,9 +1030,9 @@ const PIECE_ART = {
 }
 // END vendored chessnut piece art
 
-// ---- 07b-slot-samples.js: real recorded slot-machine sounds
-// Recorded sounds rather than a synthesiser, because a cabinet is a physical thing and the owner
-// could hear the difference ("getting closer to the casino sound but you're not using real sounds").
+// ---- 08-slot-samples.js: real recorded slot-machine sounds
+// Recorded sounds rather than a synthesiser, because a cabinet is a physical thing and a synthesiser
+// does not sound like one.
 // Eight short clips, mono 22 kHz Vorbis, embedded as data URIs so the plugin stays one file and the
 // install keeps working. Source: Mixkit free sound effects (Mixkit License - free to use in a
 // project, no attribution required; credited in THIRD-PARTY-NOTICES.md anyway).
@@ -2008,9 +2007,8 @@ function chessPiece(mark, x, y, cell, key) {
 
 // What a screen reader says about a board. The engine's sides are called white and black because that is
 // chess's vocabulary, but most of the shelf is not chess: a Connect Four player whose board announced
-// "connect4 board, white to move" was being told about a game they were not playing, in the wrong name
-// (bug found walking the shelf on a fresh profile, 2026-11-13). So: the game's title, and who holds the
-// side that is to move, when the picture says.
+// "connect4 board, white to move" was being told about a game they were not playing, in the wrong name.
+// So: the game's title, and who holds the side that is to move, when the picture says.
 function boardLabel(picture) {
   const pic = picture || {}
   const title = String(pic.title || pic.game || pic.view || 'Game').trim()
@@ -2407,7 +2405,7 @@ function coverArt(id, height) {
   }
   // Backgammon points, bar and off tray are its own board (BackgammonSvg), so it needs its own
   // cover: without this branch the picture below would fall through to BoardSvg's grid renderer and
-  // draw a chess-like grid on the tile. Owner's ask, 2026-11-11.
+  // draw a chess-like grid on the tile.
   if (pictured && pictured.view === 'backgammon') {
     return backgammonCover(160, height || 110)
   }
@@ -3134,7 +3132,7 @@ function SeaBoard({ title, badge, cells, fog, hulls, cell, interactive, onCell, 
 // A ship drawn as a ship, not as a row of squares: hull with a raked bow, a deck line, the
 // superstructure and turrets that grow with the class, a funnel and a mast. It is the picture on
 // the tray chip and on the shipyard strip, so the setup phase looks like a navy yard instead of a
-// list of words (owner's ask, 2026-11-09).
+// list of words.
 function SeaShipArt({ name = 'cruiser', size = 3, width = 96, lit = false, tone = '' }) {
   const height = Math.max(18, Math.round(width * 0.26))
   // In the end-of-game review a hull is red when it went down and grey when it survived; anywhere
@@ -3190,7 +3188,7 @@ function SeaShipArt({ name = 'cruiser', size = 3, width = 96, lit = false, tone 
 
 // The end-of-game review: five hulls a side, the ones that went down in red, the survivors grey.
 // Your kills are drawn in the enemy's waters, your losses in your own, so the picture answers
-// "what did I get, what did they get" at a glance (owner's ask, 2026-11-09).
+// "what did I get, what did they get" at a glance.
 function SeaFleetReview({ ships, where, label }) {
   if (!ships || !ships.length) return null
   return jsxs('div', {
@@ -3342,7 +3340,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
   const boardRef = useRef(null)
   // Whether this table is actually on screen. A table that is mounted somewhere hidden (a route the
   // app keeps alive, a collapsed pane) must never make a sound or a banner: that was the periodic
-  // firing the owner heard with no game open (2026-11-09).
+  // firing that a hidden table used to make with no game open.
   const [onScreen, setOnScreen] = useState(true)
   useEffect(() => {
     const node = boardRef.current
@@ -3365,17 +3363,17 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
   const shotKey = shotsNow.map(shotStamp).join('|')
   // Which shots have been announced, and whether this mount has taken its first look at the board.
   // The old effect replayed the newest shot whenever the pass card lifted, staggered the banners
-  // 520 ms apart, and could re-announce what it had already said - the owner's report, 2026-11-09:
-  // "it tells me things late or after it already told me, and seems random". One shot, once, now:
+  // 520 ms apart, and could re-announce what it had already said - late, twice, and in no order
+  // anyone could follow. One shot, once, now:
   // only the newest unannounced hit is spoken, immediately, and a shot that lands behind the pass
   // card is spoken when the card lifts.
   const seenShots = useRef(new Set())
   const primed = useRef(false)
   // The square the shot landed on, and the waters it landed in, measured at the moment the flash is
   // played, inside the frame that draws that fleet's water: a hit blooms on the square that was
-  // fired at and the lettering sits in those waters, never in the gap between the two boards
-  // (bughunter, 2026-11-09). Null when there is no layout to measure (a test host, a hidden pane);
-  // the render then falls back to the middle of that board.
+  // fired at and the lettering sits in those waters, never in the gap between the two boards. Null
+  // when there is no layout to measure (a test host, a hidden pane); the render then falls back to
+  // the middle of that board.
   const seaTargets = shot => {
     const node = boardRef.current
     if (!node || !node.getBoundingClientRect || !node.querySelector) return { cell: null, waters: null }
@@ -3407,7 +3405,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
     if (!fresh.length) return undefined
     // The biggest news among the new shots, not merely the newest: the computer answers a shot at
     // once, so the person's own sinking shot usually arrives with a reply miss behind it and was
-    // being dropped (owner's report, 2026-11-11). A sinking beats a hit beats a miss; a tie goes
+    // being dropped. A sinking beats a hit beats a miss; a tie goes
     // to the latest.
     const weight = row => (row.result === 'sunk' ? 2 : row.result === 'hit' ? 1 : 0)
     const shot = fresh.reduce((best, row) => (weight(row) >= weight(best) ? row : best), fresh[0])
@@ -3421,7 +3419,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
     // The lettering belongs over the fleet it is about: a hit on their ship over ENEMY WATERS, a
     // hit on ours over YOUR WATERS. The flash is measured on the square that was fired at, inside
     // that fleet's own frame, so both graphics sit on the board the shot happened on instead of in
-    // the middle of the table (bughunter, 2026-11-09).
+    // the middle of the table.
     const at = seaTargets(shot)
     setBlast({ words, good: mine, big: shot.result === 'sunk', where: mine ? 'enemy' : 'own', at: at.waters })
     gamesSound(shot.result === 'sunk' ? 'sunk' : (mine ? 'hitlight' : 'hit'))
@@ -3599,16 +3597,15 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
       })
     : null
   // A banner centred on the board it is about. It is rendered inside that board's own column, so it
-  // cannot drift to a corner of the water: the column's centre is where it lands (owner's ask,
-  // 2026-11-09 - a half-width guess put the lettering off to one side).
+  // cannot drift to a corner of the water: the column's centre is where it lands - a half-width
+  // guess put the lettering off to one side.
   // The flash that marks a hit, drawn inside the board it happened on so it is centred on that
   // water rather than on the gap between the two.
   const seaBoom = where => (boom && boom.where === where
     ? jsx('div', {
       'aria-hidden': true,
       'data-sea-boom': where,
-      // Where it was put, so a proof can read the square off the page rather than guess it
-      // (bughunter, 2026-11-09).
+      // Where it was put, so a proof can read the square off the page rather than guess it.
       'data-sea-boom-at': boom.at ? `${boom.at.x},${boom.at.y}` : 'waters',
       style: {
         position: 'absolute', zIndex: 4, pointerEvents: 'none', borderRadius: '50%',
@@ -3656,7 +3653,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
       })
     : null
 
-  // The result is a band at the top, under the game's own header (owner's ask, 2026-11-09): it was
+  // The result is a band at the top, under the game's own header: it was
   // a card inside the water, which hid the board and read as decoration. Above the boards it is the
   // first thing the eye lands on, on one line, and the water stays visible behind it.
   const result = over
@@ -3700,7 +3697,7 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
         : yourTurn ? 'Fire at enemy waters' : 'The computer fires…'
 
   // What to do next, in one line, always on screen: the board is a picture a person has to be told
-  // how to use, and after placement it used to say nothing at all (owner's ask, 2026-11-09).
+  // how to use, and after placement it used to say nothing at all.
   const hint = over
     ? 'The game is over. Play again to lay a new fleet.'
     : cover
@@ -3779,14 +3776,14 @@ function SeaBattleTable({ picture, interactive, busy, onMove }) {
         style: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', flex: '1 1 auto', minHeight: 0 },
         children: [
           // Your waters and the ships you still have to place sit in one column, so the tray is
-          // under the board you drag onto instead of under the enemy's (owner's ask, 2026-11-09).
+          // under the board you drag onto instead of under the enemy's.
           jsxs('div', {
             className: 'games-sea-own-column',
             style: { position: 'relative', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', minWidth: 0, maxWidth: '100%' },
             children: [
               // The board and its lettering share one frame the exact size of the water, so "You
               // took a hit!" is centred on YOUR WATERS even when the tray or the fleet review makes
-              // the column taller or wider (owner's report, 2026-11-09).
+              // the column taller or wider.
               jsxs('div', {
                 'data-sea-frame': 'own',
                 style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' },
@@ -4055,7 +4052,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
           jsxs('div', {
             children: [
               jsx('div', { style: { fontSize: 16, fontWeight: 800, letterSpacing: 0.3 }, children: 'Blackjack' }, 'title'),
-              // Who is across the felt, on the felt (owner's ask 2026-11-10): a table
+              // Who is across the felt, on the felt: a table
               // that names nobody leaves a person unable to tell whether their own
               // model is the one playing the dealer's cards.
               against
@@ -4141,42 +4138,36 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
 // ---- 18-jackpot2-machine.js: JACKPOT v2, the second cabinet, drawn from scratch
 //
 // A different machine from the Slots table's (18-slot-machine.js), not a reskin of it. It shares
-// three things with the old one and nothing else:
-//  - the shelf's routes, exactly the ones the old table and overlay already call: GET /jackpot,
-//    POST /jackpot/spin (the route the old overlay spins with), /jackpot/autoplay, /jackpot/autobet,
-//    /jackpot/machine and /jackpot/cashin. No new route, no new server work;
-//  - the recorded sounds behind gamesSound() (07-sound.js / 08-slot-samples.js), so the mute switch
-//    and the master volume are the existing ones;
-//  - the picture symbols in SM_ART (18-slot-art.js), so the Nous stamp and the wing are the shipped
-//    artwork rather than a second copy of it.
+// three things with the old one: the shelf's routes (GET /jackpot, POST /jackpot/spin - the route the
+// old overlay spins with - /jackpot/autoplay, /jackpot/autobet, /jackpot/machine and /jackpot/cashin,
+// so no new route and no new server work); the recorded sounds behind gamesSound() (07-sound.js /
+// 08-slot-samples.js), so the mute switch and the master volume are the existing ones; and the
+// picture symbols in SM_ART (18-slot-art.js), so the Nous stamp and the wing are the shipped artwork
+// rather than a second copy of it.
 //
-// One fixed size, by design: the cabinet is always 560x720 CSS pixels, and every caller scales that
-// box with a CSS transform rather than resizing the drawing. In 'overlay' mode the caller does all
-// the measuring (the layer owns those numbers). In 'full' mode the cabinet fits the element it is
-// MOUNTED IN - the Games column, the play-while-you-wait pane, a test frame - and never the window:
-// the same machine is mounted in a 400 px pane and a 1400 px page, and the frame around it is what
-// must not clip it. window.__jp2 carries the test handle: { spinning } is true while the reels are
-// travelling, and width/height/mode are published beside it so a harness can compute a fit without a
-// laid-out DOM.
+// One fixed size: the cabinet is always 560x720 CSS pixels, and every caller scales that box with a
+// CSS transform rather than resizing the drawing. In 'overlay' mode the caller does all the measuring
+// (the layer owns those numbers). In 'full' mode the cabinet fits the element it is MOUNTED IN - the
+// Games column, the play-while-you-wait pane, a test frame - and never the window: the same machine
+// is mounted in a 400 px pane and a 1400 px page, and the frame around it is what must not clip it.
+// window.__jp2 carries the test handle: { spinning } is true while the reels are travelling, and
+// width/height/mode are published beside it so a harness can compute a fit without a laid-out DOM.
 //
-// Every effect here is driven by the result the shelf sends. Nothing in this file decides an
-// outcome:
-//  - the reels run down under a motion blur (a filter plus a small vertical stretch) and each stops
-//    on its own beat with an overshoot curve and a landing bounce;
-//  - a near miss (two of the shown symbols agree, the last one does not) runs the last reel
-//    dramatically longer under a signal-coloured rim, with slow ticks so the wait is audible;
-//  - a win lights its payline with a glow and a pulse, spills coins and counts the chips up;
-//  - the payout climbs a tier ladder - the same chip steps the old machine uses, named BIG / MEGA /
-//    JACKPOT as it goes - and the banner grows with it; a big one also flashes the cabinet and sets
-//    the lights blinking;
-//  - the lever kicks, the SPIN button sinks under the finger, and the bulbs chase around the cabinet.
-// prefers-reduced-motion turns every animation off and lands the reels at once; the invite to spin,
-// the win and the payline are still shown, they simply do not move.
+// Every effect here is driven by the result the shelf sends; nothing in this file decides an outcome.
+// The reels run down under a motion blur (a filter plus a small vertical stretch) and each stops on
+// its own beat with an overshoot curve and a landing bounce; a near miss (two of the shown symbols
+// agree, the last one does not) runs the last reel much longer under a signal-coloured rim, with slow
+// ticks so the wait is audible; a win lights its payline with a glow and a pulse, spills coins and
+// counts the chips up; the payout climbs a tier ladder - the same chip steps the old machine uses,
+// named BIG / MEGA / JACKPOT as it goes - and the banner grows with it, while a big one flashes the
+// cabinet and sets the lights blinking; the lever kicks, the SPIN button sinks under the finger, and
+// the bulbs chase around the cabinet. prefers-reduced-motion turns every animation off and lands the
+// reels at once: the invite to spin, the win and the payline are still shown, they simply do not move.
 //
-// THE SCREEN DOES NOT QUOTE ODDS (owner's release rule, 2026-11-11). The win chance and the return
-// are still drawn by the shelf and still paid by it, exactly as before — this cabinet prints
-// neither number. The over-chat switch is in this panel too, beside Auto-spin/Auto-bet;
-// 19-jackpot2-layer.js owns the switch itself, so every surface shows the same one.
+// THE SCREEN DOES NOT QUOTE ODDS. The win chance and the return are still drawn by the shelf and still
+// paid by it, exactly as before — this cabinet prints neither number. The over-chat switch is in this
+// panel too, beside Auto-spin/Auto-bet; 19-jackpot2-layer.js owns the switch itself, so every surface
+// shows the same one.
 
 const JP2_W = 560
 const JP2_H = 720
@@ -4214,8 +4205,8 @@ const JP2_TIERS = [
   { chips: 10000, name: 'JACKPOT', seconds: 16, rain: 90, coins: 54, alarm: 8 }
 ]
 
-// The two sentences the owner asked for on the cabinet, in one place each so the line, the tooltip
-// and the tests quote the same words (owner's ask, 2026-11-11).
+// The two sentences the cabinet carries, in one place each so the line, the tooltip and the tests
+// quote the same words.
 const JP2_AUTOSPIN_NOTE = 'Spins by itself while Hermes is thinking or using tools. Your points rack '
   + 'up from the tokens you spend (1 point per 100,000 tokens) and from games you win.'
 const JP2_POINTS_NOTE = 'Points are your ranking. Cash some in for chips when you run low - it lowers '
@@ -4258,10 +4249,9 @@ let JP2_LAST = null
 
 // ---- telling the shelf a cabinet is on screen -----------------------------------
 // The automatic spin happens on the shelf's hook path - one spin for an inference reply, one for a
-// tool call - and the shelf refuses it unless a machine says it is on screen. Jackpot v2 never said
-// so, so with this cabinet up (and the original copy over the chat off, which is the usual case) the
-// shelf refused every hook and the reels sat still through a whole conversation (owner's report,
-// 2026-11-11: "auto-spin is NOT working"). The count is module-wide because one cabinet is mounted
+// tool call - and the shelf refuses it unless a machine says it is on screen. With this cabinet up and
+// the original copy over the chat off (the usual case) the shelf used to refuse every hook, and the
+// reels sat still through a whole conversation. The count is module-wide because one cabinet is mounted
 // and unmounted per surface - the Games page, the play-while-you-wait pane and the over-chat copy -
 // and what the shelf needs to know is whether ANY of them is drawn. 'jackpot2' is the name this
 // surface reports under, so it cannot clear the original machine's own flag (or be cleared by it).
@@ -4500,9 +4490,9 @@ function jp2NearMiss(result, machine) {
 }
 
 // ---- what it pays: the whole table, off the live paytable ------------------------
-// The owner's ask (2026-11-11): every symbol combination and what it pays at the bet on the table,
-// generated from the pay table the shelf is playing rather than typed into the cabinet, so the card
-// cannot drift from what the reels actually pay. It is drawn over the reels and scrolls inside
+// Every symbol combination and what it pays at the bet on the table, generated from the pay table the
+// shelf is playing rather than typed into the cabinet, so the card cannot drift from what the reels
+// actually pay. It is drawn over the reels and scrolls inside
 // itself: the cabinet is one fixed size and a panel may not push its rows out of it.
 function jp2PaysPanel({ machine, paytable, bet, jackpotSymbol, onClose }) {
   const lines = (machine && machine.lines) || []
@@ -4585,7 +4575,7 @@ function JackpotMachine(props) {
   const settings = props || {}
   const ctx = settings.ctx
   const mode = settings.mode === 'overlay' ? 'overlay' : 'full'
-  // Over the chat the machine is to WATCH (owner, 2026-11-11): nothing on it takes a click or a key
+  // Over the chat the machine is to WATCH: nothing on it takes a click or a key
   // except the sound switch (the X and the look controls live in the layer). The pane and the Games
   // page draw this same machine in 'full' mode and play exactly as before.
   const watch = mode === 'overlay'
@@ -4694,7 +4684,7 @@ function JackpotMachine(props) {
       // offsetWidth/offsetHeight, NOT getBoundingClientRect: a rect includes every ancestor's
       // transform, so inside a caller that already scales the cabinet - the Games page's full view
       // scales its stage - this fit would measure the SCALED box and scale the cabinet a second time.
-      // Measured in a real browser, 2026-11-10: 1.14 x 1.14 = 1.30, and the machine hung 100 px out of
+      // Measured in a real browser: 1.14 x 1.14 = 1.30, and the machine hung 100 px out of
       // its frame. The layout box is what this fit is for and no transform touches it.
       const rect = typeof node.getBoundingClientRect === 'function' ? node.getBoundingClientRect() : null
       const width = node.offsetWidth || Number(rect && rect.width) || 0
@@ -5054,7 +5044,7 @@ function JackpotMachine(props) {
   // Points into chips: the door the wallet's own cash_points() is behind (/jackpot/points/cash), on
   // the same wallet. The amount is the person's choice - the control below sends the slice they
   // picked - and the rate is the shelf's own (pointsPerBlock points buy chipsPerBlock chips). The
-  // dead-table row uses the same door for the one press that unblocks a spin (amendment, 2026-11-10).
+  // dead-table row uses the same door for the one press that unblocks a spin.
   const cashPoints = async requested => {
     const want = Math.floor((Number(requested) || 0) / pointsPerBlock) * pointsPerBlock
     if (cashBusy || want < pointsPerBlock) return
@@ -5448,8 +5438,7 @@ function JackpotMachine(props) {
     }
   }, 'flash') : null
 
-  // Owner's release rule (2026-11-11): the machine does not quote a win chance and does not quote a
-  // return. Both are still drawn by the shelf and still paid by it — the shelf's own tests pin the
+  // The machine does not quote a win chance and does not quote a return. Both are still drawn by the shelf and still paid by it — the shelf's own tests pin the
   // numbers — the screen simply never prints them. `winText` is a result, not an odds figure, so it
   // stays.
   const winText = result && Number(result.payout) > 0
@@ -5516,9 +5505,9 @@ function JackpotMachine(props) {
                 style: { display: 'flex', alignItems: 'center', gap: 8 },
                 children: [
                   // The session's win chance used to be a chip here. It is gone: the number is not
-                  // shown anywhere on either machine (owner's release rule, 2026-11-11). What is here
-                  // instead is the pay table: every combination and its payout, opened over the reels
-                  // (owner's ask, 2026-11-11). It sits in the header so it costs the cabinet no height.
+                  // shown anywhere on either machine. What is here instead is the pay table: every
+                  // combination and its payout, opened over the reels. It sits in the header so it
+                  // costs the cabinet no height.
                   paytable.length ? jsx('button', {
                     type: 'button',
                     'data-jp2-pays-open': paysOpen ? 'on' : 'off',
@@ -5576,8 +5565,8 @@ function JackpotMachine(props) {
               }, 'switches')
             ]
           }, 'controls'),
-          // The over-chat switch, in the cabinet's own panel and right below the other two switches
-          // (owner's ask, 2026-11-11). It is the SAME setting as the status bar's and Settings':
+          // The over-chat switch, in the cabinet's own panel and right below the other two switches.
+          // It is the SAME setting as the status bar's and Settings':
           // one press to float the cabinet over the conversation, with how big and how see-through
           // beside it. Guarded by name so a bundle built without the layer part still draws a
           // cabinet (the layer part is where the hooks and the controls live).
@@ -5638,8 +5627,8 @@ function JackpotMachine(props) {
                 children: notice
               }, 'notice') : null,
               // A table that cannot spin has to say why and offer the way out in one press. A grey
-              // SPIN with nothing on screen to explain it is the defect this replaces (owner's
-              // report, 2026-11-10, via the amendment). Two reasons, both said out loud: no session
+              // SPIN with nothing on screen to explain it is the defect this replaces. Two reasons,
+              // both said out loud: no session
               // from the shelf yet, or a wallet under one spin's stake - and that one carries the
               // points-to-chips conversion, four points buying three chips.
               (!trouble && !canSpin) ? (() => {
@@ -5685,7 +5674,7 @@ function JackpotMachine(props) {
                 })
               })() : null,
               // What the automatic spin is and where points come from, in the shelf's own words, said
-              // on the cabinet rather than left to be discovered (owner's ask, 2026-11-11). The whole
+              // on the cabinet rather than left to be discovered. The whole
               // sentence is the tooltip as well, so a hover repeats it in full.
               jsx('span', {
                 'data-jp2-autospin-note': '1',
@@ -5879,10 +5868,10 @@ const SM_KICK_MS = 140
 const SM_STAGGER_MS = 130
 const SM_LINE_MS = 420
 const SM_GOLD = '#facc15'
-// Casino-style win ladder: what the payout is worth in spectacle. The numbers are the ones the
-// owner named (10, 50, 100, 200, 400, 500, 1000, 10000 chips); a payout climbs to the highest tier
-// it reaches, and the tier decides how long the machine carries on, how many coins fall and whether
-// the alarm goes off. Nothing here changes an outcome - the reels already decided.
+// Casino-style win ladder: what the payout is worth in spectacle. The tiers are 10, 50, 100, 200,
+// 400, 500, 1000 and 10000 chips; a payout climbs to the highest tier it reaches, and the tier
+// decides how long the machine carries on, how many coins fall and whether the alarm goes off.
+// Nothing here changes an outcome - the reels already decided.
 const SM_TIERS = [
   { chips: 10, name: 'CHING!', seconds: 2.6, rain: 18, coins: 6, alarm: 0 },
   { chips: 50, name: 'NICE!', seconds: 3.2, rain: 26, coins: 10, alarm: 0 },
@@ -5902,9 +5891,9 @@ function SM_tierFor(payout) {
 }
 // How big the see-through copy over the chat is, as a fraction of the cabinet's own size. The table
 // and the Play page keep their fixed size; only the over-chat copy follows this. It starts at 1.00 -
-// the same size the Game Center draws - and the slider only ever makes it SMALLER (owner's ask,
-// 2026-11-09: there should be no larger, and the control was reading backwards). So the stored
-// number is a multiplier of SM_SCALE_TABLE, never an absolute scale.
+// the same size the Game Center draws - and the slider only ever makes it SMALLER: there is no
+// setting above the table's own size, and the first version of the control ran backwards. So the
+// stored number is a multiplier of SM_SCALE_TABLE, never an absolute scale.
 const SM_SCALE_KEY = 'gameshelf.slots.scale'
 const SM_SCALE_DEFAULT = 1
 const SM_SCALE_MIN = 0.1
@@ -6001,13 +5990,12 @@ function smSetOverchat(value, { save = true } = {}) {
   SM_OVERCHAT.on = on
   SM_writeOverchat(on)
   // Stored on the shelf too, not just in this browser: on/off used to live only in localStorage and
-  // came back switched off after a plugin reload, which read as the machine having vanished
-  // (owner's report, 2026-11-10).
+  // came back switched off after a plugin reload, which read as the machine having vanished.
   if (save && typeof SM_savePrefs === 'function') SM_savePrefs()
   SM_OVERCHAT.listeners.forEach(listener => listener(on))
   // Toggling the see-through copy is also the person's manual escape from a celebration that is
   // still raining: every mounted machine drops its coins at once, so a stuck overlay can never
-  // survive a click on "Show over chat" (owner's ask, 2026-11-09).
+  // survive a click on "Show over chat".
   smClearCelebrations()
 }
 
@@ -6046,8 +6034,8 @@ function useSmOverchat() {
 
 // How see-through the over-chat copy is. A viewing preference, not a game rule: it lives in
 // this browser, the control sits beside "Show over chat", and every mounted copy of the
-// machine follows it the moment it changes. 20% is the owner's default (2026-11-09), five
-// points more opaque than the 15% it was.
+// machine follows it the moment it changes. The default is 20%, five points more opaque than the
+// 15% it was.
 const SM_ALPHA_KEY = 'gameshelf.slots.overchat_alpha'
 const SM_ALPHA_DEFAULT = 0.2
 const SM_ALPHA_MIN = 0.05
@@ -6074,19 +6062,34 @@ function SM_readAlpha() {
 SM_ALPHA.value = SM_readAlpha()
 
 // The preferences live on the server as well as in this browser: localStorage alone did not
-// survive a plugin reload for the owner, so every change is also posted to the shelf, and the
-// snapshot's values are adopted on load.
+// survive a plugin reload, so every change is also posted to the shelf, and the snapshot's values
+// are adopted on load.
 let SM_prefsTimer = null
 let SM_prefsTouchedAt = 0
+// The write itself, once: the delayed path and the one on the way out share it, so closing a
+// cabinet can never post a different snapshot from the one the timer would have.
+function SM_postPrefs() {
+  if (typeof slotsSetting === 'function') {
+    slotsSetting('/jackpot/prefs', { on: SM_OVERCHAT.on, alpha: SM_ALPHA.value, scale: SM_SCALE_STATE.value })
+  }
+}
+
 function SM_savePrefs() {
   SM_prefsTouchedAt = Date.now()
   if (SM_prefsTimer) clearTimeout(SM_prefsTimer)
   SM_prefsTimer = setTimeout(() => {
     SM_prefsTimer = null
-    if (typeof slotsSetting === 'function') {
-      slotsSetting('/jackpot/prefs', { on: SM_OVERCHAT.on, alpha: SM_ALPHA.value, scale: SM_SCALE_STATE.value })
-    }
+    SM_postPrefs()
   }, 300)
+}
+
+// A change made just before the person closes the cabinet must still be saved, and the pending
+// write must not outlive the surface that asked for it: post it now instead of on a timer.
+function SM_flushPrefs() {
+  if (!SM_prefsTimer) return
+  clearTimeout(SM_prefsTimer)
+  SM_prefsTimer = null
+  SM_postPrefs()
 }
 
 function SM_adoptPrefs(prefs) {
@@ -6146,10 +6149,10 @@ const smAccent = () => SM_LOOK.accent || SM_GOLD
 const smShell = () => SM_LOOK.windowShell || SM_LOOK.bg || '#1c1917'
 const smEdge = () => SM_LOOK.windowEdge || SM_LOOK.edge || '#292524'
 // The old red cabinet was the fallback for "no machine yet", so the wait pane painted an orange-red
-// machine for one frame and then re-painted in the session's colours - the flash the owner reported
-// on 2026-11-10 ("you can see the old orange one appear before the teal comes in"). The fallback is
-// now the machine's own dark shell, which reads as the frame being built rather than as another
-// cabinet, and the last theme seen is remembered per machine so a remount never guesses.
+// machine for one frame and then re-painted in the session's colours - a flash of the old orange
+// before the teal arrives. The fallback is now the machine's own dark shell, which reads as the
+// frame being built rather than as another cabinet, and the last theme seen is remembered per
+// machine so a remount never guesses.
 const smBody = () => SM_LOOK.body || SM_LOOK.bg || '#1c1917'
 const smTrim = () => SM_LOOK.trim || '#a8a29e'
 const smLook = (key, fallback) => SM_LOOK[key] || fallback
@@ -6338,8 +6341,7 @@ function SM_symbol(symbol, size, glowing) {
   if (typeof SM_ART !== 'undefined' && SM_ART && Object.prototype.hasOwnProperty.call(SM_ART, symbol)) {
     // The picture sits on a pale plate. The Nous mark and the wing are dark artwork, and on the
     // machine's dark drum they read as a smudge; a light disc behind them makes the drawn line the
-    // thing the eye lands on (owner's ask, 2026-11-09: "hard to see the nous line here, maybe put on
-    // white background for the circle part").
+    // thing the eye lands on.
     return jsx('span', {
       'data-sm-plate': symbol,
       style: {
@@ -6383,8 +6385,7 @@ function SM_symbol(symbol, size, glowing) {
 
 // A paytable row is written as symbols separated by spaces ("NOUS NOUS NOUS", "🍒 🍒 –"). Draw each
 // token with its picture: the plain string used to reach the screen as the literal word NOUS three
-// times, while the reels themselves showed the Nous mark (owner's report, 2026-11-09: "replace nous
-// nous nous and wing wing wing and bar bar bar with the images").
+// times, while the reels themselves showed the Nous mark.
 function SM_symbolRun(text, size) {
   const tokens = String(text || '').trim().split(/\s+/).filter(Boolean)
   return jsx('span', {
@@ -6429,14 +6430,14 @@ function SM_stamp(result) {
 
 // `odds` still arrives and is still the shelf's own draw for this session — it is kept in the
 // signature because the table is what the session belongs to, and the machine no longer prints any
-// of its numbers (owner's release rule, 2026-11-11). Nothing here may start showing them again.
+// of its numbers. Nothing here may start showing them again.
 function SlotMachine({
   machine, machines, result, chips, bet, bets, odds, autoplay, autobet, busy, canSpin, trouble,
   onSpin, onBet, onPickMachine, onAutoplay, onAutobet, compact, paytable, bare, chat, onClose, onShow, cabinetRef,
   rewards, onCashin, onPoints, onBailout, onEgg, scaleOverride
 }) {
   // How the automatic bet is sized, said once, so the tooltip and the note cannot drift from
-// shelf/autobet.py (owner's ask, 2026-11-09).
+// shelf/autobet.py.
 const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k tokens: 2x. Then 3x at 40k, 4x at 80k, 6x at 160k, 8x at 320k and above - 1x is 25 chips, the smallest bet on the table. Never more than the cap, and the odds are identical at every bet: a bigger bet is a bigger swing, not a better chance.'
 // The see-through copy passes its own size; every other copy draws at the fixed table size.
   // scaleOverride is a fraction of the cabinet size: 1 means "the same as the table", 0.6 means
@@ -6446,14 +6447,13 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const strips = info.strips && info.strips.length ? info.strips : [[], [], []]
   const rows = Number(info.rows) || 3
   // A one-row machine would otherwise be a thin strip: give its single window real presence.
-  // Bigger wheels than the first cabinet: the reels are the machine, so they take the room
-  // (owner's ask, 2026-11-09: "make the wheels bigger and centered").
+  // Bigger wheels than the first cabinet: the reels are the machine, so they take the room.
   const cell = rows === 1 ? (compact ? SM_px(62) : SM_px(94)) : (compact ? SM_px(48) : SM_px(70))
   const reelWidth = Math.round(cell * 1.3)
   const still = SM_reducedMotion()
   // The auto-bet switch is optimistic: it flips under the finger, and the shelf's answer settles
-  // it. The first version read straight from the polled payload, so it never moved - the report
-  // was "auto bet sizes itself check won't turn off stays on" (2026-11-09).
+  // it. The first version read straight from the polled payload, so it never moved and the switch
+  // could not be turned off.
   const autobetOn = autobet !== false
   const [autobetShown, setAutobetShown] = useState(autobetOn)
   const [autobetHelp, setAutobetHelp] = useState(false)
@@ -6480,14 +6480,12 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const [jackpot, setJackpot] = useState(false)
   const [cashBusy, setCashBusy] = useState(false)
   // Points are the high score, so cashing them in is a slice the person picks rather than an all-in
-  // button: half by default, a quarter for a top-up, all of it only when they say so (owner's ask,
-  // 2026-11-09: "add the ability to pick how many points to convert to cash as their points is their
-  // high score so not ideal, its a penalty to keep playing").
+  // button: half by default, a quarter for a top-up, all of it only when they say so. Spending the
+  // whole score is a penalty for playing on.
   const [cashShare, setCashShare] = useState(0.5)
   // The comeback tap: three quick skill shots when the wallet cannot cover a bet. Deliberately a
   // little arcade rather than a button that hands out chips - a graded shot, a streak that grows
-  // with coming back on another day, and ten premium spins afterwards (owner's ask, 2026-11-09:
-  // "come up with a gamification for making quick chips ... really gamify this so its addictive").
+  // with coming back on another day, and ten premium spins afterwards.
   const [lodder, setLodder] = useState(null)      // { t0, marks: [] }
   const [bailoutResult, setBailoutResult] = useState(null)
   const [bailoutBusy, setBailoutBusy] = useState(false)
@@ -6514,9 +6512,9 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const timers = useRef([])
   // The celebration is bounded in time, and the bound is a deadline on the overlay itself rather
   // than a timer in `timers` (a new spin wipes that array, which is how the rain once became
-  // permanent). Owner's rule, 2026-11-09: "they never end, but shouldn't last for more than 10
-  // seconds unless jackpot which maybe can last 5 minutes". The effect below enforces it even if
-  // every other path fails, and the ✕ on the overlay ends it early.
+  // permanent). A win never rains longer than ten seconds; a jackpot is allowed five minutes. The
+  // effect below enforces it even if every other path fails, and the ✕ on the overlay ends it
+  // early.
   const counting = useRef(null)
   const settledChips = useRef(Number(chips) || 0)
   // While reels run, the chip total on screen waits for them: the server already knows the win.
@@ -6529,10 +6527,12 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   useEffect(() => () => {
     timers.current.forEach(clearTimeout)
     if (counting.current) clearInterval(counting.current)
+    // A preference change this machine was still holding is posted on the way out.
+    if (typeof SM_flushPrefs === 'function') SM_flushPrefs()
   }, [])
 
   // The person's manual escape: toggling "Show over chat" clears any celebration this machine is
-  // still drawing, so a stuck rain ends on a click instead of a reload (owner's ask, 2026-11-09).
+  // still drawing, so a stuck rain ends on a click instead of a reload.
   const clearShow = useCallback(() => {
     setCelebrate(null)
     setCoins([])
@@ -6655,8 +6655,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         const big = Boolean(result && result.jackpot)
         setJackpot(big)
         // Sound and spectacle grow with the win, tier by tier: the chime for a small one, coins for
-        // anything real, and for a jackpot an alarm and twenty seconds of ching-ching (owner's ask,
-        // 2026-11-09).
+        // anything real, and for a jackpot an alarm and twenty seconds of ching-ching.
         const wager = Math.max(1, Number(bet) || 25)
         const scale = Math.max(0.5, Math.min(3, payout / wager))
         const tier = SM_tierFor(payout)
@@ -6669,7 +6668,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         const show = big || payout >= wager * 4 || payout >= 100
         if (show) {
           // How long the coins may fall. A normal win never outlasts 10 s; the jackpot is allowed up
-          // to five minutes, and the ✕ on the overlay ends either at once (owner's rule, 2026-11-09).
+          // to five minutes, and the ✕ on the overlay ends either at once.
           const hold = big ? Math.min(300, Math.max(20, tier.seconds)) : Math.min(10, tier.seconds)
           setCelebrate({ payout, big, tier, until: Date.now() + hold * 1000, rainSeconds: hold })
         }
@@ -6696,12 +6695,12 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   // ---- drawing ----
   const windowW = reelWidth * strips.length
   const windowH = cell * rows
-  // The cabinet is as wide as its reels, the shape 9433891 drew (measured then: 284 px of cabinet
-  // around 235 px of reels; the reels filled 71% of it). Everything the machine prints - the pay
-  // strip on the glass and the points card - wraps inside that width instead of stretching the
-  // cabinet: the points card's sentences had grown it to 852 px against 274 px of reels, which is
-  // the elongated cabinet with the reels small at the left (owner's report, 2026-11-10). Measured
-  // here: the deck is the window plus its own border, the line markers and the row's gaps.
+  // The cabinet is as wide as its reels, the shape the first cabinet drew (284 px of cabinet around
+  // 235 px of reels; the reels filled 71% of it). Everything the machine prints - the pay strip on
+  // the glass and the points card - wraps inside that width instead of stretching the cabinet: the
+  // points card's sentences had grown it to 852 px against 274 px of reels, which made an elongated
+  // cabinet with the reels small at the left. Measured here: the deck is the window plus its own
+  // border, the line markers and the row's gaps.
   const deckW = windowW + 2 * (SM_px(4) * 2 + SM_px(16))
   const winCells = new Set()
   shownWins.slice(0, lit).forEach(win => (win.rows || []).forEach((row, reel) => winCells.add(`${row}-${reel}`)))
@@ -6729,8 +6728,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   const cashWant = Math.floor((Number(rewardInfo && rewardInfo.points) || 0) * cashShare / 4) * 4
   const cashGain = Math.floor(cashWant / 4) * 3
   // One function, an explicit number of points: the share buttons above use the chosen slice, and the
-  // "not enough chips" row asks for exactly one spin's worth (found 2026-11-10: at 20 chips against a
-  // 25 bet the table greyed SPIN and every rung with nothing on screen saying why).
+  // "not enough chips" row asks for exactly one spin's worth: at 20 chips against a 25 bet the table
+  // used to grey SPIN and every rung with nothing on screen saying why.
   const cashPointsFor = async want => {
     if (!rewardInfo || want < 4 || cashBusy || typeof onPoints !== 'function') return
     setCashBusy(true)
@@ -6753,7 +6752,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
 
   // An easter egg, when one is out and this person has not found it. It is deliberately quiet -
   // a small mark on the cabinet that brightens under the cursor - because a find should feel like
-  // noticing something, not like a button the game pushed at you (owner's ask, 2026-11-09).
+  // noticing something, not like a button the game pushed at you.
   const eggNow = (rewards && rewards.egg) || null
   const takeEgg = async () => {
     if (!eggNow || typeof onEgg !== 'function' || cashBusy) return
@@ -6763,8 +6762,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       const points = Number(answer && answer.points) || 0
       if (answer && answer.claimed && points > 0) {
         // A find is worth seeing: a short full-screen reveal with a burst, then it gets out of the
-        // way by itself (owner's ask, 2026-11-09: "when user finds an easter egg it should tell them
-        // and show an animation").
+        // way by itself.
         setEggHit({ points, id: eggNow.id })
         later(() => setEggHit(null), 5200)
         setCashFlash(`+${SM_chips(points)} points`)
@@ -6853,8 +6851,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       points: (win.rows || []).map((row, reel) => `${reel * reelWidth + reelWidth / 2},${row * cell + cell / 2}`).join(' '),
       fill: 'none', stroke: smAccent(), strokeWidth: SM_px(2.5), strokeLinecap: 'round', strokeLinejoin: 'round',
       // Light enough that the symbol underneath stays the thing you see: a thick glowing stroke lay
-      // across the reels hid the Nous mark and the wing, which are the jackpot faces
-      // (owner's report, 2026-11-09: "put paylines on lighter background hard to see nous images").
+      // across the reels hid the Nous mark and the wing, which are the jackpot faces.
       opacity: 0.6, strokeDasharray: `${SM_px(6)} ${SM_px(4)}`, mixBlendMode: 'screen',
       style: { filter: `drop-shadow(0 0 ${SM_px(2)}px ${smLook('glow', 'rgba(250,204,21,0.55)')})` }
     }, `line-${index}`))
@@ -6994,8 +6991,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       jsx('style', { children: SM_STYLE }),
       // A found egg says so, loudly and briefly: a burst of sparks, the points, and a line telling the
       // person there are more. Drawn as a fixed layer with pointer-events off, so it can never block
-      // a click and can never leave the machine in a state a reload has to fix (owner's ask,
-      // 2026-11-09: "when user finds an easter egg it should tell them and show an animation").
+      // a click and can never leave the machine in a state a reload has to fix.
       eggHit ? jsxs('div', {
         'data-sm-eggs-found': '1',
         role: 'status',
@@ -7092,7 +7088,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             ]
           }),
           // The way out at any moment: a jackpot is allowed five minutes of rain, and the person
-          // should never have to sit through it (owner's rule, 2026-11-09).
+          // should never have to sit through it.
           jsx('button', {
             type: 'button',
             'data-sm-stop': '1',
@@ -7132,9 +7128,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
           },
           // Each machine draws its own chance when the plugin loads, so the picker still says what
-          // this session holds — in a WORD, never in a percentage (owner's release rule,
-          // 2026-11-11: the mechanics stay, the numbers go). Picking another machine is a real
-          // choice, not a skin (owner's ask, 2026-11-09).
+          // this session holds — in a WORD, never in a percentage: the mechanics stay, the numbers
+          // go. Picking another machine is a real choice, not a skin.
           children: jsxs('span', { style: { display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 } }, { children: [
             jsx('span', { children: item.title }, 'name'),
             jsx('span', {
@@ -7164,13 +7159,11 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           eggNow ? (() => {
             // Some eggs are a picture with a word on it rather than a sparkle: the image and the word
             // come from the catalogue, so a new one is a row in shelf/eggs.py and nothing here.
-            // The word is printed at full size on a pale plaque - readable from the cabinet, which is
-            // the point of this one (owner's ask, 2026-11-09: "make the words clear on it about
-            // rebellion").
+            // The word is printed at full size on a pale plaque, readable from the cabinet, which is
+            // the point of this one.
             // A picture egg is drawn as the artwork itself, nothing printed over it: the Nous stamp
-            // already carries its slogan, so adding a caption would only clutter it (owner's ask,
-            // 2026-11-09: "just the nous image we use in the slots, no need to add anything it already
-            // mentions the slogan on it"). An egg that does want a word still gets one.
+            // already carries its slogan, so adding a caption would only clutter it. An egg that does
+            // want a word still gets one.
             const art = eggNow.art && typeof SM_ART !== 'undefined' && SM_ART && SM_ART[eggNow.art]
             const word = eggNow.word || ''
             return jsxs('button', {
@@ -7257,12 +7250,11 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             ]
           }),
           // The glass: what the machine pays, printed on the cabinet the way a real one does, so
-          // the scoring is decoration rather than something to go looking for (owner's ask,
-          // 2026-11-09: "similar decoration you see on slot machines showing how their points are
-          // scored"). The full table is still behind the Scoring button; this is the headline.
+          // the scoring is decoration rather than something to go looking for. The full table is
+          // still behind the Scoring button; this is the headline.
           (paytable || []).length ? jsxs('div', {
             // Shown in the see-through copy too: the person asked for the same paylines and the same
-            // points on the over-chat machine, not a stripped one (owner's ask, 2026-11-09).
+            // points on the over-chat machine, not a stripped one.
             'data-sm-glass': '1',
             role: 'note',
             'aria-label': 'What this machine pays, in chips per line, across five lines',
@@ -7322,8 +7314,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             title: `You earn 10 points for every 1,000,000 tokens your chats use, in and out, and 100 more for every game you win. Four points turn into three chips.`,
             style: {
               // A loyalty card rather than a line of small print: the balance is the headline, what it
-              // is worth sits beside it, and the earning rule is a footnote under a progress bar
-              // (owner's ask, 2026-11-09: "make the point advertising more clear and look nicer").
+              // is worth sits beside it, and the earning rule is a footnote under a progress bar.
               display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
               gap: `${SM_px(4)}px ${SM_px(8)}px`, marginTop: SM_px(8),
               padding: `${SM_px(6)}px ${SM_px(10)}px`, borderRadius: SM_px(10),
@@ -7379,9 +7370,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                     'data-sm-point-pct': String(pointProgress.pct),
                     // The bar tracks the leaderboard score, not the token remainder: the remainder
                     // fills and empties every few seconds while Hermes talks, so a bar tied to it
-                    // flickered from empty to full and read as broken (owner's report, 2026-11-09:
-                    // "watch the bar graph on the slots it seems not to be working"). Points only go
-                    // up until they are spent, so this one moves in one direction and means something.
+                    // flickered from empty to full and read as broken. Points only go up until they
+                    // are spent, so this one moves in one direction and means something.
                     title: `${SM_chips(rewardInfo.points)} points · ${SM_chips(pointProgress.left)} to ${SM_chips(pointProgress.next)}`,
                     style: {
                       width: SM_px(compact ? 96 : 130), height: SM_px(5), borderRadius: SM_px(999),
@@ -7398,7 +7388,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                   jsx('span', {
                     style: { opacity: 0.85 },
                     // Plain English, because "500 to 500 points" is what the first version printed at
-                    // a zero balance and it means nothing (owner's question, 2026-11-09).
+                    // a zero balance and it means nothing.
                     children: pointProgress.points === 0
                       ? `first mark at ${SM_chips(pointProgress.next)} points`
                       : (pointProgress.left === POINT_STEP
@@ -7430,7 +7420,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                 children: 'Cash in'
               }),
               // The way back from a bad run: points never depend on the cards or the reels, so a
-              // losing streak cannot lock the person out of the machines (owner's ask, 2026-11-09).
+              // losing streak cannot lock the person out of the machines.
               // How much of the score to spend is the person's call.
               jsxs('span', {
                 'data-sm-cash-share': '1',
@@ -7637,8 +7627,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               })
             ]
           }) : null,
-          // The owner asked for the cabinet 20% smaller, with a slider instead of another fixed
-          // number, so the size is theirs to set: 40% to 110%, kept in this browser.
+          // The cabinet sits 20% smaller than it was, with a slider instead of another fixed number,
+          // so the size is theirs to set: 40% to 110%, kept in this browser.
           jsxs('div', {
             'data-sm-scale': '1',
             style: {
@@ -7672,9 +7662,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         children: trouble
       }) : null,
       // A table that cannot spin has to say why and offer the way out. The wallet below the smallest
-      // bet used to leave SPIN and every rung greyed with nothing on screen to explain it (owner's
-      // report, 2026-11-10: "spin nor x1, x2 etc allow you to do anything"). Points convert at four
-      // to three chips, so this asks for just enough to cover one spin.
+      // bet used to leave SPIN and every rung greyed with nothing on screen to explain it. Points
+      // convert at four to three chips, so this asks for just enough to cover one spin.
       (!bare || chat) ? (() => {
         const stake = Number(bet) || Number((bets || [])[0]) || 25
         if (Number(chips) >= stake) return null
@@ -7721,8 +7710,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             'data-sm-bet': amount,
             'aria-pressed': Number(bet) === amount,
             // With auto-bet on the multiplier is not the person's to pick: the machine sizes every
-            // spin itself, so the ladder is greyed out rather than offered and silently ignored
-            // (owner's ask, 2026-11-09).
+            // spin itself, so the ladder is greyed out rather than offered and silently ignored.
             'data-sm-bet-locked': autobetShown ? '1' : undefined,
             disabled: Boolean(busy) || Number(chips) < amount || autobetShown,
             onClick: () => onBet && onBet(amount),
@@ -7742,7 +7730,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         ]
       }) : null,
       // With auto-bet on, the whole ladder is greyed: say so in the open rather than only on hover,
-      // because a locked ladder with no visible reason reads as a broken machine (2026-11-10).
+      // because a locked ladder with no visible reason reads as a broken machine.
       (!bare || chat) && autobetShown ? jsx('div', {
         'data-sm-bet-hint': '1',
         style: {
@@ -7753,8 +7741,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       }) : null,
       // The odds window. The mechanics are untouched — the session's chance and return are still
       // drawn by the shelf and still paid — but no percentage is printed here or anywhere else on
-      // either machine (owner's release rule, 2026-11-11: "keep the mechanics; just do not show the
-      // numbers"). What is left is the one sentence a player has to know before spending.
+      // either machine. What is left is the one sentence a player has to know before spending.
       (!bare || chat) ? jsx('div', {
         'data-sm-odds': '1',
         style: { fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary), textAlign: 'center', maxWidth: '100%', overflowWrap: 'anywhere' },
@@ -7913,8 +7900,8 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
     let viewport = frame.closest('.games-center-layout')
     // The same cabinet is also drawn in the pane beside the chat ("Play while you wait"), which is
     // narrow and has no game-page wrappers. It used to skip the fit entirely and draw at its full
-    // 1183 px inside a ~400 px pane, which is the oversized, cut-off machine the owner reported
-    // (2026-11-10). Fit the pane when there is no game page.
+    // 1183 px inside a ~400 px pane, which drew the oversized, cut-off machine. Fit the pane when
+    // there is no game page.
     if (!page || !viewport) {
       const pane = frame.closest('.games-wait-pane')
       if (pane) { page = pane; viewport = pane }
@@ -7964,8 +7951,8 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
   const [liveReward, setLiveReward] = useState(null)
   const [liveFeed, setLiveFeed] = useState(null)
   // Poll /jackpot whatever the picture carried. The picture used to be enough - and then the
-  // points froze the moment the page's own snapshot stopped moving, which is exactly what the owner
-  // saw ("I don't see I earned any points anytime recently"). The live read wins over the picture.
+  // points froze the moment the page's own snapshot stopped moving, so the card showed whatever the
+  // page had last drawn. The live read wins over the picture.
   useEffect(() => {
     let alive = true
     let timer = null
@@ -7973,7 +7960,7 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
       const rest = SM_API.rest
       // The door is wired by the status-bar item, which may mount after this page: returning here
       // and never retrying is what left the card showing the page's stale picture - chips live,
-      // points stuck at zero (owner's report, 2026-11-09: "still says I have zero points").
+      // points stuck at zero.
       if (!rest) { if (alive) timer = setTimeout(load, 500); return }
       try {
         const next = await rest('/jackpot')
@@ -8024,7 +8011,7 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
   const result = newest && machine && newest.machine === machine.id ? newest : null
   const reward = liveReward || pictureReward
   // Points into chips at 75%: the same door as the reward chips, kept beside it so the page and the
-  // overlay spend points the same way (owner's ask, 2026-11-09).
+  // overlay spend points the same way.
   const cashPoints = async points => {
     // `points` is how much of the score the person chose to spend; omitting it spends everything,
     // which is what an older desktop did and the server still accepts.
@@ -8129,7 +8116,7 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
 // Two surfaces: the chip in the status bar (the switch, the running total, and the panel a click opens),
 // and the see-through copy of the cabinet that 78-overchat-slot.js draws in the composer's underside
 // slot. The copy is a slot contribution, not an overlay: nothing here measures the app, appends to its
-// <body> or reads the route (review, 2026-11-12).
+// <body> or reads the route.
 
 const JP_STORE = { open: false, listeners: new Set() }
 const JP_STORAGE_KEY = 'gameshelf.jackpot.overlay'
@@ -8223,8 +8210,8 @@ async function jpVisible(delta, send) {
 
 function JackpotStatusItem({ ctx }) {
   SM_API.rest = (path, opts) => ctx.rest(path, opts)
-  // The chip is only part of the status bar when the person has asked for the over-chat machine
-  // (owner's ask, 2026-11-09). The switch that turns it on lives in the Slots table's settings, so
+  // The chip is only part of the status bar when the person has asked for the over-chat machine.
+  // The switch that turns it on lives in the Slots table's settings, so
   // nothing appears in the bar until it is wanted, and turning it off there removes it again.
   const [open, setOpen] = useJpOpen()
   const [data, setData] = useState(null)
@@ -8236,7 +8223,7 @@ function JackpotStatusItem({ ctx }) {
   // table may not be mounted: this item returns null while the copy is off, so nothing inside it
   // ever runs, and the copy could only be switched on from a screen that was itself hidden. That
   // deadlock is why the machine never came back after a rebuild even though the wallet said it was
-  // on (found 2026-11-10, with Claude's read of the same path).
+  // on.
   useEffect(() => {
     if (data && data.overchat) SM_adoptPrefs(data.overchat)
   }, [data && data.overchat && data.overchat.on, data && data.overchat && data.overchat.alpha,
@@ -8272,6 +8259,9 @@ function JackpotStatusItem({ ctx }) {
   useEffect(() => {
     if (!SDK_HOST || typeof SDK_HOST.onEvent !== 'function') return undefined
     let stop = () => {}
+    // The 400 ms read that follows a reply is armed per event, so it is cleared on the way out:
+    // the chip's copy can be closed the moment a reply starts.
+    const timers = []
     const pull = () => {
       if (loadNow.current) loadNow.current()
       const latest = dataRef.current
@@ -8280,12 +8270,15 @@ function JackpotStatusItem({ ctx }) {
     try {
       stop = SDK_HOST.onEvent('message.start', () => {
         pull()
-        setTimeout(() => { if (loadNow.current) loadNow.current() }, 400)
+        timers.push(setTimeout(() => { if (loadNow.current) loadNow.current() }, 400))
       }) || stop
     } catch {
       // An older host has no event stream; the poll still catches the spin.
     }
-    return () => { try { stop() } catch { /* nothing to unwire */ } }
+    return () => {
+      try { stop() } catch { /* nothing to unwire */ }
+      timers.forEach(clearTimeout)
+    }
   }, [])
   useEffect(() => {
     const row = data && data.feed && data.feed[0]
@@ -8426,7 +8419,7 @@ function JackpotStatusItem({ ctx }) {
         onClick: toggle,
         autoFocus: false,
         style: {
-          // Owner's note, 2026-11-09: the chip was a small target in a wide bar. It is a proper
+          // The chip was a small target in a wide bar. It is a proper
           // button now - taller, with room around the label - while staying one row high.
           display: 'flex', gap: 6, alignItems: 'center',
           padding: '2px 9px', minHeight: 22, border: 'none', background: 'transparent',
@@ -8555,7 +8548,7 @@ function JackpotOverlay({ ctx, onClose, data }) {
   // This is the sidebar copy of the machine: always a real, clickable panel in the corner.
   // The see-through copy over the chat is its own component below, mounted by the status item
   // so it is there whether or not this panel is open.
-  // Owner's note, 2026-11-09: the panel was sprawling over the session. It is bounded by the window
+  // The panel was sprawling over the session. It is bounded by the window
   // and by the chat column it sits beside, scrolls its own body, and never grows wider than the
   // conversation it is covering.
   const style = {
@@ -8607,9 +8600,8 @@ function JackpotOverlay({ ctx, onClose, data }) {
 // the composer's `composer.underside` slot (78-overchat-slot.js), which is a real surface of the
 // Desktop SDK. That slot belongs to the conversation's composer, so it exists exactly while the
 // conversation is on screen. There is no route sniffing here, no scan of the app's textareas, no walk
-// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body> — the
-// review's finding (2026-11-12), and the reason an app update can no longer break this machine or be
-// broken by it.
+// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body>, so an
+// app update can neither break this machine nor be broken by it.
 //
 // HOW BIG IT IS. The strip that owns the slot measures its own box and hands each machine its share of
 // the width; this component fits the cabinet into that share and then applies the person's own size
@@ -8762,7 +8754,7 @@ function SlotsOverChatCopy({ ctx, width }) {
         paytable: (snapshot && snapshot.paytable) || [],
         compact: false,
         // The copy is the same machine as the one in the wait pane, points card and printed glass
-        // included (owner's ask, 2026-11-09), with its dismissal controls (`chat: true`).
+        // included, with its dismissal controls (`chat: true`).
         bare: false,
         chat: true,
         cabinetRef,
@@ -8779,35 +8771,33 @@ function SlotsOverChatCopy({ ctx, width }) {
 // ---- 19-jackpot2-layer.js: JACKPOT v2 in the composer's own slot — its switch and the full view
 //
 // JACKPOT v2 is a second slot machine beside the old one (18-slot-machine.js / 18-slots.js /
-// 19-jackpot-overlay.js, which are NOT touched by this part). This part owns the switch and the look
-// sliders, the cabinet as it appears over the conversation, and the full-screen view the Games page
-// opens.
+// 19-jackpot-overlay.js). This part owns the switch and the look sliders, the cabinet as it appears
+// over the conversation, and the full-screen view the Games page opens.
 //
 // THE MACHINE IS NOT HERE. It is 18-jackpot2-machine.js — JackpotMachine({ ctx, mode }) — designed at
 // ONE fixed size, 560x720. Everything in this file only ever scales the box the machine sits in, with a
 // CSS transform, so the machine itself never has to know how big it is. When a bundle is built without
-// that part (the lanes are written side by side) the copy still builds and can be tested: it draws a
-// plain "not in this build yet" plate in the machine's place.
+// that part the copy still builds and can be tested: it draws a plain "not in this build yet" plate in
+// the machine's place.
 //
-// WHERE THE COPY IS DRAWN (review, 2026-11-12). Not in a div of our own appended to document.body, not
-// measured against the app's own markup, and with no stylesheet pushed into the app's <head>: all three
-// were "the plugin over-chat machine reaches into the app's own markup", and the review is right that a
-// plugin must live inside SDK surfaces so an app update can neither break it nor be broken by it.
+// WHERE THE COPY IS DRAWN. Not in a div of our own appended to document.body, not measured against the
+// app's own markup, and with no stylesheet pushed into the app's <head>: a plugin must live inside SDK
+// surfaces, so an app update can neither break it nor be broken by it.
 //
 // The copy is a contribution to the composer's `composer.underside` slot and is rendered in our own
 // tree by 78-overchat-slot.js, which owns the strip, the layout and the width each machine is given.
-// Three things follow, and they are the reason this shape is better rather than merely compliant:
+// Two things follow:
 //
 //   - "only over the conversation" is now structural. The slot belongs to the chat composer, so it does
 //     not exist on the Games page, in Settings or on another plugin's page. No route sniffing and no
 //     DOM test is needed to keep the machine off those screens.
 //   - the size comes from the slot. The strip measures ITS OWN box and hands this copy its share of the
 //     width (jp2LSlotScale); nothing here reads window.innerWidth or another element's rect, so a docked
-//     pane, a narrow window or a split layout all size the copy correctly with no measurement of the
-//     app at all.
-//   - the look (see-through, size, colour) is still one stored setting shared by every surface, and it
-//     still lives in ctx.storage: 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size',
-//     'jackpot2.hue', 'jackpot2.gradient', read live through JP2L_STORE.
+//     pane, a narrow window or a split layout all size the copy correctly.
+//
+// The look (see-through, size, colour) is one stored setting shared by every surface, in ctx.storage:
+// 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size', 'jackpot2.hue', 'jackpot2.gradient', read
+// live through JP2L_STORE.
 //
 // The tint is a stylesheet of ours, scoped to the cabinet's published root class INSIDE OUR OWN STAGE
 // (`[data-jp2-stage][data-jp2-tint] .jp2-machine`) and rendered as a <style> element in the stage's own
@@ -8834,13 +8824,10 @@ function SlotsOverChatCopy({ ctx, width }) {
 //   jp2LTintVars(tint)         the CSS values for the tint, or null at the default
 //   Jackpot2OverChatControls({ ctx, tone })   the switch, the sliders and the colour
 //   Jackpot2Full, Jackpot2Tile, jp2LPlayTiles
-// A word on names, because it has bitten this feature once already: tools/build_plugin.py puts every
-// part in ONE module scope, so two parts that declare the same name overwrite each other in silence
-// (the last one wins). The first cut of this part declared jp2Publish(), which the machine's part
-// owns — the machine's own publish would have run this part's instead. The name is jp2LPublish now,
-// and the published surface above is exactly what the harnesses ask for, so a clash with a later part
-// shows up as a harness failure rather than as a machine that quietly does nothing. Check before
-// adding a plain jp2Foo() here.
+// A word on names: tools/build_plugin.py puts every part in ONE module scope, so two parts that declare
+// the same name overwrite each other in silence (the last one wins). The published surface above is
+// exactly what the harnesses ask for, so a clash with another part shows up as a harness failure rather
+// than as a machine that quietly does nothing. Check before adding a plain jp2Foo() here.
 // Defaults and key names: alpha 0.25 (range 0.25 - 1, step 0.05), size 1 (range 0.25 - 2), hue 170
 // (range 0 - 360), gradient 'teal'.
 
@@ -8857,14 +8844,13 @@ const JP2L_ALPHA_MAX = 1
 const JP2L_ALPHA_STEP = 0.05
 // See-through by default: the machine sits under the composer, and the conversation around it has to
 // stay readable. Fully opaque is allowed, and so is fading it back to a quarter — the floor is 0.25,
-// never fully transparent, so the machine can never be there-but-invisible (owner's release rule,
-// 2026-11-11).
-// As see-through as it goes by default (owner, 2026-11-11: "default see thru should be the most").
+// never fully transparent, so the machine can never be there-but-invisible. The default sits at that
+// floor: as see-through as the range goes.
 const JP2L_ALPHA_DEFAULT = JP2L_ALPHA_MIN
 const JP2L_SIZE_MIN = 0.25
 const JP2L_SIZE_MAX = 2
 // Full size by default. "100%" is now the largest the composer's slot allows rather than the whole chat
-// column, which is a smaller box: keeping the old 50% would have halved the machine twice (review, 2026-11-12).
+// column, which is a smaller box: keeping the old 50% would have halved the machine twice.
 const JP2L_SIZE_DEFAULT = 1
 // What colour the copy's frosted frame is. The hue of the cabinet's own accent, #3ee0c5, is 170.0
 // exactly — so 170 IS "the current teal", and it is the default.
@@ -9275,7 +9261,7 @@ function jp2LStyleRules(tint) {
     '[data-jp2-stage] { pointer-events: none; }',
     '[data-jp2-stage] button, [data-jp2-stage] input, [data-jp2-stage] select, [data-jp2-stage] textarea,',
     '[data-jp2-stage] [data-jp2-control] { pointer-events: auto; }',
-    // Over the chat the machine is to WATCH (owner, 2026-11-11): its spin, lever, bet, machine picker and
+    // Over the chat the machine is to WATCH: its spin, lever, bet, machine picker and
     // other buttons do not take a click there - only the X, the sound switch and the look controls do.
     '[data-jp2-stage] .jp2-machine button:not([data-jp2-sound]):not([data-jp2-close]) { pointer-events: none !important; cursor: default !important; }',
     '[data-jp2-stage] .jp2-machine [data-jp2="overchat-row"] button { pointer-events: auto !important; cursor: pointer !important; }',
@@ -9291,7 +9277,7 @@ function jp2LStyleRules(tint) {
 
 // The scaled stage: the machine at its design size inside a box that is transform-scaled from the
 // top-left corner, which is the only thing the caller is allowed to do to it. The <style> child is the
-// stage's own rules — a document-wide stylesheet is exactly what the review asked us to stop doing.
+// stage's own rules — a document-wide stylesheet would leak into the app.
 function jp2LStage(ctx, geo, mode, tintNow) {
   const scale = geo && Number.isFinite(geo.scale) ? geo.scale : 1
   const overlay = (mode || 'overlay') === 'overlay'
@@ -9550,9 +9536,8 @@ function Jackpot2Tile({ onOpen }) {
   })
 }
 
-// The Play shelf with the Jackpot entry in it, right after the shelf's own Slots card (the owner's
-// ask: a Jackpot entry beside the old slots entry). A search only keeps it when it matches, exactly
-// like every shelf card around it.
+// The Play shelf with the Jackpot entry in it, right after the shelf's own Slots card. A search only
+// keeps it when it matches, exactly like every shelf card around it.
 function jp2LPlayTiles(list, open, waiting, openJackpot, matches) {
   const tiles = (list || []).map(item => playTile(item, open, waiting(item.id)))
   return tiles
@@ -9567,7 +9552,7 @@ function Jackpot2Full({ ctx, frame, size, onBack }) {
   const width = frame && Number(frame.width) > 0 ? Number(frame.width) : 0
   const height = frame && Number(frame.height) > 0 ? Number(frame.height) : 0
   // The playable cabinet (pane, Games page) is always full size unless a caller says otherwise: the Size
-  // slider belongs to the copy over the chat only (owner, 2026-11-11 - only that copy may change).
+  // slider belongs to the copy over the chat only; the playable cabinet is never resized.
   const factor = Number.isFinite(Number(size)) ? Number(size) : 1
   useEffect(() => {
     const read = () => {
@@ -9661,9 +9646,9 @@ const PLAY_NOTE = 'Only games we checked for seats, turns, a clear winner, repla
 
 // The account total, read from the shelf's own /jackpot route: the CHIPS the machines play with and
 // the points the person has earned. One small chip, used by the Game Center masthead and by the
-// Play-while-you-wait pane under its Game and Lobby buttons (owner's ask, 2026-11-09): the person
-// should be able to see what they have earned without opening a game. Chips first, then points
-// (owner's ask, 2026-11-11: the header shows the wallet, not only the points).
+// Play-while-you-wait pane under its Game and Lobby buttons: the person should be able to see what
+// they have earned without opening a game. Chips first, then points, so the header shows the wallet
+// and not only the points.
 function PointsChip({ ctx, style }) {
   const [wallet, setWallet] = useState(null)
   useEffect(() => {
@@ -9723,8 +9708,8 @@ function submitTarget(submit) {
   return { href: '', label: 'Submit your game' }
 }
 
-// The three ways out to the project itself, and the only links on the main screen that leave Hermes
-// (owner's ask, 2026-11-11). Every address is a fixed https page on the repository, and the click is
+// The three ways out to the project itself, and the only links on the main screen that leave Hermes.
+// Every address is a fixed https page on the repository, and the click is
 // handed to the person's own browser through the same openInBrowser door the Submit button and the
 // community shelf use — nothing is ever framed or navigated inside Hermes. The guide link is the
 // file the repo ships at docs/SUBMIT-A-GAME.md (docs/ADD-YOUR-GAME.md is its shorter sibling).
@@ -9797,8 +9782,8 @@ function playTile(item, onOpen, waiting = 0) {
 }
 
 // A card in the Experimental section: the title, the plugin it came from, one plain line about what
-// it is not - and no way in. Owner's ask 2026-11-10, #7: the section is visible but locked, so this
-// card is drawn like every other locked card (labsLockStyle/labsLockTag in 27-labs.js). The `onOpen`
+// it is not - and no way in. The section is visible but locked, so this card is drawn like every
+// other locked card (labsLockStyle/labsLockTag in 27-labs.js). The `onOpen`
 // the page still passes is deliberately not wired: a locked card has no handler at all.
 function YourGameCard({ item }) {
   return jsxs('div', {
@@ -10034,19 +10019,19 @@ function CommunityShelf({ community, ctx }) {
   return communityShelf(community, ctx, setNote, note)
 }
 
-// ---- 27-labs.js: the Labs shelf, where a Phase 1 experiment is shown as one
-// Labs is one shelf, one badge and one card shape. Another lane adds its experiment by adding a
-// `labsBlock(...)` inside the shelf, and its cards with `labsCard(...)`; it never adds a second
-// badge, a second heading style or a new colour. Nothing in Labs is Play: no experiment here is
+// ---- 27-labs.js: the Labs shelf, where a Phase 1 experiment is shown
+// Labs is one shelf, one badge and one card shape. An experiment is added as one `labsBlock(...)`
+// inside the shelf, with its cards from `labsCard(...)`; it never adds a second badge, a second
+// heading style or a new colour. Nothing in Labs is Play: no experiment here is
 // reviewed, seated, rated or visible to a lobby, and every card says who made it.
 
 const LABS_BADGE = 'Labs · experiment'
 const LABS_NOTE = 'New experiments that may change or be removed at any time. Nothing here is part of the reviewed Play shelf.'
 
-// ---- The lock on the Experimental section (owner's ask 2026-11-10, #7) -------------------------
+// ---- The lock on the Experimental section ------------------------------------
 // The Experimental section is a shop window, not a door: every game in it stays visible and cannot
 // be opened, so a draft that is not finished never costs the shelf a mark on polish. The lock is
-// one vocabulary written once here - one badge, one tooltip, one dim - so every lane's card reads
+// one vocabulary written once here - one badge, one tooltip, one dim - so every card reads
 // the same and no card invents its own way of saying no.
 const LABS_LOCK_BADGE = '🔒 Coming soon'
 const LABS_LOCK_TITLE = 'Experimental — not open yet. Coming soon.'
@@ -10081,7 +10066,7 @@ function labsLockStyle(extra) {
   }, extra || {})
 }
 
-// A locked card whose art is drawn by a file this lane does not own (Pet Battles, Mafia Town): the
+// A locked card whose art is drawn by a file this part does not own (Pet Battles, Mafia Town): the
 // card keeps its own picture, and this wrapper takes its doors away. Clicks and keys are stopped in
 // the capture phase, so a button inside never runs its handler - by mouse or by Enter/Space - and
 // the inner copy takes no pointer events at all, so the cursor stays not-allowed over it.
@@ -10122,7 +10107,7 @@ function labsBadge() {
   })
 }
 
-// The shelf heading, written once so every lane renders the same words in the same place.
+// The shelf heading, written once so every block renders the same words in the same place.
 function labsHeading(note = LABS_NOTE) {
   return jsxs('div', {
     style: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, minWidth: 0 },
@@ -10220,8 +10205,8 @@ function labsCard(item, ctx, setNote) {
   })
 }
 
-// A Labs card for a game that can be played right here - locked for now (owner's ask 2026-11-10,
-// #7): the same quiet shape as the link-out cards, the same picture and words, and no way in. The
+// A Labs card for a game that can be played right here - locked for now: the same quiet shape as
+// the link-out cards, the same picture and words, and no way in. The
 // `onOpen` a caller still passes is deliberately not wired: a locked card has no handler at all.
 function labsPlayCard(item) {
   return jsxs('div', {
@@ -10261,13 +10246,13 @@ function labsPlayCard(item) {
   })
 }
 
-// The whole shelf: heading, badge, one note, then the blocks. A lane with nothing to show returns
+// The whole shelf: heading, badge, one note, then the blocks. A block with nothing to show returns
 // null rather than an empty box.
 function labsShelf(children, note = LABS_NOTE, options = {}) {
   const shown = (Array.isArray(children) ? children : [children]).filter(Boolean)
   if (!shown.length) return null
   // Under the Experiments heading the shelf does not repeat its own title: one heading for the
-  // whole area (owner's ask, 2026-11-09).
+  // whole area.
   const withHeading = options.withHeading !== false
   return jsxs('div', {
     'data-labs-section': 'true',
@@ -10277,7 +10262,7 @@ function labsShelf(children, note = LABS_NOTE, options = {}) {
 }
 
 // A whole Labs block of link-out cards, with its own note under the cards. The Make games shelf is
-// the first user of this; another lane's shelf is the second, and neither needs new styles.
+// the first user of this; a second block is the second, and neither needs new styles.
 function LabsLinks({ title, note, notice, items, ctx }) {
   const [said, setSaid] = useState('')
   if (!items || !items.length) return null
@@ -10405,8 +10390,8 @@ function opponentChoices(view) {
 }
 
 // The words on the wait line: one wording, the same two names the rest of the shell uses, and the
-// words the person reads while the other side works (owner's ask, 2026-11-11: "Hermes is thinking…
-// 12s"). The model itself is named on the "You vs …" chip above the board, and on the wait line's
+// words the person reads while the other side works. The model itself is named on the "You vs …" chip
+// above the board, and on the wait line's
 // own hover, where there is room for "Your Hermes model (deepseek-v4-flash)" — never on the line
 // itself, which is read at a glance.
 function trafficName(seat) {
@@ -10444,9 +10429,9 @@ function pieceWord(letter) {
 
 // Who is across the table, said in one line, from the seats the table already has.
 //
-// Owner's ask 2026-11-10: a table must always say who you are playing - "vs Computer
-// (Beginner)" or "vs Hermes model: <name>" - because a board that names nobody leaves
-// a person unable to tell whether their own model is spending tokens on the game.
+// A table must always say who you are playing - "vs Computer (Beginner)" or "vs Hermes
+// model: <name>" - because a board that names nobody leaves a person unable to tell
+// whether their own model is spending tokens on the game.
 // One seat answers it: seat.kind "local" is the built-in player, "agent" is the
 // person's own Hermes model, and a house table (Blackjack) names the seat's role
 // (the dealer) instead of a strength it does not have.
@@ -10455,7 +10440,7 @@ function opponentSeatOf(pictured) {
   return seats.find(seat => seat.kind === 'agent') || seats.find(seat => seat.kind === 'local') || null
 }
 
-// The strength the built-in player is at, in the owner's words (kit.py levels).
+// The strength the built-in player is at, named as kit.py names it.
 function seatLevelOf(pictured) {
   const said = String((pictured && pictured.level) || '').toLowerCase()
   if (!said) return ''
@@ -10594,9 +10579,8 @@ function resultCountLine(pictured) {
 // lobby address and no copy-the-link invite. Nothing here opens the person's web
 // browser for a game.
 
-// How long the other seat has been on move. The owner's report, 2026-11-09: "nothing tells me why
-// I'm waiting so long or if it's my turn" - a still caption reads as a frozen screen after a few
-// seconds, a counter reads as work happening.
+// How long the other seat has been on move. A still caption reads as a frozen screen after a few
+// seconds, with no way to tell whose turn it is; a counter reads as work happening.
 function useWaitSeconds(active) {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
@@ -10629,8 +10613,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // still exists: this puts the game's own start screen back in front of the person.
   const [leftSeat, setLeftSeat] = useState(false)
   // Points, on the table itself. Every win outside blackjack is worth 100, and the number should
-  // move in front of the person who earned it rather than live only in the slots panel (owner's ask,
-  // 2026-11-09). Reading it is decoration: any failure leaves the table exactly as it was.
+  // move in front of the person who earned it rather than live only in the slots panel. Reading it
+  // is decoration: any failure leaves the table exactly as it was.
   const [points, setPoints] = useState(null)
   const readPoints = () => {
     try {
@@ -10755,7 +10739,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   }
   // Leaving the table. With no game in progress it is one press (Close table): the shelf
   // comes back and nothing is thrown away. While a game IS active the row's "Leave table"
-  // asks once and says, in the owner's words, that leaving forfeits the game — a resignation
+  // asks once and says that leaving forfeits the game — a resignation
   // against another person, and a thrown-away board against the computer or a shared keyboard.
   const leaveTable = async () => {
     if (status !== 'active' || !ownSeats.length) {
@@ -10877,7 +10861,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   const countLine = over ? resultCountLine(pictured) : ''
   // A game whose rules cannot end level offers no draw, anywhere on its screen.
   const drawable = game.draws !== false && (!pictured || pictured.draws_allowed !== false)
-  // The series line the owner asked for: names, not colours — 'Patchfox (Bot) 2 ·
+  // The series line: names, not colours — 'Patchfox (Bot) 2 ·
   // Computer (Hard) 1 · Draws 0'. Colours only appear while a seat is still empty.
   const seriesLine = `${seatLabel(seatOn('white'))} ${score.white || 0} · ${seatLabel(seatOn('black'))} ${score.black || 0}`
     + (drawable ? ` · Draws ${score.draws || 0}` : '')
@@ -10893,8 +10877,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // Never leave the person wondering whether it crashed: a model's seat is a wait the moment the
   // board says it is that seat's turn, and a machine seat answering a request of ours is a wait
   // while that request is out. A computer seat merely on move is NOT "thinking" — nothing of ours
-  // is out, so the line says it is waiting instead of claiming work that is not happening
-  // (owner's ask, 2026-11-11). My own turn is announced the moment the board says it is mine.
+  // is out, so the line says it is waiting instead of claiming work that is not happening.
+  // My own turn is announced the moment the board says it is mine.
   const thinking = Boolean(status === 'active' && (agentOnMove(pictured) || (busy && machineSeat)))
   const someoneElse = Boolean(status === 'active' && !thinking && !access.can_move && !spectating && !over)
   const waited = useWaitSeconds(thinking || someoneElse)
@@ -10917,7 +10901,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // One status line under the header, in one wording: "Your turn", "<who> is thinking… Ns",
   // "Waiting for <who>… Ns", or the result. A wait always names the seat the same way the
   // "You vs …" line does, never "your bot", and it always counts: a line that reads "0s" is
-  // telling the person the clock is running (owner's ask, 2026-11-11).
+  // telling the person the clock is running.
   // Backgammon's own turn has steps (roll, then spend the dice), so on the person's own turn its
   // board owns the words (14b-backgammon-svg.js); every wait uses the shared line above.
   const backgammonLine = pictured && pictured.view === 'backgammon' && myTurnNow
@@ -10963,9 +10947,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   const agentChoice = chosen.find(choice => choice.id === 'agent') || null
   const startOff = botOff || !access.can_manage
   // A solo table that seats an AI side (Blackjack's dealer) is offered the same two ways
-  // on as every board game (owner's ask 2026-11-10: "give it the same 'New game vs
-  // computer' and 'Play my Hermes model' controls the board games have"). A solo table
-  // with nobody to seat (Slots) keeps the one Play button it has always had.
+  // on as every board game. A solo table with nobody to seat (Slots) keeps the one Play button it
+  // has always had.
   const seatsNobody = gameSeatsNobody(game, pictured)
   const seatsAnAi = !botOff && !seatsNobody
   const vsBlack = sideWords.black.toLowerCase()
@@ -11070,8 +11053,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
             jsx('span', { className: 'games-opponent-model', style: { fontSize: 12, color: text.secondary, fontFamily: 'var(--font-mono, monospace)', overflowWrap: 'anywhere' }, children: agentChoice.model ? `${agentChoice.model}${agentChoice.where ? ` · ${agentChoice.where}` : ''}` : 'Your agent · your model' })
           ] }),
           jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Your own Hermes model plays ${sideWords.black.toLowerCase()}, one move per turn. Pick the model in Hermes Settings → Models → "Game Shelf opponent".` }),
-          // Owner's ask 2026-11-09: choosing a Hermes model offers both shapes - you against a
-          // model, or two models against each other so their play can be compared.
+          // Choosing a Hermes model offers both shapes - you against a model, or two models
+          // against each other so their play can be compared.
           modelMenu
             ? jsxs('div', {
                 'data-model-menu': '1',
@@ -11343,8 +11326,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
       children: [
         jsx('div', { className: 'games-result-title', style: { fontSize: 30, fontWeight: 800, lineHeight: 1.1 }, children: headline }),
         // The payout, said out loud: a win outside blackjack is worth 100 points, and the card shows
-        // it landing rather than leaving the person to find the number later (owner's ask,
-        // 2026-11-09).
+        // it landing rather than leaving the person to find the number later.
         iWon ? jsxs('div', {
           'data-gm-win-bonus': '100',
           style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, animation: 'gm-bonus 900ms cubic-bezier(.2,.9,.3,1.25) both' },
@@ -11557,7 +11539,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
               drawnView === 'blackjack' || drawnView === 'slots'
                 ? jsx(drawnView === 'blackjack' ? BlackjackTable : SlotsTable, {
                     picture: pictured,
-                    // The felt says who is across it (ask 2026-11-10).
+                    // The felt says who is across it.
                     against: opponentWords(pictured, view, solo),
                     interactive: Boolean(game.installed && access.can_move && !busy && !confirmation),
                     busy,
@@ -11782,9 +11764,8 @@ const PIP_FACES = {
 
 // One static or one-frame diagram drawn small and quiet: the rules card's
 // picture, not a second board. Frames animate through LearnDiagram's index.
-// The plain grid pictures (letters on blank squares) read as nothing to a new player in every game
-// (owner, 2026-11-11), so they stay hidden until they are redrawn on the real board; dice, cards
-// and seats still show.
+// The plain grid pictures (letters on blank squares) read as nothing to a new player in every game,
+// so they stay hidden until they are redrawn on the real board; dice, cards and seats still show.
 function shownDiagram(diagram) {
   return diagram && (diagram.kind || 'grid') !== 'grid' ? diagram : null
 }
@@ -12613,7 +12594,7 @@ function talkReveal(pictured) {
   })
 }
 
-// ---- Watch it think: the owner's own bot's working, and the corner coach ----
+// ---- Watch it think: your own bot's working, and the corner coach ----
 // A bot's Read answers and its scratchpad are private. The backend sends them
 // only to the person whose seat shares that bot; this panel renders what it was
 // given and never asks for more.
@@ -12912,7 +12893,7 @@ function TalkingTable({ game, view, board, send, onBack, refresh, ctx }) {
     if (!text.trim() || busy) return false
     return run(`${game.id} coach ${text.trim()}`)
   }
-  // Between rounds the table holds still for one whisper: while the owner's own
+  // Between rounds the table holds still for one whisper: while the person's own
   // bot is the next to move and the window is open, the machine seats wait.
   const coached = (pictured && (pictured.places || []).some(place =>
     place.playing && (place.kind === 'agent' || place.kind === 'champion'))) || false
@@ -13368,7 +13349,7 @@ function DoctrinePanel({ game, view, board, send, playMove, importText, refresh,
         children: sentence
       }) : null,
       // Watch it think, Doctrine flavour: the working that led to the card it
-      // just wrote. It is the owner's own card, so only this screen has it.
+      // just wrote. It is the person's own card, so only this screen has it.
       d.prep ? jsxs('section', {
         'aria-label': 'How it wrote this card',
         className: 'games-doctrine-prep',
@@ -13530,7 +13511,7 @@ function DoctrinePanel({ game, view, board, send, playMove, importText, refresh,
           jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }, children: [
             field(profile, setProfile, 'Signature', () => { if (profile.trim()) command(`author ${profile.trim()}`) }),
             // A signature, not a profile: this name is written into the card's author field and nothing
-            // else. The card is written by the person's own model (quality review, 2026-11-13).
+            // else. The card is written by the person's own model.
             button('Write a card', () => { if (profile.trim()) command(`author ${profile.trim()}`) }, { disabled: busy || !profile.trim(), title: 'Your own model writes one card, signed with the name you type. One word: letters, numbers, dots, dashes.' })
           ] })
         ]
@@ -18185,8 +18166,8 @@ function ModelPicker({ routes, current, onPick, ctx, hint = '' }) {
 
 // ---- 60-settings-and-alerts.js: the welcome, Settings and the quiet alert line
 
-// Owner's ask, 2026-11-09: no alerts in any game for now. One switch, so every surface that could
-// raise one - the line on the page, the pane's list, the desktop notification - is silent together,
+// No alerts in any game for now. One switch, so every surface that could raise one - the line on the
+// page, the pane's list, the desktop notification - is silent together,
 // and bringing them back is this one line. The components stay in the bundle.
 const ALERTS_OFF = true
 // ---------------------------------------------------------------------------
@@ -18296,8 +18277,7 @@ function WelcomePanel({ view, ctx, onDone }) {
 // Settings: the name, one switch per Play game, a pause, and whether AI seats
 // may play here. Every change is saved as it is made.
 //
-// The version chip lives at the top of THIS panel (owner, 2026-11-10: "keep everything in the status
-// bar except the version chip. The version chip lives in Settings"), so it is on the full-screen
+// The version chip lives at the top of THIS panel, not in the status bar, so it is on the full-screen
 // Settings screen and on the play-while-you-wait pane's own Settings view, both drawn by this one
 // component. The three navigation hooks are optional because they only make sense on the full page:
 // the pane welds a way back to itself and no links it cannot honour. Everything else — every row,
@@ -18424,7 +18404,7 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
             jsx(SoundSetting, {}, 'sound')
           ]
         }),
-        // The Jackpot cabinet's own switch, in Settings too (owner's ask, 2026-11-11): the SAME
+        // The Jackpot cabinet's own switch, in Settings too: the SAME
         // component the cabinet's panel and the status bar draw, reading and writing the same three
         // keys — so the two Settings views (the page's and the play-while-you-wait pane's, which is
         // this very component) can never drift from the machine. Guarded by name so a bundle built
@@ -18519,7 +18499,7 @@ const PANE_ID = 'hermes-gameshelf:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
 const PANE_WIDTH = '360px'
-// The four the owner named for a quick game. Order is the order they are offered.
+// The four quick games. Order is the order they are offered.
 const QUICK_GAMES = ['connect4', 'reversi', 'gomoku', 'breakthrough']
 const QUICK_LEVEL = 'intermediate'
 const IDLE_CHAT = { get: () => false, subscribe: () => () => {} }
@@ -18592,7 +18572,7 @@ function paneAlerts(ctx) {
 
 function alertsOn(ctx, gameId) {
   // The status-bar count is a quiet readout, not an alert drop: it stays. What ALERTS_OFF silences
-  // is anything that pops up or notifies (owner's ask, 2026-11-09).
+  // is anything that pops up or notifies.
   const settings = paneAlerts(ctx)
   return Boolean(gameId && !settings.paused && settings.games[gameId])
 }
@@ -18622,8 +18602,7 @@ function matchFound(lobby, name) {
   return games.find(game => othersLooking(lobby, game, name).length) || ''
 }
 
-// Whose move it is, in one line. The pane and the full table say it in the same words (owner's
-// ask, 2026-11-11):
+// Whose move it is, in one line. The pane and the full table say it in the same words:
 //   - a Hermes model's seat is "Hermes is thinking…" the moment the board says it is that seat's
 //     turn: the model works outside the request the person made, so the wait is real from the start;
 //   - the built-in computer is "Computer is thinking…" only while a request that will answer it is
@@ -18657,7 +18636,7 @@ function agentOnMove(picture) {
 }
 
 // The seconds on a wait line, counted from the moment the wait began: a line that reads "0s" is
-// telling the person the clock is running (owner's ask, 2026-11-11).
+// telling the person the clock is running.
 function waitSecondsWords(seconds) {
   const whole = Math.floor(Number(seconds))
   return `${Number.isFinite(whole) && whole > 0 ? whole : 0}s`
@@ -19008,7 +18987,7 @@ function ladderLine(ladder) {
   return (ladder && ladder.text) || 'The ladder game is over.'
 }
 
-// ----- Out of the way: minimize, close, Esc (owner, 12:35) -------------------
+// ----- Out of the way: minimize, close, Esc -----------------------------------
 //
 // The pane must leave easily and come back at once. Both are one session state,
 // remembered in sessionStorage: 'min' collapses the pane to a slim strip, 'closed'
@@ -19056,8 +19035,8 @@ function paneOnScreen() {
   return Boolean(WAIT_PANE_SLOT.dispose)
 }
 
-// The same read, as state a component re-renders on (owner's ask, 2026-11-11: the way back
-// in must be visible, not only in the command palette).
+// The same read, as state a component re-renders on: the way back in must be visible, not only in
+// the command palette.
 function usePaneOnScreen() {
   const [onScreen, setOnScreen] = useState(paneOnScreen)
   useEffect(() => {
@@ -19165,7 +19144,7 @@ function useOutsideDone(open, ref, onDone) {
   }, [open, ref, onDone])
 }
 
-// The four strengths, in the owner's words. /opponents carries the same ids with
+// The four strengths, in the product's own words. /opponents carries the same ids with
 // the server's own labels; this fallback keeps the pane honest on an older host.
 const LEVEL_CHOICES = [
   { id: 'beginner', label: 'Beginner' },
@@ -19578,7 +19557,7 @@ function WaitPane({ ctx }) {
   const [name, setName] = useState('')
   const [alerts, setAlerts] = useState(() => paneAlerts(ctx))
   const [restarting, setRestarting] = useState(false)
-  // Start over / new game: NOTHING is chosen until the person chooses (owner's ask, 2026-11-11).
+  // Start over / new game: NOTHING is chosen until the person chooses.
   // '' means neither radio, which is also what keeps Start disabled: no game is ever dealt against
   // an opponent the person did not name.
   const [dealWho, setDealWho] = useState('')
@@ -19603,8 +19582,7 @@ function WaitPane({ ctx }) {
   const [level, setLevel] = useState(QUICK_LEVEL)
   // The move the person has just made, drawn at once (12-board-input.js pendingCells).
   // A model or a search takes its time to answer, and the person's own move must land
-  // the moment they make it, never after the answer (owner's report 2026-11-10: "moving
-  // a piece versus the computer takes noticeably long before the piece lands").
+  // the moment they make it, never after the answer.
   const [preview, setPreview] = useState(null)
   const [boardH, setBoardH] = useState(300)
   // Backgammon's dice have a state of their own (waiting behind Roll, tumbling, spent) that the
@@ -19684,7 +19662,7 @@ function WaitPane({ ctx }) {
     // plain poll repeats the same intent, so it must not invalidate the read that is already in
     // flight: bumping the generation on every poll made the pane blind whenever /view took longer
     // than the one-second poll — each response was superseded before it landed, so the picker sat on
-    // "No curated games are installed here." for seconds after opening (owner's report, 2026-11-11).
+    // "No curated games are installed here." for seconds after opening.
     // The Games page's own refresh already has this shape: its selection generation moves on a pick.
     const mine = id === undefined ? generation.current : generation.current + 1
     generation.current = mine
@@ -19746,8 +19724,7 @@ function WaitPane({ ctx }) {
     load()
     // The waiting pane is watched, not glanced at: a three-second poll is why the machine in it
     // moved a beat behind the person. It now reads every second, and the board itself only when the
-    // game changed or three seconds have passed, so the extra reads stay cheap (owner's report,
-    // 2026-11-09: "the slot machine in 'Play while you wait' has latency of a few seconds").
+    // game changed or three seconds have passed, so the extra reads stay cheap.
     const timer = setInterval(() => load(), 1000)
     return () => clearInterval(timer)
   }, [load])
@@ -19887,7 +19864,7 @@ function WaitPane({ ctx }) {
       if (answer.ok === false) return
       // The move line's own answer carries the board it left behind - the person's move
       // and the computer's answer - so the paint happens here, the moment it arrives,
-      // instead of waiting for the read below (owner's report 2026-11-10).
+      // instead of waiting for the read below.
       if (answer.picture) {
         latest.current = { game: id, board: answer.picture }
         paneWatch.game = id
@@ -19908,8 +19885,10 @@ function WaitPane({ ctx }) {
     setWorking(true)
     setReply('')
     try {
-      const resigned = await say(`${id} resign`)
-      if (resigned.ok === false) return
+      // The resign is best effort: it ends a game in progress, and says there is nothing to end
+      // when the table is fresh. Either way the deal below answers, and its refusal is what the
+      // person is shown. Bailing out of the resign used to leave the press doing nothing at all.
+      await say(`${id} resign`)
       const started = await say(quickGameLine(id, who, level))
       if (started.ok === false) return
       latest.current = { game: id, board: null }
@@ -19958,16 +19937,22 @@ function WaitPane({ ctx }) {
   const seatsNobody = gameSeatsNobody(game, pictured)
   const aiSeats = Boolean(!seatsNobody && (!soloGame || (game && game.bots !== false)))
   // The wait line under the board, and its clock: the pane names whose move it is, with the
-  // seconds running, from the moment the wait begins (owner's ask, 2026-11-11).
+  // seconds running, from the moment the wait begins.
   const paneWait = pictured && pictured.status === 'active' ? waitWords(pictured, view, { working }) : ''
   const waited = useWaitSeconds(Boolean(paneWait))
   // "Start over" / "New game": ONE door, and the opponent is chosen inside it - never assumed.
-  // The dialog opens with nothing picked and Start disabled (owner's ask, 2026-11-11), so no game
+  // The dialog opens with nothing picked and Start disabled, so no game
   // is ever dealt against an opponent the person did not name, and the words always match the pick.
   const playedNow = Number((latest.current.board || {}).plies || 0) > 0
   // Whether a deal ends something here: a board game in play, or a solo session with hands behind
   // it. Only then does the confirm resign first; a fresh table is a single press (the server's rule).
   const endsSomething = soloGame ? playedNow : playingNow
+  // Whether this pane has read this game's board from the shelf at all. Until it has, nothing on
+  // screen can say a game is in play - and the shelf can still hold one, so a plain deal would be
+  // refused and the press would look like it did nothing. A picture from the shelf carries a
+  // schema_version; the starting picture drawn before the first read does not.
+  const boardRead = Boolean(board.picture && board.picture.schema_version)
+  const dealEndsFirst = endsSomething || !boardRead
   const dealWords = who => (who === 'agent' ? 'your Hermes model' : 'the computer')
   const dealLine = () => {
     const against = dealWho ? ` against ${dealWords(dealWho)}` : ''
@@ -19989,7 +19974,7 @@ function WaitPane({ ctx }) {
     const who = dealWho === 'agent' ? 'agent' : 'computer'
     setRestarting(false)
     setDealWho('')
-    return endsSomething ? restart(current, who) : start(current, who)
+    return dealEndsFirst ? restart(current, who) : start(current, who)
   }
   // The routes this Hermes may hand a seat, for the shared ModelPicker. It is read the first time
   // the model choice is opened: a pane that never touches it sends no request. A host without the
@@ -20109,10 +20094,10 @@ function WaitPane({ ctx }) {
         })
   })
 
-  // The owner's words for the strengths (product rule), whichever ids the server
+  // The strengths' names are the product's own words, whichever ids the server
   // uses; a level the server really has keeps its own name when it is unmapped.
   // A strength press SETS the strength and nothing else: it never deals a game and never
-  // resigns one (owner's ask, 2026-11-11). The strength the next game is dealt at is the one
+  // resigns one. The strength the next game is dealt at is the one
   // lit here, and the deal itself is the dialog's own Start.
   const serverLevels = ((((view || {}).opponents || []).find(item => item.id === 'computer') || {}).levels || [])
     .filter(item => item && item.id && item.label)
@@ -20225,7 +20210,7 @@ function WaitPane({ ctx }) {
         ref: boardBox,
         style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, width: '100%' },
         children: [
-          // Who is across the board, said above it (owner's ask 2026-11-10). Blackjack
+          // Who is across the board, said above it. Blackjack
           // carries its own label on the felt; Slots has no opponent at all.
           pictured.view === 'blackjack' || pictured.view === 'slots' ? null : jsx(OpponentLine, { pictured, view, solo: soloGame }),
           pictured.view === 'slots' ? jsx(Jackpot2Full, { ctx }) : pictured.view === 'blackjack'
@@ -20252,8 +20237,7 @@ function WaitPane({ ctx }) {
                 interactive: Boolean(current && access.can_move && !working),
                 // The person's own move is drawn the moment they make it, while the
                 // table's answer is still on its way: a search or a model takes its time,
-                // and a board that sits still reads as a board that did not hear the click
-                // (owner's report 2026-11-10).
+                // and a board that sits still reads as a board that did not hear the click.
                 pending: preview,
                 onPending: mv => { if (access.can_move && !working) setPreview(mv) },
                 onMove: token => move(current, token)
@@ -20263,7 +20247,7 @@ function WaitPane({ ctx }) {
             style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, fontWeight: 650 },
             children: [
               // Whose move it is, with the seconds running while the other seat works, in the same
-              // words the full table uses (owner's ask, 2026-11-11). On the person's own Backgammon
+              // words the full table uses. On the person's own Backgammon
               // turn the board owns the words (roll, then spend the dice: 14b-backgammon-svg.js).
               jsx('span', {
                 children: (pictured.view === 'backgammon' && myTurn(pictured, view)
@@ -20352,8 +20336,8 @@ function WaitPane({ ctx }) {
       games.some(item => item.id === 'slots') ? null : jackpotRow,
       // Who takes the other seat, on one row: ONE door, and the choice is made inside it. The
       // dialog opens with NOTHING picked, so a game is never dealt against an opponent the person
-      // did not name - and the words match the pick, never "the computer" for a model game
-      // (owner's ask, 2026-11-11). A solo table that seats a machine gets the same door
+      // did not name - and the words match the pick, never "the computer" for a model game.
+      // A solo table that seats a machine gets the same door
       // (Blackjack's dealer); a table that seats nobody (Slots) gets neither.
       aiSeats ? jsxs('div', {
               'data-pane-opponents': '1',
@@ -20681,7 +20665,7 @@ function WaitPane({ ctx }) {
 }
 
 // ---- One radio of the start-over dialog -------------------------------------
-// The dialog opens with nothing checked (owner's ask, 2026-11-11): the whole point of the control
+// The dialog opens with nothing checked: the whole point of the control
 // is that no opponent is assumed, so a game is never dealt against a seat the person did not name.
 // The radios are real inputs in one named group, so arrow keys and a screen reader work as they do
 // anywhere else, and the label carries the promise each choice makes.
@@ -20708,7 +20692,7 @@ function dealChoiceElement(id, label, note, chosen, onPick) {
   }, id)
 }
 
-// ---- The obvious door (owner's ask, 2026-11-11) -----------------------------
+// ---- The obvious door -------------------------------------------------------
 // The pane used to come back only from the command palette. Two doors now carry it: a
 // button in the Games header, beside the chips, and a status-bar item on the right. Both
 // read the one pane state (usePaneOnScreen) and press the same two functions, so they can
@@ -20769,9 +20753,9 @@ function paneDoorItemElement(onScreen) {
   })
 }
 
-// The ONE status-bar item (owner, 12:25): the pane's door and the news that needs saying —
+// The ONE status-bar item: the pane's door and the news that needs saying —
 // your turn, a match, your bot's result, or people waiting for a game you asked to hear
-// about. The news is quiet while there is nothing to say; the door (owner's ask, 2026-11-11)
+// about. The news is quiet while there is nothing to say; the door
 // stands while the pane is off the screen and hides while it is open. Neither ever takes the
 // keyboard, and a click opens the pane (or the match) instead of nagging.
 function GamesStatusItem({ ctx }) {
@@ -21245,7 +21229,7 @@ function GameCenterPage({ ctx, onArea }) {
   const [welcomeClosed, setWelcomeClosed] = useState(false)
   const selectionGen = useRef(0)
   // Whether the side pane is on the screen, so the header's one button says what its next
-  // press does (owner's ask, 2026-11-11). One read, shared with the status-bar item.
+  // press does. One read, shared with the status-bar item.
   const paneOn = usePaneOnScreen()
 
   // Full screen and the pane are one at a time. Arriving here closes the pane and
@@ -21327,7 +21311,7 @@ function GameCenterPage({ ctx, onArea }) {
         const answer = await ctx.rest('/command', { method: 'POST', body: { line } })
         setReply(answer.text || '')
         // Paint the board the command itself returned, so a move shows the moment the server answers
-        // instead of after a second round trip (owner's report, 2026-11-09: Sea Battle felt slow).
+        // instead of after a second round trip.
         if (answer && answer.picture) setBoard({ text: answer.text || '', picture: answer.picture, error: '' })
         const refreshed = await refresh()
         return { ...answer, ...refreshed, ok: answer.ok !== false && refreshed.ok, text: refreshed.ok ? answer.text || '' : refreshed.text }
@@ -21484,7 +21468,7 @@ function GameCenterPage({ ctx, onArea }) {
       button('Champions', () => setArea('champions'), { primary: area === 'champions' }),
       // The Admin tab appears only for a staff key that works with this account.
       staffRole ? button('Admin', () => setArea('admin'), { primary: area === 'admin' }) : null,
-      // The way out, top right of the Games screen, level with the tabs (owner's ask, 2026-11-11).
+      // The way out, top right of the Games screen, level with the tabs.
       // Other screens get the same button floated top right by GameCenterRoute (80-plugin.js).
       area === 'games' ? jsx('span', { 'data-gc-close-header': '1', style: { marginLeft: 'auto' }, children: closeGameCenterButton(ctx) }) : null
     ]
@@ -21597,15 +21581,15 @@ function GameCenterPage({ ctx, onArea }) {
   }
 
   const tileGrid = children => jsx('div', {
-    // 200 px a card, not 260: the lobby panel gives up half its width on the main screen
-    // (owner's ask, 2026-11-11) and that width buys one more column of game cards.
+    // 200 px a card, not 260: the lobby panel gives up half its width on the main screen, and that
+    // width buys one more column of game cards.
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))', gap: 12 },
     children
   })
 
-  // Labs: the experiment shelf. The Make games workshop is its first block; another lane adds the
-  // next one to this list with the same element and no new styles. Each block is a real component,
-  // so its own state never depends on which other screens have been on this page before.
+  // Labs: the experiment shelf. The Make games workshop is its first block; a new experiment is one
+  // more entry in this list, with the same element and no new styles. Each block is a real
+  // component, so its own state never depends on which other screens have been on this page before.
   const labsBlocks = [
     labsPlay.length
       ? jsx('div', {
@@ -21626,7 +21610,7 @@ function GameCenterPage({ ctx, onArea }) {
         }, 'make-games')
       : null,
     // Pet Battles is an experiment, so it lives here and not on the Play shelf - and it is locked
-    // with the rest of this shelf (owner's ask 2026-11-10, #7): visible, no way in.
+    // with the rest of this shelf: visible, no way in.
     jsx('div', {
       key: 'pet-battles-labs',
       style: { minWidth: 0 },
@@ -21650,16 +21634,16 @@ function GameCenterPage({ ctx, onArea }) {
 
   // One shelf for everything that is not curated Play: the games a plugin installed and the
   // prototypes from the workshop, under a single heading and a single sentence. Two sections
-  // both saying "experimental" read as a filing system, not as something to try (owner's ask,
-  // 2026-11-09). Owner's ask 2026-11-11: this whole shelf - the Coming-soon cards and the Labs
-  // blocks - is off the main page and behind ONE small "Experimental" link, where it is kept
-  // locked and hidden for later. Nothing of it is drawn on the Play page any more.
+  // both saying "experimental" read as a filing system, not as something to try. The whole shelf -
+  // the Coming-soon cards and the Labs blocks - is off the main page and behind ONE small
+  // "Experimental" link, where it is kept locked and hidden for later. Nothing of it is drawn on
+  // the Play page any more.
   const experiments = jsxs('div', {
     'data-experiments': '1',
     style: { display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 },
     children: [
       heading('Experimental'),
-      // The one short line under the heading (owner's ask 2026-11-10, #7): the shelf is a window.
+      // The one short line under the heading: the shelf is a window.
       jsx('div', { 'data-experimental-help': '1', style: { fontSize: 13, color: text.secondary, marginBottom: 2, maxWidth: 620 }, children: LABS_LOCK_HELP }),
       jsx('div', { 'data-experiments-note': '1', style: { fontSize: 12, color: text.tertiary, marginBottom: 2, maxWidth: 620 }, children: EXPERIMENTS_NOTE }),
       yourList.length
@@ -21734,11 +21718,11 @@ function GameCenterPage({ ctx, onArea }) {
                     style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
                     children: [
                       jsx(PointsChip, { ctx }),
-                      // The obvious door (owner's ask, 2026-11-11): one press opens the side pane
-                      // and keeps a game beside the chat while Hermes works. While the pane is
-                      // open the same button reads Close side pane.
+                      // The obvious door: one press opens the side pane and keeps a game beside
+                      // the chat while Hermes works. While the pane is open the same button reads
+                      // Close side pane.
                       // From full screen the door LEAVES Game Center: back to the chat with the
-                      // pane on the right, on the same game (owner, 2026-11-11).
+                      // pane on the right, on the same game.
                       paneDoorButtonElement(paneOn, null, () => paneFromPage(ctx, selected))
                     ]
                   })
@@ -21752,23 +21736,23 @@ function GameCenterPage({ ctx, onArea }) {
             textLink('Back to chat', () => closeGameCenter(ctx)),
             textLink('How to play', () => setLobbyHowto(true)),
             // One small link, and the only trace of the experiments on this page: the Coming-soon
-            // cards and the Labs shelf live behind it (owner's ask, 2026-11-11).
+            // cards and the Labs shelf live behind it.
             textLink('Experimental', () => setArea('experimental')),
             textLink('Settings', () => setArea('settings')),
             textLink('Community creations', () => setArea('community'))
           ] })
         ]
       }),
-      // The way out to the project itself (owner's ask, 2026-11-11): one row of three links, settled
+      // The way out to the project itself: one row of three links, settled
       // right under the header beside Experimental / Settings / Community creations, each handed to
       // the person's own browser by the same door the Submit button uses.
       jsx(GameCenterLinks, { ctx, onNote: setReply }),
-      // Owner's ask 2026-11-09: no alert drops anywhere for now. The rows are still read from
+      // No alert drops anywhere for now. The rows are still read from
       // /alerts and the component is still in the bundle, so bringing it back is this one line.
       null,
       // Find match lives in the lobby panel now, where it can see the lobby's own answer:
       // the stand-alone bar here used to press with whatever game happened to be selected,
-      // which is how it could say it was looking for blackjack (owner's ask, 2026-11-11).
+      // which is how it could say it was looking for blackjack.
       jsx(LobbyWhoOnline, {
         view, ctx, current,
         // "Play here" on a Hall row: the lobby server took the room, so open that game's table,
@@ -22483,12 +22467,12 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
   const muted = { fontSize: 11, color: text.tertiary }
   return jsxs('div', {
     className: 'games-center-lobby',
-    // Compact on purpose (owner's ask, 2026-11-11): the column is a side panel, not a page. It is
+    // Compact on purpose: the column is a side panel, not a page. It is
     // capped at 140 px by the layout grid - half what it was, with the freed width going to one
     // more column of game cards - so everything here is one step smaller and tighter.
     style: { display: 'flex', flexDirection: 'column', gap: 6, padding: 10, borderLeft: `1px solid ${stroke}`, minWidth: 110, fontSize: 12, overflow: 'auto', background: paper },
     children: [
-      // Only the lobby here (owner's ask, 2026-11-11): on the Game Center page the person is not at a
+      // Only the lobby here: on the Game Center page the person is not at a
       // table, so there is no Game tab. A match the lobby has made shows as one card on top.
       match ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }, children: [
         jsx('div', { style: { fontSize: 11, color: text.secondary }, children: `Your table is ready: ${match.opponent || 'someone'} for ${match.title || match.game || current}.` }),
@@ -22754,7 +22738,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     pictured: picture, status, iWon, machineWon: false,
     sideName: winner === 'black' ? 'Black' : 'White'
   })
-  // The turn line, in the owner's words: your move the moment the server says it is yours;
+  // The turn line: your move the moment the server says it is yours;
   // otherwise it waits, by name. A table that is reconnecting says that instead of pretending.
   const reconnecting = state === 'reconnecting'
   const turnKind = reconnecting ? 'reconnecting' : done ? 'over' : myTurn ? 'mine' : 'theirs'
@@ -23022,13 +23006,13 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
 //
 // Both slot machines have a "show it over the conversation" switch: the original cabinet
 // (18-slot-machine.js / 19-jackpot-overlay.js) and Jackpot v2 (19-jackpot2-layer.js). This part is the
-// one place they are put on screen, and it is the review's fix (2026-11-12).
+// one place they are put on screen.
 //
 // WHAT IT REPLACED. Each machine used to put itself over the app: a position:fixed div appended to
 // document.body, a stylesheet appended to <head>, and a measurement of the app's own markup — scan every
 // <textarea>, walk their ancestors until one was wider than half the window, call that "the chat column",
 // and read the route's hash to guess which screen was showing. A plugin that does that can be broken by
-// an app update and can break the app, which is exactly what the review asked us to stop.
+// an app update and can break the app.
 //
 // WHAT THIS IS. One contribution to `COMPOSER_AREAS.underside`, the composer's chrome-free strip below
 // the input — a real Desktop SDK surface, registered like any other contribution:
@@ -23073,8 +23057,8 @@ function OverChatStrip({ ctx }) {
   // width when a pane opens, when the window moves between screens and when the person drags a sash —
   // all of those are the same event to this element.
   //
-  // It depends on `on` and no other value, and that is the whole fix for review, 2026-11-13: the strip's
-  // div exists ONLY while a switch is on, so a mount with both switches off has no element to observe.
+  // It depends on `on` and no other value: the strip's div exists ONLY while a switch is on, so a mount
+  // with both switches off has no element to observe.
   // With `[]` the effect ran once against `null`, never attached, and never ran again — turning a machine
   // on afterwards rendered it at width 0 for good (the Jackpot v2 copy draws nothing at 0). Depending on
   // `on` re-runs the effect on the switch, and because React commits before effects run, the element is
@@ -23135,16 +23119,15 @@ function OverChatStrip({ ctx }) {
  * One source: the plugin's own backend (/v1/version -> version_stamp), never a number typed into
  * this bundle. A hard-coded badge drifts the moment the manifest moves, and drifts silently.
  *
- * It is a chip, and it is drawn twice from the one component (owner, 2026-11-11): small and muted at
- * the top of the Games header, beside the wordmark, and at the top of Settings — which is what the
- * full-screen Games app shows and what the play-while-you-wait pane's own gear opens (owner,
- * 2026-11-10: "keep everything in the status bar except the version chip. The version chip lives in
- * Settings"). One component, so the two copies can never drift apart; the header copy only passes a
- * smaller, dimmer `style` so it stays a whisper beside the title.
+ * It is a chip, and it is drawn twice from the one component: small and muted at the top of the Games
+ * header, beside the wordmark, and at the top of Settings — which is what the full-screen Games app
+ * shows and what the play-while-you-wait pane's own gear opens. One component, so the two copies can
+ * never drift apart; the header copy only passes a smaller, dimmer `style` so it stays a whisper
+ * beside the title.
  *
- * It is also click-to-copy (owner's ask, 2026-11-11): one press — or Enter/Space from the keyboard —
- * puts the full chip text on the clipboard and says "Copied" for a breath, so a bug report can quote
- * the exact build without anyone retyping it.
+ * It is also click-to-copy: one press — or Enter/Space from the keyboard — puts the full chip text on
+ * the clipboard and says "Copied" for a breath, so a bug report can quote the exact build without
+ * anyone retyping it.
  */
 
 // How long the chip wears "Copied". Long enough to see, short enough not to look stuck.
@@ -23154,9 +23137,8 @@ const CHIP_COPIED_MS = 1500
 //
 // `ctx.os.writeClipboard` is the SDK's curated clipboard and the only one a plugin should use: it is
 // attributed to the plugin, it resolves false (never throws) where the capability is missing, and it
-// needs nothing of the document. What it replaced was a hidden <textarea> appended to the app's <body>
-// and an execCommand — the same reach into the app's markup the review asked us to stop doing
-// (2026-11-12), for a copy that the browser's own clipboard API already does.
+// needs nothing of the document. A hidden <textarea> appended to the app's <body> and an execCommand
+// would do the same job by reaching into the app's markup, for a copy the clipboard API already does.
 function copyChipText(text, ctx) {
   try {
     const door = ctx && ctx.os && typeof ctx.os.writeClipboard === 'function' ? ctx.os : null

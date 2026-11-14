@@ -1,35 +1,33 @@
 // ---- 19-jackpot2-layer.js: JACKPOT v2 in the composer's own slot — its switch and the full view
 //
 // JACKPOT v2 is a second slot machine beside the old one (18-slot-machine.js / 18-slots.js /
-// 19-jackpot-overlay.js, which are NOT touched by this part). This part owns the switch and the look
-// sliders, the cabinet as it appears over the conversation, and the full-screen view the Games page
-// opens.
+// 19-jackpot-overlay.js). This part owns the switch and the look sliders, the cabinet as it appears
+// over the conversation, and the full-screen view the Games page opens.
 //
 // THE MACHINE IS NOT HERE. It is 18-jackpot2-machine.js — JackpotMachine({ ctx, mode }) — designed at
 // ONE fixed size, 560x720. Everything in this file only ever scales the box the machine sits in, with a
 // CSS transform, so the machine itself never has to know how big it is. When a bundle is built without
-// that part (the lanes are written side by side) the copy still builds and can be tested: it draws a
-// plain "not in this build yet" plate in the machine's place.
+// that part the copy still builds and can be tested: it draws a plain "not in this build yet" plate in
+// the machine's place.
 //
-// WHERE THE COPY IS DRAWN (review, 2026-11-12). Not in a div of our own appended to document.body, not
-// measured against the app's own markup, and with no stylesheet pushed into the app's <head>: all three
-// were "the plugin over-chat machine reaches into the app's own markup", and the review is right that a
-// plugin must live inside SDK surfaces so an app update can neither break it nor be broken by it.
+// WHERE THE COPY IS DRAWN. Not in a div of our own appended to document.body, not measured against the
+// app's own markup, and with no stylesheet pushed into the app's <head>: a plugin must live inside SDK
+// surfaces, so an app update can neither break it nor be broken by it.
 //
 // The copy is a contribution to the composer's `composer.underside` slot and is rendered in our own
 // tree by 78-overchat-slot.js, which owns the strip, the layout and the width each machine is given.
-// Three things follow, and they are the reason this shape is better rather than merely compliant:
+// Two things follow:
 //
 //   - "only over the conversation" is now structural. The slot belongs to the chat composer, so it does
 //     not exist on the Games page, in Settings or on another plugin's page. No route sniffing and no
 //     DOM test is needed to keep the machine off those screens.
 //   - the size comes from the slot. The strip measures ITS OWN box and hands this copy its share of the
 //     width (jp2LSlotScale); nothing here reads window.innerWidth or another element's rect, so a docked
-//     pane, a narrow window or a split layout all size the copy correctly with no measurement of the
-//     app at all.
-//   - the look (see-through, size, colour) is still one stored setting shared by every surface, and it
-//     still lives in ctx.storage: 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size',
-//     'jackpot2.hue', 'jackpot2.gradient', read live through JP2L_STORE.
+//     pane, a narrow window or a split layout all size the copy correctly.
+//
+// The look (see-through, size, colour) is one stored setting shared by every surface, in ctx.storage:
+// 'jackpot2.overchat', 'jackpot2.alpha', 'jackpot2.size', 'jackpot2.hue', 'jackpot2.gradient', read
+// live through JP2L_STORE.
 //
 // The tint is a stylesheet of ours, scoped to the cabinet's published root class INSIDE OUR OWN STAGE
 // (`[data-jp2-stage][data-jp2-tint] .jp2-machine`) and rendered as a <style> element in the stage's own
@@ -56,13 +54,10 @@
 //   jp2LTintVars(tint)         the CSS values for the tint, or null at the default
 //   Jackpot2OverChatControls({ ctx, tone })   the switch, the sliders and the colour
 //   Jackpot2Full, Jackpot2Tile, jp2LPlayTiles
-// A word on names, because it has bitten this feature once already: tools/build_plugin.py puts every
-// part in ONE module scope, so two parts that declare the same name overwrite each other in silence
-// (the last one wins). The first cut of this part declared jp2Publish(), which the machine's part
-// owns — the machine's own publish would have run this part's instead. The name is jp2LPublish now,
-// and the published surface above is exactly what the harnesses ask for, so a clash with a later part
-// shows up as a harness failure rather than as a machine that quietly does nothing. Check before
-// adding a plain jp2Foo() here.
+// A word on names: tools/build_plugin.py puts every part in ONE module scope, so two parts that declare
+// the same name overwrite each other in silence (the last one wins). The published surface above is
+// exactly what the harnesses ask for, so a clash with another part shows up as a harness failure rather
+// than as a machine that quietly does nothing. Check before adding a plain jp2Foo() here.
 // Defaults and key names: alpha 0.25 (range 0.25 - 1, step 0.05), size 1 (range 0.25 - 2), hue 170
 // (range 0 - 360), gradient 'teal'.
 
@@ -79,14 +74,13 @@ const JP2L_ALPHA_MAX = 1
 const JP2L_ALPHA_STEP = 0.05
 // See-through by default: the machine sits under the composer, and the conversation around it has to
 // stay readable. Fully opaque is allowed, and so is fading it back to a quarter — the floor is 0.25,
-// never fully transparent, so the machine can never be there-but-invisible (owner's release rule,
-// 2026-11-11).
-// As see-through as it goes by default (owner, 2026-11-11: "default see thru should be the most").
+// never fully transparent, so the machine can never be there-but-invisible. The default sits at that
+// floor: as see-through as the range goes.
 const JP2L_ALPHA_DEFAULT = JP2L_ALPHA_MIN
 const JP2L_SIZE_MIN = 0.25
 const JP2L_SIZE_MAX = 2
 // Full size by default. "100%" is now the largest the composer's slot allows rather than the whole chat
-// column, which is a smaller box: keeping the old 50% would have halved the machine twice (review, 2026-11-12).
+// column, which is a smaller box: keeping the old 50% would have halved the machine twice.
 const JP2L_SIZE_DEFAULT = 1
 // What colour the copy's frosted frame is. The hue of the cabinet's own accent, #3ee0c5, is 170.0
 // exactly — so 170 IS "the current teal", and it is the default.
@@ -497,7 +491,7 @@ function jp2LStyleRules(tint) {
     '[data-jp2-stage] { pointer-events: none; }',
     '[data-jp2-stage] button, [data-jp2-stage] input, [data-jp2-stage] select, [data-jp2-stage] textarea,',
     '[data-jp2-stage] [data-jp2-control] { pointer-events: auto; }',
-    // Over the chat the machine is to WATCH (owner, 2026-11-11): its spin, lever, bet, machine picker and
+    // Over the chat the machine is to WATCH: its spin, lever, bet, machine picker and
     // other buttons do not take a click there - only the X, the sound switch and the look controls do.
     '[data-jp2-stage] .jp2-machine button:not([data-jp2-sound]):not([data-jp2-close]) { pointer-events: none !important; cursor: default !important; }',
     '[data-jp2-stage] .jp2-machine [data-jp2="overchat-row"] button { pointer-events: auto !important; cursor: pointer !important; }',
@@ -513,7 +507,7 @@ function jp2LStyleRules(tint) {
 
 // The scaled stage: the machine at its design size inside a box that is transform-scaled from the
 // top-left corner, which is the only thing the caller is allowed to do to it. The <style> child is the
-// stage's own rules — a document-wide stylesheet is exactly what the review asked us to stop doing.
+// stage's own rules — a document-wide stylesheet would leak into the app.
 function jp2LStage(ctx, geo, mode, tintNow) {
   const scale = geo && Number.isFinite(geo.scale) ? geo.scale : 1
   const overlay = (mode || 'overlay') === 'overlay'
@@ -772,9 +766,8 @@ function Jackpot2Tile({ onOpen }) {
   })
 }
 
-// The Play shelf with the Jackpot entry in it, right after the shelf's own Slots card (the owner's
-// ask: a Jackpot entry beside the old slots entry). A search only keeps it when it matches, exactly
-// like every shelf card around it.
+// The Play shelf with the Jackpot entry in it, right after the shelf's own Slots card. A search only
+// keeps it when it matches, exactly like every shelf card around it.
 function jp2LPlayTiles(list, open, waiting, openJackpot, matches) {
   const tiles = (list || []).map(item => playTile(item, open, waiting(item.id)))
   return tiles
@@ -789,7 +782,7 @@ function Jackpot2Full({ ctx, frame, size, onBack }) {
   const width = frame && Number(frame.width) > 0 ? Number(frame.width) : 0
   const height = frame && Number(frame.height) > 0 ? Number(frame.height) : 0
   // The playable cabinet (pane, Games page) is always full size unless a caller says otherwise: the Size
-  // slider belongs to the copy over the chat only (owner, 2026-11-11 - only that copy may change).
+  // slider belongs to the copy over the chat only; the playable cabinet is never resized.
   const factor = Number.isFinite(Number(size)) ? Number(size) : 1
   useEffect(() => {
     const read = () => {

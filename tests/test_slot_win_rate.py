@@ -1,10 +1,10 @@
 """About half of every machine's spins pay the bet back, and the return lands on its target.
 
-The owner's ask (2026-11-11): *"tune every flavor so ~51% of spins pay at least the bet (hit frequency
-0.50-0.52), keeping each flavor's current RTP target unchanged"*. This file is the acceptance test for
-both halves of it, and it is the reason the numbers are allowed to be published at all.
+Every flavour is tuned so about 51% of spins pay at least the bet (hit frequency 0.50-0.52), with
+each flavour's own return target unchanged. This file is the acceptance test for both halves of it,
+and it is the reason the numbers are allowed to be published at all.
 
-Two rules about how it is measured, both of them the owner's:
+Two rules about how it is measured:
 
 * **a hit is a spin that pays at least the bet.** On a five-line machine the bet is split over the
   lines, so a spin that pays back the stake is a spin whose paylines add up to the number of lines (in
@@ -26,7 +26,7 @@ import itertools
 
 import pytest
 
-# The window the owner asked for, and the tolerance on the return.
+# The chance window, and the tolerance on the return.
 BAND_LOW, BAND_HIGH = 0.50, 0.52
 RTP_TOLERANCE = 0.01
 MOODS = ("usual", "bonus", "cold")
@@ -147,7 +147,7 @@ def test_every_win_pays_at_least_the_bet(session, machine: str) -> None:
 @pytest.mark.parametrize("machine", ["fruit9", "robot3"])
 @pytest.mark.parametrize("mood", MOODS)
 def test_the_published_hit_rate_lands_inside_its_own_window(session, machine: str, mood: str) -> None:
-    """Usual sessions inside the owner's band; the older bonus and cold draws inside their own."""
+    """Usual sessions inside the band; the older bonus and cold draws inside their own."""
     apply, seed_for = session
     reels = apply(seed_for(mood, machine))
     found = reels.variant(machine)
@@ -186,8 +186,8 @@ def test_every_draw_returns_its_machine_target(session, machine: str, mood: str)
 def test_the_everyday_pays_alone_leave_a_session_ahead(session, machine: str) -> None:
     """An ordinary session - one that never hits the jackpot - still ends up ahead.
 
-    The owner's ask of 2026-11-10, kept while the return is held on target: the jackpot tops the
-    return up rather than carrying it.
+    Kept while the return is held on target: the jackpot tops the return up rather than carrying
+    it.
     """
     apply, seed_for = session
     apply(seed_for("usual", machine))
@@ -198,7 +198,7 @@ def test_the_everyday_pays_alone_leave_a_session_ahead(session, machine: str) ->
 
 @pytest.mark.parametrize("machine", ["fruit9", "robot3"])
 def test_the_jackpot_is_the_top_prize_on_every_machine(session, machine: str) -> None:
-    """Owner's rule (2026-11-09): the Nous logo pays the most, whatever the session drew."""
+    """The Nous logo pays the most, whatever the session drew."""
     apply, seed_for = session
     reels = _slotplay().reels
     for mood in MOODS:
@@ -212,7 +212,7 @@ def test_the_jackpot_is_the_top_prize_on_every_machine(session, machine: str) ->
 
 @pytest.mark.parametrize("machine", ["fruit9", "robot3"])
 def test_the_pay_table_quotes_the_session_the_reels_play(session, machine: str) -> None:
-    """What it pays is generated from the live table, jackpot row included (owner's ask, 2026-11-11)."""
+    """What it pays is generated from the live table, jackpot row included."""
     apply, seed_for = session
     apply(seed_for("usual", machine))
     slotplay = _slotplay()

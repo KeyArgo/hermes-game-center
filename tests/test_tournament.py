@@ -350,7 +350,7 @@ def test_a_tournament_can_be_stopped_and_keeps_finished_games(tmp_path):
     """Stopped means stopped: the run is held INSIDE a move when stop() is called.
 
     The version of this test that shipped waited for the first finished game and then stopped, which on a
-    fast machine (macOS in CI, 2026-11-13) meant it stopped after the whole two-game tournament had already
+    fast machine meant it stopped after the whole two-game tournament had already
     finished — the run reported "done" and the test failed for a reason that had nothing to do with
     stopping. The match now blocks in `ask` with a gate the test opens only after it has called stop(), so
     the tournament is provably mid-flight, on every platform and every machine speed.

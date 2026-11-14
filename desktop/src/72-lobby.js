@@ -558,12 +558,12 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
   const muted = { fontSize: 11, color: text.tertiary }
   return jsxs('div', {
     className: 'games-center-lobby',
-    // Compact on purpose (owner's ask, 2026-11-11): the column is a side panel, not a page. It is
+    // Compact on purpose: the column is a side panel, not a page. It is
     // capped at 140 px by the layout grid - half what it was, with the freed width going to one
     // more column of game cards - so everything here is one step smaller and tighter.
     style: { display: 'flex', flexDirection: 'column', gap: 6, padding: 10, borderLeft: `1px solid ${stroke}`, minWidth: 110, fontSize: 12, overflow: 'auto', background: paper },
     children: [
-      // Only the lobby here (owner's ask, 2026-11-11): on the Game Center page the person is not at a
+      // Only the lobby here: on the Game Center page the person is not at a
       // table, so there is no Game tab. A match the lobby has made shows as one card on top.
       match ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }, children: [
         jsx('div', { style: { fontSize: 11, color: text.secondary }, children: `Your table is ready: ${match.opponent || 'someone'} for ${match.title || match.game || current}.` }),

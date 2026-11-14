@@ -1,4 +1,4 @@
-"""The tool hook spins too - the cheapest automatic bet, once per burst (owner's report 2026-11-09)."""
+"""The tool hook spins too - the cheapest automatic bet, once per burst."""
 
 from __future__ import annotations
 

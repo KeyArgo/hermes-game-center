@@ -405,7 +405,7 @@ function talkReveal(pictured) {
   })
 }
 
-// ---- Watch it think: the owner's own bot's working, and the corner coach ----
+// ---- Watch it think: your own bot's working, and the corner coach ----
 // A bot's Read answers and its scratchpad are private. The backend sends them
 // only to the person whose seat shares that bot; this panel renders what it was
 // given and never asks for more.
@@ -704,7 +704,7 @@ function TalkingTable({ game, view, board, send, onBack, refresh, ctx }) {
     if (!text.trim() || busy) return false
     return run(`${game.id} coach ${text.trim()}`)
   }
-  // Between rounds the table holds still for one whisper: while the owner's own
+  // Between rounds the table holds still for one whisper: while the person's own
   // bot is the next to move and the window is open, the machine seats wait.
   const coached = (pictured && (pictured.places || []).some(place =>
     place.playing && (place.kind === 'agent' || place.kind === 'champion'))) || false

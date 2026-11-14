@@ -1,9 +1,8 @@
 """A plain record of every spin, so a payout can be proved rather than argued about.
 
 The slot machine is the one place where a person can lose real (earned) chips on a random draw, and
-the owner asked for it to be logged after a session that felt wrong: "I feel like there is a big
-problem and im not getting my payouts or the probability is off" (2026-11-09). A feed of twenty spins
-in the wallet is enough for the UI and useless for a claim about odds, so this writes one JSON line
+a session that felt wrong is exactly the claim a log has to answer. A feed of twenty spins in the
+wallet is enough for the UI and useless for a claim about odds, so this writes one JSON line
 per spin - the stops, the grid, the pays, what was credited, and the chance the session promised.
 
 Two rules it keeps:
@@ -80,10 +79,8 @@ def record(wallet_path, row: dict, session: dict | None = None) -> None:
 def summary(wallet_path, machine: str | None = None, min_spins: int = 200) -> dict | None:
     """What the log actually shows: spins, chips staked, chips paid, and the return.
 
-    The machine quotes a promised return from the session it drew. A promise is not a measurement,
-    and the owner was right to distrust one ("the convert points to cash doesn't work ... the odds
-    are in my favor"). This reads the spins beside the wallet so the number on screen can be the
-    measured one. None until there are enough spins for the number to mean anything: a return over
+    The machine quotes a promised return from the session it drew. A promise is not a measurement, so
+    this reads the spins beside the wallet and lets the number on screen be the measured one. None until there are enough spins for the number to mean anything: a return over
     20 spins is noise wearing a decimal point.
     """
     path = log_path(wallet_path)

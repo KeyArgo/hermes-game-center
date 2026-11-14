@@ -1,6 +1,6 @@
 """Game Center's backend must load on Windows, where there is no fcntl.
 
-Owner's report 2026-11-11: on a fresh Windows install every Game Center call answered
+On a fresh Windows install every Game Center call answered
 404 "Plugin not found" — shelf/wallet.py imported fcntl unguarded, so the dashboard API
 module never loaded. This runs the import in a child Python with fcntl blocked and a
 stand-in msvcrt, then moves chips through the wallet's Windows lock path.

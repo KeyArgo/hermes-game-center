@@ -47,7 +47,7 @@ def test_build_info_is_not_committed():
 
 
 def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
-    """The version moved out of the status bar and out of the Games header (owner, 2026-11-10):
+    """The version moved out of the status bar and out of the Games header:
     one chip, at the top of Settings, which is what the full screen shows and what the
     play-while-you-code pane's own gear opens. Everything else stays in the status bar."""
     bundle = (ROOT / "desktop" / "plugin.js").read_text(encoding="utf-8")
@@ -55,7 +55,7 @@ def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
     assert "GamesVersionItem" not in bundle, "the old status-bar item is gone, not renamed in place"
     assert "/v1/version" in bundle
     # One reusable chip, mounted twice: at the top of SettingsPanel and at the top of the Games
-    # main screen (owner, 2026-11-11: "you can even put the chip at the top of game center").
+    # main screen.
     assert bundle.count("jsx(GamesVersionChip") == 2
     settings = (ROOT / "desktop" / "src" / "60-settings-and-alerts.js").read_text(encoding="utf-8")
     pane = (ROOT / "desktop" / "src" / "65-wait-pane.js").read_text(encoding="utf-8")
@@ -73,7 +73,7 @@ def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
     assert "id: 'version'" not in bundle, "the version is not a status-bar item"
     # The other status-bar items: one, the Slots chip. The old Slots item was retired when Slots became
     # one game on the Jackpot machine, and the Jackpot v2 item went with the overlay it existed to anchor:
-    # both see-through machines are a composer-slot contribution now (review, 2026-11-12).
+    # both see-through machines are a composer-slot contribution now.
     assert bundle.count("area: STATUSBAR_AREAS.right") == 1
     assert "id: 'status'" in bundle
     assert "id: 'jackpot'" not in bundle

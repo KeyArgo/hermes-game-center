@@ -1,8 +1,8 @@
 """The over-chat switch survives a reload, because it is stored with the other slot settings.
 
 On/off used to live only in the app's browser storage. Every rebuild of the plugin started with a
-fresh bundle, the switch came back off, and the owner reported the see-through machine as "it still
-will not show on the chat screen" after a restart while the code was drawing it correctly. Opacity
+fresh bundle, the switch came back off, and the see-through machine stayed off the chat screen after
+a restart while the code was drawing it correctly. Opacity
 and size were already kept on the shelf for the same reason; the switch was the one part left behind.
 
 The defect these tests pin: a preference the person set has to still be true after the process that

@@ -2,8 +2,8 @@
 _Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
 Labs is the one shelf on the Games page for things that are not Play. It ships with one badge
-(`Labs · experiment`), one note and one card shape, so a screen built by one lane and a card built
-by another still read as one shelf.
+(`Labs · experiment`), one note and one card shape, so a screen built for one experiment and a card
+built for another still read as one shelf.
 
 Play is `shelf/curated.json`. Something that lives in Labs never appears in Play, never sits at a
 Game Center table, is never seated in a lobby or a tournament, and is never rated.
@@ -29,7 +29,7 @@ labsBlock(title, note, children)
 // `item` is { id, title, maker, kind, summary, note, url }. `kind` is 'plugin' or 'skill'.
 labsCard(item, ctx, setNote)
 
-// The block most lanes want: a grid of link-out cards plus its own notice line.
+// The block most experiments want: a grid of link-out cards plus its own notice line.
 LabsLinks({ title, note, notice, items, ctx })
 ```
 

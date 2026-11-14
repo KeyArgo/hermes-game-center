@@ -1,8 +1,7 @@
 """How big an automatic bet is, decided by what the hook cost the person.
 
-The owner's ask (2026-11-09): auto-bet on by default, and it should size itself - frequent, cheap
-hooks pay the smallest bet, a real inference reply pays more, because that is the moment the person
-spent something. The machine then keeps turning on its own rather than waiting for a hand on the
+Auto-bet is on by default, and it sizes itself: frequent, cheap hooks pay the smallest bet, a real
+inference reply pays more, because that is the moment the person spent something. The machine then keeps turning on its own rather than waiting for a hand on the
 lever.
 
 Rules, in one place so the table, the hooks and the tests cannot drift:

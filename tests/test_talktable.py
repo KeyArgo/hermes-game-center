@@ -758,7 +758,7 @@ def test_the_model_gets_the_talking_system_message(api):
     other, _ = api._style("Pick one legal move for connect4")
     assert other != api._TALK_SYSTEM
 
-# --------------------------------------------------- defects found in review
+# --------------------------------------------------- defects found in play
 
 
 def test_a_round_robin_match_names_the_two_seats_that_are_really_playing(tmp_path):

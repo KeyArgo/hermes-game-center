@@ -1,6 +1,6 @@
 """The model door the plugin hands to the games, and what happens when there is no LLM surface at all.
 
-Quality review, 2026-11-13: ``_complete()`` returned a closure unconditionally. On a context without
+``_complete()`` once returned a closure unconditionally. On a context without
 ``ctx.llm`` that closure raised AttributeError the moment something asked for a completion, and the
 Doctrine author reported it as "That profile did not answer." — advice about a profile that was never
 involved, on a surface that has no model. This pins the honest behaviour on the REGISTERED command, which

@@ -1,4 +1,4 @@
-// tests/jackpot2_fit.mjs -- JACKPOT v2 (LANE D): the three surfaces a real browser can measure.
+// tests/jackpot2_fit.mjs -- JACKPOT v2: the three surfaces a real browser can measure.
 //
 //   node tests/jackpot2_fit.mjs [--port 18793] [--shots DIR]
 //
@@ -8,13 +8,13 @@
 // headless Chrome against tests/browser_table_server.py, which serves the REAL built plugin (only the
 // SDK is stubbed), so every number below comes from layout. Exit 1 is a real regression.
 //
-// What it checks, each one a defect the review named:
+// What it checks:
 //   pane   the ~400 px "Play while you code" pane offers Slots and mounts the cabinet; it must be on
-//          screen at 0.6 of its design size or more, with nothing outside the pane (amendment 2);
+//          screen at 0.6 of its design size or more, with nothing outside the pane;
 //   full   the Games page's full view fits 1400x900 and 900x500 with nothing clipped - the machine
-//          fits the frame it is MOUNTED IN, not the window (amendment 2);
+//          fits the frame it is MOUNTED IN, not the window;
 //   copy   the see-through copy over the conversation is still on screen after the trip into the
-//          full view and back, and after a window resize (amendment 3).
+//          full view and back, and after a window resize.
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -201,7 +201,7 @@ await cdp('Page.navigate', { url: URL_BASE })
 await sleep(6000)
 await dismissWelcome()
 
-// The status bar shows NOTHING for Slots any more (owner, 2026-11-11). The switch is the one in the
+// The status bar shows NOTHING for Slots any more. The switch is the one in the
 // cabinet's own panel (and Settings): [data-jp2-oc="toggle"] input.
 const chip = await evaluate(`(() => ({ ok: !document.querySelector('[data-jp2="status"]') }))()`)
 check('the status bar carries no Slots button', Boolean(chip && chip.ok), JSON.stringify(chip))
@@ -242,7 +242,7 @@ if (chip && chip.ok) {
     JSON.stringify(on))
   check('the copy holds a real machine', Boolean(on && on.machine), JSON.stringify(on))
 
-  // ---- the trip the owner reported losing the copy over: into the full view and back ----
+  // ---- into the full view and back: the copy has to survive the trip ----
   const opened = await click('[data-game-tile="slots"]')
   check('the Games page offers Slots', opened === true)
   await sleep(2500)
@@ -322,7 +322,7 @@ fs.writeFileSync(WALLET, JSON.stringify({
 await resize(1400, 900)
 await cdp('Page.reload', {})
 await sleep(6000)
-// The separate Jackpot tile is gone (owner 02:04): Slots opens the Jackpot machine.
+// The separate Jackpot tile is gone: Slots opens the Jackpot machine.
 await click('[data-game-tile="slots"]')
 await sleep(3000)
 const broke = await evaluate(`(() => {
@@ -360,8 +360,8 @@ if (broke && broke.button) {
 }
 
 // ---------------------------------------------------------------- the cabinet's own new rows
-// The owner's asks of 2026-11-11 that live ON the cabinet: the line that says the machine spins
-// itself while Hermes thinks or uses tools, the control that turns a chosen slice of points into
+// The rows that live ON the cabinet: the line that says the machine spins itself while Hermes thinks
+// or uses tools, the control that turns a chosen slice of points into
 // chips (slider, number and Max, at the shelf's own 4-points-buy-3 rate), and the whole pay table
 // behind one button. The cabinet is a single fixed 560x720 box with its content column clipped by it,
 // so every one of them - and the pay table with all of its rows open - has to land inside that box.
@@ -504,7 +504,7 @@ await sleep(1000)
 const smaller = await overlayFacts()
 check('the size slider changes the copy size', Boolean(sizeSet && smaller && smaller.machine && dimmed && dimmed.machine && smaller.machine.width < dimmed.machine.width), JSON.stringify({ before: dimmed, after: smaller }))
 check('the over-chat copy offers an X close button', Boolean(smaller && smaller.close), JSON.stringify(smaller))
-// Over the chat the machine is to watch (owner, 2026-11-11): the spin and lever take no click there, the
+// Over the chat the machine is to watch: the spin and lever take no click there, the
 // sound switch and the X still do. Checked by what a real click would hit, not by a style string.
 const watchOnly = await evaluate(`(() => {
   const surface = document.querySelector('[data-jp2-surface="mirror"]') || document.querySelector('[data-jp2-layer]')

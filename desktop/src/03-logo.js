@@ -22,7 +22,7 @@ function GameCenterWordmark() {
   ] })
 }
 
-// The small game icon both side-pane doors wear (owner's ask, 2026-11-11): the same pad the
+// The small game icon both side-pane doors wear: the same pad the
 // Game Center mark draws, at status-bar size and in whatever colour the door is set in. It
 // takes no state, so it is a plain function and its element lands in the caller's own tree.
 function paneDoorIconElement(size = 14) {

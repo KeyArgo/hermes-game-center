@@ -196,8 +196,8 @@ def test_plays_through_game_center(tmp_path: Path) -> None:
 def test_the_table_controls_seat_the_computer_and_the_model(tmp_path: Path) -> None:
     """The two controls the page offers are lines the table really accepts.
 
-    Owner's ask 2026-11-10: Blackjack gets the same "New game vs computer" and "Play my
-    Hermes model" controls the board games have. They are the same two lines every table
+    Blackjack gets the same "New game vs computer" and "Play my Hermes model" controls the
+    board games have. They are the same two lines every table
     takes - ``allow-ai blackjack black=local`` and ``allow-ai blackjack black=agent`` -
     with the dealer's seat as the seat they fill. A session already on the felt has to be
     ended first, which is why the page sends ``abandon`` before a new deal.

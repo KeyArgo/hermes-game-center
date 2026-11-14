@@ -3,7 +3,7 @@
 The defect these tests pin: ``slotplay.spin`` logged ``reels.variant(machine)`` — a fresh draw —
 instead of the variant ``reels.spin`` had already used to pay. Two draws of the same machine carry
 different blank counts and paytables, so re-deriving a payout from the stops with the *logged*
-variant disagreed with the *paid* one on 184 of 592 real spins (2026-11-10). Those 184 were reported
+variant disagreed with the *paid* one on 184 of 592 real spins. Those 184 were reported
 as payout mismatches; every one of them was the log lying about the paytable, not the machine
 underpaying. A false accusation is the worst thing a proof tool can do.
 

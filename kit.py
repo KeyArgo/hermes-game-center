@@ -990,7 +990,7 @@ class Table:
         identity = str(getattr(player, "id", "") or "")
         owner = bool(identity and identity == state.get("owner_id"))
         # A shared-keyboard table is one person at both seats: their identity is
-        # the table's, not the seats', so consent runs through the owner.
+        # the table's, not the seats', so consent runs through the account.
         both = shared_keyboard(player) and all(state.get(f"{side}_id") for side in SIDES) \
             and len({state[f"{side}_id"] for side in SIDES}) == 1
         if not mine and not both and not (has_bot and owner):
@@ -1076,7 +1076,9 @@ class Table:
             and guard < burst
         ):
             agent = seat_kind(str(state.get(state["turn"]) or "")) == "agent"
-            move, fallback = self._agent_move(state) if agent else (rules.bot(state), "")
+            setup = self._setup_move(state, agent)
+            move, fallback = setup if setup is not None else (
+                self._agent_move(state) if agent else (rules.bot(state), ""))
             shown = rules.show(move)
             note = rules.play(state, move)
             self._count(state, shown)
@@ -1343,6 +1345,26 @@ class Table:
         fresh["ai_consent"] = {"by": fresh["owner_id"], "seats": [other]}
         write(self.root, fresh)
         return "\n".join([f"Review, move {found.get('ply', found.get('coach', {}).get('ply'))}: {found['say']}", self.draw(fresh)])
+
+    def _setup_move(self, state: dict, agent: bool) -> tuple[Any, str] | None:
+        """The game's own one-move setup for a model seat, or None.
+
+        A fleet is laid out in a single move the rules already know how to make (Sea Battle's
+        random/duplicate). Asking a model for it, ship by ship, costs one model call per ship
+        inside the person's own request - a locked board for up to AGENT_SECONDS with a slow
+        model - and it is setup nobody watches. The model still plays every real move.
+        """
+        if not agent:
+            return None
+        rules = self.rules
+        phase = str(getattr(rules, "SETUP_PHASE", "") or "")
+        wanted = {str(name) for name in getattr(rules, "SETUP_MOVES", ())}
+        if not phase or not wanted or str(state.get("phase") or "") != phase:
+            return None
+        for move in rules.legal(state):
+            if str(rules.show(move)) in wanted:
+                return move, " (Your agent's fleet was laid out by the game's own chooser.)"
+        return None
 
     def _agent_move(self, state: dict) -> tuple[Any, str]:
         """The person's own model picks from the legal moves. Two tries, then the built-in move."""

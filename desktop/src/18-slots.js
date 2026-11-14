@@ -96,8 +96,8 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
     let viewport = frame.closest('.games-center-layout')
     // The same cabinet is also drawn in the pane beside the chat ("Play while you wait"), which is
     // narrow and has no game-page wrappers. It used to skip the fit entirely and draw at its full
-    // 1183 px inside a ~400 px pane, which is the oversized, cut-off machine the owner reported
-    // (2026-11-10). Fit the pane when there is no game page.
+    // 1183 px inside a ~400 px pane, which drew the oversized, cut-off machine. Fit the pane when
+    // there is no game page.
     if (!page || !viewport) {
       const pane = frame.closest('.games-wait-pane')
       if (pane) { page = pane; viewport = pane }
@@ -147,8 +147,8 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
   const [liveReward, setLiveReward] = useState(null)
   const [liveFeed, setLiveFeed] = useState(null)
   // Poll /jackpot whatever the picture carried. The picture used to be enough - and then the
-  // points froze the moment the page's own snapshot stopped moving, which is exactly what the owner
-  // saw ("I don't see I earned any points anytime recently"). The live read wins over the picture.
+  // points froze the moment the page's own snapshot stopped moving, so the card showed whatever the
+  // page had last drawn. The live read wins over the picture.
   useEffect(() => {
     let alive = true
     let timer = null
@@ -156,7 +156,7 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
       const rest = SM_API.rest
       // The door is wired by the status-bar item, which may mount after this page: returning here
       // and never retrying is what left the card showing the page's stale picture - chips live,
-      // points stuck at zero (owner's report, 2026-11-09: "still says I have zero points").
+      // points stuck at zero.
       if (!rest) { if (alive) timer = setTimeout(load, 500); return }
       try {
         const next = await rest('/jackpot')
@@ -207,7 +207,7 @@ function SlotsTable({ picture, interactive, busy, onMove, onSetting }) {
   const result = newest && machine && newest.machine === machine.id ? newest : null
   const reward = liveReward || pictureReward
   // Points into chips at 75%: the same door as the reward chips, kept beside it so the page and the
-  // overlay spend points the same way (owner's ask, 2026-11-09).
+  // overlay spend points the same way.
   const cashPoints = async points => {
     // `points` is how much of the score the person chose to spend; omitting it spends everything,
     // which is what an older desktop did and the server still accepts.
