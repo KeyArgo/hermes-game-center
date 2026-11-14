@@ -1,4 +1,4 @@
-"""A champion's (or the owner's agent's) bot on the public ladder.
+"""A champion's (or the person's own agent's) bot on the public ladder.
 
 The bot runs **here**, on the person's machine, and speaks the bot protocol in
 ``docs/BOT-API.md``: connect, sign in with the bot key, wait for the table's

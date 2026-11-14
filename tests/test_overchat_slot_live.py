@@ -1,6 +1,6 @@
 """The over-chat strip, in a real React render: off -> on, and a resize after the switch.
 
-Quality review, 2026-11-13: the strip attached its ResizeObserver in an effect with `[]` deps, so a mount
+The strip attached its ResizeObserver in an effect with `[]` deps, so a mount
 with both switches off never attached it, and turning a machine on afterwards rendered it at width 0 for
 good. No stubbed-hooks harness can see that — they call components and read the tree, so a ref filled in
 by hand is always "there". It takes a real commit, so this test runs tests/overchat_slot_live.mjs, which
@@ -51,8 +51,8 @@ def test_the_machine_appears_when_the_switch_is_turned_on_live():
         pytest.skip("node is not installed, so the browser check cannot run")
     if chrome is None:
         pytest.skip("no Chrome/Chromium binary, so the browser check cannot run (CHROME_BIN sets one)")
-    # The QA server needs uvicorn. GitHub's runner has Chrome but not this, so the check skips there rather
-    # than failing a build over a missing test dependency (which is exactly what it did on 2026-11-13).
+    # The QA server needs uvicorn. GitHub's runner has Chrome but not this, so the check skips there
+    # rather than failing a build over a missing test dependency.
     if importlib.util.find_spec("uvicorn") is None:
         pytest.skip("the QA server needs uvicorn, which is not installed here")
     assert SCRIPT.is_file(), "tests/overchat_slot_live.mjs is missing"
@@ -69,7 +69,7 @@ def test_the_machine_appears_when_the_switch_is_turned_on_live():
         pytest.skip(f"the browser check could not run here: {output.strip().splitlines()[0]}")
     assert result.returncode == 0, output
     assert "all over-chat live checks passed" in output, output
-    # The three beats the review asked for are in that output by name; a run that skipped them is not a pass.
+    # The three beats are in that output by name; a run that skipped them is not a pass.
     for beat in ("both switches off at mount", "turning it on draws the copy",
                  "a narrower window re-measures the copy", "turning it off takes the copy"):
         assert beat in output, f"the live run never reported '{beat}':\n{output}"

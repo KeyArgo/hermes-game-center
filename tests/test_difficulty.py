@@ -257,7 +257,7 @@ def test_checkers_expert_beats_beginner_without_a_ply_cap_draw(monkeypatch) -> N
     cap rather than as a draw by adjudication.
 
     The bot's clock is dropped for the run (GAMESHELF_BOT_DETERMINISTIC=1), because the
-    expert's strength otherwise depends on how busy the machine is: measured 2026-11-10, this test
+    expert's strength otherwise depends on how busy the machine is: this test
     passed twice and then failed on the same commit when three suites shared the box, the expert's
     search cut short and the game ended in the adjudicated draw it is meant to catch. The node
     budget is what makes it reproducible; the clock is what made it flaky.

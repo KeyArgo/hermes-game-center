@@ -2,9 +2,9 @@
 //
 //   node tests/backgammon_play.mjs [--port 18720] [--shots DIR]
 //
-// The owner's report (2026-11-11): "I cannot figure out how to move the backgammon pieces" and
-// "dice should actually be rolled and you see it roll". Both are things only a real layout and a
-// real click can answer, so this drives headless Chrome against tests/browser_table_server.py --
+// Two things only a real layout and a real click can answer: whether a person can work out how to
+// move a piece, and whether the dice visibly roll. So this drives headless Chrome against
+// tests/browser_table_server.py --
 // which serves the REAL built plugin and runs the REAL commands -- and plays the game by mouse:
 //
 //   roll   on your turn the dice wait behind Roll; pressing it lands two (or four, on a double)
@@ -226,7 +226,7 @@ check('the page reports no script errors', Boolean(facts && facts.errors.length 
   JSON.stringify(facts && { errors: facts.errors, consoleErrors: facts.consoleErrors }))
 
 // ---------------------------------------------------------------- the roll
-// A fresh turn's dice wait behind Roll: the point of the owner's ask is that the roll is seen.
+// A fresh turn's dice wait behind Roll: the roll has to be seen.
 check('a fresh turn offers a Roll button', Boolean(facts && facts.roll), JSON.stringify({ roll: facts.roll, dice: facts.dice, turn: facts.turn }))
 check('the board says what to do with the dice', Boolean(facts && /Roll|move|Tap/i.test(facts.hint || '')), JSON.stringify(facts && facts.hint))
 check('the status line names the roll', Boolean(facts && /Your turn — roll/.test(facts.status)), JSON.stringify(facts && facts.status))

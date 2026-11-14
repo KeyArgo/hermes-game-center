@@ -172,7 +172,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
           jsxs('div', {
             children: [
               jsx('div', { style: { fontSize: 16, fontWeight: 800, letterSpacing: 0.3 }, children: 'Blackjack' }, 'title'),
-              // Who is across the felt, on the felt (owner's ask 2026-11-10): a table
+              // Who is across the felt, on the felt: a table
               // that names nobody leaves a person unable to tell whether their own
               // model is the one playing the dealer's cards.
               against

@@ -1,7 +1,7 @@
 // ---- 60-settings-and-alerts.js: the welcome, Settings and the quiet alert line
 
-// Owner's ask, 2026-11-09: no alerts in any game for now. One switch, so every surface that could
-// raise one - the line on the page, the pane's list, the desktop notification - is silent together,
+// No alerts in any game for now. One switch, so every surface that could raise one - the line on the
+// page, the pane's list, the desktop notification - is silent together,
 // and bringing them back is this one line. The components stay in the bundle.
 const ALERTS_OFF = true
 // ---------------------------------------------------------------------------
@@ -111,8 +111,7 @@ function WelcomePanel({ view, ctx, onDone }) {
 // Settings: the name, one switch per Play game, a pause, and whether AI seats
 // may play here. Every change is saved as it is made.
 //
-// The version chip lives at the top of THIS panel (owner, 2026-11-10: "keep everything in the status
-// bar except the version chip. The version chip lives in Settings"), so it is on the full-screen
+// The version chip lives at the top of THIS panel, not in the status bar, so it is on the full-screen
 // Settings screen and on the play-while-you-wait pane's own Settings view, both drawn by this one
 // component. The three navigation hooks are optional because they only make sense on the full page:
 // the pane welds a way back to itself and no links it cannot honour. Everything else — every row,
@@ -239,7 +238,7 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
             jsx(SoundSetting, {}, 'sound')
           ]
         }),
-        // The Jackpot cabinet's own switch, in Settings too (owner's ask, 2026-11-11): the SAME
+        // The Jackpot cabinet's own switch, in Settings too: the SAME
         // component the cabinet's panel and the status bar draw, reading and writing the same three
         // keys — so the two Settings views (the page's and the play-while-you-wait pane's, which is
         // this very component) can never drift from the machine. Guarded by name so a bundle built

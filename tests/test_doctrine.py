@@ -356,8 +356,8 @@ def test_catalog_finds_and_plays_doctrine(tmp_path):
 def test_a_signature_must_look_like_one_name(game):
     """The input is a signature, so it is validated as a name — not as a Hermes profile.
 
-    The quality review (2026-11-13) found the field pretending to name a profile that was never used,
-    which is why `private` is no longer special here: no profile is ever run in this path (see
+    The field once pretended to name a profile that was never used, which is why `private` is no
+    longer special here: no profile is ever run in this path (see
     test_the_author_path_starts_no_process_and_inherits_no_environment), so nothing has to be carved out.
     """
     assert "Usage" in game.command("author")

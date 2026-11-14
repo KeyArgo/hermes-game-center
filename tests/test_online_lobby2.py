@@ -1,4 +1,4 @@
-"""The lobby as the owner asked for it (2026-11-11): everyone online shows, appear offline
+"""The lobby: everyone online shows, appear offline
 hides you, the request switches are per game, find match pairs by the games the person chose,
 a seat ends find match, and lobby posts are stamped and purged after a day.
 """

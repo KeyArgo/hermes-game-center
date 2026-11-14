@@ -1,7 +1,7 @@
 """Jackpot v2 spins itself on the hook path, and only while a machine is on screen.
 
-The owner's report (2026-11-11): *"auto-spin is NOT working"*. It was not the hook path - that had
-been spinning the old machine for two days - it was the gate in front of it. Every automatic spin in
+The automatic spin was not working, and it was not the hook path - that had been spinning the old
+machine for days - it was the gate in front of it. Every automatic spin in
 ``shelf/slotplay.py`` refuses unless the wallet says a machine is on screen, and the only surface that
 ever said so was the ORIGINAL copy over the chat (``19-jackpot-overlay.js``). With the Jackpot cabinet
 up - the usual case, and the only case with the original copy off - nothing reported visibility, so
@@ -116,7 +116,7 @@ def test_the_points_still_rack_up_while_the_machine_is_shut(tmp_path: Path) -> N
 
 
 def test_one_surface_closing_does_not_stop_the_other(tmp_path: Path) -> None:
-    """Two machines may float at once (owner's ask, 2026-11-11): the flags are separate."""
+    """Two machines may float at once, so the flags are separate."""
     wallet = _armed(tmp_path, "jackpot2")
     wallet.set_visible(True, "slots")
     assert wallet.read()["visible_sources"] == {"jackpot2": True, "slots": True}

@@ -1,14 +1,14 @@
 """Jackpot Mode: Slot machine with published odds.
 Symbols: cherry 30, bell 20, gem 12, star 8, seven 5, NOUS 2 (total weight 77).
-Payouts target a return of 97.5% of every chip staked; measured on 2026-11-09 over
-1,000,000 index-seeded spins: 0.9838 ± 0.0145 (95%).
+Payouts target a return of 97.5% of every chip staked; measured over 1,000,000
+index-seeded spins: 0.9838 ± 0.0145 (95%).
 """
 import secrets
 import random
 from typing import Dict
 
-# The Nous stamp is the jackpot here too, as it is on both shelf machines (owner's ask, 2026-11-10:
-# "make the nous logo the top valued spin on all"). The temple it replaced is gone everywhere.
+# The Nous stamp is the jackpot here too, as it is on both shelf machines. The temple it replaced is
+# gone everywhere.
 SYMBOLS = ["🍒", "🔔", "💎", "⭐", "7️⃣", "NOUS"]  # Emojis for reels; NOUS names the stamp
 WEIGHTS = [30, 20, 12, 8, 5, 2]  # Weights sum to 77
 # Payout table for three-of-a-kind (tuned for EV ≈ 0.95)

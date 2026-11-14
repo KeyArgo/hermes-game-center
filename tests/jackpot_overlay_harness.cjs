@@ -5,8 +5,8 @@ const path = require('node:path')
 const source = fs.readFileSync(path.join(__dirname, '../desktop/plugin.js'), 'utf8')
   .replace(/^import .*$/gm, '').replace(/^export \{.*\}$/gm, '').replace('export default {', 'const plugin = {')
 const storage = {}
-// The bundle announces the frame the Jackpot v2 copy chose with console.info (the owner's ask: it
-// must be readable without a debugger). The gate counts every line a harness prints that is not
+// The bundle announces the frame the Jackpot v2 copy chose with console.info (it must be readable
+// without a debugger). The gate counts every line a harness prints that is not
 // "…: passed", so those lines are captured here and asserted instead of written to stdout.
 const said = []
 const sandbox = {
@@ -14,7 +14,7 @@ const sandbox = {
   Set, setTimeout, clearTimeout, setInterval, clearInterval,
   PANES_AREA: 'panes', PALETTE_AREA: 'palette', ROUTES_AREA: 'routes',
   SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' },
-  // The composer's seams: where the see-through machines are contributed (review, 2026-11-12).
+  // The composer's seams: where the see-through machines are contributed.
   COMPOSER_AREAS: { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
 }
 sandbox.window = {
@@ -57,8 +57,8 @@ sandbox.useEffect = (fn, deps) => {
 }
 // The plugin builds elements with children in a third argument -
 // jsxs('span', style, { children: [...] }) - so a stub that reads only props.children loses them and
-// no check can ever see their text. Measured 2026-11-10: the machine picker drew two data-sm-pick
-// buttons while words(tree) could not find "Classic".
+// no check can ever see their text: the machine picker drew two data-sm-pick buttons while
+// words(tree) could not find "Classic".
 sandbox.jsx = sandbox.jsxs = (type, props, extra) => {
   const p = props || {}
   // Some elements carry their children in a third argument - jsxs('span', style, { children: [...] }).
@@ -175,7 +175,7 @@ assert.ok(nodes(centreTree).some(node => node.props && node.props['aria-label'] 
 reset()
 
 sandbox.props = { ctx: { rest: async () => data } }
-// Owner's ask 2026-11-09: nothing sits in the status bar until the over-chat machine is asked for.
+// Nothing sits in the status bar until the over-chat machine is asked for.
 const statusOff = draw('JackpotStatusItem(props)')
 assert.ok(!nodes(statusOff).some(node => node.props && node.props['data-games-jackpot'] === 'status'),
   'no slots chip while the over-chat machine is off')
@@ -280,7 +280,7 @@ assert.ok(words(pickTree).includes('Hermes Robots'), 'the machine picker shows H
 assert.equal(nodes(pickTree).filter(node => node.props && node.props['data-sm-pick']).length, 2,
   'the picker is a two-button control')
 
-// The owner's new setting: a checkbox next to auto-spin, remembered per viewer.
+// A checkbox next to auto-spin, remembered per viewer.
 reset()
 sandbox.tableProps = {
   machine: classic,
@@ -298,8 +298,8 @@ sandbox.tableProps = {
 }
 const tableTree = draw('SlotMachine(tableProps)')
 {
-  // Owner's ask 2026-11-09: the cabinet is 20% smaller than the 85% it was, and the size is a
-  // slider (40%–110%) whose choice is kept in this browser.
+  // The cabinet is 20% smaller than the 85% it was, and the size is a slider (40%–110%) whose choice
+  // is kept in this browser.
   const row = nodes(tableTree).find(node => node.props && node.props['data-sm-scale'] === '1')
   assert.ok(row, 'the machine offers a size control')
   const range = nodes(row).find(node => node.props && node.props['data-sm-scale-range'] === '1')
@@ -446,8 +446,8 @@ assert.equal(nodes(offLabel).find(node => node.type === 'input').props.checked, 
 
 // ---- picture symbols, new cabinets, token rewards, and the message pull ----
 // A picture symbol is an img on a pale plate - the plate exists because the dark artwork read as a
-// smudge on the dark drum (owner's ask, 2026-11-09: "maybe put on white background for the circle
-// part"). This check used to expect the bare img and was left behind by that change.
+// smudge on the dark drum. This check used to expect the bare img and was left behind by that
+// change.
 const picture = token => {
   const plate = evaluate(`SM_symbol('${token}', 40)`)
   const img = nodes(plate).find(node => node.type === 'img')
@@ -471,7 +471,7 @@ const themes = evaluate('Object.keys(SM_THEMES)')
 assert.ok(themes.includes('fruit9'), 'the Classic cabinet has a desktop palette')
 assert.ok(themes.includes('robot3'), 'the Hermes Robots cabinet has a desktop palette')
 // The "no machine yet" cabinet used to be red, so the pane flashed an orange machine before the
-// session's own colour arrived (owner's report, 2026-11-10). The fallback is neutral now, and a
+// session's own colour arrived. The fallback is neutral now, and a
 // remount repaints the last theme it saw for that machine.
 assert.ok(!source.includes("'linear-gradient(180deg, #7f1d1d 0%, #b91c1c 30%, #7f1d1d 100%)'"),
   'the placeholder cabinet is not the old red machine')
@@ -573,10 +573,10 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 })
 
 {
-  // Review, 2026-11-12: the see-through machine used to be a position:fixed div of ours appended to the
-  // app's <body>, measured against the app's own markup (it scanned every <textarea> and walked their
-  // ancestors for a "chat column") and gated by the route's hash. A plugin that does that can be broken by
-  // an app update and can break the app. It is a `composer.underside` contribution now, so the slot itself
+  // The see-through machine used to be a position:fixed div of ours appended to the app's <body>,
+  // measured against the app's own markup (it scanned every <textarea> and walked their ancestors for a
+  // "chat column") and gated by the route's hash. A plugin that does that can be broken by an app
+  // update and can break the app. It is a `composer.underside` contribution now, so the slot itself
   // decides where it goes: the slot is part of the conversation's composer and does not exist on any other
   // screen, which is what "only over the conversation" means from here on.
   const registration = source.slice(source.indexOf("id: 'overchat'") - 40, source.indexOf("id: 'overchat'") + 500)
@@ -602,8 +602,8 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 }
 
 {
-  // Owner's report 2026-11-09: a plugin reload reset the size. The preferences are posted to the
-  // shelf and adopted from its snapshot, so the browser is not the only memory.
+  // A plugin reload used to reset the size. The preferences are posted to the shelf and adopted from
+  // its snapshot, so the browser is not the only memory.
   assert.ok(source.includes("slotsSetting('/jackpot/prefs'"), 'every change is posted to the shelf')
   assert.ok(source.includes('function SM_adoptPrefs'), 'the snapshot is adopted on load')
   evaluate('SM_prefsTouchedAt = 0')  // as if the plugin had just loaded, not just been changed
@@ -618,8 +618,8 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 }
 
 {
-  // Owner's ask 2026-11-09: no slots chip in the status bar unless the over-chat machine is on;
-  // the Slots table's switches are how it is turned on, off or changed.
+  // No slots chip in the status bar unless the over-chat machine is on; the Slots table's switches
+  // are how it is turned on, off or changed.
   assert.ok(source.includes('if (!overchatOn) return null'),
     'the status chip is withheld while the over-chat machine is off')
   assert.ok(source.includes('SM_adoptPrefs(data.overchat)'),
@@ -632,7 +632,7 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 }
 
 {
-  // Owner's report 2026-11-09: the size slider barely moved the copy. The machine was resizing
+  // The size slider barely moved the copy. The machine was resizing
   // itself, the fit recomputed against that, and the two cancelled. The wrapper scales now, and the
   // fit is the slot's own width - never the window, never a column measured off the app.
   assert.ok(source.includes('scaleOverride: 1'), 'the machine draws at its own size and the wrapper scales it')

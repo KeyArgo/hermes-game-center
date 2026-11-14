@@ -36,9 +36,8 @@ const PIP_FACES = {
 
 // One static or one-frame diagram drawn small and quiet: the rules card's
 // picture, not a second board. Frames animate through LearnDiagram's index.
-// The plain grid pictures (letters on blank squares) read as nothing to a new player in every game
-// (owner, 2026-11-11), so they stay hidden until they are redrawn on the real board; dice, cards
-// and seats still show.
+// The plain grid pictures (letters on blank squares) read as nothing to a new player in every game,
+// so they stay hidden until they are redrawn on the real board; dice, cards and seats still show.
 function shownDiagram(diagram) {
   return diagram && (diagram.kind || 'grid') !== 'grid' ? diagram : null
 }

@@ -1,9 +1,5 @@
 """Easter eggs pay once per person, only when they are the egg actually showing.
 
-Owner's ask, 2026-11-09: "find easter eggs that show up randomly through game center that gives the
-user points if they find. we can update them every now and again but one user can use them once, and
-each can pay out as much as 10k in points or as little as 1k."
-
 These tests pin the three rules that make that a real find rather than a button: the catalogue pays
 inside 1,000-10,000, the wallet refuses a second find of the same egg, and the schedule cannot be
 rerolled by asking again in the same hour.
@@ -85,8 +81,7 @@ def test_a_find_survives_a_downgrade(tmp_path: Path) -> None:
     The record lives in the wallet file, and a version that has never heard of a key still writes the
     file when anything changes. Unknown keys are carried through for exactly this reason: without it,
     going back to an older commit and spending a chip would drop `eggs_found` and let the same egg pay
-    twice (owner's ask, 2026-11-09: "even if they go back and forth between commits or updates they
-    cannot cheat as we keep records of which easter eggs they redeemed").
+    twice, even if they go back and forth between commits or updates.
     """
     import json
 

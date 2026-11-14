@@ -146,8 +146,8 @@ sandbox.useEffect = (fn, deps) => {
 }
 // The plugin builds elements with children in a third argument -
 // jsxs('span', style, { children: [...] }) - so a stub that reads only props.children loses them and
-// no check can ever see their text. Measured 2026-11-10: the machine picker drew two data-sm-pick
-// buttons while words(tree) could not find "Classic".
+// no check can ever see their text: the machine picker drew two data-sm-pick buttons while
+// words(tree) could not find "Classic".
 sandbox.jsx = sandbox.jsxs = (type, props, extra) => {
   const p = props || {}
   // Some elements carry their children in a third argument - jsxs('span', style, { children: [...] }).
@@ -277,7 +277,7 @@ async function lifecycle() {
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(calls.at(-1), 'connect4 draw accept', 'accept draw sends the acceptance verb, not another offer')
   reset()
-  // Leaving a seat with another person at the table asks once, in the owner's words.
+  // Leaving a seat with another person at the table asks once, in the words the table uses.
   props.board.picture = { ...active, table_id: 'table-1', view: 'connect4', seats: [
     { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
     { side: 'black', kind: 'human', id: 'bea', name: 'Bea', open: false }
@@ -700,7 +700,7 @@ async function accessibilityContract() {
   assert.ok(source.includes('@media') && source.includes('games-center-layout'), 'small panes stack the lobby rather than crushing the table')
   reset()
   // Your games cards: an experiment another plugin installed is visible and locked - it can open
-  // nothing, by press or by key (owner's ask 2026-11-10, #7).
+  // nothing, by press or by key.
   const opened = []
   sandbox.yourItem = { id: 'hello', title: 'Hello', summary: 'Says hi.', plugin: 'fake-game', opens: 'screen', desktop_route: '/hello' }
   sandbox.yourOpen = async card => { opened.push(card.desktop_route); return '' }
@@ -1416,7 +1416,7 @@ async function firstRunContract() {
   findButton(tree, 'Back to Game Center').props.onClick()
   assert.deepEqual(asked.at(-1), ['back', 'games'], 'Back goes to the games, not to a click event')
 
-  // --- the version chip, at the top of Settings (owner, 2026-11-10). It is the one place the install
+  // --- the version chip, at the top of Settings. It is the one place the install
   // in view is drawn: not the status bar, not the Games header, not the pane's foot. Both Settings
   // views — the full screen's and the pane's — are this one panel, so both carry it.
   reset()
@@ -1514,9 +1514,9 @@ async function firstRunContract() {
     return draw('GamesStatusItem')
   }
   try {
-    // The door (owner's ask, 2026-11-11): while the pane is off the screen the status bar
-    // carries the way back, with a small game icon and its own words. The pane is set closed
-    // for this block, and the news line is checked through its own hook.
+    // The door: while the pane is off the screen the status bar carries the way back, with a small
+    // game icon and its own words. The pane is set closed for this block, and the news line is
+    // checked through its own hook.
     const doorItem = tree => nodes(tree).find(node => node.props && node.props['data-games-pane-door'])
     const newsItem = tree => nodes(tree).find(node => node.props && node.props['data-games-status'] === 'action')
     evaluate('WAIT_PANE_SLOT.dispose = null')
@@ -1640,13 +1640,13 @@ async function paneContract() {
   // The reversi tile, however deep the pane nests it.
   const gameTile = (tree, id) => nodes(tree).find(node => node.props && node.props['data-game-tile'] === id)
 
-  // The status item's two faces, each found by its own hook: the door that opens the pane
-  // (owner's ask, 2026-11-11) and the news line that needs saying.
+  // The status item's two faces, each found by its own hook: the door that opens the pane, and the
+  // news line that needs saying.
   const statusDoor = tree => nodes(tree).find(node => node.props && node.props['data-games-pane-door'])
   const statusNews = tree => nodes(tree).find(node => node.props && node.props['data-games-status'] === 'action')
 
-  // The four quick games the owner named, as tiles; and NOTHING is dealt until the person names an
-  // opponent in the one door under the board (owner's ask, 2026-11-11).
+  // The four quick games, as tiles; and NOTHING is dealt until the person names an opponent in the
+  // one door under the board.
   assert.equal(evaluate("quickGameLine('connect4')"), 'allow-ai connect4 black=local level=intermediate')
   assert.equal(evaluate("quickGameLine('gomoku', 'agent')"), 'allow-ai gomoku black=agent level=intermediate')
   reset()
@@ -1711,7 +1711,7 @@ async function paneContract() {
 
   // The thinking line in the pane, with the seconds ticking: the moment the board says a Hermes
   // model's seat is to move, the pane says so and counts - and it never claims the built-in
-  // computer is working when nothing of ours is out (owner's ask, 2026-11-11).
+  // computer is working when nothing of ours is out.
   reset()
   boardPicture = { ...picture, turn: 'black', permissions: { can_move: false }, seats: [
     { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
@@ -1821,8 +1821,8 @@ async function paneContract() {
   tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
   sandbox.paneCtx = lobbyCtx.ctx
   assert.equal(evaluate("alertsOn(paneCtx, 'connect4')"), false, 'alerts are off until asked for')
-  // Owner's ask 2026-11-09: no alert drops in any game for now, so the opt-in is not on the page
-  // either. The controls are still in the source; ALERTS_OFF is what hides them.
+  // No alert drops in any game for now, so the opt-in is not on the page either. The controls are
+  // still in the source; ALERTS_OFF is what hides them.
   assert.ok(source.includes('const ALERTS_OFF = true'), 'alerts are switched off in one place')
   assert.ok(source.includes('ALERTS_OFF ? null : jsxs'), 'the pane list is not rendered while off')
   const alertBox = nodes(tree).find(node => node.type === 'label' && words(node).includes('Tell me when it is my turn'))
@@ -1857,7 +1857,7 @@ async function paneContract() {
   await new Promise(resolve => setTimeout(resolve, 0))
   badge = draw('GamesStatusItem(paneProps)', { ctx: badgeCtx.ctx })
   assert.equal(statusNews(badge).props['aria-label'], 'Games: Your turn (Connect Four)', 'the status bar shows your turn, with the game')
-  // Alerts are off for now (owner's ask, 2026-11-09): the badge still reads "Your turn", and
+  // Alerts are off for now: the badge still reads "Your turn", and
   // nothing is pushed at the person.
   assert.equal(badgeCtx.ctx.notified.length, 0, 'and raises no notification while alerts are off')
   badge = draw('GamesStatusItem(paneProps)', { ctx: badgeCtx.ctx })
@@ -1937,7 +1937,7 @@ async function paneContract() {
   view.lobby = { lines: [], looking: [] }
   boardPicture = picture
 
-  // Alerts are off for now (owner's ask, 2026-11-09), so the notification rules below are kept
+  // Alerts are off for now, so the notification rules below are kept
   // for the day they come back rather than asserted against silent code.
   if (!evaluate('ALERTS_OFF')) {
   // Paused alerts are not remembered as told: the turn that happened while paused is
@@ -2006,7 +2006,7 @@ async function paneContract() {
   view.lobby = { lines: [], looking: [] }
 
   // Start over: the model choice in the dialog, and its words naming the model - never "the
-  // computer" for a model game (owner's ask, 2026-11-11).
+  // computer" for a model game.
   reset()
   evaluate("paneWatch.game = 'connect4'")
   const restartCtx = makeCtx({ 'pane-game': 'connect4' })
@@ -2089,7 +2089,7 @@ async function paneContract() {
   boardPicture = picture
   reset()
 
-  // Blackjack in the pane (owner's ask 2026-11-10): its dealer seat can be the built-in
+  // Blackjack in the pane: its dealer seat can be the built-in
   // player or the person's own model, so a solo table that seats one is offered the same
   // two buttons every board game has - the pane had no way to start a new game at all.
   reset()
@@ -2156,10 +2156,9 @@ async function paneContract() {
   view.play = savedPlayAgain
   boardPicture = picture
 
-  // A move in the pane is drawn the moment it is made, and painted from the answer itself
-  // (owner's report 2026-11-10: "moving a piece versus the computer takes noticeably long
-  // before the piece lands"). The board read after the move used to be the only thing that
-  // could show it, so the piece sat still for the computer's whole search.
+  // A move in the pane is drawn the moment it is made, and painted from the answer itself. The
+  // board read after the move used to be the only thing that could show it, so the piece sat still
+  // for the computer's whole search.
   reset()
   const moveCtx = makeCtx({ 'pane-game': 'connect4' })
   boardPicture = picture
@@ -2221,7 +2220,7 @@ async function paneContract() {
   assert.ok(entries.find(item => item.area === 'palette' && item.data.id === 'hermes-gameshelf.wait'), 'the palette command keeps its own id')
   assert.equal(typeof entries.find(item => item.id === 'status').render, 'function')
 
-  // The version (owner's ask 2026-11-10): one reusable chip, and it is drawn at the top of Settings —
+  // The version: one reusable chip, and it is drawn at the top of Settings —
   // the full-screen Settings screen and this pane's own gear. It is NOT a status-bar item, NOT in the
   // Games header, and NOT at this pane's foot.
   assert.equal(entries.find(item => item.id === 'version'), undefined, 'the version is not a status-bar item')
@@ -2229,7 +2228,7 @@ async function paneContract() {
     'and nothing else registers it in the status bar')
   assert.equal(entries.filter(item => item.area === 'right').length, 1,
     'the status bar has one Slots item and nothing else')
-  // The two see-through machines are a composer-slot contribution now (review, 2026-11-12): the app owns
+  // The two see-through machines are a composer-slot contribution now: the app owns
   // where they go, so nothing has to be anchored in the status bar or floated over the app's markup.
   assert.ok(entries.find(item => item.area === 'composer.underside' && item.id === 'overchat'),
     'the over-chat machines are contributed to the composer underside slot')
@@ -2298,7 +2297,7 @@ async function paneContract() {
   tree = draw('WaitPane(paneProps)', sandbox.chipProps)
   assert.ok(findButton(tree, 'Connect Four'), 'one press back and the pane game list is there again')
 
-  // Out of the way, per the owner: a visible Close and Minimize in the header, a
+  // Out of the way: a visible Close and Minimize in the header, a
   // strip to come back with, Esc while the pane has focus, and the choice kept
   // for the session.
   reset()
@@ -2391,7 +2390,7 @@ async function paneContract() {
 
   // The pane's controls, as the source has them: one door to a new game with the opponent chosen
   // inside it, real radios with nothing picked, Start waiting for a choice, and a strength press
-  // that only sets the strength (owner's ask, 2026-11-11).
+  // that only sets the strength.
   assert.ok(source.includes('const [dealWho, setDealWho] = useState(\'\')'), 'the pane starts with no opponent chosen')
   assert.ok(source.includes("type: 'radio'"), 'the dialog uses real radios')
   assert.ok(source.includes("'data-deal-choice': id"), 'each with its own hook')
@@ -2405,7 +2404,7 @@ async function paneContract() {
   assert.ok(source.includes('jsx(ModelPicker, {'), 'the model seat is offered the shared ModelPicker')
 
   // The pane hides what is not built, and keeps it: each gate wears its own FUTURE(2026-11-11) note
-  // and the code behind it is still in the bundle (owner's ask, 2026-11-11).
+  // and the code behind it is still in the bundle.
   assert.ok(source.includes('const PANE_LADDER_OFF = true'), 'the bot ladder is switched off in one place')
   assert.ok(source.includes('const PANE_LEAGUES_OFF = true'), 'so are Bots & leagues')
   assert.ok(source.includes('const PANE_ONLINE_ALERT_OFF = true'), 'and the online-alert switch')
@@ -2430,12 +2429,76 @@ async function paneContract() {
   assert.ok(source.includes('function waitSecondsWords(seconds)'), 'the seconds are counted in one place')
   assert.ok(source.includes('const paneWait = pictured && pictured.status'), 'the pane follows that line, with the seconds')
 
+  // A match the pane cannot see yet. The board read is still in flight (a gateway restart, a slow
+  // first paint), so nothing on screen says a game is in play - and the shelf is holding one. The
+  // deal must end it before it deals, or the table refuses the line and the press does nothing.
+  reset()
+  const blindStore = { 'pane-game': 'gomoku' }
+  const blindAsked = []
+  const blindGame = { status: 'active', plies: 3 }
+  let firstBoardRead = true
+  const blindPicture = extra => ({ ...picture, view: 'gomoku', game: 'gomoku', seats, ...extra })
+  const blindCtx = {
+    storage: {
+      get: (key, fallback) => (key in blindStore ? blindStore[key] : fallback),
+      set: (key, value) => { blindStore[key] = value },
+      remove: key => { delete blindStore[key] }
+    },
+    os: { notify() {} },
+    rest: async (path, options) => {
+      const line = options && options.body ? options.body.line : path
+      blindAsked.push(line)
+      if (path === '/view') return view
+      if (path === '/models') return { ok: true, routes: [], current: '' }
+      if (path.startsWith('/board')) {
+        if (firstBoardRead) { firstBoardRead = false; return new Promise(() => {}) }
+        return { text: '', picture: blindPicture({ status: blindGame.status, plies: blindGame.plies }) }
+      }
+      if (path === '/command') {
+        if (/^allow-ai /.test(line)) {
+          if (blindGame.plies > 0) {
+            return { ok: false, text: 'A match is in progress. Finish or resign before starting a new game.' }
+          }
+          blindGame.status = 'active'
+          blindGame.plies = 0
+          return { text: 'OK', ok: true }
+        }
+        if (line === 'gomoku resign') {
+          blindGame.status = 'resigned'
+          blindGame.plies = 0
+          return { text: 'Resigned.', ok: true }
+        }
+        return { text: 'OK', ok: true }
+      }
+      return {}
+    }
+  }
+  let blindTree = draw('WaitPane(paneProps)', { ctx: blindCtx })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  blindTree = draw('WaitPane(paneProps)', { ctx: blindCtx })
+  const blindDoor = findButton(blindTree, 'New game') || findButton(blindTree, 'Start over')
+  assert.ok(blindDoor, 'the pane offers its one deal door: ' + words(blindTree).slice(-200))
+  blindDoor.props.onClick()
+  blindTree = draw('WaitPane(paneProps)', { ctx: blindCtx })
+  nodes(blindTree).find(node => node.props && node.props['data-deal-choice'] === 'computer').props.onChange()
+  blindTree = draw('WaitPane(paneProps)', { ctx: blindCtx })
+  await findButton(blindTree, 'Start').props.onClick()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  blindTree = draw('WaitPane(paneProps)', { ctx: blindCtx })
+  const blindDeals = blindAsked.filter(line => line === 'gomoku resign' || line.startsWith('allow-ai'))
+  assert.deepEqual(blindDeals, ['gomoku resign', 'allow-ai gomoku black=local level=intermediate'],
+    'a deal on a table whose board has not been read ends the match it cannot see, then deals: '
+    + JSON.stringify(blindAsked))
+  assert.equal(blindGame.status, 'active', 'and the new game really starts')
+  assert.equal(blindGame.plies, 0, 'on a fresh board')
+  assert.ok(findButton(blindTree, 'Start over'), 'the pane is on the game it dealt')
+
   reset()
   chatBusy.value = false
   console.log('play while you code pane: passed')
 }
 
-// The obvious door (owner's ask, 2026-11-11): the pane and its palette command are "Play while
+// The obvious door: the pane and its palette command are "Play while
 // you code", a real button stands in the Games header beside the chips, and the status bar
 // carries a small game icon and the same words while the pane is closed. Both doors read one
 // state and press the same two functions, and the status item hides while the pane is open.
@@ -2901,7 +2964,7 @@ async function resultContract() {
   console.log('game result overlay, check and draws: passed')
 }
 
-// Watch it think and the corner coach: the owner's private panel, the states of
+// Watch it think and the corner coach: the person's private panel, the states of
 // the whisper box, and the line a watcher sees instead. The panel is drawn by
 // TalkingTable; the coach box is its own component, so it is drawn directly.
 async function watchItThinkContract() {
@@ -3177,10 +3240,10 @@ async function teamTableContract() {
 }
 
 
-// The bug hunt's chess vocabulary on tables that are not chess: the game names its
+// Chess vocabulary on tables that are not chess: the game names its
 // own two sides (kit.py side_words / seat_words) and the table uses those words
 // everywhere a side is named — the seat row, the move history and the start screen.
-// Owner's ask 2026-11-10 (1 and 2): a table always says who you are playing, and a solo
+// A table always says who you are playing, and a solo
 // table that seats a machine (Blackjack's dealer) is offered the same two ways on as every
 // board game. The label is words over the seats the page already has: seat.kind "local" is
 // the built-in player, "agent" is the person's own Hermes model.
@@ -3244,7 +3307,7 @@ async function soloSeatContract() {
 
   // The page: a board game shows the chip above the board, and Blackjack offers the same
   // two ways onto a new table as every board game, without a strength row a dealer cannot
-  // use (owner's ask: "the same 'New game vs computer' and 'Play my Hermes model'").
+  // use.
   const calls = []
   sandbox.seatPageProps = {
     game: { id: 'connect4', title: 'Connect Four', kind: 'table', installed: true, bots: true },
@@ -3573,7 +3636,7 @@ async function talkResultContract() {
 }
 
 
-// Owner's ask 2026-11-10 (#7), at page level: the Experimental section is drawn, titled
+// At page level: the Experimental section is drawn, titled
 // "Experimental", and every game inside it is locked - the whole shelf renders, and nothing in it
 // can be entered from the library.
 async function experimentalShelfContract() {
@@ -3784,7 +3847,7 @@ async function onlineContract() {
   assert.ok(words(tree).includes('You are Ada online.'), 'the person is signed in in the same breath')
 
   // 3. Linked: Find a match online asks the queue for this game. The online-alert switch is NOT
-  //    offered on the pane (owner's ask, 2026-11-11): it saves a flag, but the notification behind
+  //    offered on the pane: it saves a flag, but the notification behind
   //    it is a no-op, so the pane does not promise it. It is still in the source, behind a gate.
   const linked = makeCtx({ on: true, linked: true, name: 'Ada' })
   tree = await open(linked)
@@ -3804,7 +3867,7 @@ async function onlineContract() {
   tree = await open(found)
   assert.ok(words(tree).includes('Your table is ready: Bea for Connect Four'), 'the match is named')
   assert.ok(words(tree).includes('You play black'))
-  // Online play is inside Hermes now (owner, 2026-11-11): Play here, and no browser door.
+  // Online play is inside Hermes now: Play here, and no browser door.
   assert.ok(findButton(tree, 'Play here'), 'the ready table is played here')
   assert.equal(findButton(tree, 'Open in browser'), undefined, 'and there is no Open in browser any more')
   assert.deepEqual(found.opened || [], [], 'nothing opens a browser')
@@ -3822,7 +3885,7 @@ async function onlineContract() {
   assert.ok(down.asked.some(item => item[0] === '/command' && item[1].body.line === 'looking connect4'),
     'and local play is untouched by the online server being down')
 
-  // 6. The bot ladder and Bots & leagues are NOT on the pane (owner's ask, 2026-11-11): rated
+  // 6. The bot ladder and Bots & leagues are NOT on the pane: rated
   //    bot-versus-bot is not proven end to end, and watching a league leaves Hermes for the
   //    browser. Both are still in the source, behind their own gates.
   const ladderAsk = {
@@ -3845,7 +3908,7 @@ async function onlineContract() {
   const tell = makeCtx({ on: true, linked: true, name: 'Ada',
     alert: { game: 'connect4', at: 500, waiting: 2, text: '2 people online wants a game of connect4 right now.' } })
   await open(tell)
-  // Alerts are off for now (owner's ask, 2026-11-09): the lobby still says it in words on the
+  // Alerts are off for now: the lobby still says it in words on the
   // Lobby tab, and nothing is pushed at the person.
   assert.equal(tell.notified.length, 0, 'no alert is pushed while alerts are off')
   assert.ok(words(draw('WaitPane(paneProps)', { ctx: tell.ctx })).includes('2 people online'), 'the lobby still says it in words')
@@ -4002,7 +4065,7 @@ async function onlineTableContract() {
   assert.equal(words(turnLine(tree)), 'Waiting for Bea', 'and the table\'s own picture is what is drawn')
 
   reset()
-  // 5. Resign asks first, in the owner's words, and closing the table is its own route.
+  // 5. Resign asks first, in the words the table uses, and closing the table is its own route.
   const leaving = makeCtx(live(minePicture))
   const leavingProps = { game, ctx: leaving.ctx, roomId: 'r1', onBack: () => localCalls.push('back') }
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', leavingProps)
@@ -4088,7 +4151,7 @@ async function onlineTableContract() {
   tree = await settle('PlayTable(ptProps)', 'ptProps', ptProps)
   assert.ok(findButton(tree, 'Offer draw'), 'and the local table comes back when it is forgotten')
 
-  // The local agent seat keeps the thinking line the owner asked for.
+  // The local agent seat keeps the thinking line.
   ptProps.board = { picture: { ...localPicture, turn: 'black', permissions: { can_move: false },
     seats: [{ side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
       { side: 'black', kind: 'agent', id: 'agent', name: 'Your agent', open: false }] } }
@@ -4096,7 +4159,7 @@ async function onlineTableContract() {
   assert.equal(turnLine(tree).props['data-turn-line'], 'thinking', 'a local model seat still says it is thinking')
   assert.ok(words(tree).includes('Hermes is thinking… 0s'), 'in the owner\'s words, with the seconds: ' + words(tree).slice(0, 160))
   // A computer seat that is only ON move is not "Computer is thinking…": nothing of ours is out,
-  // so the line says it is waiting, with the same clock (owner's ask, 2026-11-11).
+  // so the line says it is waiting, with the same clock.
   ptProps.board = { picture: { ...localPicture, turn: 'black', permissions: { can_move: false },
     seats: [{ side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
       { side: 'black', kind: 'local', id: 'local', name: 'Local', open: false }] } }
@@ -4366,7 +4429,7 @@ async function lobbyColumnContract() {
   assert.equal(drafts.name, '', 'a name the lobby took clears the box')
 
   // 2. The lobby column keeps every in-Hermes way into a match, and no browser link: the web
-  // way in was removed (owner's ask, 2026-11-11). "Play here" is the one door on a ready table.
+  // way in was removed. "Play here" is the one door on a ready table.
   reset()
   const withMatch = { player: { id: 'me', name: 'Ada', named: true }, lobby: { lines: [], looking: [] },
     online: { on: true, url: 'https://games.hermesnet.xyz',
@@ -4393,7 +4456,7 @@ async function lobbyColumnContract() {
 
   reset()
   // 4. The column is narrow (140 px): each box gets its own full-width line with its button under
-  // it, never squeezed side by side (owner's ask, 2026-11-11).
+  // it, never squeezed side by side.
   reset()
   tree = paint({ view: unnamed })
   const sayRows = nodes(tree).filter(node => node.props && node.props['data-lobby-say-row'] === '1')
@@ -4449,7 +4512,7 @@ async function hallContract() {
   }
   const props = extra => ({ ctx: null, current: 'connect4', view: {}, onPlayHere: () => {}, ...extra })
 
-  // 1. The three not-live states each say their one line, in the owner's words.
+  // 1. The three not-live states each say their one line.
   reset()
   let run = makeCtx({ state: 'off', you, prefs: {}, roster: [], requests: [], seated: null })
   let tree = await settle(props({ ctx: run.ctx }))
@@ -5714,22 +5777,21 @@ async function refereeBadgeContract() {
   // is the win's length, and a new result that drops the overlay instead of orphaning its timer.
   assert.ok(source.includes("data-sm-bet-locked"), 'the bet ladder is marked locked while auto-bet is on')
   // The reels are the machine: bigger cells, and a cabinet that is not pushed left by the space kept
-  // for the lever. The glass prints the headline pays on the cabinet itself (owner's ask, 2026-11-09).
+  // for the lever. The glass prints the headline pays on the cabinet itself.
   assert.ok(source.includes('SM_px(70)') && source.includes('SM_px(48)'), 'the three-row wheels are bigger')
   assert.ok(/marginLeft: SM_px\(24\), marginRight: SM_px\(24\)/.test(source), 'the cabinet has equal margins, so it sits centred')
   assert.ok(source.includes("data-sm-glass"), 'the cabinet carries a printed pay strip')
-  // The cabinet is as wide as its reels, the shape 9433891 drew (284 px of cabinet around 235 px of
-  // reels). Everything printed on it - the pay strip and the points card - wraps INSIDE that width.
-  // A card that measured its own sentences into the cabinet grew it to 852 px against 274 px of
-  // reels, and the reels sat small at the left of it (owner's report, 2026-11-10: "the current
-  // cabinet is drawn elongated ... reels small on the left"). Pinned as the deck, not a magic
+  // The cabinet is as wide as its reels, the shape the first cabinet drew (284 px of cabinet around
+  // 235 px of reels). Everything printed on it - the pay strip and the points card - wraps INSIDE
+  // that width. A card that measured its own sentences into the cabinet grew it to 852 px against
+  // 274 px of reels, and the reels sat small at the left of it. Pinned as the deck, not a magic
   // number, because the deck is the window plus its own border, the markers and the row's gaps.
   assert.ok(source.includes('const deckW = windowW + 2 * (SM_px(4) * 2 + SM_px(16))'),
     'the cabinet is sized by its reels, as in 9433891')
   assert.equal((source.match(/maxWidth: deckW/g) || []).length, 2,
     'both printed strips wrap inside the deck width instead of stretching the cabinet')
   // The comeback ladder: a graded tap when the wallet is empty, a cooldown to come back to, and the
-  // premium on the following wins (owner's ask, 2026-11-09: "really gamify this so its addictive").
+  // premium on the following wins.
   assert.ok(source.includes("data-sm-bailout-start"), 'the empty wallet is offered a skill shot')
   assert.ok(source.includes("data-sm-egg"), 'a hidden egg can be marked on the cabinet')
   // A find is announced and animated, and the reveal is a fixed pointer-transparent layer so it can
@@ -5749,8 +5811,7 @@ async function refereeBadgeContract() {
   assert.ok(source.includes('sm-sweep 1100ms linear infinite'), 'the marker sweeps at the graded period')
   assert.ok(source.includes("onBailout: grade => post('/jackpot/bailout'"), 'the over-chat copy can post a grade')
   // A paytable row is a run of symbols, and each one is drawn with its picture: the plain string used
-  // to reach the screen as the word NOUS three times while the reels showed the Nous mark
-  // (owner's report, 2026-11-09: "replace nous nous nous ... with the images").
+  // to reach the screen as the word NOUS three times while the reels showed the Nous mark.
   assert.ok(source.includes('function SM_symbolRun('), 'paytable rows are drawn symbol by symbol')
   assert.ok(source.includes("'data-sm-plate'"), 'the picture symbols sit on a pale plate, so the line reads on a dark drum')
   // Sea Battle says what to do at the top, above the boards, not under them; the table shows the
@@ -5765,7 +5826,7 @@ async function refereeBadgeContract() {
   assert.ok(source.includes("'data-gm-opponent'"), 'the table names its opponent')
   assert.ok(source.includes("'data-gm-vs'"), 'the one who-line carries the seat-kind hook')
   assert.ok(!source.includes("'data-gm-findmatch'"), 'and offers no browser door to find a match')
-  // The see-through machine is fitted to the SLOT it is given (review, 2026-11-12): the composer's
+  // The see-through machine is fitted to the SLOT it is given: the composer's
   // underside measures its own box, hands each machine a share of the width, and the copy is fitted into
   // that share with a height budget — never against the window, and never against the app's markup.
   assert.ok(source.includes('function overchatFitScale'), 'the copy is fitted to the width it was given')
@@ -5780,8 +5841,7 @@ async function refereeBadgeContract() {
   assert.ok(source.includes('if (answer && answer.picture) setBoard('), 'a move paints from the command reply')
   assert.ok(/SM_symbolRun\(row\.symbol/.test(source), 'the glass and the scoring card both use it')
   // The points panel is a card, not small print: the balance as the headline, its worth beside it,
-  // and a bar showing how close the next point is (owner's ask, 2026-11-09: "make the point
-  // advertising more clear and look nicer").
+  // and a bar showing how close the next point is.
   assert.ok(source.includes("data-sm-point-progress"), 'the points card shows progress to the next point')
   assert.ok(source.includes("data-sm-points-worth"), 'the card says what the balance is worth in chips')
   assert.ok(source.includes("10 points for every 1M tokens in + out"), 'the earning rule is spelled out in words')
@@ -5809,7 +5869,7 @@ async function refereeBadgeContract() {
 
 {
   // A watched surface must not sit a beat behind the person: a poll of three or five seconds reads as
-  // lag even when the server answered at once (owner's report, 2026-11-09: "latency of a few seconds").
+  // lag even when the server answered at once.
   assert.ok(source.includes('setInterval(load, 600)'), 'the over-chat overlay reads every 600 ms')
   assert.ok(source.includes('setInterval(() => load(), 1000)'), 'the waiting pane reads every second')
   assert.ok(source.includes("SDK_HOST.onEvent('message.start', () => load())"),
@@ -5856,10 +5916,9 @@ async function refereeBadgeContract() {
 }
 
 {
-  // The owner asked for 85% of the old machine size, and the separate robots game is gone.
-  // Owner's ask 2026-11-09: 20% smaller than the 85% it was, and the size is a slider now.
-  // Owner's correction: only the see-through copy over the chat changes size; the table and the
-  // Play page keep the size they had.
+  // The cabinet is 85% of the old machine size and 20% smaller again over the chat, where the size is
+  // a slider; the separate robots game is gone. Only the see-through copy changes size - the table and
+  // the Play page keep the size they had.
   assert.equal(evaluate('SM_SCALE_DEFAULT'), 1, 'the over-chat copy starts at the Game Center size')
   assert.equal(evaluate('SM_SCALE_TABLE'), 0.85, 'the machine where it is played keeps its size')
   assert.equal(evaluate('SM_SCALE'), 0.85, 'a machine draws at the table size by default')
@@ -5891,16 +5950,16 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: no alert drops anywhere for now - the component stays in the bundle,
-  // so bringing it back is one line, but nothing renders it.
+  // No alert drops anywhere for now - the component stays in the bundle, so bringing it back is one
+  // line, but nothing renders it.
   assert.ok(!source.includes('jsx(AlertLine'), 'no alert drop is rendered on any screen')
   assert.ok(source.includes('function AlertLine'), 'the component itself is still there to restore')
   console.log('alerts: no drops anywhere, component kept: passed')
 }
 
 {
-  // Owner's ask 2026-11-09: the ships you still have to place sit under your own waters, so the
-  // drag is short, instead of under the enemy's board where they used to be centred.
+  // The ships still to place sit under your own waters, so the drag is short, instead of under the
+  // enemy's board where they used to be centred.
   const columnAt = source.indexOf("'games-sea-own-column'")
   const enemyAt = source.indexOf("title: side ? 'ENEMY WATERS'")
   const usedAt = source.indexOf('trayBlock,', columnAt)
@@ -5912,7 +5971,7 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: after placement the game must say what to do next.
+  // After placement the game must say what to do next.
   assert.ok(source.includes("'data-sea-hint': '1'"), 'the table shows a next-step line')
   assert.ok(source.includes('Click any square in ENEMY WATERS to fire'), 'the fire phase tells you where to click')
   assert.ok(source.includes('Drag a ship from the tray under YOUR WATERS'), 'the place phase says where the ships come from')
@@ -5921,15 +5980,14 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's report 2026-11-09: the shooter got the big lettering, the enemy's screen did not.
+  // The shooter got the big lettering and the defender's screen did not: both are told in words.
   assert.ok(source.includes("☠ Your ${shipName} went down!"), 'the defender is told in words')
   assert.ok(!source.includes('if (firstLook) return undefined'),
     'the newest shot is not swallowed by a fresh view')
-  // Owner's report 2026-11-09: "it tells me things late or after it already told me". One shot,
-  // once, immediately: no 520 ms stagger, no replay when the pass card lifts.
+  // One shot, once, immediately: no 520 ms stagger, no replay when the pass card lifts.
   assert.ok(!source.includes('index * 520'), 'banners are not staggered behind the board')
-  // One shot is spoken - the biggest news, not merely the newest (owner's report 2026-11-11: your
-  // own sinking shot was swallowed by the computer's instant reply miss).
+  // One shot is spoken - the biggest news, not merely the newest, so a sinking is not swallowed by
+  // the computer's instant reply miss.
   assert.ok(!source.includes('const shot = fresh[fresh.length - 1]'), 'the newest shot no longer wins by default')
   const pickLine = source.split('\n').find(line => line.includes('const shot = fresh.reduce('))
   const weightLine = source.split('\n').find(line => line.includes("const weight = row => (row.result === 'sunk'"))
@@ -5949,9 +6007,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's correction 2026-11-09: every graphic is centred on the board it is about - a hit you
-  // land appears on ENEMY waters, a hit you take on your own - instead of being placed at a guessed
-  // fraction of the whole table.
+  // Every graphic is centred on the board it is about - a hit you land appears on ENEMY waters, a hit
+  // you take on your own - instead of being placed at a guessed fraction of the whole table.
   assert.ok(source.includes("where: mine ? 'enemy' : 'own'"), 'a shot names the board it happened on')
   assert.ok(source.includes("seaBanner('own')") && source.includes("seaBanner('enemy')"), 'each board draws its own banner')
   assert.ok(source.includes("seaBoom('own')") && source.includes("seaBoom('enemy')"), 'each board draws its own flash')
@@ -5968,8 +6025,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: a jackpot takes the machine over - 15-20 seconds of coins, an alarm,
-  // a screen flash - and the size of the celebration follows the size of the win.
+  // A jackpot takes the machine over - 15-20 seconds of coins, an alarm, a screen flash - and the
+  // size of the celebration follows the size of the win.
   assert.equal(evaluate('SM_tierFor(10).chips'), 10, 'a 10 chip win is a tier')
   assert.equal(evaluate('SM_tierFor(60).chips'), 50, '60 chips is the 50 tier')
   assert.equal(evaluate('SM_tierFor(999).chips'), 500, '999 chips is the 500 tier')
@@ -5988,9 +6045,9 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's correction 2026-11-09: one Experiments shelf for the installed games and the workshop,
-  // and the word "experimental" said once, not in every section. Owner's ask 2026-11-10 (#7): the
-  // shelf is now titled "Experimental" and every game in it is locked - visible, with no way in.
+  // One Experiments shelf for the installed games and the workshop, and the word "experimental" said
+  // once, not in every section. The shelf is titled "Experimental" and every game in it is locked -
+  // visible, with no way in.
   assert.ok(source.includes("heading('Experimental')"), 'one heading covers the whole shelf')
   assert.ok(!source.includes("heading('Experiments')"), 'the old heading is not left beside it')
   assert.ok(!source.includes("heading('Experimental Games')"), 'the second heading is gone')
@@ -6003,9 +6060,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-10 (#7): the Experimental shelf is a shop window. Its heading, its one
-  // short help line and the lock every card wears are written once (27-labs.js), so no lane can
-  // invent a second way of saying no.
+  // The Experimental shelf is a shop window. Its heading, its one short help line and the lock every
+  // card wears are written once (27-labs.js), so no card can invent a second way of saying no.
   assert.ok(source.includes("LABS_LOCK_HELP = 'Early experiments. You can see them; they open when they are ready.'"),
     'the one short help line is the sentence asked for')
   assert.ok(source.includes("'data-experimental-help': '1'"), 'and it is drawn under the heading')
@@ -6056,8 +6112,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's report 2026-11-09: Sea Battle sounds fired periodically with no game open. A mounted
-  // but hidden table must stay silent, and the window being hidden silences it too.
+  // Sea Battle sounds fired periodically with no game open. A mounted but hidden table must stay
+  // silent, and the window being hidden silences it too.
   assert.ok(source.includes('const [onScreen, setOnScreen] = useState(true)'), 'the table knows whether it is on screen')
   assert.ok(source.includes('new IntersectionObserver'), 'it watches its own visibility')
   assert.ok(source.includes('if (!onScreen) return undefined'), 'a hidden table plays nothing')
@@ -6065,8 +6121,8 @@ async function refereeBadgeContract() {
   console.log('sea battle: a hidden table is silent: passed')
 }
 {
-  // Owner's report: the coins sounded like a bell, not metal. The strike is noise, the ring is
-  // short and high, and no partial is allowed a long decay.
+  // The coins sounded like a bell, not metal. The strike is noise, the ring is short and high, and no
+  // partial is allowed a long decay.
   assert.ok(source.includes('bandpass'), 'the coin strike is filtered noise')
   assert.ok(source.includes('length: 0.04 + Math.random() * 0.05'), 'the cascade rings for tens of milliseconds')
   assert.ok(!source.includes('[[1, 1], [2.76, 0.5], [5.4, 0.26]]'), 'the bell ratios are gone')
@@ -6074,7 +6130,7 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: real ship pictures during setup, not a list of squares.
+  // Real ship pictures during setup, not a list of squares.
   assert.ok(source.includes('function SeaShipArt'), 'a ship is drawn as a silhouette')
   assert.ok(source.includes("'data-sea-ship-art'"), 'the chip carries the picture')
   assert.ok(source.includes("'data-sea-shipyard'"), 'the ship in the hand is drawn big')
@@ -6083,8 +6139,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's correction 2026-11-09: the result belongs at the TOP, above the boards and under the
-  // game's own header - not inside the water and not straddling two boards.
+  // The result belongs at the TOP, above the boards and under the game's own header - not inside the
+  // water and not straddling two boards.
   const resultAt = source.indexOf("'data-sea-result'")
   const boardsAt = source.indexOf("className: 'games-seabattle-boards'")
   assert.ok(resultAt > -1 && resultAt < boardsAt, 'the result band is above the boards')
@@ -6093,8 +6149,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: at the end, a picture of both fleets - your kills in their waters, your
-  // losses in yours, the sunk ones red and the survivors grey.
+  // At the end, a picture of both fleets - your kills in their waters, your losses in yours, the sunk
+  // ones red and the survivors grey.
   assert.ok(source.includes('function SeaFleetReview'), 'the review draws a fleet')
   assert.ok(source.includes("tone: ship.sunk ? 'sunk' : 'afloat'"), 'sunk hulls are red, survivors grey')
   assert.ok(source.includes("data-sea-fleet': where") || source.includes("'data-sea-fleet': where"), 'each side has its own review')
@@ -6103,8 +6159,8 @@ async function refereeBadgeContract() {
   console.log('sea battle: the review shows both fleets, sunk in red: passed')
 }
 {
-  // Owner's ask: coins plus the machine's own ding ding ding. The tray body is what makes a clink
-  // read as money rather than a tick.
+  // Coins plus the machine's own ding ding ding. The tray body is what makes a clink read as money
+  // rather than a tick.
   assert.ok(source.includes("case 'payout'"), 'the machine has its own payout chime')
   assert.ok(source.includes('soundTone(ctx, { freq: 1568'), 'the ding is a bright bell')
   assert.ok(source.includes("[[0.28, 0.4], [0.52, 0.25]]"), 'the coin has a tray ringing under it')
@@ -6112,7 +6168,7 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: real recorded slot sounds, and a variety of them.
+  // Real recorded slot sounds, and a variety of them.
   const clips = ['coin', 'coinwin', 'winalert', 'ding', 'payout', 'win', 'siren', 'wheel']
   for (const name of clips) {
     assert.ok(source.includes(`${name}: 'data:audio/ogg;base64,`), `the ${name} clip is embedded`)
@@ -6127,8 +6183,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's asks 2026-11-09: the table must be muteable and lowerable, and the recordings were
-  // abrasive at conversation volume.
+  // The table must be muteable and lowerable, and the recordings were abrasive at conversation
+  // volume.
   assert.ok(source.includes('function gamesVolume()'), 'there is a master volume')
   assert.ok(source.includes('function gamesVolumeSet('), 'and it can be set')
   assert.equal(evaluate('SOUND_VOLUME_DEFAULT'), 35, 'it starts low rather than loud')
@@ -6143,8 +6199,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's asks 2026-11-09: the Sea Battle result belongs at the top, above the boards; the alert
-  // drops are gone for now; and choosing a Hermes model offers 1v1 or model-vs-model.
+  // The Sea Battle result belongs at the top, above the boards; the alert drops are gone for now;
+  // and choosing a Hermes model offers 1v1 or model-vs-model.
   const resultAt = source.indexOf("'data-sea-result'")
   const boardsAt = source.indexOf("className: 'games-seabattle-boards'")
   assert.ok(resultAt > -1 && resultAt < boardsAt, 'the result band is drawn above the boards')
@@ -6157,8 +6213,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's ask 2026-11-09: the auto-bet sizes itself by what the hook cost, and it is on by
-  // default. The switch says so, and turning it off leaves the lever's bet in charge.
+  // The auto-bet sizes itself by what the hook cost, and it is on by default. The switch says so,
+  // and turning it off leaves the lever's bet in charge.
   assert.ok(source.includes("'Auto-bet sizes itself'"), 'the switch is on the machine card')
   assert.ok(source.includes('/jackpot/autobet'), 'it talks to the shelf')
   assert.ok(source.includes('autobet !== false'), 'absent means on, so the default is auto-bet')
@@ -6166,8 +6222,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's report 2026-11-09: the auto-bet switch would not turn off - it read straight from the
-  // polled payload, so it snapped back to on every render. It flips locally and posts now.
+  // The auto-bet switch used to read straight from the polled payload, so it snapped back to on
+  // every render. It flips locally and posts now.
   assert.ok(source.includes('const flipAutobet = on =>'), 'the switch flips under the finger')
   assert.ok(source.includes('setAutobetShown(Boolean(on))'), 'and keeps its own value')
   assert.ok(source.includes("checkbox('Auto-bet sizes itself', autobetShown, flipAutobet"), 'the checkbox uses that value, not the payload')
@@ -6183,8 +6239,7 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's release rule, 2026-11-11: the win chance and the return are taken OFF the screen of both
-  // machines. The session draw itself is untouched — the shelf's own tests pin the numbers — so the
+  // The win chance and the return are taken OFF the screen of both machines. The session draw itself is untouched — the shelf's own tests pin the numbers — so the
   // picker still says what tonight holds, in a WORD and never in a percentage.
   assert.ok(!source.includes("'data-sm-chance'"), 'the picker shows no session win chance')
   assert.ok(!source.includes('% · bonus') && !source.includes('% · cold'), 'no chance percentage is named beside a mood')
@@ -6194,9 +6249,8 @@ async function refereeBadgeContract() {
 }
 
 {
-  // Owner's report 2026-11-09: playing a Hermes model, nothing said whether it was thinking or whose
-  // turn it was. The strip now always names the state, and counts the seconds while the other seat
-  // works.
+  // Playing a Hermes model, nothing used to say whether it was thinking or whose turn it was. The
+  // strip now always names the state, and counts the seconds while the other seat works.
   assert.ok(source.includes("'data-turn-line': thinking ? 'thinking'"), 'the strip names thinking')
   assert.ok(source.includes("myTurnNow ? 'Your turn'"), 'and says your turn in words')
   assert.ok(source.includes('`${machineName} is thinking…'), 'a model thinking is named as Hermes')
@@ -6240,7 +6294,7 @@ async function refereeBadgeContract() {
   console.log('leagues: watch opens only a web table address: passed')
 }
 
-// The lobby as the owner asked for it (2026-11-11): everyone online is listed, appear
+// The lobby: everyone online is listed, appear
 // offline is one obvious switch at the top, the request switches name every game the
 // server can seat, find match is chips (never a silent default game), a match offer
 // arrives as a Join / Not now dialog with one dim line of its own, and every lobby
@@ -6495,7 +6549,7 @@ async function lobbyAsksContract() {
   console.log('lobby asks: everyone listed, appear offline, per-game switches, find match chips, offers as dialogs, stamped posts: passed')
 }
 
-// The three owner asks of 2026-11-11, in one contract: Backgammon's Play tile draws its own board
+// Three surface contracts in one place: Backgammon's Play tile draws its own board
 // (not the dark stand-in scene an unknown id gets), the main screen carries one row of links out to
 // the project, and the version chip copies its own line on a click or a key and says so.
 async function gcextrasContract() {
@@ -6555,7 +6609,7 @@ async function gcextrasContract() {
   sandbox.navigator = { clipboard: { writeText: text => { copied.push(text); return Promise.resolve() } } }
   const line = 'v1.0.0-dev.7 · 2026-11-11 · abcdef12'
   // The copy goes through the SDK's own clipboard door (ctx.os.writeClipboard) — never a hidden textarea
-  // appended to the app's <body> (review, 2026-11-12).
+  // appended to the app's <body>.
   const clip = []
   sandbox.gcChip = { ctx: {
     os: { writeClipboard: text => { clip.push(text); copied.push(text); return Promise.resolve(true) } },
@@ -6653,7 +6707,7 @@ async function gcextrasContract() {
   console.log('gcextras: backgammon cover, project link row and the copyable version chip: passed')
 }
 
-// ---- the board's name for the side to move (bug found on a fresh profile, 2026-11-13) ---------------
+// ---- the board's name for the side to move ----------------------------------
 // The engine calls its sides white and black because that is chess's vocabulary. On a Connect Four board
 // that reached the person as "connect4 board, white to move": the wrong game's name and the wrong words.
 {

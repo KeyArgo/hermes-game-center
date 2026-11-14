@@ -1,6 +1,4 @@
-"""Owner feedback on the test build: the library, and who plays "Your agent".
-
-Two things the owner hit with his own hands:
+"""Two things a person hit with their own hands, on a test build:
 
 * only Connect Four looked playable, because every other shipped game sat in Get;
 * the table never said which model was playing, or where it runs.

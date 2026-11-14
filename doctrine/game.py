@@ -412,7 +412,7 @@ class Doctrine:
             if "```" in text:
                 text = re.sub(r"```(?:json)?", "", text)
             # The reply may show its working around the card. Only the card is
-            # validated; the working is kept for the owner's own panel.
+            # validated; the working is kept for the person's own panel.
             thought = talking.parse_thinking(text)
             body = thought["action"] or text.strip()
             candidate, problems = self.card_mod.validate(_extract_json(body) or body)
@@ -463,9 +463,8 @@ class Doctrine:
 
     def _author(self, state: dict, rest: list[str]) -> str:
         # A SIGNATURE, not a profile: the name is written into the card's author field and nothing else.
-        # The model that writes the card is the person's own (see doctrine/profiles.py). The quality
-        # review (2026-11-13) was right that announcing a profile as the author was a claim we could not
-        # keep — no profile is ever run.
+        # The model that writes the card is the person's own (see doctrine/profiles.py). Announcing a
+        # profile as the author would be a claim we cannot keep — no profile is ever run.
         signature = self.profiles.clean(rest[0] if rest else "")
         if not signature:
             return "Usage: doctrine author <name> - the name to sign the card with"
@@ -477,7 +476,7 @@ class Doctrine:
                     "Pick one in Settings → Models → \"Game Shelf opponent\". Everything else still works.")
         flavour = " ".join(rest[1:]) or state["your_card"].get("personality", "")
         # The card comes from the person's own model through Hermes's plugin LLM door: text only, no
-        # child process, no tool set and no environment to inherit (review, 2026-11-12).
+        # child process, no tool set and no environment to inherit.
         reply, error = self.profiles.author(signature, self.profiles.prompt(signature, flavour),
                                            complete=self.complete)
         if error:

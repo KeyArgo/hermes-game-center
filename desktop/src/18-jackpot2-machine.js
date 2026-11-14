@@ -1,42 +1,36 @@
 // ---- 18-jackpot2-machine.js: JACKPOT v2, the second cabinet, drawn from scratch
 //
 // A different machine from the Slots table's (18-slot-machine.js), not a reskin of it. It shares
-// three things with the old one and nothing else:
-//  - the shelf's routes, exactly the ones the old table and overlay already call: GET /jackpot,
-//    POST /jackpot/spin (the route the old overlay spins with), /jackpot/autoplay, /jackpot/autobet,
-//    /jackpot/machine and /jackpot/cashin. No new route, no new server work;
-//  - the recorded sounds behind gamesSound() (07-sound.js / 08-slot-samples.js), so the mute switch
-//    and the master volume are the existing ones;
-//  - the picture symbols in SM_ART (18-slot-art.js), so the Nous stamp and the wing are the shipped
-//    artwork rather than a second copy of it.
+// three things with the old one: the shelf's routes (GET /jackpot, POST /jackpot/spin - the route the
+// old overlay spins with - /jackpot/autoplay, /jackpot/autobet, /jackpot/machine and /jackpot/cashin,
+// so no new route and no new server work); the recorded sounds behind gamesSound() (07-sound.js /
+// 08-slot-samples.js), so the mute switch and the master volume are the existing ones; and the
+// picture symbols in SM_ART (18-slot-art.js), so the Nous stamp and the wing are the shipped artwork
+// rather than a second copy of it.
 //
-// One fixed size, by design: the cabinet is always 560x720 CSS pixels, and every caller scales that
-// box with a CSS transform rather than resizing the drawing. In 'overlay' mode the caller does all
-// the measuring (the layer owns those numbers). In 'full' mode the cabinet fits the element it is
-// MOUNTED IN - the Games column, the play-while-you-wait pane, a test frame - and never the window:
-// the same machine is mounted in a 400 px pane and a 1400 px page, and the frame around it is what
-// must not clip it. window.__jp2 carries the test handle: { spinning } is true while the reels are
-// travelling, and width/height/mode are published beside it so a harness can compute a fit without a
-// laid-out DOM.
+// One fixed size: the cabinet is always 560x720 CSS pixels, and every caller scales that box with a
+// CSS transform rather than resizing the drawing. In 'overlay' mode the caller does all the measuring
+// (the layer owns those numbers). In 'full' mode the cabinet fits the element it is MOUNTED IN - the
+// Games column, the play-while-you-wait pane, a test frame - and never the window: the same machine
+// is mounted in a 400 px pane and a 1400 px page, and the frame around it is what must not clip it.
+// window.__jp2 carries the test handle: { spinning } is true while the reels are travelling, and
+// width/height/mode are published beside it so a harness can compute a fit without a laid-out DOM.
 //
-// Every effect here is driven by the result the shelf sends. Nothing in this file decides an
-// outcome:
-//  - the reels run down under a motion blur (a filter plus a small vertical stretch) and each stops
-//    on its own beat with an overshoot curve and a landing bounce;
-//  - a near miss (two of the shown symbols agree, the last one does not) runs the last reel
-//    dramatically longer under a signal-coloured rim, with slow ticks so the wait is audible;
-//  - a win lights its payline with a glow and a pulse, spills coins and counts the chips up;
-//  - the payout climbs a tier ladder - the same chip steps the old machine uses, named BIG / MEGA /
-//    JACKPOT as it goes - and the banner grows with it; a big one also flashes the cabinet and sets
-//    the lights blinking;
-//  - the lever kicks, the SPIN button sinks under the finger, and the bulbs chase around the cabinet.
-// prefers-reduced-motion turns every animation off and lands the reels at once; the invite to spin,
-// the win and the payline are still shown, they simply do not move.
+// Every effect here is driven by the result the shelf sends; nothing in this file decides an outcome.
+// The reels run down under a motion blur (a filter plus a small vertical stretch) and each stops on
+// its own beat with an overshoot curve and a landing bounce; a near miss (two of the shown symbols
+// agree, the last one does not) runs the last reel much longer under a signal-coloured rim, with slow
+// ticks so the wait is audible; a win lights its payline with a glow and a pulse, spills coins and
+// counts the chips up; the payout climbs a tier ladder - the same chip steps the old machine uses,
+// named BIG / MEGA / JACKPOT as it goes - and the banner grows with it, while a big one flashes the
+// cabinet and sets the lights blinking; the lever kicks, the SPIN button sinks under the finger, and
+// the bulbs chase around the cabinet. prefers-reduced-motion turns every animation off and lands the
+// reels at once: the invite to spin, the win and the payline are still shown, they simply do not move.
 //
-// THE SCREEN DOES NOT QUOTE ODDS (owner's release rule, 2026-11-11). The win chance and the return
-// are still drawn by the shelf and still paid by it, exactly as before — this cabinet prints
-// neither number. The over-chat switch is in this panel too, beside Auto-spin/Auto-bet;
-// 19-jackpot2-layer.js owns the switch itself, so every surface shows the same one.
+// THE SCREEN DOES NOT QUOTE ODDS. The win chance and the return are still drawn by the shelf and still
+// paid by it, exactly as before — this cabinet prints neither number. The over-chat switch is in this
+// panel too, beside Auto-spin/Auto-bet; 19-jackpot2-layer.js owns the switch itself, so every surface
+// shows the same one.
 
 const JP2_W = 560
 const JP2_H = 720
@@ -74,8 +68,8 @@ const JP2_TIERS = [
   { chips: 10000, name: 'JACKPOT', seconds: 16, rain: 90, coins: 54, alarm: 8 }
 ]
 
-// The two sentences the owner asked for on the cabinet, in one place each so the line, the tooltip
-// and the tests quote the same words (owner's ask, 2026-11-11).
+// The two sentences the cabinet carries, in one place each so the line, the tooltip and the tests
+// quote the same words.
 const JP2_AUTOSPIN_NOTE = 'Spins by itself while Hermes is thinking or using tools. Your points rack '
   + 'up from the tokens you spend (1 point per 100,000 tokens) and from games you win.'
 const JP2_POINTS_NOTE = 'Points are your ranking. Cash some in for chips when you run low - it lowers '
@@ -118,10 +112,9 @@ let JP2_LAST = null
 
 // ---- telling the shelf a cabinet is on screen -----------------------------------
 // The automatic spin happens on the shelf's hook path - one spin for an inference reply, one for a
-// tool call - and the shelf refuses it unless a machine says it is on screen. Jackpot v2 never said
-// so, so with this cabinet up (and the original copy over the chat off, which is the usual case) the
-// shelf refused every hook and the reels sat still through a whole conversation (owner's report,
-// 2026-11-11: "auto-spin is NOT working"). The count is module-wide because one cabinet is mounted
+// tool call - and the shelf refuses it unless a machine says it is on screen. With this cabinet up and
+// the original copy over the chat off (the usual case) the shelf used to refuse every hook, and the
+// reels sat still through a whole conversation. The count is module-wide because one cabinet is mounted
 // and unmounted per surface - the Games page, the play-while-you-wait pane and the over-chat copy -
 // and what the shelf needs to know is whether ANY of them is drawn. 'jackpot2' is the name this
 // surface reports under, so it cannot clear the original machine's own flag (or be cleared by it).
@@ -360,9 +353,9 @@ function jp2NearMiss(result, machine) {
 }
 
 // ---- what it pays: the whole table, off the live paytable ------------------------
-// The owner's ask (2026-11-11): every symbol combination and what it pays at the bet on the table,
-// generated from the pay table the shelf is playing rather than typed into the cabinet, so the card
-// cannot drift from what the reels actually pay. It is drawn over the reels and scrolls inside
+// Every symbol combination and what it pays at the bet on the table, generated from the pay table the
+// shelf is playing rather than typed into the cabinet, so the card cannot drift from what the reels
+// actually pay. It is drawn over the reels and scrolls inside
 // itself: the cabinet is one fixed size and a panel may not push its rows out of it.
 function jp2PaysPanel({ machine, paytable, bet, jackpotSymbol, onClose }) {
   const lines = (machine && machine.lines) || []
@@ -445,7 +438,7 @@ function JackpotMachine(props) {
   const settings = props || {}
   const ctx = settings.ctx
   const mode = settings.mode === 'overlay' ? 'overlay' : 'full'
-  // Over the chat the machine is to WATCH (owner, 2026-11-11): nothing on it takes a click or a key
+  // Over the chat the machine is to WATCH: nothing on it takes a click or a key
   // except the sound switch (the X and the look controls live in the layer). The pane and the Games
   // page draw this same machine in 'full' mode and play exactly as before.
   const watch = mode === 'overlay'
@@ -554,7 +547,7 @@ function JackpotMachine(props) {
       // offsetWidth/offsetHeight, NOT getBoundingClientRect: a rect includes every ancestor's
       // transform, so inside a caller that already scales the cabinet - the Games page's full view
       // scales its stage - this fit would measure the SCALED box and scale the cabinet a second time.
-      // Measured in a real browser, 2026-11-10: 1.14 x 1.14 = 1.30, and the machine hung 100 px out of
+      // Measured in a real browser: 1.14 x 1.14 = 1.30, and the machine hung 100 px out of
       // its frame. The layout box is what this fit is for and no transform touches it.
       const rect = typeof node.getBoundingClientRect === 'function' ? node.getBoundingClientRect() : null
       const width = node.offsetWidth || Number(rect && rect.width) || 0
@@ -914,7 +907,7 @@ function JackpotMachine(props) {
   // Points into chips: the door the wallet's own cash_points() is behind (/jackpot/points/cash), on
   // the same wallet. The amount is the person's choice - the control below sends the slice they
   // picked - and the rate is the shelf's own (pointsPerBlock points buy chipsPerBlock chips). The
-  // dead-table row uses the same door for the one press that unblocks a spin (amendment, 2026-11-10).
+  // dead-table row uses the same door for the one press that unblocks a spin.
   const cashPoints = async requested => {
     const want = Math.floor((Number(requested) || 0) / pointsPerBlock) * pointsPerBlock
     if (cashBusy || want < pointsPerBlock) return
@@ -1308,8 +1301,7 @@ function JackpotMachine(props) {
     }
   }, 'flash') : null
 
-  // Owner's release rule (2026-11-11): the machine does not quote a win chance and does not quote a
-  // return. Both are still drawn by the shelf and still paid by it — the shelf's own tests pin the
+  // The machine does not quote a win chance and does not quote a return. Both are still drawn by the shelf and still paid by it — the shelf's own tests pin the
   // numbers — the screen simply never prints them. `winText` is a result, not an odds figure, so it
   // stays.
   const winText = result && Number(result.payout) > 0
@@ -1376,9 +1368,9 @@ function JackpotMachine(props) {
                 style: { display: 'flex', alignItems: 'center', gap: 8 },
                 children: [
                   // The session's win chance used to be a chip here. It is gone: the number is not
-                  // shown anywhere on either machine (owner's release rule, 2026-11-11). What is here
-                  // instead is the pay table: every combination and its payout, opened over the reels
-                  // (owner's ask, 2026-11-11). It sits in the header so it costs the cabinet no height.
+                  // shown anywhere on either machine. What is here instead is the pay table: every
+                  // combination and its payout, opened over the reels. It sits in the header so it
+                  // costs the cabinet no height.
                   paytable.length ? jsx('button', {
                     type: 'button',
                     'data-jp2-pays-open': paysOpen ? 'on' : 'off',
@@ -1436,8 +1428,8 @@ function JackpotMachine(props) {
               }, 'switches')
             ]
           }, 'controls'),
-          // The over-chat switch, in the cabinet's own panel and right below the other two switches
-          // (owner's ask, 2026-11-11). It is the SAME setting as the status bar's and Settings':
+          // The over-chat switch, in the cabinet's own panel and right below the other two switches.
+          // It is the SAME setting as the status bar's and Settings':
           // one press to float the cabinet over the conversation, with how big and how see-through
           // beside it. Guarded by name so a bundle built without the layer part still draws a
           // cabinet (the layer part is where the hooks and the controls live).
@@ -1498,8 +1490,8 @@ function JackpotMachine(props) {
                 children: notice
               }, 'notice') : null,
               // A table that cannot spin has to say why and offer the way out in one press. A grey
-              // SPIN with nothing on screen to explain it is the defect this replaces (owner's
-              // report, 2026-11-10, via the amendment). Two reasons, both said out loud: no session
+              // SPIN with nothing on screen to explain it is the defect this replaces. Two reasons,
+              // both said out loud: no session
               // from the shelf yet, or a wallet under one spin's stake - and that one carries the
               // points-to-chips conversion, four points buying three chips.
               (!trouble && !canSpin) ? (() => {
@@ -1545,7 +1537,7 @@ function JackpotMachine(props) {
                 })
               })() : null,
               // What the automatic spin is and where points come from, in the shelf's own words, said
-              // on the cabinet rather than left to be discovered (owner's ask, 2026-11-11). The whole
+              // on the cabinet rather than left to be discovered. The whole
               // sentence is the tooltip as well, so a hover repeats it in full.
               jsx('span', {
                 'data-jp2-autospin-note': '1',

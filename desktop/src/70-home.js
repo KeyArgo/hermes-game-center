@@ -26,7 +26,7 @@ function GameCenterPage({ ctx, onArea }) {
   const [welcomeClosed, setWelcomeClosed] = useState(false)
   const selectionGen = useRef(0)
   // Whether the side pane is on the screen, so the header's one button says what its next
-  // press does (owner's ask, 2026-11-11). One read, shared with the status-bar item.
+  // press does. One read, shared with the status-bar item.
   const paneOn = usePaneOnScreen()
 
   // Full screen and the pane are one at a time. Arriving here closes the pane and
@@ -108,7 +108,7 @@ function GameCenterPage({ ctx, onArea }) {
         const answer = await ctx.rest('/command', { method: 'POST', body: { line } })
         setReply(answer.text || '')
         // Paint the board the command itself returned, so a move shows the moment the server answers
-        // instead of after a second round trip (owner's report, 2026-11-09: Sea Battle felt slow).
+        // instead of after a second round trip.
         if (answer && answer.picture) setBoard({ text: answer.text || '', picture: answer.picture, error: '' })
         const refreshed = await refresh()
         return { ...answer, ...refreshed, ok: answer.ok !== false && refreshed.ok, text: refreshed.ok ? answer.text || '' : refreshed.text }
@@ -265,7 +265,7 @@ function GameCenterPage({ ctx, onArea }) {
       button('Champions', () => setArea('champions'), { primary: area === 'champions' }),
       // The Admin tab appears only for a staff key that works with this account.
       staffRole ? button('Admin', () => setArea('admin'), { primary: area === 'admin' }) : null,
-      // The way out, top right of the Games screen, level with the tabs (owner's ask, 2026-11-11).
+      // The way out, top right of the Games screen, level with the tabs.
       // Other screens get the same button floated top right by GameCenterRoute (80-plugin.js).
       area === 'games' ? jsx('span', { 'data-gc-close-header': '1', style: { marginLeft: 'auto' }, children: closeGameCenterButton(ctx) }) : null
     ]
@@ -378,15 +378,15 @@ function GameCenterPage({ ctx, onArea }) {
   }
 
   const tileGrid = children => jsx('div', {
-    // 200 px a card, not 260: the lobby panel gives up half its width on the main screen
-    // (owner's ask, 2026-11-11) and that width buys one more column of game cards.
+    // 200 px a card, not 260: the lobby panel gives up half its width on the main screen, and that
+    // width buys one more column of game cards.
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))', gap: 12 },
     children
   })
 
-  // Labs: the experiment shelf. The Make games workshop is its first block; another lane adds the
-  // next one to this list with the same element and no new styles. Each block is a real component,
-  // so its own state never depends on which other screens have been on this page before.
+  // Labs: the experiment shelf. The Make games workshop is its first block; a new experiment is one
+  // more entry in this list, with the same element and no new styles. Each block is a real
+  // component, so its own state never depends on which other screens have been on this page before.
   const labsBlocks = [
     labsPlay.length
       ? jsx('div', {
@@ -407,7 +407,7 @@ function GameCenterPage({ ctx, onArea }) {
         }, 'make-games')
       : null,
     // Pet Battles is an experiment, so it lives here and not on the Play shelf - and it is locked
-    // with the rest of this shelf (owner's ask 2026-11-10, #7): visible, no way in.
+    // with the rest of this shelf: visible, no way in.
     jsx('div', {
       key: 'pet-battles-labs',
       style: { minWidth: 0 },
@@ -431,16 +431,16 @@ function GameCenterPage({ ctx, onArea }) {
 
   // One shelf for everything that is not curated Play: the games a plugin installed and the
   // prototypes from the workshop, under a single heading and a single sentence. Two sections
-  // both saying "experimental" read as a filing system, not as something to try (owner's ask,
-  // 2026-11-09). Owner's ask 2026-11-11: this whole shelf - the Coming-soon cards and the Labs
-  // blocks - is off the main page and behind ONE small "Experimental" link, where it is kept
-  // locked and hidden for later. Nothing of it is drawn on the Play page any more.
+  // both saying "experimental" read as a filing system, not as something to try. The whole shelf -
+  // the Coming-soon cards and the Labs blocks - is off the main page and behind ONE small
+  // "Experimental" link, where it is kept locked and hidden for later. Nothing of it is drawn on
+  // the Play page any more.
   const experiments = jsxs('div', {
     'data-experiments': '1',
     style: { display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 },
     children: [
       heading('Experimental'),
-      // The one short line under the heading (owner's ask 2026-11-10, #7): the shelf is a window.
+      // The one short line under the heading: the shelf is a window.
       jsx('div', { 'data-experimental-help': '1', style: { fontSize: 13, color: text.secondary, marginBottom: 2, maxWidth: 620 }, children: LABS_LOCK_HELP }),
       jsx('div', { 'data-experiments-note': '1', style: { fontSize: 12, color: text.tertiary, marginBottom: 2, maxWidth: 620 }, children: EXPERIMENTS_NOTE }),
       yourList.length
@@ -515,11 +515,11 @@ function GameCenterPage({ ctx, onArea }) {
                     style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
                     children: [
                       jsx(PointsChip, { ctx }),
-                      // The obvious door (owner's ask, 2026-11-11): one press opens the side pane
-                      // and keeps a game beside the chat while Hermes works. While the pane is
-                      // open the same button reads Close side pane.
+                      // The obvious door: one press opens the side pane and keeps a game beside
+                      // the chat while Hermes works. While the pane is open the same button reads
+                      // Close side pane.
                       // From full screen the door LEAVES Game Center: back to the chat with the
-                      // pane on the right, on the same game (owner, 2026-11-11).
+                      // pane on the right, on the same game.
                       paneDoorButtonElement(paneOn, null, () => paneFromPage(ctx, selected))
                     ]
                   })
@@ -533,23 +533,23 @@ function GameCenterPage({ ctx, onArea }) {
             textLink('Back to chat', () => closeGameCenter(ctx)),
             textLink('How to play', () => setLobbyHowto(true)),
             // One small link, and the only trace of the experiments on this page: the Coming-soon
-            // cards and the Labs shelf live behind it (owner's ask, 2026-11-11).
+            // cards and the Labs shelf live behind it.
             textLink('Experimental', () => setArea('experimental')),
             textLink('Settings', () => setArea('settings')),
             textLink('Community creations', () => setArea('community'))
           ] })
         ]
       }),
-      // The way out to the project itself (owner's ask, 2026-11-11): one row of three links, settled
+      // The way out to the project itself: one row of three links, settled
       // right under the header beside Experimental / Settings / Community creations, each handed to
       // the person's own browser by the same door the Submit button uses.
       jsx(GameCenterLinks, { ctx, onNote: setReply }),
-      // Owner's ask 2026-11-09: no alert drops anywhere for now. The rows are still read from
+      // No alert drops anywhere for now. The rows are still read from
       // /alerts and the component is still in the bundle, so bringing it back is this one line.
       null,
       // Find match lives in the lobby panel now, where it can see the lobby's own answer:
       // the stand-alone bar here used to press with whatever game happened to be selected,
-      // which is how it could say it was looking for blackjack (owner's ask, 2026-11-11).
+      // which is how it could say it was looking for blackjack.
       jsx(LobbyWhoOnline, {
         view, ctx, current,
         // "Play here" on a Hall row: the lobby server took the room, so open that game's table,

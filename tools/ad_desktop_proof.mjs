@@ -333,7 +333,7 @@ try {
   record('player has no Admin tab', !(await has('Admin')))
   await shot('01-player-no-admin-tab')
 
-  // The owner with the staff key: the tab appears and every panel works.
+  // The admin, signed in with the staff key: the tab appears and every panel works.
   await load(ownerKey, staffKey)
   record('admin tab appears for staff', await waitFor(() => has('Admin')))
   await shot('02-admin-tab-visible')

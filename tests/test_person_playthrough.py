@@ -37,7 +37,7 @@ ME = SimpleNamespace(id="u1", name="Ada", platform="desktop", bot=False)
 TABLE_GAMES = sorted(path.parent.name for path in ROOT.glob("*/game.json")
                      if json.loads(path.read_text()).get("kind") == "table")
 
-# Games whose review must find the planted mistake (plan section 4.1). The rest
+# Games whose review must find the planted mistake. The rest
 # may honestly report nothing in this version, and must not crash.
 REVIEW_FINDS = ["connect4", "gomoku", "checkers", "chessboard"]
 REVIEW_HONEST = ["reversi", "go", "hex", "breakthrough"]
@@ -374,7 +374,7 @@ def test_a_game_without_draws_offers_none(tmp_path):
     assert tab.picture()["draw_offer"] == ""
     assert tab.command("draw accept", player=ME) in {"No opponent draw offer to accept.", answer}
     # Every table game whose manifest allows draws still offers one; the games
-    # that cannot be drawn (owner rule: Hex, Breakthrough, Go with komi, and Sea
+    # that cannot be drawn (Hex, Breakthrough, Go with komi, and Sea
     # Battle, where the fleet that sinks first loses) are exactly the ones the
     # shelf must stay silent about.
     drawless = {path.parent.name for path in ROOT.glob("*/game.json")

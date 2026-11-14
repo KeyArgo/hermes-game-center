@@ -5,9 +5,9 @@ const PLAY_NOTE = 'Only games we checked for seats, turns, a clear winner, repla
 
 // The account total, read from the shelf's own /jackpot route: the CHIPS the machines play with and
 // the points the person has earned. One small chip, used by the Game Center masthead and by the
-// Play-while-you-wait pane under its Game and Lobby buttons (owner's ask, 2026-11-09): the person
-// should be able to see what they have earned without opening a game. Chips first, then points
-// (owner's ask, 2026-11-11: the header shows the wallet, not only the points).
+// Play-while-you-wait pane under its Game and Lobby buttons: the person should be able to see what
+// they have earned without opening a game. Chips first, then points, so the header shows the wallet
+// and not only the points.
 function PointsChip({ ctx, style }) {
   const [wallet, setWallet] = useState(null)
   useEffect(() => {
@@ -67,8 +67,8 @@ function submitTarget(submit) {
   return { href: '', label: 'Submit your game' }
 }
 
-// The three ways out to the project itself, and the only links on the main screen that leave Hermes
-// (owner's ask, 2026-11-11). Every address is a fixed https page on the repository, and the click is
+// The three ways out to the project itself, and the only links on the main screen that leave Hermes.
+// Every address is a fixed https page on the repository, and the click is
 // handed to the person's own browser through the same openInBrowser door the Submit button and the
 // community shelf use — nothing is ever framed or navigated inside Hermes. The guide link is the
 // file the repo ships at docs/SUBMIT-A-GAME.md (docs/ADD-YOUR-GAME.md is its shorter sibling).
@@ -141,8 +141,8 @@ function playTile(item, onOpen, waiting = 0) {
 }
 
 // A card in the Experimental section: the title, the plugin it came from, one plain line about what
-// it is not - and no way in. Owner's ask 2026-11-10, #7: the section is visible but locked, so this
-// card is drawn like every other locked card (labsLockStyle/labsLockTag in 27-labs.js). The `onOpen`
+// it is not - and no way in. The section is visible but locked, so this card is drawn like every
+// other locked card (labsLockStyle/labsLockTag in 27-labs.js). The `onOpen`
 // the page still passes is deliberately not wired: a locked card has no handler at all.
 function YourGameCard({ item }) {
   return jsxs('div', {

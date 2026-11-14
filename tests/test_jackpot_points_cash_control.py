@@ -1,9 +1,9 @@
 """Cashing points in: the person picks the slice, the shelf pays it, the server hears about it.
 
-The owner's ask (2026-11-11): *"a control where the person chooses HOW MANY points to turn into chips
-(slider/number + Max), at the existing rate in shelf/wallet.py (4 points -> 3 chips, cash_points
-(points))"*, and the copy that says what that decision costs: *"Points are your ranking. Cash some in
-for chips when you run low - it lowers your ranking."*
+The control lets the person choose HOW MANY points to turn into chips (slider, number and Max), at the
+existing rate in shelf/wallet.py (4 points -> 3 chips, ``cash_points(points)``), and the copy beside it
+says what that decision costs: *"Points are your ranking. Cash some in for chips when you run low - it
+lowers your ranking."*
 
 What is pinned here:
 
@@ -146,7 +146,7 @@ class Recorder:
 
 
 def test_a_conversion_is_reported_to_the_lobby_with_the_new_totals(tmp_path, shelf) -> None:
-    """Cash in, and the lobby is told the new pair in the same breath (owner's ask, 2026-11-11).
+    """Cash in, and the lobby is told the new pair in the same breath.
 
     The note goes up from the route itself - not from the next lobby poll half a minute later - so a
     person who converts points and closes Hermes still has the right chips and points on the server.
@@ -186,7 +186,7 @@ def test_the_nudge_is_silent_when_no_source_is_running(tmp_path, shelf) -> None:
 
 
 def test_the_cabinet_says_what_cashing_in_costs_the_ranking() -> None:
-    """The copy, in the cabinet's own source, word for word as the owner asked for it."""
+    """The copy, in the cabinet's own source, word for word."""
     source = (Path(plugin_api.__file__).resolve().parents[1] / "desktop" / "src"
               / "18-jackpot2-machine.js").read_text(encoding="utf-8")
     assert "Points are your ranking. Cash some in for chips when you run low - it lowers " in source

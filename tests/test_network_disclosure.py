@@ -1,6 +1,6 @@
 """The network section names every outbound request the plugin can make.
 
-The catalog review (2026-11-12) caught a promise the README made and the code did not keep: "the plugin
+A promise the README made and the code did not keep: "the plugin
 makes no network calls of its own — the one exception is online play", while the **Experimental** pet
 gallery also reads the public Petdex manifest. The fallback stays (it is the same document Hermes's own
 pet picker reads), so the disclosure has to name it.

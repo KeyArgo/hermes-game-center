@@ -19,8 +19,8 @@ from pathlib import Path
 
 try:  # POSIX
     import fcntl
-except ImportError:  # pragma: no cover - Windows has no fcntl; an unguarded import stopped the
-    fcntl = None     # whole plugin backend loading there ("Plugin not found", 2026-11-11).
+except ImportError:  # pragma: no cover - Windows has no fcntl, and an unguarded import stops the
+    fcntl = None     # whole plugin backend loading there ("Plugin not found").
     import msvcrt
 
 
@@ -52,7 +52,7 @@ LOCK_TIMEOUT_SECONDS = 10.0
 # that other things (avatars, later) can spend - not chips.
 TOKENS_PER_POINT = 100_000
 # Points cash into chips at 75%, kept in whole numbers: 4 points buy 3 chips, and the points under
-# one block wait for the next conversion (owner's ask, 2026-11-09).
+# one block wait for the next conversion.
 POINTS_PER_CHIP_BLOCK = 4
 CHIPS_PER_BLOCK = 3
 # What the old token route minted: one reward chip per 100k tokens. Wallets from before the
@@ -68,9 +68,9 @@ _BLANK = {"chips": START_CHIPS, "spins": 0, "biggest": 0, "hands": 0, "bet": MIN
           "tokens": 0, "reward": 0, "tokens_total": 0,
           # How the see-through machine over the chat is drawn: whether it is shown at all, its
           # opacity and its size. Kept with the person's other slot settings so reloading the plugin
-          # does not reset them - localStorage alone did not survive a plugin reload (owner's report,
-          # 2026-11-09), and on/off was the one part still living only in the browser, which is why
-          # the copy could vanish after a rebuild (owner's report, 2026-11-10).
+          # does not reset them - localStorage alone did not survive a plugin reload, and on/off was
+          # the one part still living only in the browser, which is why the copy could vanish after a
+          # rebuild.
           "overchat": False, "overchat_alpha": 0.2, "overchat_scale": 1.0,
           # The comeback loop, all in play chips: when the last bailout was handed out (epoch
           # seconds), how many days in a row the person has come back, and how many spins are still
@@ -78,7 +78,7 @@ _BLANK = {"chips": START_CHIPS, "spins": 0, "biggest": 0, "hands": 0, "bet": MIN
           "bailout_at": 0, "streak": 0, "streak_day": 0, "comeback": 0,
           # Which surfaces are showing a machine right now, by name: 'slots' for the original copy
           # over the chat, 'jackpot2' for the Jackpot cabinet. Two machines may be on screen at once
-          # (owner's ask, 2026-11-11) and the automatic spin runs while ANY of them is. One boolean
+          # and the automatic spin runs while ANY of them is. One boolean
           # that every surface wrote to was a flag the last surface to close could clear while
           # another was still drawing, which is how the Jackpot cabinet sat there spinning nothing.
           "visible_sources": {}}
@@ -167,7 +167,7 @@ class Wallet:
                 if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
                     data[key] = value
         data["autoplay"] = bool(isinstance(raw, dict) and raw.get("autoplay") is True)
-        # Auto-bet is ON unless it was turned off: the owner's default (2026-11-09). Its cap is a
+        # Auto-bet is ON unless it was turned off. Its cap is a
         # multiple of the table minimum, remembered with the rest of the table's settings.
         data["autobet"] = not (isinstance(raw, dict) and raw.get("autobet") is False)
         cap = raw.get("autobet_max") if isinstance(raw, dict) else None
@@ -187,21 +187,20 @@ class Wallet:
         data["visible"] = any(sources.values())
         # Whether the see-through copy is shown over the chat. A boolean, so it needs its own line:
         # the integer branch above skips bools, which is exactly how this setting was dropped on the
-        # next load even after it had been written (found 2026-11-10 while pinning the switch).
+        # next load even after it had been written.
         data["overchat"] = bool(isinstance(raw, dict) and raw.get("overchat") is True)
         machine = raw.get("machine") if isinstance(raw, dict) else None
         data["machine"] = machine if isinstance(machine, str) and machine else DEFAULT_MACHINE
         feed = raw.get("feed") if isinstance(raw, dict) else None
         data["feed"] = [row for row in feed if isinstance(row, dict)][:FEED_SIZE] if isinstance(feed, list) else []
         # Easter eggs already found. A list of ids, not a count: the record is which ones, so a new
-        # egg can be added to the catalogue and still pay this person once (owner's ask, 2026-11-09).
+        # egg can be added to the catalogue and still pay this person once.
         found = raw.get("eggs_found") if isinstance(raw, dict) else None
         data["eggs_found"] = [str(item)[:64] for item in found][:500] if isinstance(found, list) else []
         # Keys this version does not know are carried through untouched. Without this, rolling the
         # plugin back to a commit from before a field existed would drop that field on the next write
         # - and an easter egg record is exactly the kind of thing a person could erase by
-        # downgrading. The record has to outlive the code that wrote it (owner's ask, 2026-11-09:
-        # "even if they go back and forth between commits or updates they cannot cheat").
+        # downgrading. The record has to outlive the code that wrote it.
         if isinstance(raw, dict):
             for key, value in raw.items():
                 if key not in data:
@@ -224,7 +223,7 @@ class Wallet:
         (the default, so an older caller and every existing test keep working) and 'jackpot2' is the
         Jackpot cabinet. Each surface keeps its own flag and the wallet's own truth is whether any of
         them is on, so a surface closing cannot switch the automatic spin off while another is still
-        on screen (owner's ask, 2026-11-11: two machines may float at once).
+        on screen: two machines may float at once.
         """
         name = str(source or "slots")[:32] or "slots"
         with self._held() as data:
@@ -262,8 +261,7 @@ class Wallet:
     # A person who cannot cover the smallest bet is offered a skill tap rather than a silent
     # refill: three bars, graded miss / good / perfect, and the grade picks the stack. It is
     # deliberately engaging - a cooldown to come back to, a streak that grows, and ten spins at a
-    # premium afterwards - but it pays only play chips and never points, so it cannot buy rank
-    # (owner's ask, 2026-11-09: "really gamify this so its addictive to the user").
+    # premium afterwards - but it pays only play chips and never points, so it cannot buy rank.
     BAILOUT_COOLDOWN = 8 * 60          # seconds between rescues
     BAILOUT_STACKS = {"miss": 1500, "good": 2500, "perfect": 4000}
     COMEBACK_SPINS = 10
@@ -341,8 +339,8 @@ class Wallet:
         stack = int(stack)
         with self._held() as data:
             # The check and the add share the lock: two tables asking at once used to both
-            # read "broke" and both pay, which is how a refill could be farmed. The check
-            # and the credit were not one locked change (bughunter, 2026-11-09).
+            # read "broke" and both pay, which is how a refill could be farmed. The check and the
+            # credit have to be one locked change.
             held = int(data.get("chips") or 0)
             if held >= floor:
                 return 0
@@ -350,7 +348,7 @@ class Wallet:
             if not give:
                 return 0
             # A fresh stack is not a win, so it goes into the wallet directly rather than
-            # through credit(), which records the biggest payout (grok, 2026-11-09).
+            # through credit(), which records the biggest payout.
             data["chips"] = held + give
         return give
 
@@ -412,9 +410,8 @@ class Wallet:
     def cash_points(self, points: int | None = None) -> dict:
         """Turn waiting points into play chips at 75%: four points buy three chips.
 
-        The person asked for a way back from a bad run at the tables that does not depend on luck
-        (owner's ask, 2026-11-09: "more ways to make money or a faster way to make money if they
-        lose at blackjack or our future poker"). Points are earned from chat use and from games won,
+        A way back from a bad run at the tables that does not depend on luck. Points are earned from
+        chat use and from games won,
         so a bad streak at blackjack still leaves a route to chips that the luck of the cards cannot
         take away. The rate is exact in whole numbers - 4 points to 3 chips, no floating point - and
         the points under one block stay on the account for the next time.
@@ -423,7 +420,7 @@ class Wallet:
             held_points = int(data.get("bonus") or 0)
             # Points are the high score, so spending them is a deliberate choice rather than an
             # all-in button: the argument is how much of the balance the person chose to spend, and
-            # the rest stays on the leaderboard (owner's ask, 2026-11-09). ``None`` means all of it,
+            # the rest stays on the leaderboard. ``None`` means all of it,
             # which is what an older desktop asks for.
             spendable = held_points if points is None else max(0, min(int(points), held_points))
             blocks = spendable // POINTS_PER_CHIP_BLOCK if POINTS_PER_CHIP_BLOCK else 0

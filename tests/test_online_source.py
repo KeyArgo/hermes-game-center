@@ -578,7 +578,7 @@ def play_bot(base: str, room: str, key: str, side: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Review findings: three ways the online side could have misbehaved.
+# Three ways the online side could have misbehaved.
 # ---------------------------------------------------------------------------
 
 

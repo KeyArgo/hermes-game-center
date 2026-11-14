@@ -69,7 +69,7 @@ def test_a_game_left_mid_move_is_still_there_later(tmp_path: Path) -> None:
 
 
 def test_the_pane_is_play_while_you_code_and_wears_an_obvious_door() -> None:
-    """Owner's ask 2026-11-11: renamed, and the way back in is visible.
+    """Renamed, and the way back in is visible.
 
     The pane could be reopened only from the command palette, so a button now stands in the
     Games header beside the chips and a status-bar item carries a small game icon and the same
@@ -124,7 +124,7 @@ def test_the_pane_is_a_right_hand_pane_with_a_quick_game_and_an_agent_line() -> 
     assert "item.title || item.id" in src, "the tiles carry the game's own title"
     assert "level=${level || QUICK_LEVEL}" in src
     assert "const QUICK_LEVEL = 'intermediate'" in src
-    # Strength buttons in the owner's words, on tiles never a drop-down.
+    # Strength buttons in the product's own words, on tiles never a drop-down.
     assert "LEVEL_LABELS" in src
     assert "data-game-tile" in src
     assert "data-level" in src

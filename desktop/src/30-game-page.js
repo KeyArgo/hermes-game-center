@@ -108,8 +108,8 @@ function opponentChoices(view) {
 }
 
 // The words on the wait line: one wording, the same two names the rest of the shell uses, and the
-// words the person reads while the other side works (owner's ask, 2026-11-11: "Hermes is thinking…
-// 12s"). The model itself is named on the "You vs …" chip above the board, and on the wait line's
+// words the person reads while the other side works. The model itself is named on the "You vs …" chip
+// above the board, and on the wait line's
 // own hover, where there is room for "Your Hermes model (deepseek-v4-flash)" — never on the line
 // itself, which is read at a glance.
 function trafficName(seat) {
@@ -147,9 +147,9 @@ function pieceWord(letter) {
 
 // Who is across the table, said in one line, from the seats the table already has.
 //
-// Owner's ask 2026-11-10: a table must always say who you are playing - "vs Computer
-// (Beginner)" or "vs Hermes model: <name>" - because a board that names nobody leaves
-// a person unable to tell whether their own model is spending tokens on the game.
+// A table must always say who you are playing - "vs Computer (Beginner)" or "vs Hermes
+// model: <name>" - because a board that names nobody leaves a person unable to tell
+// whether their own model is spending tokens on the game.
 // One seat answers it: seat.kind "local" is the built-in player, "agent" is the
 // person's own Hermes model, and a house table (Blackjack) names the seat's role
 // (the dealer) instead of a strength it does not have.
@@ -158,7 +158,7 @@ function opponentSeatOf(pictured) {
   return seats.find(seat => seat.kind === 'agent') || seats.find(seat => seat.kind === 'local') || null
 }
 
-// The strength the built-in player is at, in the owner's words (kit.py levels).
+// The strength the built-in player is at, named as kit.py names it.
 function seatLevelOf(pictured) {
   const said = String((pictured && pictured.level) || '').toLowerCase()
   if (!said) return ''
@@ -297,9 +297,8 @@ function resultCountLine(pictured) {
 // lobby address and no copy-the-link invite. Nothing here opens the person's web
 // browser for a game.
 
-// How long the other seat has been on move. The owner's report, 2026-11-09: "nothing tells me why
-// I'm waiting so long or if it's my turn" - a still caption reads as a frozen screen after a few
-// seconds, a counter reads as work happening.
+// How long the other seat has been on move. A still caption reads as a frozen screen after a few
+// seconds, with no way to tell whose turn it is; a counter reads as work happening.
 function useWaitSeconds(active) {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
@@ -332,8 +331,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // still exists: this puts the game's own start screen back in front of the person.
   const [leftSeat, setLeftSeat] = useState(false)
   // Points, on the table itself. Every win outside blackjack is worth 100, and the number should
-  // move in front of the person who earned it rather than live only in the slots panel (owner's ask,
-  // 2026-11-09). Reading it is decoration: any failure leaves the table exactly as it was.
+  // move in front of the person who earned it rather than live only in the slots panel. Reading it
+  // is decoration: any failure leaves the table exactly as it was.
   const [points, setPoints] = useState(null)
   const readPoints = () => {
     try {
@@ -458,7 +457,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   }
   // Leaving the table. With no game in progress it is one press (Close table): the shelf
   // comes back and nothing is thrown away. While a game IS active the row's "Leave table"
-  // asks once and says, in the owner's words, that leaving forfeits the game — a resignation
+  // asks once and says that leaving forfeits the game — a resignation
   // against another person, and a thrown-away board against the computer or a shared keyboard.
   const leaveTable = async () => {
     if (status !== 'active' || !ownSeats.length) {
@@ -580,7 +579,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   const countLine = over ? resultCountLine(pictured) : ''
   // A game whose rules cannot end level offers no draw, anywhere on its screen.
   const drawable = game.draws !== false && (!pictured || pictured.draws_allowed !== false)
-  // The series line the owner asked for: names, not colours — 'Patchfox (Bot) 2 ·
+  // The series line: names, not colours — 'Patchfox (Bot) 2 ·
   // Computer (Hard) 1 · Draws 0'. Colours only appear while a seat is still empty.
   const seriesLine = `${seatLabel(seatOn('white'))} ${score.white || 0} · ${seatLabel(seatOn('black'))} ${score.black || 0}`
     + (drawable ? ` · Draws ${score.draws || 0}` : '')
@@ -596,8 +595,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // Never leave the person wondering whether it crashed: a model's seat is a wait the moment the
   // board says it is that seat's turn, and a machine seat answering a request of ours is a wait
   // while that request is out. A computer seat merely on move is NOT "thinking" — nothing of ours
-  // is out, so the line says it is waiting instead of claiming work that is not happening
-  // (owner's ask, 2026-11-11). My own turn is announced the moment the board says it is mine.
+  // is out, so the line says it is waiting instead of claiming work that is not happening.
+  // My own turn is announced the moment the board says it is mine.
   const thinking = Boolean(status === 'active' && (agentOnMove(pictured) || (busy && machineSeat)))
   const someoneElse = Boolean(status === 'active' && !thinking && !access.can_move && !spectating && !over)
   const waited = useWaitSeconds(thinking || someoneElse)
@@ -620,7 +619,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // One status line under the header, in one wording: "Your turn", "<who> is thinking… Ns",
   // "Waiting for <who>… Ns", or the result. A wait always names the seat the same way the
   // "You vs …" line does, never "your bot", and it always counts: a line that reads "0s" is
-  // telling the person the clock is running (owner's ask, 2026-11-11).
+  // telling the person the clock is running.
   // Backgammon's own turn has steps (roll, then spend the dice), so on the person's own turn its
   // board owns the words (14b-backgammon-svg.js); every wait uses the shared line above.
   const backgammonLine = pictured && pictured.view === 'backgammon' && myTurnNow
@@ -666,9 +665,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   const agentChoice = chosen.find(choice => choice.id === 'agent') || null
   const startOff = botOff || !access.can_manage
   // A solo table that seats an AI side (Blackjack's dealer) is offered the same two ways
-  // on as every board game (owner's ask 2026-11-10: "give it the same 'New game vs
-  // computer' and 'Play my Hermes model' controls the board games have"). A solo table
-  // with nobody to seat (Slots) keeps the one Play button it has always had.
+  // on as every board game. A solo table with nobody to seat (Slots) keeps the one Play button it
+  // has always had.
   const seatsNobody = gameSeatsNobody(game, pictured)
   const seatsAnAi = !botOff && !seatsNobody
   const vsBlack = sideWords.black.toLowerCase()
@@ -773,8 +771,8 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
             jsx('span', { className: 'games-opponent-model', style: { fontSize: 12, color: text.secondary, fontFamily: 'var(--font-mono, monospace)', overflowWrap: 'anywhere' }, children: agentChoice.model ? `${agentChoice.model}${agentChoice.where ? ` · ${agentChoice.where}` : ''}` : 'Your agent · your model' })
           ] }),
           jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Your own Hermes model plays ${sideWords.black.toLowerCase()}, one move per turn. Pick the model in Hermes Settings → Models → "Game Shelf opponent".` }),
-          // Owner's ask 2026-11-09: choosing a Hermes model offers both shapes - you against a
-          // model, or two models against each other so their play can be compared.
+          // Choosing a Hermes model offers both shapes - you against a model, or two models
+          // against each other so their play can be compared.
           modelMenu
             ? jsxs('div', {
                 'data-model-menu': '1',
@@ -1046,8 +1044,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
       children: [
         jsx('div', { className: 'games-result-title', style: { fontSize: 30, fontWeight: 800, lineHeight: 1.1 }, children: headline }),
         // The payout, said out loud: a win outside blackjack is worth 100 points, and the card shows
-        // it landing rather than leaving the person to find the number later (owner's ask,
-        // 2026-11-09).
+        // it landing rather than leaving the person to find the number later.
         iWon ? jsxs('div', {
           'data-gm-win-bonus': '100',
           style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, animation: 'gm-bonus 900ms cubic-bezier(.2,.9,.3,1.25) both' },
@@ -1260,7 +1257,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
               drawnView === 'blackjack' || drawnView === 'slots'
                 ? jsx(drawnView === 'blackjack' ? BlackjackTable : SlotsTable, {
                     picture: pictured,
-                    // The felt says who is across it (ask 2026-11-10).
+                    // The felt says who is across it.
                     against: opponentWords(pictured, view, solo),
                     interactive: Boolean(game.installed && access.can_move && !busy && !confirmation),
                     busy,

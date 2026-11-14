@@ -261,7 +261,7 @@ def test_desktop_backend_runs_lines_as_the_person_at_the_desktop(tmp_path: Path,
     after = api.view()
     assert after["player"] == {"name": "Argo", "named": True}
     # A lobby post is its author, its words, and the moment it was written: the lobby shows
-    # the date and time on every line, so the time is part of the line (owner's ask, 2026-11-11).
+    # the date and time on every line, so the time is part of the line.
     line = after["lobby"]["lines"][-1]
     assert {key: line[key] for key in ("id", "name", "text")} == {"id": "local", "name": "Argo", "text": "hi"}
     assert abs(line["at"] - time.time()) < 60, line

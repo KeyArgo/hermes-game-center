@@ -3,7 +3,7 @@
 // Two surfaces: the chip in the status bar (the switch, the running total, and the panel a click opens),
 // and the see-through copy of the cabinet that 78-overchat-slot.js draws in the composer's underside
 // slot. The copy is a slot contribution, not an overlay: nothing here measures the app, appends to its
-// <body> or reads the route (review, 2026-11-12).
+// <body> or reads the route.
 
 const JP_STORE = { open: false, listeners: new Set() }
 const JP_STORAGE_KEY = 'gameshelf.jackpot.overlay'
@@ -97,8 +97,8 @@ async function jpVisible(delta, send) {
 
 function JackpotStatusItem({ ctx }) {
   SM_API.rest = (path, opts) => ctx.rest(path, opts)
-  // The chip is only part of the status bar when the person has asked for the over-chat machine
-  // (owner's ask, 2026-11-09). The switch that turns it on lives in the Slots table's settings, so
+  // The chip is only part of the status bar when the person has asked for the over-chat machine.
+  // The switch that turns it on lives in the Slots table's settings, so
   // nothing appears in the bar until it is wanted, and turning it off there removes it again.
   const [open, setOpen] = useJpOpen()
   const [data, setData] = useState(null)
@@ -110,7 +110,7 @@ function JackpotStatusItem({ ctx }) {
   // table may not be mounted: this item returns null while the copy is off, so nothing inside it
   // ever runs, and the copy could only be switched on from a screen that was itself hidden. That
   // deadlock is why the machine never came back after a rebuild even though the wallet said it was
-  // on (found 2026-11-10, with Claude's read of the same path).
+  // on.
   useEffect(() => {
     if (data && data.overchat) SM_adoptPrefs(data.overchat)
   }, [data && data.overchat && data.overchat.on, data && data.overchat && data.overchat.alpha,
@@ -146,6 +146,9 @@ function JackpotStatusItem({ ctx }) {
   useEffect(() => {
     if (!SDK_HOST || typeof SDK_HOST.onEvent !== 'function') return undefined
     let stop = () => {}
+    // The 400 ms read that follows a reply is armed per event, so it is cleared on the way out:
+    // the chip's copy can be closed the moment a reply starts.
+    const timers = []
     const pull = () => {
       if (loadNow.current) loadNow.current()
       const latest = dataRef.current
@@ -154,12 +157,15 @@ function JackpotStatusItem({ ctx }) {
     try {
       stop = SDK_HOST.onEvent('message.start', () => {
         pull()
-        setTimeout(() => { if (loadNow.current) loadNow.current() }, 400)
+        timers.push(setTimeout(() => { if (loadNow.current) loadNow.current() }, 400))
       }) || stop
     } catch {
       // An older host has no event stream; the poll still catches the spin.
     }
-    return () => { try { stop() } catch { /* nothing to unwire */ } }
+    return () => {
+      try { stop() } catch { /* nothing to unwire */ }
+      timers.forEach(clearTimeout)
+    }
   }, [])
   useEffect(() => {
     const row = data && data.feed && data.feed[0]
@@ -300,7 +306,7 @@ function JackpotStatusItem({ ctx }) {
         onClick: toggle,
         autoFocus: false,
         style: {
-          // Owner's note, 2026-11-09: the chip was a small target in a wide bar. It is a proper
+          // The chip was a small target in a wide bar. It is a proper
           // button now - taller, with room around the label - while staying one row high.
           display: 'flex', gap: 6, alignItems: 'center',
           padding: '2px 9px', minHeight: 22, border: 'none', background: 'transparent',
@@ -429,7 +435,7 @@ function JackpotOverlay({ ctx, onClose, data }) {
   // This is the sidebar copy of the machine: always a real, clickable panel in the corner.
   // The see-through copy over the chat is its own component below, mounted by the status item
   // so it is there whether or not this panel is open.
-  // Owner's note, 2026-11-09: the panel was sprawling over the session. It is bounded by the window
+  // The panel was sprawling over the session. It is bounded by the window
   // and by the chat column it sits beside, scrolls its own body, and never grows wider than the
   // conversation it is covering.
   const style = {
@@ -481,9 +487,8 @@ function JackpotOverlay({ ctx, onClose, data }) {
 // the composer's `composer.underside` slot (78-overchat-slot.js), which is a real surface of the
 // Desktop SDK. That slot belongs to the conversation's composer, so it exists exactly while the
 // conversation is on screen. There is no route sniffing here, no scan of the app's textareas, no walk
-// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body> — the
-// review's finding (2026-11-12), and the reason an app update can no longer break this machine or be
-// broken by it.
+// up their ancestors for a "chat column", and nothing appended to the app's <head> or <body>, so an
+// app update can neither break this machine nor be broken by it.
 //
 // HOW BIG IT IS. The strip that owns the slot measures its own box and hands each machine its share of
 // the width; this component fits the cabinet into that share and then applies the person's own size
@@ -636,7 +641,7 @@ function SlotsOverChatCopy({ ctx, width }) {
         paytable: (snapshot && snapshot.paytable) || [],
         compact: false,
         // The copy is the same machine as the one in the wait pane, points card and printed glass
-        // included (owner's ask, 2026-11-09), with its dismissal controls (`chat: true`).
+        // included, with its dismissal controls (`chat: true`).
         bare: false,
         chat: true,
         cabinetRef,

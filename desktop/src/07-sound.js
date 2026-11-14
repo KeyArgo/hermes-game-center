@@ -5,7 +5,7 @@
 
 const SOUND_KEY = 'hermes-games-sound'
 // How loud the table is, 0 to 100. Kept beside the on/off switch so a person can keep the sounds but
-// take the edge off them (owner's ask, 2026-11-09), and applied to every voice - synth and sample.
+// take the edge off them, and applied to every voice - synth and sample.
 const SOUND_VOLUME_KEY = 'hermes-games-sound-volume'
 const SOUND_VOLUME_DEFAULT = 35
 
@@ -49,8 +49,7 @@ function soundAudio() {
 }
 
 // One bus for every voice, synth and sample, with a gentle compressor in front of the speakers: a
-// jackpot stacks a dozen sounds, and without this the sum is the "loud and computerised" peak the
-// owner heard (2026-11-09).
+// jackpot stacks a dozen sounds, and without this the sum is a "loud and computerised" peak.
 let soundBusNode = null
 function soundBus(ctx) {
   if (soundBusNode && soundBusNode.context === ctx) return soundBusNode
@@ -109,7 +108,7 @@ function soundNoise(ctx, { at, length, gain = 0.07, low = 400 }) {
 // A coin landing on a tray. Two things make a coin sound like a coin and not like a bell:
 // the strike is a burst of broadband noise (metal hitting metal, no pitch of its own), and the
 // ring on top of it is very short and very high - a few milliseconds of 4-9 kHz, gone in under a
-// tenth of a second. Long sine partials are what produced the "ting tong" the owner heard.
+// tenth of a second. Long sine partials are what turn a coin into a "ting tong" bell.
 function soundCoin(ctx, { at, freq = 2600, gain = 0.05, length = 0.09 }) {
   const strike = Math.max(1, Math.floor(ctx.sampleRate * 0.006))
   const buffer = ctx.createBuffer(1, strike, ctx.sampleRate)
@@ -204,8 +203,8 @@ function gamesSound(kind, options) {
         break
       }
       case 'ching': {
-        // The sound of coins landing again and again: the person asked for ching-ching-ching for the
-        // length of the celebration, and for it to be coins, not beeps.
+        // The sound of coins landing again and again, for the length of the celebration: coins, not
+        // beeps, and never one held note.
         const count = Math.max(4, Math.min(400, Math.round(Number((options && options.times) || 10))))
         const span = Math.max(0.2, Math.min(20, Number((options && options.seconds) || 2)))
         const step = span / count

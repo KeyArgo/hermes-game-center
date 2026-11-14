@@ -199,8 +199,8 @@ console.log('jackpot2 look: four gradients, four looks, flat teal by default and
 // ---- every value through the shelf's own drawer -------------------------------
 const store = {}
 sandbox.lookCtx = { storage: { get: (key, fallback) => (key in store ? store[key] : fallback), set: (key, value) => { store[key] = value } } }
-// The offsets are gone (review, 2026-11-12): a copy in a slot has a place, so a stored 'jackpot2.posx'
-// is simply not read — old values in a drawer must not move anything.
+// The offsets are gone: a copy in a slot has a place, so a stored 'jackpot2.posx' is simply not read
+// — old values in a drawer must not move anything.
 store['jackpot2.posx'] = 0.5
 store['jackpot2.posy'] = -0.25
 store['jackpot2.hue'] = '300'

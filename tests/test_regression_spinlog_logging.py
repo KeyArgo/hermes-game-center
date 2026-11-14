@@ -2,9 +2,8 @@
 
 ``shelf/spinlog.py`` is best-effort by design: a spin must never fail because its log could not be
 written. The defect these tests pin is the opposite failure — it was *silently* best-effort, so a
-log that had stopped being written at all looked exactly like a log with nothing to record, and the
-owner's question about missing payouts ("I feel like there is a big problem and im not getting my
-payouts or the probability is off", 2026-11-09) could not be answered from a log that never existed.
+log that had stopped being written at all looked exactly like a log with nothing to record, and a
+question about missing payouts could not be answered from a log that never existed.
 
 Every handler now logs at warning level with the traceback a person can act on. The game still does
 not raise: the balance, the payout and the spin are untouched.

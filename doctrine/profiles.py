@@ -5,12 +5,10 @@ card as they asked, the way a drawing is signed. The model that writes the card 
 have selected in Hermes, through ``ctx.llm.complete`` — the plugin LLM door, which returns text and cannot
 run a tool, start a process, read a file or reach the network.
 
-It is deliberately NOT "ask another Hermes profile to write this". The first version of this module ran
-``hermes -p <profile> chat`` and the catalog review (2026-11-12) was right that the child inherited that
-profile's tools; the second version wrote the card with the person's own model but still announced it as
-the named profile's work, and the quality review (2026-11-13) was right that a name in a field is not
-authorship. So the input is a signature, every surface says "signed", and nothing here claims a profile
-ran.
+It is deliberately NOT "ask another Hermes profile to write this". Running ``hermes -p <profile> chat``
+would hand a child process that profile's tools, and announcing the card as that profile's work would
+claim authorship a name in a field cannot carry. So the input is a signature, every surface says
+"signed", and nothing here claims a profile ran.
 """
 
 from __future__ import annotations

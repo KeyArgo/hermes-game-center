@@ -186,7 +186,7 @@ def talking_prompt(*, title: str, seat: int, seats: int, brief: str, seen: list[
     ``seen`` is what that seat's own eyes recorded, already filtered by the
     environment. ``said`` is recent speech by other seats, which is untrusted.
     ``read_block`` non-empty asks the seat to show its working (only its owner
-    ever sees it); ``coach`` is the owner's own whisper for this round.
+    ever sees it); ``coach`` is the person's own whisper for this round.
     """
     lines = [
         MARKER,
@@ -207,7 +207,7 @@ def talking_prompt(*, title: str, seat: int, seats: int, brief: str, seen: list[
     ]
     whisper = clean(coach, 120)
     if whisper:
-        # The owner's whisper is the one voice at this table that is not an
+        # The person's whisper is the one voice at this table that is not an
         # opponent: it is fenced anyway, and it is never treated as game text.
         lines += [
             "Your corner coach whispered this to you before this move:",

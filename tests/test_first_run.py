@@ -233,7 +233,7 @@ def test_an_unreadable_config_still_turns_ai_off(tmp_path, monkeypatch):
 
     api = _api(tmp_path, monkeypatch)
     monkeypatch.setattr(api, "_config", refuse)
-    api.settings_save({"allow_ai": True})  # the person asked for AI...
+    api.settings_save({"allow_ai": True})  # the person opted in to AI seats...
     assert api.view()["allow_ai"] is False, "...but a broken config still fails closed"
 
 

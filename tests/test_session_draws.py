@@ -2,7 +2,7 @@
 
 Each process draws a chance per machine (50-52% usual, 60% bonus, 40% cold). A test that waits for a
 bonus session fails about one run in twenty-five, and a test that assumes a usual one fails far more
-often - which is exactly how three tests in ``test_slots_table.py`` went red on 2026-11-10. These force
+often - which is exactly how three tests in ``test_slots_table.py`` went red. These force
 the seed instead.
 
 Two traps this file exists to keep shut:
@@ -77,7 +77,7 @@ def test_each_draw_publishes_the_window_it_drew(drawn) -> None:
 
 
 def test_every_draw_still_returns_the_players_money(drawn) -> None:
-    # Owner's rule: the machine should not bleed a player who keeps spinning. It holds even on a cold
+    # The machine should not bleed a player who keeps spinning. It holds even on a cold
     # draw - fewer wins, not worse payouts - and the jackpot carries the everyday pays shortfall.
     for seed in DRAWS:
         reels = drawn(seed)

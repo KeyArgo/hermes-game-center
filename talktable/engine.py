@@ -434,7 +434,7 @@ class Table:
         return common.talking_prompt(
             title=self.game.TITLE, seat=seat, seats=len(state["seats"]),
             brief=brief, seen=seen, said=said, instruction=instruction, shape=shape,
-            # Only the owner's own seats are asked for their working; the panel
+            # Only the person's own seats are asked for their working; the panel
             # that shows it is filtered to those seats again in picture().
             read_block=common.read_questions(), coach=coach)
 
@@ -493,7 +493,7 @@ class Table:
             tokens += spent
             calls["tokens"] = int(calls.get("tokens", 0)) + spent
             # The reply may carry the seat's private working around its action.
-            # Only the action is ever played; the working goes to the owner's panel.
+            # Only the action is ever played; the working goes to the person's panel.
             thought = common.parse_thinking(text)
             parsed = self._parse_answer(env, seat, thought["action"], allowed)
             if isinstance(parsed, tuple) and parsed and parsed[0] == "act" and parsed[1]:
@@ -802,7 +802,7 @@ class Table:
                 state["coach_note"] = last
         if row["kind"] in {"agent", "champion"} and note:
             # The model's answer was unusable, so the built-in player covered it.
-            # The owner's panel says so plainly instead of pretending otherwise.
+            # The person's panel says so plainly instead of pretending otherwise.
             self._record_think(state, index, seat,
                                {"read": [], "scratch": "", "action": str(raw)},
                                str(raw), coach="", fallback=True)
@@ -1606,7 +1606,7 @@ class Table:
             "open": bool(active and same_round and until > now and not used_round),
             "until": until,
             "seconds_left": max(0, until - now) if same_round else 0,
-            # The pending sentence is the owner's alone: the window is visible
+            # The pending sentence is the person's alone: the window is visible
             # to the table, but what was whispered into it is not.
             "text": str(coach_state.get("text") or "") if (same_round and seat is not None) else "",
             "used_round": used_round,
@@ -1617,7 +1617,7 @@ class Table:
         }
         log_rows = self._log(state, trace, human_env, index)
         if seat is not None:
-            # The whisper is between the owner and their own bot: only this
+            # The whisper is between the person and their own bot: only this
             # viewer's log carries it, and it is never put in the trace.
             for whisper in coach_state.get("whispers") or []:
                 log_rows.append({

@@ -123,7 +123,7 @@ class App:
         jackpot_db.row_factory = sqlite3.Row
         self.ledger = Ledger(jackpot_db)
         self.importmap_hash = base64.b64encode(hashlib.sha256(IMPORTMAP.encode()).digest()).decode()
-        # Lobby requests. Presence is another lane; until it attaches, status() is None.
+        # Lobby requests. Presence is not built yet; until it attaches, status() is None.
         self.requests = play_requests.Service(
             self.store, self.rooms, play_requests.AppHub(self), clock=self.clock)
         play_requests.service = self.requests

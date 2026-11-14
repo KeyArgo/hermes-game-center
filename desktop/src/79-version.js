@@ -3,16 +3,15 @@
  * One source: the plugin's own backend (/v1/version -> version_stamp), never a number typed into
  * this bundle. A hard-coded badge drifts the moment the manifest moves, and drifts silently.
  *
- * It is a chip, and it is drawn twice from the one component (owner, 2026-11-11): small and muted at
- * the top of the Games header, beside the wordmark, and at the top of Settings — which is what the
- * full-screen Games app shows and what the play-while-you-wait pane's own gear opens (owner,
- * 2026-11-10: "keep everything in the status bar except the version chip. The version chip lives in
- * Settings"). One component, so the two copies can never drift apart; the header copy only passes a
- * smaller, dimmer `style` so it stays a whisper beside the title.
+ * It is a chip, and it is drawn twice from the one component: small and muted at the top of the Games
+ * header, beside the wordmark, and at the top of Settings — which is what the full-screen Games app
+ * shows and what the play-while-you-wait pane's own gear opens. One component, so the two copies can
+ * never drift apart; the header copy only passes a smaller, dimmer `style` so it stays a whisper
+ * beside the title.
  *
- * It is also click-to-copy (owner's ask, 2026-11-11): one press — or Enter/Space from the keyboard —
- * puts the full chip text on the clipboard and says "Copied" for a breath, so a bug report can quote
- * the exact build without anyone retyping it.
+ * It is also click-to-copy: one press — or Enter/Space from the keyboard — puts the full chip text on
+ * the clipboard and says "Copied" for a breath, so a bug report can quote the exact build without
+ * anyone retyping it.
  */
 
 // How long the chip wears "Copied". Long enough to see, short enough not to look stuck.
@@ -22,9 +21,8 @@ const CHIP_COPIED_MS = 1500
 //
 // `ctx.os.writeClipboard` is the SDK's curated clipboard and the only one a plugin should use: it is
 // attributed to the plugin, it resolves false (never throws) where the capability is missing, and it
-// needs nothing of the document. What it replaced was a hidden <textarea> appended to the app's <body>
-// and an execCommand — the same reach into the app's markup the review asked us to stop doing
-// (2026-11-12), for a copy that the browser's own clipboard API already does.
+// needs nothing of the document. A hidden <textarea> appended to the app's <body> and an execCommand
+// would do the same job by reaching into the app's markup, for a copy the clipboard API already does.
 function copyChipText(text, ctx) {
   try {
     const door = ctx && ctx.os && typeof ctx.os.writeClipboard === 'function' ? ctx.os : null

@@ -2,13 +2,13 @@
 //
 // Both slot machines have a "show it over the conversation" switch: the original cabinet
 // (18-slot-machine.js / 19-jackpot-overlay.js) and Jackpot v2 (19-jackpot2-layer.js). This part is the
-// one place they are put on screen, and it is the review's fix (2026-11-12).
+// one place they are put on screen.
 //
 // WHAT IT REPLACED. Each machine used to put itself over the app: a position:fixed div appended to
 // document.body, a stylesheet appended to <head>, and a measurement of the app's own markup — scan every
 // <textarea>, walk their ancestors until one was wider than half the window, call that "the chat column",
 // and read the route's hash to guess which screen was showing. A plugin that does that can be broken by
-// an app update and can break the app, which is exactly what the review asked us to stop.
+// an app update and can break the app.
 //
 // WHAT THIS IS. One contribution to `COMPOSER_AREAS.underside`, the composer's chrome-free strip below
 // the input — a real Desktop SDK surface, registered like any other contribution:
@@ -53,8 +53,8 @@ function OverChatStrip({ ctx }) {
   // width when a pane opens, when the window moves between screens and when the person drags a sash —
   // all of those are the same event to this element.
   //
-  // It depends on `on` and no other value, and that is the whole fix for review, 2026-11-13: the strip's
-  // div exists ONLY while a switch is on, so a mount with both switches off has no element to observe.
+  // It depends on `on` and no other value: the strip's div exists ONLY while a switch is on, so a mount
+  // with both switches off has no element to observe.
   // With `[]` the effect ran once against `null`, never attached, and never ran again — turning a machine
   // on afterwards rendered it at width 0 for good (the Jackpot v2 copy draws nothing at 0). Depending on
   // `on` re-runs the effect on the switch, and because React commits before effects run, the element is

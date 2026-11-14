@@ -16,20 +16,20 @@ First public release.
 - **Online play is optional and off by default.** One shared lobby with chat and play requests when you turn it on. Everything else works offline.
 - **People play first.** A model calling the tool can never take a seat for someone. The other person joins with `/games <game> join`.
 
-### After the hackathon submission
+### After the 1.0.0 submission
 
-The hackathon entry pins commit `ccfe915` ([NousResearch/hermes-agent#154026](https://github.com/NousResearch/hermes-agent/pull/154026), tag `hackathon-submission`). 1.0.0 is the commit the catalog accepts; these changes came after the submission:
+The 1.0.0 entry pins commit `ccfe915` ([NousResearch/hermes-agent#154026](https://github.com/NousResearch/hermes-agent/pull/154026), tag `hackathon-submission`). 1.0.0 is the commit the catalog accepts; these changes came after it:
 
-- **The catalog review's four fixes.** (1) The Doctrine "author a card" run is no longer a child process: the card is written through `ctx.llm.complete`, so there is no `hermes chat` invocation, no `--toolsets ""` (which Hermes reads as "not set") and no inherited approval-mode environment. (2) The see-through slot machines are a `composer.underside` slot contribution instead of a `position: fixed` div appended to the app's `<body>` with a stylesheet in its `<head>` and a scan of its textareas: the slot owns the place and the width, and nothing measures the app. (3) `HERMES_GAMESHELF_BOT_KEY` and `HERMES_GAMESHELF_STAFF_KEY` are declared in `config_schema` as `type: secret`, beside `lobby_key`. (4) The developer key and the egg-force file moved out of `~/.hermes` into the profile's plugin data folder, so one armed in a profile no longer armed another. (Both are gone entirely now — see **The quality review** below.)
+- **Four fixes for the catalog entry.** (1) The Doctrine "author a card" run is no longer a child process: the card is written through `ctx.llm.complete`, so there is no `hermes chat` invocation, no `--toolsets ""` (which Hermes reads as "not set") and no inherited approval-mode environment. (2) The see-through slot machines are a `composer.underside` slot contribution instead of a `position: fixed` div appended to the app's `<body>` with a stylesheet in its `<head>` and a scan of its textareas: the slot owns the place and the width, and nothing measures the app. (3) `HERMES_GAMESHELF_BOT_KEY` and `HERMES_GAMESHELF_STAFF_KEY` are declared in `config_schema` as `type: secret`, beside `lobby_key`. (4) The developer key and the egg-force file moved out of `~/.hermes` into the profile's plugin data folder, so one armed in a profile no longer armed another. (Both are gone entirely now — see **Second pass** below.)
 
-### The quality review
+### Second pass
 
-The second Nous pass (2026-11-13) looked at the fixes above and found four more. One was a blocker:
+A second pass over those fixes found four more. One was a blocker:
 
 - **The over-chat machine measures itself when the switch is turned on later.** The strip that holds the two see-through machines attached its `ResizeObserver` in an effect with `[]` deps. The strip's element exists only while a switch is on, so a mount with both switches off ran the effect once against nothing, never attached, and never ran again: turning a machine on afterwards drew it at width 0 for ever, and the Jackpot v2 copy — which fits itself into that width — drew nothing at all. The effect now depends on the switch, and the width is read after the commit that puts the element in the tree. Proved in a real React render by `tests/overchat_slot_live.mjs` (driven from `tests/test_overchat_slot_live.py`), which opens the pane with both switches off, clicks the cabinet's own switch, resizes to 520 px and back, and turns it off again; with the old deps the same script fails exactly as reported.
-- **Authoring a Doctrine card is signed, not attributed.** `doctrine author <name>` never ran that profile, yet the card and the notice said it wrote the card. The input is now a **signature**: one name, validated as a name, written into the card's `author` field, and every surface says "signed" instead of implying a profile ran. (Asking a profile to write the card would mean a cross-profile model call, which Hermes gates behind a trust setting this plugin does not ask for, and a child process is what the first review ruled out.)
+- **Authoring a Doctrine card is signed, not attributed.** `doctrine author <name>` never ran that profile, yet the card and the notice said it wrote the card. The input is now a **signature**: one name, validated as a name, written into the card's `author` field, and every surface says "signed" instead of implying a profile ran. (Asking a profile to write the card would mean a cross-profile model call, which Hermes gates behind a trust setting this plugin does not ask for, and a child process is ruled out.)
 - **A context with no LLM gets no model door.** `_complete()` returned a closure unconditionally, so on a surface without `ctx.llm` the AttributeError surfaced as "That profile did not answer." — advice about a profile that was never involved. It returns `None` now, and the caller says "needs one model".
-- **The developer cheats are removed, not hidden** (owner's decision). `shelf/devgrant.py`, `scripts/dev-grant.py`, `scripts/dev-eggs.py`, the `/eggs` command, the forced-egg override, the `HERMES_GAMESHELF_EGG*` variables, `Wallet.grant()` and the key/force files are all gone, with `shelf/paths.py` (built only for those two files). The cheats were protected by a passphrase hash and a key file — native security against a copy of the source — and the owner no longer wants them. `tests/test_no_developer_cheats.py` keeps them from creeping back.
+- **The developer cheats are removed, not hidden.** `shelf/devgrant.py`, `scripts/dev-grant.py`, `scripts/dev-eggs.py`, the `/eggs` command, the forced-egg override, the `HERMES_GAMESHELF_EGG*` variables, `Wallet.grant()` and the key/force files are all gone, with `shelf/paths.py` (built only for those two files). The cheats were protected by a passphrase hash and a key file — native security against a copy of the source — and none of it is wanted any more. `tests/test_no_developer_cheats.py` keeps them from creeping back.
 
 - **Tournament seats ask the right model.** A lambda in the champion loop captured the loop variable late; it now binds each entrant.
 - **A flaky test is now deterministic.** The blackjack seating test dealt a random shoe; when a natural ended the hand early, the dealer's model was never asked to play, about one run in ten. It now deals a fixed hand.
@@ -43,48 +43,47 @@ The second Nous pass (2026-11-13) looked at the fixes above and found four more.
 
 The notes below were written during development, before the first public release.
 
-- **Game Center loads on Windows (owner's report, 2026-11-11).** A fresh Windows install answered every
+- **Game Center loads on Windows.** A fresh Windows install answered every
   Game Center call with 404 "Plugin not found": `shelf/wallet.py` imported `fcntl`, which Windows does not
   have, so the backend never loaded. The wallet now takes the same one-byte `msvcrt` lock that
   `shelf/filelock.py` already uses there; Linux and macOS keep the identical `flock` path.
   `tests/test_windows_import.py` loads the dashboard API with `fcntl` blocked and moves chips through the
   Windows lock path.
-- **Close Game Center sits top right (owner's ask, 2026-11-11)**, level with the Games / Champions tabs, and
+- **Close Game Center sits top right**, level with the Games / Champions tabs, and
   floats top right on the other screens instead of the bottom-right corner. The lobby column's name and
   chat boxes take the full width with their button under them.
-- **Game Center page lobby column is only the lobby (owner's report, 2026-11-11).** The Lobby / Game tab
+- **Game Center page lobby column is only the lobby.** The Lobby / Game tab
   row is gone: the Game tab was cut off at the column's edge and the page has no table of its own. A
   match the lobby makes shows as one card with **Play here** on top of the lobby; the name and chat rows
   wrap in the narrow column.
-- **Sea Battle tells you when you sink their ship (owner's report, 2026-11-11).** The computer fires back
+- **Sea Battle tells you when you sink their ship.** The computer fires back
   at once, so your sinking shot arrived with its reply miss behind it and the banner spoke only the
   newest shot. It now speaks the biggest news among the new shots: a sinking, then a hit, then a miss.
-- **Backgammon is hidden for now (owner's call, 2026-11-11).** It fails the game contract the other Play
+- **Backgammon is hidden for now.** It fails the game contract the other Play
   games pass (replayable dice, a Hermes model seat, lessons, ship-gate entry), so it is off Play and off
   every list: `backgammon/game.json` is renamed `game.json.future` (see `backgammon/HIDDEN.md`). Its code,
   the moving-pieces fix, the dice roll and the cover art stay for when it comes back.
-- **Backgammon has a cover of its own (owner's ask, 2026-11-11).** Every Play tile draws its own
+- **Backgammon has a cover of its own.** Every Play tile draws its own
   board into the same 130 px stage, but Backgammon was the one game with no starting picture: its
   tile fell through to the dark stand-in scene an unknown id gets. `startingPicture('backgammon')`
   now hands back the standard opening position (the same one `backgammon/game.py` deals), and
   `coverArt` draws it with a new `backgammonCover()` — the table's own brown board, twenty-four
   points, the bar and the fifteen-plus-fifteen checkers, as a plain SVG with no controls and no
   clicks. The other games' tiles are untouched; a grid game still goes through `BoardSvg`.
-- **One row of links out to the project on the Game Center main screen (owner's ask, 2026-11-11).**
+- **One row of links out to the project on the Game Center main screen.**
   Under the header, beside **Experimental · Settings · Community creations**, sit three quiet links:
   **Report a problem** (the repository's new-issue page), **Contribute** (the repository) and **Add
   your own game** (`docs/SUBMIT-A-GAME.md` on GitHub). Each is the shared `textLink`, so a keyboard
   reaches it like any other control, and each click goes through the same `openInBrowser` door the
   Submit button and the community shelf already use — the address is handed to the person's own
   browser and nothing is ever framed or navigated inside Hermes.
-- **The version chip is click-to-copy (owner's ask, 2026-11-11).** One press on the chip — or
+- **The version chip is click-to-copy.** One press on the chip — or
   Enter/Space from the keyboard, the chip is now a real control with a tab stop — puts the full chip
   text (`v1.0.0-dev.N · YYYY-MM-DD · abcdef12`) on the clipboard through
   `navigator.clipboard.writeText`, with a hidden textarea and `execCommand('copy')` as the fallback
   where that door is missing. The chip wears **Copied** for 1.5 s and its tooltip ends with **Click
   to copy the version**, so a bug report can quote the exact build without anyone retyping it.
-- **The side pane deals only against the opponent you name, and says who is thinking (owner's ask,
-  2026-11-11).** Four findings from the pane-redesign review are fixed in one pass. **Start over** is one
+- **The side pane deals only against the opponent you name, and says who is thinking.** Four pane fixes landed in one pass. **Start over** is one
   door with a real pair of radios inside it — **( ) Computer** and **( ) Your Hermes model** — with
   *nothing* pre-selected: **Start** stays disabled until a choice is made, the strength row
   (Beginner … Expert) belongs to the Computer choice, the shared searchable **ModelPicker** belongs to the
@@ -107,7 +106,7 @@ The notes below were written during development, before the first public release
   untouched: it names its opponent and its strength on the controls that start a game, so it carries no
   silent default — reordering it (online first) is the next slice.
 
-- **The over-chat copy can be placed and coloured (owner's ask, 2026-11-11).** The panel that already
+- **The over-chat copy can be placed and coloured.** The panel that already
   holds **Show over chat**, **See-through** and **Size** now carries two more rows. **Position** is a
   **Left-right** and an **Up-down** slider plus a **Centre** button: both are offsets from the place
   the copy has always had — centred over the chat column — so the default is byte-for-byte the geometry
@@ -128,8 +127,7 @@ The notes below were written during development, before the first public release
   mount. `tests/jackpot2_harness.cjs` pins the default geometry against the pre-existing answer, the
   clamp at the edges, the composer rule, the six swatches and the gradient, and that the colour default
   is the teal the cabinet already draws, to the last digit.
-- **The side pane is "Play while you code", and the way in is one you can see (owner's ask,
-  2026-11-11).** The right-hand pane and its command-palette command were named *Play while you
+- **The side pane is "Play while you code", and the way in is one you can see.** The right-hand pane and its command-palette command were named *Play while you
   wait*, and once × had taken the pane off the screen the only way back was Ctrl+K. Both now read
   **Play while you code** — the pane's own title, the strip's tooltip, the palette label and its
   keywords — while the internal ids (`id: 'pane'`, `hermes-gameshelf.wait`) are unchanged. Two
@@ -142,8 +140,7 @@ The notes below were written during development, before the first public release
   button reads **Close side pane** and calls `closeWaitPane()`. New tests pin the rename, the two
   doors and the state they share (`tests/table_ui_harness.cjs`, `tests/test_play_pane.py`).
   `desktop/plugin.js` is built from `desktop/src/` with `tools/build_plugin.py`.
-- **The Jackpot cabinet spins itself while Hermes works, says so, and shows what it pays (owner's ask,
-  2026-11-11).** *"auto-spin is NOT working"* was true, and the cause was not the hook path: the shelf
+- **The Jackpot cabinet spins itself while Hermes works, says so, and shows what it pays.** *"auto-spin is NOT working"* was true, and the cause was not the hook path: the shelf
   spins on it — one spin for each inference reply, one for each tool call — only while a machine reports
   itself on screen, and the only surface that ever did was the ORIGINAL copy over the chat
   (`19-jackpot-overlay.js` posts `/jackpot/visible`). With Jackpot v2 up — the wait pane, the Games page,
@@ -154,20 +151,19 @@ The notes below were written during development, before the first public release
   an older wallet file with one boolean still reads as the original copy's. Closing one surface can
   therefore no longer switch the automatic spin off while the other is still on screen. Nothing else
   about the feed changed — the same three hooks, the same `shelf/autobet.py` stake sizing, no idle timer
-  — and the cabinet carries the owner's sentence for it in full, with the same words as its tooltip. The
+  — and the cabinet carries that sentence in full, with the same words as its tooltip. The
   **points** side is a choice now instead of an all-in press: a slider, a number and **Max** turn the
   slice the person picked into chips at the shelf's own rate (four points buy three chips, read off the
   payload's new `points_rate`, not a copy typed into the cabinet), a line under it says what spending the
   ranking costs, and a conversion is reported to `/api/balance` at once rather than at the next lobby
   poll. **What it pays** opens over the reels from the header: every combination and its payout at the
   bet on the table, jackpot row marked, generated from the live pay table the shelf is playing.
-- **The win rate is the owner's number, and the return is on target instead of over it (owner's ask,
-  2026-11-11).** Every machine now wins about half its spins — 0.50-0.52 of them pay at least the bet
+- **The win rate is drawn per session, and the return lands on target instead of over it.** Every machine now wins about half its spins — 0.50-0.52 of them pay at least the bet
   back — and returns its target rather than a number above it. Measured before the change: only 32.3% of
   a usual fruit9 session's spins gave the stake back (0.3484 with the machine's own strips, 0.3229 with
   the session's), and the solved returns were 1.1345 (fruit9) and 1.2231 (robot3) against a 1.10 target.
   The dilution is per reel now — one blank on every reel moves the hit rate about three points, wider
-  than the two-point band the owner asked for, so the coarse ladder is refined by a blank on ONE reel —
+  than the two-point band the design calls for, so the coarse ladder is refined by a blank on ONE reel —
   and the paytable is solved for the largest everyday multiple whose jackpot still stands 25% above the
   best everyday pay, after which the jackpot is solved to add exactly the remainder, rounded up so a
   session is never a chip under its own promise. Every pay in both tables is at or above the stake the
@@ -181,15 +177,14 @@ The notes below were written during development, before the first public release
   pins the hit rate (0.5031 fruit9, 0.5025 robot3, both against 0.5025/0.5033 enumerated) but cannot
   resolve the return to a hundredth on robot3, where one 981-chip jackpot in a few thousand spins is
   ±0.005 of the return on its own.
-- **The automatic spin is the hook path, pinned (owner's ask, 2026-11-11).** `tests/test_jackpot_autospin.py`
+- **The automatic spin is the hook path, pinned.** `tests/test_jackpot_autospin.py`
   drives the real `register()` hooks — the reply spins, the tool call spins, the turn spins, a shut
   machine spins nothing while the points still count, and a wallet under the smallest bet spins nothing
   and loses nothing — and proves the plugin schedules no work of its own, so time passing cannot spin.
   `tests/jackpot2_harness.cjs` pins the cabinet's side: it reports itself on screen under its own name,
   reports when it goes away, never posts a spin of its own, carries both lines, and opens the pay table
   from the live answer.
-- **The lobby is everyone who is online, and find match is the games you picked (owner's asks,
-  2026-11-11).** Five things, one lobby. **(1) Everyone shows.** A signed-in person is in the roster from
+- **The lobby is everyone who is online, and find match is the games you picked.** Five things, one lobby. **(1) Everyone shows.** A signed-in person is in the roster from
   their first lobby connection — not because they queued, said hello or opened a page: the roster is the
   lobby socket (`presence.py`), and the Hermes connection is now kept up by *any* poll of the online side
   while online play is on, not only by the lobby page being open (`plugin_api._online_payload_unsafe`).
@@ -234,8 +229,8 @@ The notes below were written during development, before the first public release
   class of cause. `SlotsOverChat` always mounted — the **show logic** was the defect: since 2026-11-10
   the copy was suppressed whenever a laid-out `.games-center-layout` was in the document, and Hermes
   keeps the Game Center page mounted *behind* the conversation, so the copy was hidden over the very
-  screen it exists for (the same symptom the owner had already reported once: *"there was a faint copy
-  but it disappeared and wont come back"*). The show logic is 9433891's again, hardened: the route
+  screen it exists for (the same symptom as before: a faint copy that disappeared
+  and did not come back). The show logic is 9433891's again, hardened: the route
   decides first — the Games page has a route of its own, `/games`, and now sits in the denylist — and the
   Games *page* is only trusted when the conversation is **not** on screen. A composer outside the games
   (a textarea that is in neither a play table, the wait pane, nor the Game Center page) *is* the
@@ -246,7 +241,7 @@ The notes below were written during development, before the first public release
   in the harnesses) with 9433891's chat-column rule — the first textarea's first ancestor wider than half
   the window, the window itself when the shell exposes no column — and every path that cannot measure
   looks again instead of leaving the copy out. The machine's look (the full cabinet with its points card
-  and controls), the size slider, the opacity and the `lane/q-slotfit` cabinet sizing are unchanged, and
+  and controls), the size slider, the opacity and the cabinet sizing are unchanged, and
   neither the odds window nor the status chip prints a win chance or a return on this machine either
   (the bundle-wide check in `tests/jackpot2_harness.cjs` pins that for both machines). **Both machines
   may now be on at once, and they share the conversation instead of covering each other**: the original
@@ -275,8 +270,8 @@ The notes below were written during development, before the first public release
   host react-dom *can* fill the layer div the machine is drawn there instead — one mounted machine
   either way, and all three host shapes are pinned by `tests/jackpot2_harness.cjs`. The copy is never
   zero-sized and never fully transparent (frame floored at 240×200, alpha floor raised to 0.25), and it
-  says which frame it chose once on `console.info` as `[jackpot2] over chat: frame …` so the owner can
-  see why. A clear **Show over chat** switch with the size and see-through sliders now also sits inside
+  says which frame it chose once on `console.info` as `[jackpot2] over chat: frame …` so the reason is
+  visible without a debugger. A clear **Show over chat** switch with the size and see-through sliders now also sits inside
   the cabinet's own panel beside Auto-spin/Auto-bet and in Settings (the full screen and the
   play-while-you-wait pane, which is one component) — all of them, and the status-bar toggle, read and
   write the same `jackpot2.overchat` / `.alpha` / `.size` keys. Separately, **every win-chance and
@@ -288,7 +283,7 @@ The notes below were written during development, before the first public release
 
 - **The version chip lives in Settings, and nowhere else.** It was one small chip too many in the
   status bar, so it became `GamesVersionChip` (`desktop/src/79-version.js`) and moved first to the Games
-  header and the pane's foot; the owner's call is now the final one — *everything* stays in the status
+  header and the pane's foot; the rule is now — *everything* stays in the status
   bar except this chip, and the chip belongs to Settings. It is mounted exactly once, at the top of
   `SettingsPanel` (`desktop/src/60-settings-and-alerts.js`): the same `/v1/version` source, the same
   `v<version> · <date> · <8-char commit>` line (plus `· modified` on a dirty install), the same hover
@@ -394,7 +389,7 @@ The notes below were written during development, before the first public release
 - **A table found online can be played in Hermes.** `desktop/src/73-online-table.js` draws the lobby
   server's own per-seat picture with the same `BoardSvg` the local table uses, reads `GET
   /online/table` every 400 ms and sends every click as `POST /online/table/cmd {action:'move',args}` —
-  there is no local game behind it, so it can never post a local move, and the turn line is the owner's
+  there is no local game behind it, so it can never post a local move, and the turn line uses the product's
   wording (*Your turn* / *Waiting for …* / *Reconnecting…*), never a claimed model. **Play here** on a
   matched table (dock and lobby column) opens the room in Hermes with `POST /online/table/open`, the
   browser stays as a small secondary link, resign asks once, and **Close table** posts

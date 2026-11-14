@@ -1,6 +1,6 @@
 """The number of games the README promises is the number the shelf actually ships.
 
-Quality review, 2026-11-13: the README led with "Eighteen games Hermes can actually play" while Play has
+The README once led with "Eighteen games Hermes can actually play" while Play has
 eleven curated games and the other seven sit behind the Experimental link. A reader counted eighteen on
 the shelf and found eleven, and the plugin's own shelf file says which is which.
 

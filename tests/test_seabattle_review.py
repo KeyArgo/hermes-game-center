@@ -1,6 +1,6 @@
 """The end-of-game review: both fleets published, the sunk ones marked.
 
-The owner asked for a picture at the end - five hulls a side, the killed ones red, your kills in the
+The end of a game publishes a picture - five hulls a side, the killed ones red, your kills in the
 enemy's waters and your losses in your own. That needs the enemy's whole fleet in the payload, which
 must not leak while the game is still running.
 """

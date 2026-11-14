@@ -764,8 +764,8 @@ def _jackpot_payload(wallet, spun: dict | None = None) -> dict:
             "broke_below": slotplay.MIN_BET,
         },
         # The easter egg that is out this hour, when it is one this person has not found yet. The
-        # catalogue lives in shelf/eggs.py; adding or retiring one is a row there (owner's ask,
-        # 2026-11-09: "we can update them every now and again but one user can use them once").
+        # catalogue lives in shelf/eggs.py; adding or retiring one is a row there. Each person finds
+        # a given egg once.
         "egg": (lambda egg: None if egg is None or egg["id"] in (held.get("eggs_found") or [])
                 else {"id": egg["id"], "hint": egg["hint"], "where": egg["where"],
                       "ends_at": egg["ends_at"],
@@ -843,8 +843,7 @@ def jackpot_visible(body: dict | None = None) -> dict:
 
     ``source`` names the surface: the original copy over the chat (the default, which is what the
     older desktop posts) or the Jackpot cabinet. Each keeps its own flag, so closing one cannot
-    switch the automatic spin off while another is still drawing (owner's ask, 2026-11-11: two
-    machines may float at once).
+    switch the automatic spin off while another is still drawing: two machines may float at once.
     """
     body = body or {}
     wallet = _jackpot_wallet()
@@ -910,8 +909,7 @@ def jackpot_bailout(body: dict | None = None) -> dict:
 
     Three quick bars, graded miss / good / perfect, and the grade picks the stack. It pays only
     chips - never points - so it cannot buy rank, and the cooldown plus the daily streak make
-    coming back worth more than hammering it (owner's ask, 2026-11-09: "really gamify this so its
-    addictive to the user").
+    coming back worth more than hammering it.
     """
     grade = str((body or {}).get("grade") or "miss")
     wallet = _jackpot_wallet()
@@ -924,18 +922,18 @@ def jackpot_points_cash(body: dict | None = None) -> dict:
     """Turn points into play chips at 75% - the way back from a bad run at the tables.
 
     Deliberately independent of any game's luck: points come from chat usage and from games won, so
-    a losing streak at blackjack cannot lock the person out of the slot machines (owner's ask,
-    2026-11-09). Four points buy three chips; the points under one block stay on the account.
+    a losing streak at blackjack cannot lock the person out of the slot machines. Four points buy
+    three chips; the points under one block stay on the account.
     """
     wallet = _jackpot_wallet()
     # Optional: how many points to spend. Omitted means all of them, which is what an older desktop
     # asks for; the current one sends the slice the person picked, because points are the high score
-    # and spending them all is a penalty for playing (owner's ask, 2026-11-09).
+    # and spending them all is a penalty for playing.
     wanted = (body or {}).get("points")
     answer = wallet.cash_points(None if wanted is None else int(wanted))
     # The server keeps a copy of this account's own totals for moving to another computer later, and
     # the copy has to be the new pair after a conversion - the points went down and the chips went up
-    # in the same change (owner's ask, 2026-11-11). Best effort and never waited for: the online
+    # in the same change. Best effort and never waited for: the online
     # source decides whether it is on, whether anyone is signed in, and how often it may speak.
     _report_balance_now()
     return dict(_jackpot_payload(wallet), points_cashed=answer["cashed"],
@@ -1051,7 +1049,7 @@ def command(body: dict | None = None) -> dict:
     answer: dict[str, Any] = {"text": text, "ok": not _is_refusal(text)}
     # The board this command left behind, so the table paints the moment the move lands instead of
     # asking again. Sea Battle fires one shot per click, and the extra round trip was most of the
-    # wait the owner called slow (2026-11-09: "playing battleship is really slow").
+    # wait that made it feel slow.
     head = (line.split() or [""])[0].lower()
     if head:
         try:

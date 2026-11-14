@@ -1,6 +1,6 @@
 """The Play tiles draw to one stage: no game's cover art is bigger than its neighbours'.
 
-The owner reported the Slots tile reading larger than the others (2026-11-09). The cause was
+The Slots tile read larger than the others. The cause was
 the slots and blackjack scenes being drawn 160 wide and stretched across the whole tile while
 every board sat inside the same 130 px stage. These pin the two numbers that keep them equal.
 """

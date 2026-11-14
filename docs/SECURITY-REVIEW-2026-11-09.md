@@ -1,7 +1,7 @@
 # Security review — 2026-11-09
 _Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
 
-Scope: the whole tree on branch `bughunter/green-clean-secure`, six areas. Every "clean" line below
+Scope: the whole tree, six areas. Every "clean" line below
 is a check that was **run**, not an assumption; every "fixed" line names the test that failed before
 the fix.
 
@@ -161,8 +161,7 @@ Each was read against the code or reproduced, then dismissed:
 
 ## Second round — four more, all fixed
 
-A second pass with the lane models and the agent CLIs (Claude Code, Codex, Cursor/Grok, AGY/Argon) found
-these, each reproduced before the fix:
+A second pass found four more, each reproduced before the fix:
 
 1. **The lobby named people to signed-out callers.** `GET /api/lobby` returned `waiting`,
    `bots_waiting` and the `presence` roster — display names and ratings — to anyone with the URL. Tables,

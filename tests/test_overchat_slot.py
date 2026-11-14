@@ -1,6 +1,6 @@
-"""Review item 2: the see-through machines live in an SDK slot, not over the app's markup.
+"""The see-through machines live in an SDK slot, not over the app's markup.
 
-Nous's review (2026-11-12) found the Desktop over-chat machine reaching into the app: it scanned the
+The Desktop over-chat machine used to reach into the app: it scanned the
 app's ``textarea`` elements and walked their ancestors to find a "chat column", appended a stylesheet to
 ``<head>`` and a full-screen overlay to ``<body>``. A plugin that does that can be broken by an app
 update and can break the app.

@@ -1,8 +1,7 @@
 """Easter eggs: small surprises that hide in Game Center and pay points when found.
 
-Owner's ask, 2026-11-09: "find easter eggs that show up randomly through game center that gives the
-user points if they find. we can update them every now and again but one user can use them once, and
-each can pay out as much as 10k in points or as little as 1k."
+An egg pays between 1,000 and 10,000 points, each person can find a given one once, and the
+catalogue can be added to or retired without touching a find already recorded.
 
 How it works, and why:
 
@@ -10,10 +9,9 @@ How it works, and why:
   ``hour + salt`` decides whether an egg is out and which one. That keeps the schedule server-side
   and identical on every surface, so a person cannot refresh the machine to reroll for a better egg.
 - **The catalogue is data.** Adding, retiring or repricing an egg is one row in ``EGGS``; nothing
-  else needs to change, which is what "we can update them every now and again" asks for.
+  else needs to change.
 - **A person finds each egg once, ever.** The wallet keeps the ids claimed, so the tenth sighting of
-  the same egg pays nothing. That is the "one user can use them once" rule, enforced where the
-  points are actually paid rather than in the UI.
+  the same egg pays nothing. The rule is enforced where the points are actually paid, not in the UI.
 - **Pay between 1,000 and 10,000 points.** Points are the leaderboard currency, so an easter egg is
   a real gain in standing, not play money.
 """
@@ -25,7 +23,7 @@ import time
 from pathlib import Path
 
 # The catalogue. ``points`` is what finding it pays; ``hint`` is shown once someone is close enough
-# to see it, in the owner's voice. Keep ids stable forever: they are the record of who found what.
+# to see it, in the game's own voice. Keep ids stable forever: they are the record of who found what.
 EGGS = (
     {"id": "wing-in-the-glass", "points": 1000, "where": "slots",
      "hint": "A wing is hiding in the glass of the fruit machine."},
@@ -44,9 +42,8 @@ EGGS = (
     {"id": "the-argo-stamp", "points": 10000, "where": "anywhere",
      "hint": "One developer stamp is slightly the wrong colour."},
     # The one that is just the mark. ``art`` names a picture the desktop already draws for the reels
-    # (the Nous stamp), and that artwork carries its own slogan - nothing is printed on top of it
-    # (owner's ask, 2026-11-09: "just the nous image we use in the slots, no need to add anything,
-    # it already mentions the slogan on it"). Allowed up to 5,000 points, the top of the second tier.
+    # (the Nous stamp), and that artwork carries its own slogan - nothing is printed on top of it.
+    # Allowed up to 5,000 points, the top of the second tier.
     {"id": "rebellion-mark", "points": 5000, "where": "slots", "art": "NOUS",
      "hint": "One Nous stamp on the cabinet is not on a reel."},
 )
@@ -75,9 +72,9 @@ def slot(hour: int | None = None) -> int:
 def current(hour: int | None = None) -> dict | None:
     """The egg showing right now, or None. Deterministic for the hour, so no rerolling.
 
-    There is no override any more (owner's decision, 2026-11-13): the developer cheats were removed
-    outright rather than hidden, so there is nothing to force — the schedule is the schedule, on every
-    machine, for everyone holding a copy of this source.
+    There is no override: the developer cheats were removed outright rather than hidden, so there is
+    nothing to force — the schedule is the schedule, on every machine, for everyone holding a copy of
+    this source.
     """
     at = slot(hour)
     roll = _hash(SALT, "roll", at) % EGG_ODDS

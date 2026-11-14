@@ -69,7 +69,7 @@ def test_a_kill_the_computer_made_is_credited_to_the_computer():
 
 
 def test_a_shot_is_credited_to_who_fired_it_even_on_a_square_both_sides_used() -> None:
-    """The enemy's attack must never be drawn on ENEMY WATERS (owner's report, 2026-11-09).
+    """The enemy's attack must never be drawn on ENEMY WATERS.
 
     Both seats can fire at the same square - the player misses, the computer answers on the same
     coordinate. Testing membership in the shot sets then credits the wrong seat, and the marker the
@@ -114,7 +114,7 @@ def test_against_a_machine_the_person_stays_the_same_side_all_game() -> None:
     The viewer's seat used to be read as "whoever's turn it is" whenever one seat was unbound,
     which is right for pass-the-screen and wrong against an agent: on the machine's ply the person
     became black, so their own hits were drawn on ENEMY WATERS and their water showed the machine's
-    marks. Reported as "it doesn't show me destroying anything" (owner, 2026-11-09).
+    marks, and nothing on either board looked like it had landed.
     """
     sb = load()
     state = state_with(sb, white_shots=[], black_shots=[], sunk_by_white=False)

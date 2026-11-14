@@ -1,4 +1,4 @@
-// tests/jackpot2_harness.cjs -- JACKPOT v2, LANE C: the over-chat copy, its switch and the fit.
+// tests/jackpot2_harness.cjs -- JACKPOT v2: the over-chat copy, its switch and the fit.
 //
 // The second slot machine is two parts of the bundle beside the old one: 18-jackpot2-machine.js (the
 // cabinet, JackpotMachine({ ctx, mode })) and 19-jackpot2-layer.js (the copy over the conversation, the
@@ -6,12 +6,12 @@
 // style of tests/jackpot_overlay_harness.cjs: it loads the built desktop/plugin.js in a vm sandbox and
 // reads the tree the components hand the app — no Games page, no route, no browser.
 //
-// THE COPY LIVES IN A SLOT (review, 2026-11-12). It used to be a position:fixed div appended to
+// THE COPY LIVES IN A SLOT. It used to be a position:fixed div appended to
 // document.body, measured against the app's own markup and announced on the console. It is a
 // `composer.underside` contribution now: the composer's width is the only measurement, the strip splits it
 // between the machines, and nothing here reads the window or the app's DOM.
 //
-// What it checks, in the order the brief lists it:
+// What it checks:
 //   1. the switch alone draws and removes the copy: nothing while it is off, a fitted box while it is on;
 //   2. the switch is the same stored setting the cabinet's panel and Settings write, and a stored switch
 //      is adopted by a copy that mounts afterwards (a reload does not lose it);
@@ -21,11 +21,11 @@
 //   5. the stage holds the cabinet in overlay mode, and its tint / watch-only rules are a <style> element
 //      of the stage rather than a stylesheet pushed into the app's <head>;
 //   6. the old machine keeps its odds mechanics and prints no win-chance or return percentage;
-//   7. the copy is drawn with NO document and NO window at all — the review's whole point;
+//   7. the copy is drawn with NO document and NO window at all;
 //   8. one switch, drawn from one component, in the cabinet's own panel and in Settings, on the same keys;
 //   9. no win-chance or return percentage text survives anywhere in the built bundle, and no copy is drawn
 //      at a size nobody could see;
-//  10. the colour (owner's ask, 2026-11-11): six swatches, a gradient, a default that is exactly the teal
+//  10. the colour: six swatches, a gradient, a default that is exactly the teal
 //      the cabinet already draws, Reset look putting it back, and no position sliders — the slot owns the
 //      place now.
 //
@@ -43,7 +43,7 @@ const source = fs.readFileSync(path.join(ROOT, 'desktop/plugin.js'), 'utf8')
   .replace(/^import .*$/gm, '').replace(/^export \{.*\}$/gm, '').replace('export default {', 'const plugin = {')
 
 // ---- the smallest DOM there is -----------------------------------------------
-// The copy is drawn inside the composer's underside slot (review, 2026-11-12), so it needs no document
+// The copy is drawn inside the composer's underside slot, so it needs no document
 // of the app's: no body to append to, no head for a stylesheet, no element to measure. These stubs are
 // here only for the parts that genuinely own a DOM node (the cabinet's own art), and section 7 proves the
 // copy itself is drawn with no document and no window at all.
@@ -76,7 +76,7 @@ function makeNode(tag) {
 const body = makeNode('body')
 const head = makeNode('head')
 const localStore = {}
-// The bundle logs the frame it chose with console.info (the owner's ask: it must be readable without
+// The bundle logs the frame it chose with console.info (it must be readable without
 // a debugger). The gate counts every line the harness prints that is not "…: passed", so those
 // lines are captured here rather than written to stdout — assertion 9 below reads this buffer.
 const said = []
@@ -219,7 +219,6 @@ sandbox.jp2ctx = ctx
 sandbox.jp2store = store
 
 // ---- 1. the copy is a slot contribution: a stored switch and a width -------------------
-// ---- the copy is a slot contribution: a stored switch and a width -----------------------
 // One helper for a fresh mount, the way the composer mounts the strip: a new ctx (so the stored switch is
 // adopted), reset hooks, drawn with the width the slot would hand it.
 function drawCopy(width, ctxOverride) {
@@ -269,7 +268,6 @@ const copySurface = tree => nodes(tree).find(node => node.props && node.props['d
   assert.equal(drawCopy(380, makeCtx()), null, 'and a stored off draws nothing')
   console.log('jackpot2: the switch alone draws, removes and revives the copy: passed')
 }
-// ---- 3. the fit: the share it is given, and nothing else ---------------------
 // ---- 3. the fit: the share it is given, and nothing else ---------------------
 // The strip measures its own box and splits it; the copy is fitted into its share with a height budget, and
 // the size slider scales it inside that. No window, no chat column, no viewport.
@@ -353,18 +351,11 @@ console.log('jackpot2: the full view fits 1400x900 and 900x500 without clipping:
   console.log('jackpot2: the stage holds the cabinet, and its rules live in our own tree: passed')
 }
 // ---- 6. the old machine keeps its mechanics and prints no odds numbers -------
-// This check used to be `git diff --quiet` on 18-slot-machine.js as well. That is deliberately no
-// longer the promise: the owner's release rule (2026-11-11) takes the win chance and the return OFF
-// the screen of BOTH machines, so that file is edited on purpose. What must still hold is that the
-// v2 lane never needed to touch the old machine's session plumbing, and that no percentage is
-// printed by it.
-//
-// 19-jackpot-overlay.js came off this list when the over-chat lane took it on (2026-11-11): that
-// lane's whole job is the ORIGINAL machine's copy over the conversation (it restores 9433891's mount,
-// chat-column measurement and show logic so the copy actually appears in the real app), so a
-// `git diff` promise over that file would pin the defect. What was worth pinning is pinned directly
-// instead, at the end of this file: the built bundle prints no win-chance or return percentage
-// anywhere, either machine.
+// The win chance and the return are taken OFF the screen of BOTH machines, so 18-slot-machine.js is
+// edited on purpose and a `git diff` promise over it would pin a defect. What has to hold instead:
+// the old machine's own session plumbing is untouched, and no percentage is printed by either
+// machine. That is pinned at the end of this file, against the built bundle, rather than by diffing
+// source files.
 const OLD_MACHINE_PLUMBING = ['desktop/src/18-slots.js']
 try {
   execFileSync('git', ['-C', ROOT, 'diff', '--quiet', '--', ...OLD_MACHINE_PLUMBING], { stdio: 'ignore' })
@@ -378,8 +369,7 @@ assert.ok(!legacyMachine.includes('% · bonus') && !legacyMachine.includes('% ·
 console.log('jackpot2: the old machine shows no odds numbers, and its session plumbing is untouched: passed')
 
 // ---- 7. no document, no window: the whole point of the fix ---------------------
-// ---- 7. no document, no window: the whole point of the fix ---------------------
-// The review's finding was a copy that reached into the app's markup. This draws it with `document` and
+// A copy must not reach into the app's markup. This draws it with `document` and
 // `window` deleted from the sandbox: if anything still needs them, this fails loudly instead of in a shell
 // the plugin cannot see.
 {
@@ -406,7 +396,7 @@ console.log('jackpot2: the old machine shows no odds numbers, and its session pl
   console.log('jackpot2: the copy is drawn with no document and no window: passed')
 }
 // ---- 8. one switch: the cabinet's own panel and Settings, on the same keys ----
-// The owner's ask (2026-11-11): a clear "Show over chat" switch INSIDE the Jackpot panel beside
+// A clear "Show over chat" switch INSIDE the Jackpot panel beside
 // Auto-spin/Auto-bet, and the same switch with the size and see-through sliders in Settings (the
 // page's and the pane's, which is one component). One source of truth: the keys the status bar
 // already writes.
@@ -474,13 +464,12 @@ console.log('jackpot2: one over-chat switch, in the panel and in Settings, on th
   console.log('jackpot2: no percentage is printed, and no copy is zero-sized: passed')
 }
 // ---- 10. the colour of the frame (and no place to set: the slot owns it) ------
-// ---- 10. the colour of the frame (and no place to set: the slot owns it) ------
-// The owner's ask (2026-11-11) kept the part a reader can check with no browser in the room: the colour
-// default is EXACTLY the teal the cabinet already draws, the six swatches and the gradient are one static
-// rule scoped to our own stage, and Reset look puts every look setting back.
+// The part a reader can check with no browser in the room: the colour default is EXACTLY the teal the
+// cabinet already draws, the six swatches and the gradient are one static rule scoped to our own
+// stage, and Reset look puts every look setting back.
 //
-// The two position sliders are gone on purpose (review, 2026-11-12): a copy that lives in a slot has a
-// place, and an offset would move it across a frame it does not own. The stored keys are not read.
+// The two position sliders are gone on purpose: a copy that lives in a slot has a place, and an
+// offset would move it across a frame it does not own. The stored keys are not read.
 evaluate('jp2LSetOverchat(false, jp2ctx)')
 evaluate('jp2LResetLook(jp2ctx)')
 assert.equal(sandbox.jp2store['jackpot2.overchat'], false, 'Reset look never turns the copy on by itself')
@@ -569,12 +558,11 @@ evaluate('jp2LSetOverchat(false, jp2ctx)')
 reset()
 console.log('jackpot2: the copy’s colour defaults to exactly the frame the cabinet already draws: passed')
 // ---- 11. the cabinet feeds itself, says so, and shows what it pays -------------
-// The owner's report (2026-11-11): *"auto-spin is NOT working"*. The hook path was not the defect and
-// is not touched here: the shelf spins on it - one spin for a reply, one for a tool call - only while
-// a machine says it is on screen, and the Jackpot cabinet never said so, so with the cabinet up (the
-// usual case, the original copy over the chat being off) every hook was refused. This section pins
-// the report, the two lines the owner asked the cabinet to carry, the pay table it opens, and the
-// one thing the cabinet must never do: spin on a clock of its own.
+// The shelf spins on the hook path - one spin for a reply, one for a tool call - only while a machine
+// says it is on screen. A cabinet that never says so leaves every hook refused while it is up (the
+// usual case, the original copy over the chat being off). This section pins that handshake, the two
+// lines the cabinet carries, the pay table it opens, and the one thing the cabinet must never do:
+// spin on a clock of its own.
 reset()
 const seen = []
 const watchCtx = {
@@ -608,7 +596,7 @@ const off = seen.filter(call => call.path === '/jackpot/visible')
 assert.ok(off.length >= 1, 'unmounting reports the surface going away')
 assert.equal(off[off.length - 1].body.on, false, 'and that nothing is on screen any more')
 
-// The two lines the owner asked for, on the cabinet, with the whole sentence in the tooltip.
+// The two lines, on the cabinet, with the whole sentence in the tooltip.
 const noteLine = nodes(machineDraw).find(node => node.props && node.props['data-jp2-autospin-note'])
 const autospinWords = evaluate('JP2_AUTOSPIN_NOTE')
 assert.ok(noteLine, 'the cabinet carries the line about the automatic spin')

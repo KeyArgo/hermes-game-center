@@ -25,7 +25,7 @@ GAMESHELF_REACT_ASSETS=online/web/vendor \
 node tools/browser_drive.mjs --url http://127.0.0.1:18798/ --out /tmp/gameshelf-shots --game chess --level Beginner
 ```
 
-The QA server uses a scratch data folder; it never reads the owner's `~/.hermes` data.
+The QA server uses a scratch data folder; it never reads your own `~/.hermes` data.
 
 ## Run the checks
 

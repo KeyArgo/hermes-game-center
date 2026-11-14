@@ -259,7 +259,7 @@ const main = async () => {
   if (!(await waitForSetup(9000))) {
     throw new Error('the setting-up screen did not open')
   }
-  // Three seats, one of them the owner's own bot: a whisper needs a bot to hear it.
+  // Three seats, one of them the person's own bot: a whisper needs a bot to hear it.
   check('three seats offered', await pressButton('3 seats'))
   check('agent seat offered', await pressButton('Seat your agent'))
   await shot('01-setup-agent-seated')

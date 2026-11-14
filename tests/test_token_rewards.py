@@ -88,8 +88,7 @@ def test_many_small_replies_add_up_exactly(tmp_path: Path) -> None:
     """Real traffic is thousands of small replies, mostly under one point each.
 
     The person's points must equal floor(total tokens / 100k) with the remainder carried - no point
-    lost to a rounding step and none invented. Owner's ask, 2026-11-09: "make sure the points are
-    being accurately accumulated".
+    lost to a rounding step and none invented.
     """
     wallet = fresh(tmp_path)
     total = 0
