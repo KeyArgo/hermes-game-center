@@ -35,12 +35,12 @@ config_schema:
     type: string
     default: "https://games.hermesnet.xyz/submit"
     label: Submit your game link
-    description: Where the Submit your game button goes. Empty shows the submission guide link instead.
+    description: A submission page the form offers beside its own GitHub issue. Empty hides that link.
   submit_docs_url:
     type: string
     default: ""
     label: Submission guide link
-    description: A web page with the submission guide, shown when the Submit link above is empty.
+    description: A web page with the submission guide, offered by the form when the Submit link above is empty.
   lobby_url:
     type: string
     default: "https://games.hermesnet.xyz"

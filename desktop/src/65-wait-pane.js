@@ -17,6 +17,28 @@ const PANE_LEAGUES_OFF = true
 // this line hides it.
 const PANE_ONLINE_ALERT_OFF = true
 
+// The pane's own stylesheet. It sits in the pane so every rule can follow the pane's width - a
+// container query on the pane root - rather than the window's: the frame is dragged from 300 px to
+// 1200 px, and the lobby and the board fill whatever frame they are given. Only the classes this
+// file draws are named here, and nothing outside the pane is touched.
+const PANE_CSS = `
+  .games-wait-pane { container-type: inline-size; }
+  .games-pane-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
+  .games-pane-wide { grid-column: 1 / -1; min-width: 0; }
+  .games-pane-column { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .games-pane-board { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'who' 'board' 'status'; gap: 6px; width: 100%; min-width: 0; }
+  .games-pane-board-who { grid-area: who; min-width: 0; }
+  .games-pane-board-main { grid-area: board; min-width: 0; }
+  .games-pane-board-status { grid-area: status; min-width: 0; }
+  @container (max-width: 380px) {
+    .games-pane-games { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  }
+  @container (min-width: 640px) {
+    .games-pane-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .games-pane-board { grid-template-columns: minmax(0, 1fr) minmax(140px, 24%); grid-template-areas: 'board status' 'board who'; }
+  }
+`
+
 function WaitPane({ ctx }) {
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
@@ -105,16 +127,26 @@ function WaitPane({ ctx }) {
   useOutsideDone(Boolean(restarting), confirmBox, () => setRestarting(false))
   useOutsideDone(Boolean(ladderAsk), ladderBox, () => setLadderAsk(null))
 
-  // Boards scale with the pane: the same BoardSvg, sized to the width it gets.
+  // Boards scale with the pane: the same BoardSvg, sized to the width it gets. The board draws to the
+  // width of its own cell, so the cell's width is what it is given; the pane's height then caps it,
+  // so a wide, short frame does not push the turn line below the fold. The meter is attached when the
+  // board first appears, because the board arrives after the first read of /board.
+  const hasBoard = Boolean(board.picture)
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined' || !boardBox.current) return undefined
     const meter = new ResizeObserver(entries => {
-      const width = entries && entries[0] && entries[0].contentRect ? entries[0].contentRect.width : 0
-      if (width > 120) setBoardH(Math.max(200, Math.min(460, Math.round(width * 0.92))))
+      const box = entries && entries[0] && entries[0].contentRect
+      if (!box || !(box.width > 120)) return
+      const root = rootBox.current
+      const room = root && typeof root.getBoundingClientRect === 'function'
+        ? root.getBoundingClientRect().height - 190
+        : 0
+      const byHeight = room > 200 ? Math.round(room) : 640
+      setBoardH(Math.max(200, Math.min(640, Math.round(box.width * 0.92), byHeight)))
     })
     meter.observe(boardBox.current)
     return () => meter.disconnect()
-  }, [])
+  }, [hasBoard])
 
   const widen = () => {
     setChrome('open')
@@ -528,10 +560,12 @@ function WaitPane({ ctx }) {
   })
 
   const header = jsxs('div', {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', minWidth: 0 },
     children: [
       jsx('div', { style: { fontWeight: 700, fontSize: 14 }, children: 'Play while you code' }),
-      jsxs('div', { style: { display: 'flex', gap: 6, alignItems: 'center' }, children: [
+      // The tabs, what the person has earned and the four icon buttons: in a narrow pane this row
+      // wraps rather than pushing itself out of the frame.
+      jsxs('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }, children: [
         button('Game', () => { setSettings(false); setTab('game') }, { primary: tab === 'game' && !settings }),
         button('Lobby', () => { setSettings(false); setTab('lobby') }, { primary: tab === 'lobby' && !settings }),
         // What the person has earned, right here under the two tabs they use most.
@@ -660,7 +694,9 @@ function WaitPane({ ctx }) {
         className: 'games-pane-games',
         role: 'group',
         'aria-label': 'Game',
-        style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 },
+        // As many tiles as the width holds, each the same share of it: two columns in a narrow pane,
+        // four or five in a wide one. Nothing here is a fixed pair of columns.
+        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 6, minWidth: 0 },
         children: orderedGames.map(item => jsx('button', {
           type: 'button',
           'aria-pressed': item.id === 'slots' ? jackpot : item.id === current,
@@ -681,47 +717,60 @@ function WaitPane({ ctx }) {
       })
     : jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: 'No curated games are installed here.' })
 
+  // The board and what is said around it: one grid of three cells - who is across it, the board
+  // itself, and the turn line (12-board-input.js draws the controls on the board). A narrow pane
+  // stacks them as they always were; a wide one puts the words in a column beside the board, so the
+  // board gets the width and the turn stays in view without scrolling.
   const boardView = pictured
     ? jsxs('div', {
         'aria-label': 'Game board',
-        ref: boardBox,
-        style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, width: '100%' },
+        className: 'games-pane-board games-pane-wide',
+        style: { display: 'grid', gap: 6, width: '100%', minWidth: 0 },
         children: [
           // Who is across the board, said above it. Blackjack
           // carries its own label on the felt; Slots has no opponent at all.
-          pictured.view === 'blackjack' || pictured.view === 'slots' ? null : jsx(OpponentLine, { pictured, view, solo: soloGame }),
-          pictured.view === 'slots' ? jsx(Jackpot2Full, { ctx }) : pictured.view === 'blackjack'
-            ? jsx(BlackjackTable, {
-                picture: pictured,
-                against: opponentWords(pictured, view, soloGame),
-                interactive: Boolean(current && access.can_move && !working),
-                busy: working,
-                onMove: token => move(current, token),
-                onSetting: (path, body) => ctx.rest(path, { method: 'POST', body })
-              })
-          : pictured.view === 'seabattle'
-            ? jsx(SeaBattleTable, {
-                picture: pictured,
-                interactive: Boolean(current && access.can_move && !working),
-                busy: working,
-                onMove: token => move(current, token)
-              })
-            : jsx(pictured && pictured.view === 'backgammon' ? BackgammonSvg : BoardSvg, {
-                picture: pictured,
-                height: boardH,
-                flat: true,
-                onPhase: setBgPhase,
-                interactive: Boolean(current && access.can_move && !working),
-                // The person's own move is drawn the moment they make it, while the
-                // table's answer is still on its way: a search or a model takes its time,
-                // and a board that sits still reads as a board that did not hear the click.
-                pending: preview,
-                onPending: mv => { if (access.can_move && !working) setPreview(mv) },
-                onMove: token => move(current, token)
-              }),
+          pictured.view === 'blackjack' || pictured.view === 'slots' ? null : jsx('div', {
+            className: 'games-pane-board-who',
+            style: { gridArea: 'who', minWidth: 0 },
+            children: jsx(OpponentLine, { pictured, view, solo: soloGame })
+          }),
+          jsx('div', {
+            className: 'games-pane-board-main',
+            ref: boardBox,
+            style: { gridArea: 'board', minWidth: 0 },
+            children: pictured.view === 'slots' ? jsx(Jackpot2Full, { ctx }) : pictured.view === 'blackjack'
+              ? jsx(BlackjackTable, {
+                  picture: pictured,
+                  against: opponentWords(pictured, view, soloGame),
+                  interactive: Boolean(current && access.can_move && !working),
+                  busy: working,
+                  onMove: token => move(current, token),
+                  onSetting: (path, body) => ctx.rest(path, { method: 'POST', body })
+                })
+              : pictured.view === 'seabattle'
+                ? jsx(SeaBattleTable, {
+                    picture: pictured,
+                    interactive: Boolean(current && access.can_move && !working),
+                    busy: working,
+                    onMove: token => move(current, token)
+                  })
+                : jsx(pictured && pictured.view === 'backgammon' ? BackgammonSvg : BoardSvg, {
+                    picture: pictured,
+                    height: boardH,
+                    flat: true,
+                    onPhase: setBgPhase,
+                    interactive: Boolean(current && access.can_move && !working),
+                    // The person's own move is drawn the moment they make it, while the
+                    // table's answer is still on its way: a search or a model takes its time,
+                    // and a board that sits still reads as a board that did not hear the click.
+                    pending: preview,
+                    onPending: mv => { if (access.can_move && !working) setPreview(mv) },
+                    onMove: token => move(current, token)
+                  })
+          }),
           pictured.view === 'slots' ? null : jsxs('div', {
-            role: 'status', 'aria-live': 'polite', className: 'games-status',
-            style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, fontWeight: 650 },
+            role: 'status', 'aria-live': 'polite', className: 'games-status games-pane-board-status',
+            style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, fontWeight: 650, gridArea: 'status', minWidth: 0 },
             children: [
               // Whose move it is, with the seconds running while the other seat works, in the same
               // words the full table uses. On the person's own Backgammon
@@ -776,6 +825,7 @@ function WaitPane({ ctx }) {
 
   const jackpotView = jsxs('div', {
     'data-jp2': 'pane',
+    className: 'games-pane-wide',
     style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, width: '100%', flex: '1 1 auto', minHeight: 0 },
     children: [
       jsxs('div', {
@@ -801,9 +851,14 @@ function WaitPane({ ctx }) {
     // pushed the machine's bottom below the fold, and "scroll down to see it" is not "nothing clipped".
     // The list comes back with the Back control, exactly as the Games page swaps its column for the
     // full view.
+    // Otherwise the pane's sections are one grid: one column in a narrow pane, two when the frame is
+    // wide (PANE_CSS), with the board and the opponent dialog taking the full width.
+    className: 'games-pane-body',
     style: {
-      display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0,
-      ...(jackpot ? { flex: '1 1 auto', minHeight: 0 } : {})
+      display: 'grid', gap: 10, minWidth: 0,
+      ...(jackpot
+        ? { flex: '1 1 auto', minHeight: 0, alignItems: 'stretch', gridTemplateRows: 'minmax(0, 1fr)' }
+        : { alignItems: 'start' })
     },
     children: jackpot ? [jackpotView] : [
       soloGame ? null : quick,
@@ -818,7 +873,8 @@ function WaitPane({ ctx }) {
       // (Blackjack's dealer); a table that seats nobody (Slots) gets neither.
       aiSeats ? jsxs('div', {
               'data-pane-opponents': '1',
-              style: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+              className: 'games-pane-wide',
+              style: { display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 0 },
               children: [
                 restarting
                   ? jsxs('div', {
@@ -1029,76 +1085,92 @@ function WaitPane({ ctx }) {
     ]
   })
 
+  // The lobby, in two columns when the frame is wide: the people beside you on the left, online play
+  // (and, when it is on, the ladder and leagues) on the right. A narrow pane folds them into one
+  // column, in the same order.
   const lobbyTab = jsxs('div', {
-    style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 },
+    className: 'games-pane-body',
+    style: { display: 'grid', gap: 10, alignItems: 'start', minWidth: 0 },
     children: [
-      view && view.player && view.player.named
-        ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `You are ${view.player.name}` })
-        : jsxs('div', {
-            style: { display: 'flex', gap: 6 },
-            children: [
-              field(name, setName, 'Your name', () => { say(`name ${name.trim()}`); setName('') }),
-              button('Set', () => { say(`name ${name.trim()}`); setName('') }, { disabled: !name.trim() })
-            ]
-          }),
-      jsx('div', { style: { fontWeight: 650, fontSize: 13 }, children: `Find a match${current ? `: ${(game && game.title) || current}` : ''}` }),
-      jsx('div', {
-        style: { fontSize: 12, color: text.secondary },
-        children: isLooking(lobby, current, myName)
-          ? 'Looking. This keeps searching while you use Hermes; you will be told when someone wants this game.'
-          : 'Ask to be listed, then play while Hermes works. Nothing interrupts you.'
-      }),
-      jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
-        isLooking(lobby, current, myName)
-          ? button('Stop looking', () => say('looking stop'), { disabled: working || !current })
-          : button('Find a match', () => say(`looking ${current}`), { primary: true, disabled: working || !current || !myName })
-      ] }),
-      found.length
-        ? jsx('div', {
-            role: 'status', 'aria-live': 'polite',
-            style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
-            children: `Match found: ${found.map(row => row.name).join(', ')} wants ${(game && game.title) || current}. Say hello below.`
-          })
-        : null,
-      jsx('div', {
-        style: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: text.secondary, maxHeight: 140, overflow: 'auto' },
-        children: lobby.lines.length
-          ? lobby.lines.slice(-8).map((item, index) => {
-              const timestamp = item.at ? new Date(item.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-              return jsxs('div', {
-                style: { display: 'flex', gap: 6, fontSize: 11 },
+      jsxs('div', {
+        className: 'games-pane-column games-pane-lobby',
+        style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 },
+        children: [
+          view && view.player && view.player.named
+            ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `You are ${view.player.name}` })
+            : jsxs('div', {
+                style: { display: 'flex', gap: 6 },
                 children: [
-                  jsx('span', { style: { color: text.tertiary, whiteSpace: 'nowrap', minWidth: 40 }, children: timestamp }),
-                  jsx('span', { style: { fontWeight: 650 }, children: `${item.name}: ` }),
-                  jsx('span', { children: item.text, style: { flex: 1, minWidth: 0, wordWrap: 'break-word' } })
+                  field(name, setName, 'Your name', () => { say(`name ${name.trim()}`); setName('') }),
+                  button('Set', () => { say(`name ${name.trim()}`); setName('') }, { disabled: !name.trim() })
                 ]
-              }, index);
-            })
-          : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' })
+              }),
+          jsx('div', { style: { fontWeight: 650, fontSize: 13 }, children: `Find a match${current ? `: ${(game && game.title) || current}` : ''}` }),
+          jsx('div', {
+            style: { fontSize: 12, color: text.secondary },
+            children: isLooking(lobby, current, myName)
+              ? 'Looking. This keeps searching while you use Hermes; you will be told when someone wants this game.'
+              : 'Ask to be listed, then play while Hermes works. Nothing interrupts you.'
+          }),
+          jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
+            isLooking(lobby, current, myName)
+              ? button('Stop looking', () => say('looking stop'), { disabled: working || !current })
+              : button('Find a match', () => say(`looking ${current}`), { primary: true, disabled: working || !current || !myName })
+          ] }),
+          found.length
+            ? jsx('div', {
+                role: 'status', 'aria-live': 'polite',
+                style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
+                children: `Match found: ${found.map(row => row.name).join(', ')} wants ${(game && game.title) || current}. Say hello below.`
+              })
+            : null,
+          jsx('div', {
+            style: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: text.secondary, maxHeight: 140, overflow: 'auto' },
+            children: lobby.lines.length
+              ? lobby.lines.slice(-8).map((item, index) => {
+                  const timestamp = item.at ? new Date(item.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                  return jsxs('div', {
+                    style: { display: 'flex', gap: 6, fontSize: 11 },
+                    children: [
+                      jsx('span', { style: { color: text.tertiary, whiteSpace: 'nowrap', minWidth: 40 }, children: timestamp }),
+                      jsx('span', { style: { fontWeight: 650 }, children: `${item.name}: ` }),
+                      jsx('span', { children: item.text, style: { flex: 1, minWidth: 0, wordWrap: 'break-word' } })
+                    ]
+                  }, index);
+                })
+              : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' })
+          }),
+          jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
+            field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
+            button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
+          ] }),
+          onlineProblem
+            ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' }, children: onlineProblem })
+            : null,
+          onlineNote
+            ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: onlineNote })
+            : null
+        ]
       }),
-      jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
-        field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
-        button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
-      ] }),
-      onlineProblem
-        ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' }, children: onlineProblem })
-        : null,
-      onlineNote
-        ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: onlineNote })
-        : null,
-      onlineSection,
-      // FUTURE(2026-11-11): the bot ladder — remove if never built.
-      // The section is kept whole (above); PANE_LADDER_OFF keeps it off the pane, so bringing it
-      // back is one boolean rather than a rebuild. Rated bot-versus-bot is not proven end to end,
-      // and it belongs with Champions.
-      PANE_LADDER_OFF ? null : ladderSection,
-      // FUTURE(2026-11-11): Bots & leagues — remove if never built.
-      // Leagues, watching a live table and bot passports all work against the lobby server, but
-      // watching leaves Hermes for the browser. Kept whole (64-leagues.js); PANE_LEAGUES_OFF hides
-      // it on the pane, which is the only surface that mounts it.
-      PANE_LEAGUES_OFF || !(online.on && online.linked)
-        ? null
-        : jsx(BotsLeagues, { online, busy: onlineBusy, call: onlineCall, ctx, setNote: setOnlineNote })
+      jsxs('div', {
+        className: 'games-pane-column games-pane-online',
+        style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 },
+        children: [
+          onlineSection,
+          // FUTURE(2026-11-11): the bot ladder — remove if never built.
+          // The section is kept whole (above); PANE_LADDER_OFF keeps it off the pane, so bringing it
+          // back is one boolean rather than a rebuild. Rated bot-versus-bot is not proven end to end,
+          // and it belongs with Champions.
+          PANE_LADDER_OFF ? null : ladderSection,
+          // FUTURE(2026-11-11): Bots & leagues — remove if never built.
+          // Leagues, watching a live table and bot passports all work against the lobby server, but
+          // watching leaves Hermes for the browser. Kept whole (64-leagues.js); PANE_LEAGUES_OFF hides
+          // it on the pane, which is the only surface that mounts it.
+          PANE_LEAGUES_OFF || !(online.on && online.linked)
+            ? null
+            : jsx(BotsLeagues, { online, busy: onlineBusy, call: onlineCall, ctx, setNote: setOnlineNote })
+        ]
+      })
     ]
   })
 
@@ -1110,13 +1182,14 @@ function WaitPane({ ctx }) {
     return jsxs('div', {
       className: 'games-wait-pane',
       ref: rootBox,
-      style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', background: paper },
+      style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', background: paper, containerType: 'inline-size' },
       children: [
+        jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
         header,
         settings
           ? settingsView
           : jsx('div', {
-              style: { flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column' },
+              style: { flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', minWidth: 0 },
               children: jsx(OnlineTable, {
                 game, view, ctx, roomId: hereRoom, height: boardH,
                 onBack: () => setOnlineRoom(''),
@@ -1127,16 +1200,21 @@ function WaitPane({ ctx }) {
     })
   }
 
+  // The pane is its own container (containerType), so PANE_CSS can answer to the frame the person
+  // drags - 300 px or 1200 px - instead of the window behind it.
   return jsxs('div', {
     className: 'games-wait-pane',
     ref: rootBox,
-    style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'auto', background: paper, boxSizing: 'border-box' },
-    children: settings ? [header, settingsView] : [
-      header,
-      agentRow(agentNotice(busy, finished, approval), ctx),
-      problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
-      noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,
-      tab === 'lobby' ? lobbyTab : gameTab
+    style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'auto', background: paper, boxSizing: 'border-box', containerType: 'inline-size' },
+    children: [
+      jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
+      ...(settings ? [header, settingsView] : [
+        header,
+        agentRow(agentNotice(busy, finished, approval), ctx),
+        problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
+        noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,
+        tab === 'lobby' ? lobbyTab : gameTab
+      ])
     ]
   })
 }

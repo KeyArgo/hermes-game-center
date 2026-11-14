@@ -2498,6 +2498,138 @@ async function paneContract() {
   console.log('play while you code pane: passed')
 }
 
+// The pane's contents fill the pane it is given. It opens at 720 px and drags to 1200 px, but its
+// pieces were laid out for ~360 px: the game tiles stayed two small columns and the board kept a
+// width of its own. The pane is its own container now, so its layout answers to the frame rather
+// than to the window - and nothing inside it caps itself at a number of pixels.
+async function paneFillContract() {
+  const play = [
+    { id: 'connect4', title: 'Connect Four', kind: 'table', installed: true, bots: true },
+    { id: 'reversi', title: 'Reversi', kind: 'table', installed: true, bots: true },
+    { id: 'gomoku', title: 'Gomoku', kind: 'table', installed: true, bots: true },
+    { id: 'breakthrough', title: 'Breakthrough', kind: 'table', installed: true, bots: true }
+  ]
+  const view = {
+    player: { id: 'me', name: 'Ada', named: true }, viewer_id: 'me', allow_ai: true, play,
+    online: { on: true, linked: true, name: 'Ada', url: 'https://games.example' },
+    lobby: { lines: [], looking: [] }
+  }
+  const picture = { ...active, table_id: 't1', view: 'connect4', game: 'connect4', status: 'active', plies: 2 }
+  const ctx = {
+    storage: { get: () => undefined, set: () => {}, remove: () => {} },
+    os: { notify() {} },
+    runAction: () => ({ ok: true }),
+    rest: async path => (path === '/view' ? view : path.startsWith('/board') ? { text: '', picture } : {})
+  }
+  const classOf = node => String((node.props && node.props.className) || '')
+  const hasClass = (node, name) => classOf(node).split(/\s+/).includes(name)
+  const byClass = (root, name) => nodes(root).find(node => hasClass(node, name))
+  const drawPane = async () => {
+    sandbox.paneProps = { ctx }
+    cursor = 0
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return evaluate('WaitPane(paneProps)')
+  }
+  const realInterval = sandbox.setInterval
+  sandbox.setInterval = () => 1
+  try {
+    reset()
+    // A pane that a previous check minimized would draw its strip instead of itself.
+    evaluate("window.sessionStorage.removeItem('gameshelf-pane-chrome')")
+    // The pane reads /view once, then the board: settle until the lobby it draws is the one the
+    // server answered with.
+    let tree = await drawPane()
+    for (let settle = 0; settle < 3; settle += 1) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+      tree = await drawPane()
+    }
+
+    // 1. The pane is its own query container, so every rule below follows the pane's width.
+    const root = byClass(tree, 'games-wait-pane')
+    assert.ok(root, 'the pane draws its own root')
+    assert.equal(root.props.style.containerType, 'inline-size',
+      'the pane root declares the container: its layout follows the pane, never the window')
+
+    // 2. The rules that make it fill: in the pane's own style tag, on the pane's own classes.
+    const cssNode = nodes(tree).find(node => node.type === 'style' && node.props && node.props['data-pane-css'])
+    assert.ok(cssNode, 'the pane carries its own stylesheet')
+    const css = String(cssNode.props.children)
+    assert.ok(/\.games-wait-pane\s*\{[^}]*container-type: inline-size/.test(css),
+      'the container is declared in the stylesheet too, on the pane root')
+
+    const wideAt = css.indexOf('@container (min-width: 640px)')
+    assert.ok(wideAt >= 0, 'a wide pane has rules of its own')
+    const wide = css.slice(wideAt)
+    assert.ok(/\.games-pane-body\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/.test(wide),
+      'the pane\'s sections sit side by side in two columns when the pane is wide: ' + wide.slice(0, 200))
+    assert.ok(/\.games-pane-board\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(140px, 24%\)/.test(wide),
+      'a wide pane gives the board the room and the turn a column beside it: ' + wide.slice(0, 300))
+    assert.ok(/\.games-pane-board\s*\{[^}]*grid-template-areas: 'board status' 'board who'/.test(wide),
+      'with the board on the left and the side info beside it: ' + wide.slice(0, 300))
+
+    const narrowAt = css.indexOf('@container (max-width: 380px)')
+    assert.ok(narrowAt >= 0, 'a pane narrower than the old one has rules of its own')
+    assert.ok(/\.games-pane-games\s*\{[^}]*repeat\(2, minmax\(0, 1fr\)\)/.test(css.slice(narrowAt)),
+      'at 300 px the tiles still sit two to a row, on the width the pane has: ' + css.slice(narrowAt, narrowAt + 200))
+
+    // 3. The game view, as drawn: one grid of sections, with the tiles filling their column.
+    const body = byClass(tree, 'games-pane-body')
+    assert.ok(body, 'the pane\'s game view is drawn in one grid of sections')
+    assert.equal(body.props.style.display, 'grid')
+    const picker = nodes(tree).find(node => node.props && node.props['aria-label'] === 'Game')
+    assert.equal(picker.props.style.gridTemplateColumns, 'repeat(auto-fill, minmax(150px, 1fr))',
+      'the game tiles fill the width they are given instead of two fixed columns')
+    for (const tile of nodes(picker).filter(node => node.props && node.props['data-game-tile'])) {
+      assert.equal(tile.props.style.minWidth, undefined, 'and no tile holds a width of its own')
+    }
+
+    // 4. The board: the cell that grows, and the side info that moves beside it when there is room.
+    const board = byClass(tree, 'games-pane-board')
+    assert.ok(board, 'the board is drawn in its own grid')
+    assert.ok(hasClass(board, 'games-pane-wide'), 'and takes the whole width of the pane when it is wide')
+    const areas = { 'games-pane-board-who': 'who', 'games-pane-board-main': 'board', 'games-pane-board-status': 'status' }
+    for (const [name, area] of Object.entries(areas)) {
+      const cell = byClass(board, name)
+      assert.ok(cell, `the board's ${area} is a cell of its own: ${name}`)
+      assert.equal(cell.props.style.gridArea, area, `${name} sits in the ${area} area`)
+    }
+    const drawn = nodes(tree).find(node => node.type && node.type.name === 'BoardSvg')
+    assert.ok(nodes(byClass(board, 'games-pane-board-main')).includes(drawn),
+      'the board itself is the cell that grows with the pane')
+    assert.equal(nodes(byClass(board, 'games-pane-board-status')).some(node => node.type && node.type.name === 'BoardSvg'), false,
+      'and never the status cell')
+
+    // 5. The lobby: the people beside you, and online play, as two columns when there is room.
+    findButton(tree, 'Lobby').props.onClick()
+    tree = await drawPane()
+    const lobby = byClass(tree, 'games-pane-body')
+    assert.ok(lobby, 'the lobby is drawn in the same grid of sections')
+    const columns = nodes(lobby).filter(node => hasClass(node, 'games-pane-column'))
+    assert.equal(columns.length, 2, 'in two columns: the lobby chat, then online play')
+    assert.ok(words(columns[0]).includes('Find a match'), 'the first column is the lobby chat')
+    assert.ok(words(columns[1]).includes('Play with people online'), 'the second is online play')
+
+    // 6. Nothing in the pane caps its own width in pixels: a cap is what left the small lobby in
+    //    the wider frame.
+    const capped = nodes(tree)
+      .map(node => node.props && node.props.style && node.props.style.maxWidth)
+      .filter(value => typeof value === 'string' && /^\d+(\.\d+)?px$/.test(value))
+    assert.deepEqual(capped, [], 'nothing in the pane caps its own width at a number of pixels')
+    findButton(tree, 'Game').props.onClick()
+    tree = await drawPane()
+    const cappedGame = nodes(tree)
+      .map(node => node.props && node.props.style && node.props.style.maxWidth)
+      .filter(value => typeof value === 'string' && /^\d+(\.\d+)?px$/.test(value))
+    assert.deepEqual(cappedGame, [], 'nothing on the game view caps its own width either')
+  } finally {
+    sandbox.setInterval = realInterval
+    reset()
+  }
+  console.log('pane fill: the container, the two-column sections and the wide board: passed')
+}
+
 // The obvious door: the pane and its palette command are "Play while
 // you code", a real button stands in the Games header beside the chips, and the status bar
 // carries a small game icon and the same words while the pane is closed. Both doors read one
@@ -3737,7 +3869,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -6575,18 +6707,20 @@ async function gcextrasContract() {
   assert.equal(typeof grid.type, 'function', 'a grid game still draws its own board component')
   reset()
 
-  // ---- 2. One row of links out to the project, opened through the one browser door.
+  // ---- 2. One row of links out to the project, opened through the one browser door — and Add your
+  //         own game, which is the one link that stays inside Game Center and opens its form.
   reset()
   const repo = 'https://github.com/KeyArgo/hermes-game-center'
   const wanted = [
     ['Report a problem', repo + '/issues/new'],
-    ['Contribute', repo],
-    ['Add your own game', repo + '/blob/main/docs/SUBMIT-A-GAME.md']
+    ['Contribute', repo]
   ]
   const launched = []
+  const added = []
   sandbox.linkProps = {
     ctx: { os: { openExternal: async url => { launched.push(url); return true } } },
-    onNote: () => {}
+    onNote: () => {},
+    onAdd: id => added.push(id)
   }
   const row = evaluate('GameCenterLinks(linkProps)')
   assert.equal(row.props['data-games-links'], 'repo', 'the links are one marked row')
@@ -6599,6 +6733,12 @@ async function gcextrasContract() {
   }
   assert.deepEqual(launched, wanted.map(item => item[1]), 'each link asked for exactly its own address')
   assert.ok(!/javascript|file:/i.test(JSON.stringify(launched)), 'and nothing but a web address is ever handed over')
+  const add = findButton(row, 'Add your own game')
+  assert.ok(add, 'the row carries Add your own game')
+  add.props.onClick()
+  await tick()
+  assert.deepEqual(added, ['add'], 'Add your own game opens the form in this plugin')
+  assert.deepEqual(launched, wanted.map(item => item[1]), 'and opens no page at all')
   // ---- 3. The version chip copies its own line, on a click or a key, and says so for a breath.
   // Drawn before the page on purpose: a component only has the harness's hook slots to itself while
   // it is the one drawing, so the chip goes first and the page — whose poll keeps resolving — goes last.

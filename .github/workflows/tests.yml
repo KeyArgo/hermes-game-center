@@ -39,3 +39,4 @@ jobs:
           node tests/jackpot2_harness.cjs
           node tests/jackpot2_look_harness.cjs
           node tests/timers_harness.cjs
+          node tests/submit_harness.cjs

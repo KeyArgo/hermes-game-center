@@ -1,6 +1,6 @@
 # Configuration
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 Every setting, environment variable and stored preference the code reads, with the default it uses.
 
@@ -12,8 +12,8 @@ These are declared in `plugin.yaml` and read through `ctx.get_config` in `__init
 |---|---|---|---|
 | `allow_ai` | bool | `true` | Off means no game may seat an AI. On still requires a person to agree (`/games allow-ai …`) before an AI faces a human. Game Center's own Settings can override this per profile. |
 | `doom_wad` | string | `""` | Path to a Doom `.wad`. Empty uses the free Freedoom files when they are installed. |
-| `submit_url` | string | `https://games.hermesnet.xyz/submit` | Where **Submit your game** goes. Only an `https` address is used; empty falls back to the guide link. |
-| `submit_docs_url` | string | `""` | A web page with the submission guide, shown when `submit_url` is empty. Must be `https`. |
+| `submit_url` | string | `https://games.hermesnet.xyz/submit` | A submission page the form offers beside its own GitHub issue. Only an `https` address is used; empty hides that link. |
+| `submit_docs_url` | string | `""` | A web page with the submission guide, offered by the form when `submit_url` is empty. Must be `https`. |
 | `lobby_url` | string | `https://games.hermesnet.xyz` | Where online play and match alerts connect. A self-hosted lobby works here. |
 | `lobby_key` | secret | `""` | The online recovery key. Stored through Hermes's credential route; also readable from `HERMES_GAMESHELF_LOBBY_KEY`. |
 | `bot_key` | secret | `""` | The ladder bot key the lobby issued when the bot was created. Stored through Hermes's credential route; also readable from `HERMES_GAMESHELF_BOT_KEY`. |

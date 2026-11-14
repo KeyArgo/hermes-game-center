@@ -1,5 +1,5 @@
 # Labs — where a Phase 1 experiment goes
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 Labs is the one shelf on the Games page for things that are not Play. It ships with one badge
 (`Labs · experiment`), one note and one card shape, so a screen built for one experiment and a card

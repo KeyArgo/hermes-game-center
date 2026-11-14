@@ -530,16 +530,25 @@ def _external_problem(manifest: dict[str, Any], plugin_id: str) -> str:
 
 
 def _homes() -> list[Path]:
-    """The active Hermes home.
+    """The active Hermes home, as Hermes itself resolves it.
 
     ``HERMES_HOME`` wins outright: when it names an isolated install or profile,
-    the default ``~/.hermes`` belongs to a different environment and its plugins
-    are not loaded where this plugin runs.
+    the default home belongs to a different environment and its plugins are not
+    loaded where this plugin runs. With no variable set, Hermes's own resolver
+    answers, because it knows the profile and the platform's default location. A
+    build without that module gets no guessed path back: discovery then finds only
+    the folders beside this plugin, and nothing is read from a home that may not
+    be the one in use.
     """
     raw = os.environ.get("HERMES_HOME", "").strip()
     if raw:
         return [Path(raw).expanduser()]
-    return [Path.home() / ".hermes"]
+    try:
+        from hermes_constants import get_hermes_home
+
+        return [Path(get_hermes_home()).expanduser()]
+    except Exception:
+        return []
 
 
 def _installed_folder(owner: Path) -> bool:

@@ -1,0 +1,46 @@
+name: Community game
+description: A web game of yours that runs in a browser, for Community creations
+title: "[community] "
+labels: ["community-game"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Community creations are games other people made and host themselves. Game Center never loads, frames or runs your page: it hands the address to the player's own browser, and the card says the game is made by the community. [docs/SUBMIT-A-GAME.md](https://github.com/KeyArgo/hermes-game-center/blob/main/docs/SUBMIT-A-GAME.md) explains the whole path.
+  - type: input
+    id: game-title
+    attributes:
+      label: Game title
+    validations:
+      required: true
+  - type: input
+    id: game-link
+    attributes:
+      label: Link to the game
+      description: An address that starts with https:// and that you are allowed to host.
+    validations:
+      required: true
+  - type: input
+    id: submitter
+    attributes:
+      label: Your name or handle
+    validations:
+      required: true
+  - type: input
+    id: licence
+    attributes:
+      label: Licence
+      description: MIT, for example, or "all rights reserved" if you are keeping the game closed.
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: One line about the game
+      description: What it is, and how long a game takes.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste a recovery key, a provider key or personal data. Security problems belong in the private **Report a vulnerability** form.

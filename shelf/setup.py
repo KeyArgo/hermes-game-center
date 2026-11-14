@@ -191,7 +191,7 @@ class Setup:
             return {}
         try:
             loaded = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, ValueError):
             return {}
         return loaded if isinstance(loaded, dict) else {}
 

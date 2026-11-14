@@ -396,3 +396,26 @@ The notes below were written during development, before the first public release
   `/online/table/close` without ending the match. `tests/table_ui_harness.cjs` pins the online turn
   line, the command route, the locked board while a move is out, and that the local agent seat still
   says it is thinking.
+
+### Third pass
+
+Three more from the same review, and one from a sweep of the state files:
+
+- **A state file with bad bytes is a fresh table, not a traceback.** `UnicodeDecodeError` is neither
+  `OSError` nor `JSONDecodeError`, so an interrupted write or a UTF-16 save raised out of every
+  command in the game. `kit.py` and the five shelf loaders now catch it as `ValueError`, which covers
+  both a half-written file and bytes that are not text. `tests/test_corrupt_state.py` writes those
+  bytes over every game's `state.json`.
+- **A state file with the wrong shapes is repaired.** A `turn` that was a dict raised on every
+  command and a `score` that was not an object raised in the picture, so one hand-edited or older
+  file made a table unusable. `kit.load()` now puts the fields the shelf reads into their expected
+  shape and leaves the game's own fields exactly as written.
+- **The Hermes home is Hermes's answer.** `shelf/catalog.py` guessed `~/.hermes` when `HERMES_HOME`
+  was unset, which is wrong for a profile, a container and Windows. It now asks
+  `hermes_constants.get_hermes_home()`; with neither available the answer is no home rather than a
+  path that may belong to another environment. `scripts/deploy.sh`, `scripts/verify-served.py` and
+  `scripts/slot-audit.py` follow the same rule.
+- **The network section names the arcade's one address.** A lobby server you host yourself reads a
+  game's `HERMES-REMOVE.txt` from `raw.githubusercontent.com` when someone asks to remove their tile;
+  the README's network bullet says so now, and `tests/test_catalog_review_guards.py` fails if any
+  host the shipped code names is missing from it.

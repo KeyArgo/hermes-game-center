@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import pathlib
 import sys
 from collections import Counter, defaultdict
@@ -32,7 +33,17 @@ sys.path.insert(0, str(ROOT))
 
 from shelf import reels  # noqa: E402
 
-DATA = pathlib.Path.home() / ".hermes" / "plugin-data" / "hermes-gameshelf" / "spins.jsonl"
+def hermes_home() -> pathlib.Path:
+    """Hermes's own answer for its home, so a profile or container is not guessed at."""
+    raw = os.environ.get("HERMES_HOME", "").strip()
+    if raw:
+        return pathlib.Path(raw).expanduser()
+    from hermes_constants import get_hermes_home
+
+    return pathlib.Path(get_hermes_home())
+
+
+DATA = hermes_home() / "plugin-data" / "hermes-gameshelf" / "spins.jsonl"
 
 
 def load(path: pathlib.Path, limit: int | None, machine: str | None) -> list[dict]:

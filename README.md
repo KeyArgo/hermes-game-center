@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=main" alt="CI"></a>
@@ -152,7 +152,7 @@ The shelf ships the machinery for bot **champions** (a named playbook, Elo ratin
 
 Everything that is not curated Play — the installed talking tables and experiments, the workshop prototypes (Liar's Dice 2v2, Pet Battles, Mafia Town) and any game another plugin ships — sits behind one small **Experimental** link, and its cards are kept locked for now: visible to look at, with no way in. A game that is not in `shelf/curated.json` never reaches Play, a tournament or a rating.
 
-**Community creations** is a side link with a few cards for games other people made and host on their own sites. Game Center does not load them — no iframes, no previews, no fetching: nothing happens until you press **Open**, which hands the address to your own browser through the Desktop's `openExternal`. The list lives in [community/games.json](community/games.json), is https-only, and a bad entry is skipped with a plain note. That view also carries **Submit your game** ([docs/SUBMIT-A-GAME.md](docs/SUBMIT-A-GAME.md) explains the three levels in plain words).
+**Community creations** is a side link with a few cards for games other people made and host on their own sites. Game Center does not load them — no iframes, no previews, no fetching: nothing happens until you press **Open**, which hands the address to your own browser through the Desktop's `openExternal`. The list lives in [community/games.json](community/games.json), is https-only, and a bad entry is skipped with a plain note. That view also carries **Submit your game**, which opens a form for a community game or a Game Center game and turns it into a GitHub issue in your own browser ([docs/SUBMIT-A-GAME.md](docs/SUBMIT-A-GAME.md) explains the three levels in plain words).
 
 ## Screenshots
 
@@ -262,7 +262,7 @@ The Desktop page never judges a move. It sends the move to `dashboard/plugin_api
 - **Writes** only its own data folder (one folder per game, plus `players.json`, `champions/`, `ratings.json`, `tournaments/` and `online.json` for the online preferences). Nothing outside it, and no Hermes config. The one exception is the online recovery key, which goes through Hermes's credential route and nowhere else.
 - **Reads** the game folders that ship with the plugin, and the `game.json` of any installed, enabled plugin in the Hermes home's `plugins` folder (or beside this plugin). Nothing else is claimed.
 - **Model calls go only through Hermes** (never to a provider directly) and only when a person chose them: an AI seat you agreed to (`allow-ai`), a hint you asked for (your model adds one short reason), a Doctrine card you asked the model to write, signed with a name you typed, or a bot-ladder game you started. No model call happens on its own. Prompts carry game data only — boards, moves, bot weights — plus the one name you typed yourself.
-- **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. Two things are the exception, and neither happens unless you ask for it. **Online play**, off until you turn it on: it talks to that one address (or the `lobby_url` you set) and nothing else, and **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser. **The pet gallery** in **Experimental**, only while you have it open: it reads the public Petdex manifest (`https://petdex.dev/api/manifest`, the same list Hermes's own pet picker reads, through the host's client when this build has one) to show which pets exist. That request carries nothing about you, your files, your keys or your play.
+- **Network:** the plugin makes no network calls of its own — no telemetry, no phone-home, no update checks, no remote code loading. Two things are the exception, and neither happens unless you ask for it. **Online play**, off until you turn it on: it talks to that one address (or the `lobby_url` you set) and nothing else, and **Open in browser** is a plain link that hands `https://games.hermesnet.xyz` to your browser. **The pet gallery** in **Experimental**, only while you have it open: it reads the public Petdex manifest (`https://petdex.dev/api/manifest`, the same list Hermes's own pet picker reads, through the host's client when this build has one) to show which pets exist. That request carries nothing about you, your files, your keys or your play. One more address is touched only by a lobby server you host yourself, never by this plugin on your machine: the community arcade's ownership check reads a game's `HERMES-REMOVE.txt` from `https://raw.githubusercontent.com` when someone asks to remove their tile.
 - **No telemetry, no self-update, no remote code loading, no binaries.** Updates arrive only when you install a newer version, and the code is MIT.
 
 ### Online play and the bot ladder (opt-in)

@@ -218,16 +218,27 @@ def test_the_bundle_carries_the_three_extras_the_owner_asked_for():
         "backgammon has no starting picture, so its tile would draw the stand-in scene"
 
     # 2. One link row out to the project, each address a fixed https page, opened through the one
-    #    browser door the Submit button already uses.
+    #    browser door — and Add your own game, which opens the submission form in this plugin.
     assert "const GAMES_REPO = 'https://github.com/KeyArgo/hermes-game-center'" in bundle, \
         "the repository the links point at is not in the bundle"
-    for suffix in ("/issues/new", "/blob/main/docs/SUBMIT-A-GAME.md"):
-        assert suffix in library, f"the link row does not carry {suffix}"
+    assert "/issues/new" in library, "the link row does not carry the new-issue page"
     assert "href: GAMES_REPO" in library, "a link does not point at the repository"
+    assert "label: 'Add your own game', href: ''" in library, \
+        "Add your own game still leaves Hermes instead of opening the form"
     assert "'data-games-links': 'repo'" in bundle, "the row is not one marked row"
     assert "function GameCenterLinks(" in library, "the row is not a component"
     assert "jsx(GameCenterLinks," in home, "the main screen does not draw the link row"
     assert "openInBrowser(ctx, link.href, onNote)" in library, "the links use the shared browser door"
+
+    # 2b. The submission form itself: both choices, its own screen, and the issue address builder.
+    assert "function SubmitGameForm(" in bundle, "the submission form is not in the bundle"
+    assert "jsx(SubmitGameForm," in home, "the page never draws the submission form"
+    assert "'data-submit-kind'" in bundle, "the two choices carry no handle for a test to find"
+    assert "function submitIssueUrl(" in bundle, "the issue address is not built anywhere"
+    assert "SUBMIT_TEMPLATES" in bundle and "submit-community-game.yml" in bundle
+    assert "submit-game-center-game.yml" in bundle, "the Game Center form is never named"
+    assert "openInBrowser(ctx, submitIssueUrl(draft)," in bundle.split("function SubmitGameForm(")[1], \
+        "the form does not send through the shared browser door"
 
     # 3. The chip copies its own line, through the SDK's clipboard door with the browser's own as a
     #    fallback — never a hidden textarea appended to the app's <body> — and a key

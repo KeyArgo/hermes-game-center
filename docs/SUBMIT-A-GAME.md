@@ -1,5 +1,5 @@
 # Submit your game
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 There are three places a game can live, and each one asks for a little more than the
 one before it. Start where your game is today.
@@ -9,6 +9,12 @@ one before it. Start where your game is today.
 | **Community creations** | A working web game, a link and a licence | Anyone, in their own browser |
 | **Experiments** | A Hermes plugin that ships `game.json` | The person who installs the plugin |
 | **Play** | The Play contract below, plus a review | Everyone, with a lobby and a record |
+
+The first two levels are submitted from **Add your own game**, in the row of links under the main
+screen's header, and from **Submit your game** on the Community creations page. Both open the same
+form: pick *Community game* or *Game Center game*, fill in what it asks for, and Game Center turns
+your answers into a GitHub issue in your own browser. You read the issue, press Send there, and
+nothing is sent by Game Center itself.
 
 ## 1. Community creations: a link to a game you made
 
@@ -23,9 +29,10 @@ You need:
   address to the person's own browser when they press Open, and the card says the
   game is made by the community and not by Game Center or Nous.
 
-Send those three things through **Submit your game** on the Community creations page.
-The list itself is `community/games.json` in this plugin, and a reviewed commit adds
-your card to it.
+Send those three things through **Add your own game** → *Community game*. The form checks the link
+is `https://` and that nothing is blank, then opens a GitHub issue, named and filed under
+`community-game`, with your answers in it for you to send. The list itself is
+`community/games.json` in this plugin, and a reviewed commit adds your card to it.
 
 Community games are clearly labelled as outside code. They never appear in Play,
 never take part in a tournament and never enter a rating.
@@ -75,8 +82,10 @@ python3 tools/check_game.py my-plugin-folder
 It prints one plain PASS or FAIL line per item and plays several bot-versus-bot
 games in a throwaway folder. It never installs or publishes anything.
 
-When every line passes, submit it through **Submit your game**. A person reviews
-it, plays it, and — if it holds up — the game joins the curated list in
+When every line passes, submit it through **Add your own game** → *Game Center game*. That choice
+shows the six items above as boxes to tick, asks for the source repository and an MIT-compatible
+licence, and asks you to confirm the checker passed; the form will not open the issue until every
+box is ticked. A person reviews it, plays it, and — if it holds up — the game joins the curated list in
 `shelf/curated.json`. Play cards open Game Center's own table, so today that
 means the game's code is merged into this plugin, under this MIT licence, rather
 than staying in a plugin of its own. A game that keeps its own screen stays in

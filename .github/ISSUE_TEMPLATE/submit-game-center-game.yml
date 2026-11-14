@@ -1,0 +1,76 @@
+name: Game Center game
+description: A game built for Game Center's own table, for the curated Play shelf
+title: "[play] "
+labels: ["game-center-game"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Only games built for Game Center can be played in Game Center: seats, turns, a clear winner, a replay, a computer opponent and a lobby. Anything else can still go in Community. [docs/SUBMIT-A-GAME.md](https://github.com/KeyArgo/hermes-game-center/blob/main/docs/SUBMIT-A-GAME.md) is the guide, and `python3 tools/check_game.py my-plugin-folder` is the checker that has to print PASS on every line first.
+  - type: input
+    id: game-title
+    attributes:
+      label: Game title
+    validations:
+      required: true
+  - type: input
+    id: source-repo
+    attributes:
+      label: Source repository
+      description: An address that starts with https://, where the game's code can be read.
+    validations:
+      required: true
+  - type: input
+    id: submitter
+    attributes:
+      label: Your name or handle
+    validations:
+      required: true
+  - type: input
+    id: licence
+    attributes:
+      label: Licence (must be MIT-compatible)
+      description: Play ships inside this MIT plugin, so the game's licence has to allow that.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: The Play contract you ticked in Game Center
+      description: One line per item, as the form sent it. Add anything that does not fit here.
+      value: |
+        - Seats
+        - Turns
+        - A clear winner
+        - A replay
+        - A computer opponent
+        - Lobby-ready
+        - tools/check_game.py: every line passed
+  - type: checkboxes
+    id: contract-checks
+    attributes:
+      label: Tick each item the game really meets
+      options:
+        - label: Seats — two of them, and a bot seat if you want one
+          required: true
+        - label: Turns — one move at a time, in a fixed order
+          required: true
+        - label: A clear winner — the game ends in a win or a draw, and says which
+          required: true
+        - label: A replay — the same moves from a fresh table reach the same result
+          required: true
+        - label: A computer opponent — the game's own bot always finds a legal move
+          required: true
+        - label: Lobby-ready — the game can be listed, joined and watched through Game Center
+          required: true
+  - type: checkboxes
+    id: check-game
+    attributes:
+      label: The checker
+      options:
+        - label: I ran tools/check_game.py and every line passed
+          required: true
+  - type: markdown
+    attributes:
+      value: |
+        A person plays the game before it joins Play, and a Play game is merged into this plugin under its MIT licence, rather than staying in a plugin of its own. Please do not paste a recovery key, a provider key or personal data.

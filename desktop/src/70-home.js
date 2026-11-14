@@ -244,17 +244,11 @@ function GameCenterPage({ ctx, onArea }) {
     return `This game has no screen of its own. In chat, /games install ${card.id} adds it, then /games ${card.id} plays it.`
   }
 
-  // Submit your game: the configured page, or the guide when that page is not set.
-  const openSubmit = async () => {
-    if (!submit.href) return
-    try {
-      const opened = ctx && ctx.os && typeof ctx.os.openExternal === 'function'
-        ? await ctx.os.openExternal(submit.href)
-        : false
-      if (!opened) setReply(`Could not open ${submit.href} in your browser.`)
-    } catch {
-      setReply(`Could not open ${submit.href} in your browser.`)
-    }
+  // Submit your game: the form in this page, the same one Add your own game opens. A submission page
+  // from the settings is offered as a second link inside the form, never instead of it.
+  const openSubmit = () => {
+    setReply('')
+    setArea('submit')
   }
 
   const staffRole = (view.online && view.online.staff && view.online.staff.role) || ''
@@ -325,6 +319,27 @@ function GameCenterPage({ ctx, onArea }) {
     })
   }
 
+  // Add your own game is a screen of its own: two choices, one form, and the finished form becomes a
+  // GitHub issue the person's browser opens to review and send.
+  if (area === 'submit') {
+    return jsxs('div', {
+      className: 'games-center-shell',
+      'data-skin': skin,
+      style: { display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 0, background: paper, overflow: 'auto', paddingBottom: 96 },
+      children: [
+        jsx('style', { children: SKIN_CSS }),
+        jsx('div', { style: { padding: '12px 18px 0' }, children: tabs }),
+        jsx(SubmitGameForm, {
+          ctx,
+          onBack: () => setArea('games'),
+          submitHref: submit.href,
+          submitLabel: submit.label,
+          onNote: setReply
+        })
+      ]
+    })
+  }
+
   // Community creations is a side link, never part of the Play page: link-out cards only,
   // the same labels and the same disclosure as before.
   if (area === 'community') {
@@ -353,20 +368,12 @@ function GameCenterPage({ ctx, onArea }) {
                 jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
                   button(submit.label, openSubmit, {
                     primary: true,
-                    disabled: !submit.href,
-                    title: submit.href || 'Submissions are not open yet.'
+                    title: 'Choose Community or Game Center, fill in the form, and send it from your own browser'
                   }),
                   button('Back to Game Center', () => setArea('games'))
                 ] })
               ]
             }),
-            submit.href
-              ? null
-              : jsx('div', {
-                  role: 'status',
-                  style: { fontSize: 12, color: text.secondary },
-                  children: 'Submissions are not open yet. The guide is docs/SUBMIT-A-GAME.md in the Game Center folder.'
-                }),
             jsx(CommunityShelf, { community, ctx }),
             reply
               ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: reply })
@@ -542,8 +549,9 @@ function GameCenterPage({ ctx, onArea }) {
       }),
       // The way out to the project itself: one row of three links, settled
       // right under the header beside Experimental / Settings / Community creations, each handed to
-      // the person's own browser by the same door the Submit button uses.
-      jsx(GameCenterLinks, { ctx, onNote: setReply }),
+      // the person's own browser by the same door the community shelf uses — except Add your own game,
+      // which opens this plugin's submission form.
+      jsx(GameCenterLinks, { ctx, onNote: setReply, onAdd: () => { setReply(''); setArea('submit') } }),
       // No alert drops anywhere for now. The rows are still read from
       // /alerts and the component is still in the bundle, so bringing it back is this one line.
       null,

@@ -217,24 +217,68 @@ def remember_level(root: Path, chosen: str, levels: tuple[str, ...] = LEVELS) ->
         log.debug("the chosen level could not be remembered", exc_info=True)
 
 
+def _text(value: object, default: str = "") -> str:
+    """A field the shelf stores as text: anything else is the default."""
+    return value if isinstance(value, str) else default
+
+
+def _whole(value: object, default: int = 0) -> int:
+    """A count: anything that is not a whole number of 0 or more is the default."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return default
+    return value
+
+
+def _repair(loaded: dict) -> None:
+    """The shelf's own envelope in the shape the rest of this file reads it in.
+
+    A file from an older build, a hand edit or a half-written copy can hold the right keys with the
+    wrong types. The game's own fields are left exactly as written; these are the ones the shelf
+    reads, and one wrong type among them (a ``turn`` that is a dict) used to raise on every command.
+    """
+    turn = _text(loaded.get("turn"))
+    loaded["turn"] = turn if turn in SIDES else "white"
+    loaded["status"] = _text(loaded.get("status"), "idle") or "idle"
+    winner = _text(loaded.get("winner"))
+    loaded["winner"] = winner if winner in SIDES else ""
+    loaded["plies"] = _whole(loaded.get("plies"))
+    moves = loaded.get("moves")
+    loaded["moves"] = moves if isinstance(moves, list) else []
+    refusals = loaded.get("refusals")
+    loaded["refusals"] = [record for record in refusals if isinstance(record, dict)] \
+        if isinstance(refusals, list) else []
+    score = loaded.get("score")
+    loaded["score"] = ({side: _whole(score.get(side)) for side in (*SIDES, "draws")}
+                       if isinstance(score, dict) else {side: 0 for side in (*SIDES, "draws")})
+    rematch = loaded.get("rematch")
+    requested = rematch.get("requested_by") if isinstance(rematch, dict) else None
+    loaded["rematch"] = {"requested_by": [item for item in requested if isinstance(item, str)]
+                         if isinstance(requested, list) else []}
+    loaded["draw_offer"] = _text(loaded.get("draw_offer"))
+    for side in SIDES:
+        loaded[side] = _text(loaded.get(side))
+        loaded[f"{side}_id"] = _text(loaded.get(f"{side}_id"))
+        loaded[f"{side}_name"] = _text(loaded.get(f"{side}_name"))
+
+
 def load(root: Path) -> dict | None:
     path = Path(root) / "state.json"
     if not path.is_file():
         return None
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    # ValueError is both a half-written file and bytes that are not UTF-8.
+    except (OSError, ValueError):
         return None
     if not isinstance(loaded, dict):
         return None
     loaded["schema_version"] = 2
-    loaded.setdefault("table_id", uuid.uuid5(uuid.NAMESPACE_URL, str(path.resolve())).hex)
-    loaded.setdefault("owner_id", next((str(loaded.get(f"{side}_id")) for side in SIDES
-                                         if loaded.get(f"{side}_id") and seat_kind(loaded.get(side, "")) == "human"), ""))
-    loaded.setdefault("score", {"white": 0, "black": 0, "draws": 0})
-    loaded.setdefault("moves", [])
-    loaded.setdefault("rematch", {"requested_by": []})
-    loaded.setdefault("draw_offer", "")
+    _repair(loaded)
+    loaded["table_id"] = _text(loaded.get("table_id")) or uuid.uuid5(uuid.NAMESPACE_URL, str(path.resolve())).hex
+    owner = _text(loaded.get("owner_id"))
+    loaded["owner_id"] = owner or next(
+        (loaded[f"{side}_id"] for side in SIDES
+         if loaded[f"{side}_id"] and seat_kind(loaded[side]) == "human"), "")
     return loaded
 
 

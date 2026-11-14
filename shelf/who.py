@@ -153,7 +153,7 @@ class NameBook:
             return {}
         try:
             loaded = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, ValueError):
             return {}
         if not isinstance(loaded, dict):
             return {}

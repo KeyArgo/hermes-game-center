@@ -12,11 +12,23 @@ Exits non-zero on any break, so a deploy cannot report success while the app run
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-INSTALLED = Path.home() / ".hermes" / "plugins" / "hermes-gameshelf"
+
+
+def installed() -> Path:
+    """Where Hermes would install this plugin, as Hermes resolves its own home."""
+    raw = os.environ.get("HERMES_HOME", "").strip()
+    home = Path(raw).expanduser() if raw else None
+    if home is None:
+        from hermes_constants import get_hermes_home
+
+        home = Path(get_hermes_home())
+    return home / "plugins" / "hermes-gameshelf"
+
 
 # Strings only a recent build carries. Update them when the work moves on.
 MARKERS = ["GamesVersionChip", "/v1/version"]
@@ -34,18 +46,19 @@ def declared(path: Path) -> str:
 
 def main() -> int:
     problems = []
+    installed_dir = installed()
 
-    if not INSTALLED.is_dir():
-        print("FAILED — Game Center is not installed at %s" % INSTALLED)
+    if not installed_dir.is_dir():
+        print("FAILED — Game Center is not installed at %s" % installed_dir)
         return 1
 
-    wanted, have = declared(REPO), declared(INSTALLED)
+    wanted, have = declared(REPO), declared(installed_dir)
     if not have:
         problems.append("the installed copy has no plugin.yaml version")
     elif wanted and have != wanted:
         problems.append("installed version %r is not this tree's %r" % (have, wanted))
 
-    stamp_path = INSTALLED / "BUILD_INFO.json"
+    stamp_path = installed_dir / "BUILD_INFO.json"
     stamp = {}
     if stamp_path.is_file():
         try:
@@ -55,7 +68,7 @@ def main() -> int:
     else:
         problems.append("no BUILD_INFO.json in the installed copy — it cannot say which commit it is")
 
-    bundle = INSTALLED / "desktop" / "plugin.js"
+    bundle = installed_dir / "desktop" / "plugin.js"
     if not bundle.is_file():
         problems.append("the installed copy has no desktop/plugin.js")
     else:

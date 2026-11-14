@@ -1,5 +1,5 @@
 # SECURITY
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 What this plugin does to your machine and your network, and how to stop it. Sourced from
 README.md ("What this plugin does on your machine"), `plugin.yaml`, and the Desktop table code.
@@ -93,8 +93,8 @@ do not open a public issue with a working exploit in it.
 3. **Change or self-host the lobby** — set `lobby_url` to your own address so nothing goes to the
    author's server. [docs/HOSTING.md](docs/HOSTING.md) covers what a self-hosted lobby needs: TLS in
    front, a kept-offline admin key, and a backup of the data folder.
-4. **Remove outbound links you did not want** — set `submit_url` empty; the submission guide link
-   is shown instead. Keep any `submit_docs_url` pointing somewhere you trust.
+4. **Remove outbound links you did not want** — set `submit_url` empty; the form then offers no
+   submission page of its own. Keep any `submit_docs_url` pointing somewhere you trust.
 5. **Disable the plugin in Hermes.** This stops every command, card and table it provides. Delete
    its data folder afterwards if you want the local game state, champions and ratings gone too.
 

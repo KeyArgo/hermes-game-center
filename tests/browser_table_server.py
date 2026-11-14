@@ -345,16 +345,20 @@ const ctx={os:{openExternal(url){qa.external=(qa.external||[]).concat([url]);let
 </script>'''.replace('__QA_PET_THUMB__', pet_thumb))
 
     @app.get('/pane')
-    def pane_page():
+    def pane_page(w: int = 400):
         # The pane beside a stub chat. Only the SDK is stubbed: the pane component,
         # the board and every command are the real ones, and the chat itself is a
         # drawing, because the native Desktop cannot be opened here.
+        # `w` is the frame the pane is given, so the pane's own container queries can be
+        # measured at 300 px and at 1200 px (tests/pane_fill_checks.mjs). A browser cannot
+        # drag the real Desktop's divider, so the harness's own frame is the divider.
+        pane_width = max(200, min(1600, int(w)))
         return HTMLResponse('''<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><title>Play while you code — isolated QA</title>
 <style>
 :root{--ui-text-primary:#e8edf4;--ui-text-secondary:#b4becc;--ui-text-tertiary:#7d8796;--ui-text-on-accent:#0b1220;--ui-stroke-secondary:#394656;--ui-accent:#7ec8ff;--ui-bg-editor:#101820;--ui-bg-elevated:#161e28}
 *{box-sizing:border-box}html,body,#app{height:100%;margin:0}
 body{font-family:system-ui;background:#0b1220;color:#e8edf4}
-#app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
+#app{display:grid;grid-template-columns:minmax(0,1fr) __PANE_W__px;height:100%}
 #chat{display:flex;flex-direction:column;gap:12px;padding:22px;min-width:0;overflow:auto;border-right:1px solid var(--ui-stroke-secondary)}
 #chat h1{font-size:15px;margin:0 0 4px}
 .bubble{max-width:620px;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.45}
@@ -460,7 +464,7 @@ const fire = type => (qa.listeners[type] || []).forEach(fn => fn({ type }))
 document.getElementById('working').onclick = () => { host.state.busy.set(true); document.getElementById('chat-turn').textContent = 'Hermes is working' }
 document.getElementById('finished').onclick = () => { host.state.busy.set(false); fire('message.complete'); document.getElementById('chat-turn').textContent = 'Hermes finished' }
 document.getElementById('approval').onclick = () => { fire('approval.request'); document.getElementById('chat-turn').textContent = 'waiting for an approval' }
-</script>''')
+</script>'''.replace('__PANE_W__', str(pane_width)))
 
     @app.get('/favicon.ico')
     def favicon():

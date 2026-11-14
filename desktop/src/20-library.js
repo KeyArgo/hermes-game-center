@@ -57,8 +57,9 @@ function PointsChip({ ctx, style }) {
 const EXPERIMENTS_NOTE = 'Work in progress, shown here so you can see what is coming: games other plugins installed, and prototypes still being built. Nothing here is rated or in a lobby, and nothing here opens yet - if one is good, tell me and it graduates to Play.'
 const YOUR_NOTE = EXPERIMENTS_NOTE
 
-// Submit your game goes to the configured page. When that is unset, the guide link is shown
-// instead, so the button never opens nothing.
+// Submit your game keeps the label its settings give it: the configured page names the button, the
+// guide names it when no page is set. Pressing it opens the form in this plugin; the address it names
+// is offered inside the form, so the setting still goes somewhere without the button leaving Hermes.
 function submitTarget(submit) {
   const url = String((submit && submit.url) || '')
   const docs = String((submit && submit.docs) || '')
@@ -67,30 +68,34 @@ function submitTarget(submit) {
   return { href: '', label: 'Submit your game' }
 }
 
-// The three ways out to the project itself, and the only links on the main screen that leave Hermes.
+// The ways out to the project itself, and the only links on the main screen that leave Hermes.
 // Every address is a fixed https page on the repository, and the click is
-// handed to the person's own browser through the same openInBrowser door the Submit button and the
-// community shelf use — nothing is ever framed or navigated inside Hermes. The guide link is the
-// file the repo ships at docs/SUBMIT-A-GAME.md (docs/ADD-YOUR-GAME.md is its shorter sibling).
+// handed to the person's own browser through the same openInBrowser door the community shelf uses —
+// nothing is ever framed or navigated inside Hermes. Add your own game is the exception: it opens the
+// submission form in this plugin (21-submit.js), which is where a game is described before anything
+// leaves the machine.
 const GAMES_REPO = 'https://github.com/KeyArgo/hermes-game-center'
 const GAMES_LINKS = [
   { id: 'report', label: 'Report a problem', href: GAMES_REPO + '/issues/new',
     title: 'Open a new issue on the Game Center repository in your browser' },
   { id: 'contribute', label: 'Contribute', href: GAMES_REPO,
     title: 'The Game Center repository on GitHub, in your browser' },
-  { id: 'add', label: 'Add your own game', href: GAMES_REPO + '/blob/main/docs/SUBMIT-A-GAME.md',
-    title: 'How to add a game: docs/SUBMIT-A-GAME.md on GitHub, in your browser' }
+  { id: 'add', label: 'Add your own game', href: '',
+    title: 'Add your own game: a community game or a Game Center game, in a form here' }
 ]
 
 // One row, three quiet links, drawn near Experimental / Settings / Community creations. Each is the
-// shared textLink, so it looks like the side links beside it and a keyboard can reach it.
-function GameCenterLinks({ ctx, onNote }) {
+// shared textLink, so it looks like the side links beside it and a keyboard can reach it. A link with
+// no address is one of this plugin's own screens, handed to the page through onAdd.
+function GameCenterLinks({ ctx, onNote, onAdd }) {
   return jsx('div', {
     'data-games-links': 'repo',
     style: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', minWidth: 0 },
     children: GAMES_LINKS.map(link => textLink(
       link.label,
-      () => openInBrowser(ctx, link.href, onNote),
+      link.href
+        ? () => openInBrowser(ctx, link.href, onNote)
+        : () => { if (typeof onAdd === 'function') onAdd(link.id) },
       link.title,
       link.id
     ))

@@ -153,7 +153,7 @@ def _load(folder: Path) -> dict:
         return empty
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):
         return empty
     if not isinstance(loaded, dict):
         return empty

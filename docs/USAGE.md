@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-13 (0ad31b96)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -103,7 +103,7 @@ Both live on the Experimental shelf; their cards are locked for now.
 
 ## Community creations
 
-**Community creations** lists games other people made and host on their own sites. Game Center loads none of them: press **Open** and the address goes to your own browser through the Desktop's `openExternal`. A bad entry is skipped with a plain note. **Submit your game** opens the submission page; [SUBMIT-A-GAME.md](SUBMIT-A-GAME.md) explains the three levels.
+**Community creations** lists games other people made and host on their own sites. Game Center loads none of them: press **Open** and the address goes to your own browser through the Desktop's `openExternal`. A bad entry is skipped with a plain note. **Submit your game** opens the submission form: pick a community game or a Game Center game, fill it in, and Game Center builds a GitHub issue for your own browser to send. [SUBMIT-A-GAME.md](SUBMIT-A-GAME.md) explains the three levels.
 
 ![Community creations: link-out cards only](../screenshots/community-creations.png)
 
@@ -120,6 +120,14 @@ When a model seat proposes an illegal move, the referee names the move and the r
 ![Chess: two illegal model moves refused, with the reasons](../screenshots/referee-refusal.png)
 
 The wording comes from the table's refusal path in `kit.py`; the page draws it from `pictured.refusals` in `desktop/src/30-game-page.js`.
+
+## Play while you code, beside the chat
+
+The pane on the right of the conversation is its own small Games screen. Open it from the Games header, from the status bar item, or with its command in the palette.
+
+- The pane opens at 720 px. Drag its edge: it goes down to 300 px and out to 1200 px.
+- Everything inside answers to that width. The game list fills the row it is in, and the pane's sections (the game list, online play, alerts) sit two abreast once there is room, then stack again when the pane is narrow.
+- A game in the pane draws its board as large as the pane allows, capped by the pane's height so the turn line stays in view, and puts the turn beside the board when there is room for both. Nothing scrolls sideways, down to 300 px.
 
 ## Online play
 
