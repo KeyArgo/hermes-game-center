@@ -66,10 +66,16 @@ def test_agent_answers_a_human_in_every_game(game_id, tmp_path):
     assert "Your agent" in started
     state_path = tmp_path / game_id / "state.json"
     reply = tab.command(f"move {first_human_move(module, state_path)}", complete=model, player=ME)
+    setup_plies = 0
+    if getattr(module, "SETUP_PHASE", None):
+        # The fleet is laid out without the model; it answers the first real move.
+        assert not model.prompts, reply
+        setup_plies = json.loads(state_path.read_text())["plies"]
+        reply = tab.command(f"move {first_human_move(module, state_path)}", complete=model, player=ME)
     state = json.loads(state_path.read_text())
     assert model.prompts, reply
     assert "Agent played" in reply and "built-in player chose" not in reply, reply
-    assert state["plies"] == 2 or state["status"] != "active"
+    assert state["plies"] == setup_plies + 2 or state["status"] != "active"
     assert "Mallory" not in model.prompts[0]
 
 

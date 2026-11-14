@@ -10,6 +10,7 @@ import logging
 import os
 import queue
 import random
+import re
 import shlex
 import threading
 import uuid
@@ -397,6 +398,12 @@ def _pick(text: str, by_name: dict, rules, legal: list):
     for token in tokens:
         if token in by_name:
             return by_name[token]
+    # Moves spelled in more than one word ("fire j10") never match a single token.
+    words = " ".join(tokens)
+    found = [(hit.start(), name) for name in by_name if " " in name
+             for hit in [re.search(r"(?<!\S)" + re.escape(name) + r"(?!\S)", words)] if hit]
+    if found:
+        return by_name[min(found)[1]]
     with contextlib.suppress(Exception):
         move = rules.parse(tokens)
         if move is not None and move in legal:
