@@ -74,6 +74,18 @@ The version chip line shows the wallet: chips and points.
 
 See the wallet file and its keys in [ARCHITECTURE.md](ARCHITECTURE.md) and [CONFIGURATION.md](CONFIGURATION.md).
 
+## Blackjack
+
+Open **Blackjack** on the Play shelf and bet chips from the wallet. The dealer stands on all 17s, and the table stays open between hands.
+
+- **The moves are the table's, not the page's.** Hit, Stand, Double and Split are drawn from the rules: a move that is not on offer is disabled, and a hand with a short stack gets no Double or Split.
+- **Double** is offered on the first two cards only. It puts a second bet of the same size on the felt, deals exactly one more card, and that hand stands. A doubled hand wins or loses twice its wager, and the next hand starts from what you bet, not from the double.
+- **Split** is offered on two cards of the same rank (A/A, 8/8, K/K). It puts a second bet of the same size on the felt, deals one card to each hand, and the two hands are played one after the other. The felt names the hand you are playing and shows each hand's wager and result; the round's net result is the sum of its hands.
+- **Split aces** are dealt the casino way: exactly one card to each, no further hit and no double. An ace with a ten after a split is 21 that pays even money, not a 3:2 blackjack.
+- **The dealer waits for every hand**, and does not play at all when every hand has busted.
+- **Payouts:** blackjack pays 3:2, a plain win pays 1:1, a push returns the stake. A split hand that reaches 21 never gets the 3:2 bonus.
+- **House rules kept as flags in `blackjack/game.py`:** pairs split on the same rank only (a king and a queen are behind `SPLIT_EQUAL_VALUE`, off by default), resplitting aces is off (`RESPLIT_ACES`), double after a split is on (but never on split aces), and a round holds up to four hands (`MAX_HANDS`).
+
 ## Slots and the Jackpot cabinet
 
 Open **Slots** on the Play shelf. Pick a bet (25 chips up) and press **Spin**.
