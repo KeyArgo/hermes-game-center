@@ -353,6 +353,19 @@ def test_splitting_an_ace_again_behind_the_flag_takes_no_hit_or_double(bj):
         bj.RESPLIT_ACES = False
 
 
+def test_the_reported_hand_offers_split_and_its_double_still_loses_the_doubled_stake(bj):
+    """The hand from the bug report: A/A, dealer 10+Q = 20, the double draws a K for 12."""
+    state = start(bj, ["AS", "10H", "AD", "QD", "KC"])
+    bj.play(state, "bet1000")
+    assert "split" in bj.legal(state), "this is the hand that showed no Split"
+
+    bj.play(state, "double")
+
+    assert state["outcome"] == "lose" and state["won"] == -2000
+    assert chips(bj) == START - 2000, "the double was right: both stakes of 1,000 are lost"
+    assert state["bet"] == 1000, "and the next hand bets the original 1,000, not the double"
+
+
 def test_the_built_in_player_splits_aces(bj):
     state = start(bj, ["AS", "9H", "AD", "8H", "KC", "5C"])
     bj.play(state, "bet10")
