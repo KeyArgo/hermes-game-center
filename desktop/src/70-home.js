@@ -1,4 +1,111 @@
 // ---- 70-home.js: the Games page: Play, Experimental Games, the lobby and the tabs
+
+// ---- Inference Auto Play: one button, on the screen people arrive at ----------
+// "Spin while Hermes thinks" is TWO settings, and both are needed:
+//
+//   - the wallet's autoplay switch (POST /jackpot/autoplay) is permission for a hook to spin at all;
+//   - the Jackpot backdrop switch ('jackpot2.overchat', 19-jackpot2-layer.js) is what puts a machine on
+//     screen — and the shelf refuses a reply's spin while NO machine reports itself visible.
+//
+// One press here sets both, so the person gets a working feature instead of half of one, and the button
+// is ON only while BOTH are on: flip either switch anywhere else (the cabinet's panel, Settings, the
+// status bar) and this one says so, because it reads the wallet and the store rather than its own
+// memory of the last press.
+const INFERENCE_AUTOPLAY_TIP = 'Spins the slot machine each time Hermes starts thinking, shown as a see-through backdrop over the chat.'
+
+function inferenceAutoplayOn(autoplay, backdrop) {
+  return Boolean(autoplay) && Boolean(backdrop)
+}
+
+function InferenceAutoPlayButton({ ctx }) {
+  const [backdrop, setBackdrop] = useJp2LOverchat(ctx)
+  // null until the wallet has answered once: before that the button is off, never a guess.
+  const [autoplay, setAutoplay] = useState(null)
+  const [trouble, setTrouble] = useState('')
+  const [busy, setBusy] = useState(false)
+  // The wallet's own switch, read from the route the cabinet and the status bar read. A failed read
+  // keeps the last good answer and says nothing: this is a control, not a report.
+  useEffect(() => {
+    let alive = true
+    const read = async () => {
+      try {
+        const next = await ctx.rest('/jackpot')
+        if (alive && next) setAutoplay(Boolean(next.autoplay))
+      } catch { /* the last answer stands */ }
+    }
+    read()
+    const timer = setInterval(read, POLL_MS)
+    return () => { alive = false; clearInterval(timer) }
+  }, [ctx])
+  const on = inferenceAutoplayOn(autoplay, backdrop)
+  const press = async () => {
+    if (busy) return
+    const want = !on
+    setBusy(true)
+    setTrouble('')
+    // The backdrop switch follows the finger at once — that is the part this window owns — and the
+    // wallet's answer decides what stays.
+    setBackdrop(want)
+    try {
+      const answer = await ctx.rest('/jackpot/autoplay', { method: 'POST', body: { on: want } })
+      const confirmed = answer && typeof answer.autoplay === 'boolean' ? answer.autoplay : want
+      setAutoplay(confirmed)
+      if (confirmed !== want) {
+        setBackdrop(!want)
+        setTrouble(`The wallet did not ${want ? 'start' : 'stop'} it.`)
+      }
+    } catch (error) {
+      // Back to the truth that is known: the wallet refused, so nothing would have spun.
+      setBackdrop(!want)
+      setTrouble(`Inference Auto Play could not ${want ? 'start' : 'stop'}: ${jp2Reason(error)}.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return jsxs('span', {
+    'data-inference-autoplay-host': '1',
+    style: { display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 },
+    children: [
+      jsx('button', {
+        type: 'button',
+        'data-inference-autoplay': on ? 'on' : 'off',
+        'aria-pressed': on,
+        'aria-busy': busy ? 'true' : undefined,
+        // A second press while the first is in flight would post again: the button waits its turn.
+        disabled: busy,
+        title: INFERENCE_AUTOPLAY_TIP,
+        onClick: press,
+        children: on ? 'Stop Inference Auto Play' : 'Start Inference Auto Play',
+        style: {
+          padding: '8px 13px', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          cursor: busy ? 'progress' : 'pointer',
+          opacity: busy ? 0.7 : 1,
+          border: `1px solid ${on ? '#ff5d73' : accent}`,
+          // The on look is a change of ink and a ring, not a shade: a running machine must be obvious
+          // from across the room, and the label changes with it so colour is never the only signal.
+          background: on ? '#ff5d73' : accent,
+          color: 'var(--ui-text-on-accent, white)',
+          boxShadow: on ? '0 0 0 2px rgba(255,93,115,.30)' : 'none',
+          transition: 'background 160ms linear, box-shadow 160ms linear'
+        }
+      }, 'button'),
+      jsx('span', {
+        'data-inference-autoplay-state': on ? 'on' : 'off',
+        style: {
+          fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+          color: on ? '#ff5d73' : text.tertiary
+        },
+        children: on ? 'On' : 'Off'
+      }, 'state'),
+      trouble ? jsx('span', {
+        'data-inference-autoplay-note': '1', role: 'status', 'aria-live': 'polite',
+        style: { fontSize: 11, color: text.secondary },
+        children: trouble
+      }, 'note') : null
+    ]
+  })
+}
+
 function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
@@ -522,6 +629,9 @@ function GameCenterPage({ ctx, onArea }) {
                     style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
                     children: [
                       jsx(PointsChip, { ctx }),
+                      // The feature the owner could not find: one press, both settings, on the screen
+                      // people arrive at rather than inside the machine.
+                      jsx(InferenceAutoPlayButton, { ctx }),
                       // The obvious door: one press opens the side pane and keeps a game beside
                       // the chat while Hermes works. While the pane is open the same button reads
                       // Close side pane.
