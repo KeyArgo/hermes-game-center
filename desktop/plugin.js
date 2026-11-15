@@ -22289,8 +22289,8 @@ function GameCenterPage({ ctx, onArea }) {
                     style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
                     children: [
                       jsx(PointsChip, { ctx }),
-                      // The feature the owner could not find: one press, both settings, on the screen
-                      // people arrive at rather than inside the machine.
+                      // One press, both settings, on the screen people arrive at rather than inside
+                      // the machine.
                       jsx(InferenceAutoPlayButton, { ctx }),
                       // The obvious door: one press opens the side pane and keeps a game beside
                       // the chat while Hermes works. While the pane is open the same button reads
