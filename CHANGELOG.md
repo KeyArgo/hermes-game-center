@@ -6,6 +6,14 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The Inference Slot Machine switch explains what it now does.** The rename landed but the help
+  line under it still said "One spin per message you send", the old behaviour and exactly the
+  two-setting confusion the Games-page button was added to end; the Jackpot cabinet said it in a
+  third set of words. Both cabinets now carry one line: **"One spin each time Hermes starts
+  thinking, and only while this machine is on screen."** `desktop/src/18-slot-machine.js`,
+  `desktop/src/18-jackpot2-machine.js`. Guard:
+  `test_both_cabinets_explain_the_switch_with_the_behaviour_it_now_has` in
+  `tests/test_backdrop_wording.py`.
 - **Each person's hands are numbered among their own hands, in the note as well as on the felt.**
   With two people at the table the note counted every hand on the table, so Player 2's first and
   only hand was "Hand 2 of 2" (or "Hand 5 of 5" after splits), while the felt drew it as hand 1 of 1.

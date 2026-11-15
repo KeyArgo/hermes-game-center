@@ -80,3 +80,19 @@ def test_the_jackpot_cabinet_names_its_auto_spin_switch_inference_auto_play():
     source = (SRC / "18-jackpot2-machine.js").read_text(encoding="utf-8")
     assert "toggle('autoplay', 'Auto-spin'," not in source
     assert "toggle('autoplay', 'Inference Slot Machine'," in source
+
+
+INFERENCE_HELP = ("One spin each time Hermes starts thinking, and only while this machine is "
+                  "on screen.")
+
+
+def test_both_cabinets_explain_the_switch_with_the_behaviour_it_now_has():
+    """One switch, one help line. The old line promised a spin per message sent, which is the
+    two-setting confusion the Games-page button was added to end."""
+    overlay = (SRC / "18-slot-machine.js").read_text(encoding="utf-8")
+    cabinet = (SRC / "18-jackpot2-machine.js").read_text(encoding="utf-8")
+
+    assert INFERENCE_HELP in overlay, "the slots cabinet still explains the old behaviour"
+    assert INFERENCE_HELP in cabinet, "the Jackpot cabinet explains it in other words"
+    assert "One spin per message you send" not in overlay
+    assert "Spins each time Hermes starts thinking, while" not in cabinet

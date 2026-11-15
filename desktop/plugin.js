@@ -5765,7 +5765,7 @@ function JackpotMachine(props) {
               jsx('div', {
                 style: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' },
                 children: [
-                  toggle('autoplay', 'Inference Slot Machine', autoplay, setAutoplay, 'Spins each time Hermes starts thinking, while this machine is on screen.'),
+                  toggle('autoplay', 'Inference Slot Machine', autoplay, setAutoplay, 'One spin each time Hermes starts thinking, and only while this machine is on screen.'),
                   toggle('autobet', 'Auto-bet', autobet, setAutobet, 'The machine sizes each stake by what the reply cost. Turn it off to play the table bet.')
                 ]
               }, 'switches')
@@ -7794,7 +7794,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             },
             children: `SPIN · ${bet || ''}`.trim()
           }),
-          checkbox('Inference Slot Machine (spins when Hermes thinks)', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
+          checkbox('Inference Slot Machine (spins when Hermes thinks)', autoplay, onAutoplay, 'One spin each time Hermes starts thinking, and only while this machine is on screen.'),
           checkbox('Auto-bet sizes itself', autobetShown, flipAutobet, 'Turn starting or a tool running: 1x. A reply under 20k tokens: 2x. Then 3x at 40k, 4x at 80k, 6x at 160k, 8x at 320k and above - 1x is 25 chips, the smallest bet on the table. Never more than the cap, and the odds are identical at every bet: a bigger bet is a bigger swing, not a better chance.'),
           jsx('button', {
             type: 'button',

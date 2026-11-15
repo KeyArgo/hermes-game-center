@@ -103,7 +103,7 @@ Open **Blackjack** on the Play shelf and bet chips from the wallet. The dealer s
 Open **Slots** on the Play shelf. Pick a bet (25 chips up) and press **Spin**.
 
 - **Classic** is a nine-window, five-payline machine; **Hermes Olympus** is one line on three Greek reels. You can switch mid-session.
-- **Inference Slot Machine** spins while Hermes is working: one per reply and one per tool call, only while a machine is on screen.
+- **Inference Slot Machine** spins while Hermes is working, and only while a machine is on screen. Both cabinets' switches and the Games-page button carry the same one-line help: *One spin each time Hermes starts thinking, and only while this machine is on screen.* In full: one spin each time Hermes starts thinking, one per burst of tool calls, and one after a reply.
 - **Auto-bet** sizes each stake by what the reply cost.
 - **Show as backdrop** draws a see-through copy at the top centre of the conversation, centred over the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. **Backdrop size** and **Backdrop opacity** are shared by the cabinet, the status bar and Settings. 100% is 640 px tall, twice the old copy, and never more than 60% of the window's height; **Small** / **Medium** / **Large** set 50% (the old size) / 100% / 160% in one press.
 
