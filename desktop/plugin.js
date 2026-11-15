@@ -11855,25 +11855,34 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // actually do is drawn, and both Resign and Leave table confirm before they act
   // (leaveTable above says whether leaving keeps or forfeits the game).
   const canUndo = Boolean(pictured && pictured.lesson && pictured.lesson.undo)
-  // A session table keeps its one Leave table with the opponent buttons above the felt.
-  // Two identical buttons on one screen is not "one obvious place", so the row below the
-  // board is only drawn when there is no row above it carrying the same button.
+  // A session table keeps its one Leave table with the opponent buttons above the felt, and two
+  // identical buttons on one screen is not "one obvious place" - so only that one button steps
+  // out of this row. The row itself stays: Hint and Undo move live nowhere else, and dropping the
+  // whole row took the advice door off the one solo table that offers it (Blackjack).
   const leaveAtTop = Boolean(soloControls) && !showStart && status === 'active'
-  const actionRow = leaveAtTop ? null : jsxs('div', {
+  const hintOnOffer = Boolean(pictured && pictured.hint_ok && access.can_move)
+  const drawOnOffer = status === 'active' && drawable && !solo
+  const resignOnOffer = status === 'active' && !solo
+  // An empty group is not a table action: draw the row only when it holds something.
+  const rowWanted = canUndo || hintOnOffer || drawOnOffer || resignOnOffer || !leaveAtTop
+  const actionRow = rowWanted ? jsxs('div', {
     className: 'games-actions',
     role: 'group',
     'aria-label': 'Table actions',
     style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
     children: [
       canUndo ? button('Undo move', () => command(`${game.id} learn undo`), lock({ disabled: Boolean(confirmation), title: 'Take back that move and the computer reply, and try again.' })) : null,
-      pictured && pictured.hint_ok && access.can_move ? greyed(button('Hint', () => submit({ kind: 'hint' }, () => send(`${game.id} hint`)), lock({ disabled: Boolean(confirmation) || skillless, title: skillless ? SKILL_WHY : 'The computer suggests a move, and your Hermes model says why. Only against the computer.' }))) : null,
-      status === 'active' && drawable && !solo ? button(drawOffer && !offeredByMe ? 'Accept draw' : offeredByMe ? 'Draw offered' : 'Offer draw', () => ask(drawOffer && !offeredByMe ? 'draw' : 'offer draw', drawOffer && !offeredByMe ? 'Accepting ends this match as a draw.' : 'Offer a draw to your opponent. The game continues until accepted.', `${game.id} draw${drawOffer && !offeredByMe ? ' accept' : ''}`), lock({ disabled: !access.can_draw || offeredByMe })) : null,
-      status === 'active' && !solo ? button('Resign', () => ask('resign', 'Resigning ends this match and awards the win to your opponent.', `${game.id} resign`), lock({ disabled: !access.can_resign })) : null,
-      status === 'active' && ownSeats.length
-        ? button('Leave table', leaveTable, lock({ disabled: Boolean(confirmation) }))
-        : button('Close table', leaveTable, lock({ title: 'Back to the shelf. Nothing here is thrown away.' }))
+      hintOnOffer ? greyed(button('Hint', () => submit({ kind: 'hint' }, () => send(`${game.id} hint`)), lock({ disabled: Boolean(confirmation) || skillless, title: skillless ? SKILL_WHY : 'The computer suggests a move, and your Hermes model says why. Only against the computer.' }))) : null,
+      drawOnOffer ? button(drawOffer && !offeredByMe ? 'Accept draw' : offeredByMe ? 'Draw offered' : 'Offer draw', () => ask(drawOffer && !offeredByMe ? 'draw' : 'offer draw', drawOffer && !offeredByMe ? 'Accepting ends this match as a draw.' : 'Offer a draw to your opponent. The game continues until accepted.', `${game.id} draw${drawOffer && !offeredByMe ? ' accept' : ''}`), lock({ disabled: !access.can_draw || offeredByMe })) : null,
+      resignOnOffer ? button('Resign', () => ask('resign', 'Resigning ends this match and awards the win to your opponent.', `${game.id} resign`), lock({ disabled: !access.can_resign })) : null,
+      // The one button the row above already carries while a session is seated: dropped here,
+      // never the rest of the row with it.
+      leaveAtTop ? null
+        : status === 'active' && ownSeats.length
+          ? button('Leave table', leaveTable, lock({ disabled: Boolean(confirmation) }))
+          : button('Close table', leaveTable, lock({ title: 'Back to the shelf. Nothing here is thrown away.' }))
     ]
-  })
+  }) : null
 
   // A proper move ledger, not a cramped ticker: two named columns (the shelf's
   // games all open with White), move numbers, larger text, its own scroll that

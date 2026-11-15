@@ -3912,7 +3912,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackTwoPlayersContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -7144,6 +7144,62 @@ async function blackjackDealerContract() {
   reset()
 
   console.log('blackjack: the dealer is named, and the three ways in: passed')
+}
+
+
+// ---- Blackjack: a solo table keeps the action row under the board ---------------------
+// A session table keeps its one Leave table with the opponent buttons above the felt, so the
+// row under the board used to be dropped whole - and that row is the only place Hint lives.
+// Blackjack is one of the two solo tables and the only one that sets hint_ok, so the advice
+// door vanished exactly where it was the only one. Only the duplicate Leave goes now.
+async function blackjackActionRowContract() {
+  const seat = (side, kind, name, open) => ({ side, kind, name, open })
+  const me = { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false }
+  sandbox.bjRowView = { viewer_id: 'me', player: { id: 'me' }, allow_ai: true, opponent: { model: 'glm-5.3-flash' } }
+  const table = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white', plies: 4,
+    seats: [me, seat('black', 'local', 'Local', false)],
+    side_words: { white: 'You', black: 'Dealer' }, dealer_kind: 'local',
+    levels: [{ id: 'intermediate', label: 'Intermediate' }], level: 'intermediate',
+    legal: ['bet10'], bets: [10], chips: 9900, bet: 0, outcome: '', won: 0, hands: 2,
+    hand: [], dealer: [], player_hands: [], total_wager: 0, table_players: 1, two_players: true,
+    hint_ok: true, permissions: { can_move: true, can_manage: true, can_step: true }
+  }
+  const page = picture => {
+    reset()
+    cursor = 0
+    sandbox.bjRowProps = {
+      game: { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true, solo: true },
+      view: sandbox.bjRowView,
+      board: { picture },
+      send: async () => ({ text: 'Table updated.', ok: true }),
+      playMove: async () => {}, onBack: () => {}, ctx: {}
+    }
+    const drawn = evaluate('PlayTable(bjRowProps)')
+    const queued = effects
+    effects = []
+    queued.forEach(run => run())
+    return drawn
+  }
+  const leavesOf = tree => nodes(tree).filter(node => node.type === 'button' && words(node) === 'Leave table')
+
+  const live = page(table)
+  assert.equal(leavesOf(live).length, 1, 'an active solo table draws exactly one Leave table')
+  const top = nodes(live).find(node => node.props && node.props.className === 'games-table-top')
+  assert.ok(top && nodes(top).some(node => node.type === 'button' && words(node) === 'Leave table'),
+    'and the one Leave table sits with the opponent buttons above the felt')
+  const row = nodes(live).find(node => node.props && node.props.className === 'games-actions')
+  assert.ok(row, 'the action row under the board is still drawn on a solo table')
+  assert.ok(nodes(row).some(node => node.type === 'button' && words(node) === 'Hint'),
+    'so Hint is still on the table that offers it: ' + JSON.stringify(nodes(live)
+      .filter(node => node.type === 'button').map(node => words(node))))
+  // The row is what the table can really do: a table that offers no hint draws no Hint, and
+  // still leaves exactly one way out.
+  const noHint = page({ ...table, hint_ok: false })
+  assert.equal(leavesOf(noHint).length, 1, 'one way out, whatever the row holds')
+  assert.equal(findButton(noHint, 'Hint'), undefined, 'a table with no hint on offer draws no Hint')
+  reset()
+  console.log('blackjack: the action row keeps Hint, and Leave table stays one button: passed')
 }
 
 

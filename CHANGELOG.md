@@ -6,6 +6,12 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A solo table keeps its action row: Hint no longer disappears.** While a session was active the
+  page dropped the whole row under the board because the row above already carried **Leave table**,
+  and that row is where **Hint** and **Undo move** live. Blackjack is the only solo table that sets
+  `hint_ok`, so the advice door vanished exactly where it was the only one. Only the duplicate
+  Leave table is dropped now, and the row is drawn only when it holds something.
+  `desktop/src/30-game-page.js`. Guard: `blackjackActionRowContract` in `tests/table_ui_harness.cjs`.
 - **The dealer is never asked for a turn, whatever is in that seat.** A model in the dealer's seat
   used to be handed the play-out as if it were a decision: **two model calls per hand**, both inside
   the person's own request, and a model that answered anything but `stand` wrote a false "Referee
