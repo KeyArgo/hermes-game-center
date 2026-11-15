@@ -163,6 +163,18 @@ def test_double_and_split_are_not_offered_without_the_chips(bj):
     assert "double" not in offered and "split" not in offered
 
 
+def test_a_split_that_is_not_on_offer_is_refused(bj):
+    state = start(bj, ["KS", "9H", "QD", "8H"])
+    bj.play(state, "bet10")
+    before = chips(bj)
+
+    answer = bj.play(state, "split")
+
+    assert chips(bj) == before, "a refused split must not take a second wager"
+    assert "not on offer" in answer, answer
+    assert len(state["player_hands"]) == 1, "and no hand is created"
+
+
 def test_each_split_hand_settles_on_its_own(bj):
     # Hand 1: 8+K = 18 (wins). Hand 2: 8+3 = 11, hit a 2 for 13 (loses). Dealer sits on 17.
     state = start(bj, ["8S", "9H", "8D", "8H", "KD", "3C", "2C"])
