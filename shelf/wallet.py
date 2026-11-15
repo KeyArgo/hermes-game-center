@@ -24,6 +24,24 @@ except ImportError:  # pragma: no cover - Windows has no fcntl, and an unguarded
     import msvcrt
 
 
+# Windows refuses to swap the wallet in while a reader has it open ("Access is denied"); reads do
+# not take the write lock, so a save that lands on a poll is retried for a moment instead of being
+# lost. This module is loaded on its own (load_fresh), so it keeps its own copy of the retry.
+_REPLACE_TRIES = 20
+_REPLACE_WAIT = 0.025
+
+
+def _replace(source: Path, target: Path) -> None:
+    for attempt in range(_REPLACE_TRIES):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == _REPLACE_TRIES - 1:
+                raise
+            time.sleep(_REPLACE_WAIT)
+
+
 def _try_lock(lock) -> None:
     """Take the wallet lock without waiting; OSError when another process holds it."""
     if fcntl is not None:
@@ -144,7 +162,7 @@ class Wallet:
                 yield data
                 tmp = self.path.with_suffix(".tmp")
                 tmp.write_text(json.dumps(data), encoding="utf-8")
-                os.replace(tmp, self.path)
+                _replace(tmp, self.path)
             finally:
                 _unlock(lock)
 

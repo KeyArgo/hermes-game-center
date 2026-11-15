@@ -19,6 +19,7 @@ import threading
 import time
 from pathlib import Path
 
+from . import filelock
 from .directory import Directory, join_line
 from .lobby import looking_rows
 
@@ -181,19 +182,22 @@ class Setup:
             temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
             try:
                 temporary.write_text(json.dumps(body), encoding="utf-8")
-                os.replace(temporary, self.path)
+                filelock.replace(temporary, self.path)
             finally:
                 if temporary.exists():
                     temporary.unlink()
 
     def _read(self) -> dict:
-        if not self.path.is_file():
-            return {}
-        try:
-            loaded = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
+        # Under the same lock as a save: this process never holds the file open while it swaps.
+        with _LOCK:
+            if not self.path.is_file():
+                return {}
+            try:
+                loaded = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return {}
         return loaded if isinstance(loaded, dict) else {}
+
 
 
 def apply_choice(settings: dict, folder: Path) -> dict:

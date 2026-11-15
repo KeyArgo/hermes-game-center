@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import time
 import types
@@ -510,3 +511,30 @@ def test_a_dismissal_that_lands_during_a_poll_is_kept(tmp_path):
     # Once the window has passed, a live row may be recorded again.
     setup.remember_quiet({key: {"at": 100.0 + RATE_SECONDS + 1, "dismissed": False}}, [], now=100.0 + RATE_SECONDS + 1)
     assert Setup(folder).data()["quiet"][key]["dismissed"] is False
+
+
+def test_a_save_survives_windows_refusing_the_replace_while_a_reader_has_the_file_open(tmp_path, monkeypatch):
+    """Windows will not replace a file another thread or process has open ("Access is denied").
+
+    CI on Windows lost a save this way (test_two_writers_cannot_lose_a_choice): a poll was reading
+    setup.json at the moment a save swapped the new file in. A refused swap is retried briefly
+    instead of throwing the person's choice away, and no temporary file is left behind.
+    """
+    import shelf.setup as setup_module
+
+    real_replace = os.replace
+    refusals = {"left": 3}
+
+    def busy_replace(source, target):
+        if refusals["left"]:
+            refusals["left"] -= 1
+            raise PermissionError(5, "Access is denied")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(setup_module.os, "replace", busy_replace)
+    folder = tmp_path / "data"
+    Setup(folder).watch("connect4", True)
+    saved = json.loads((folder / "setup.json").read_text(encoding="utf-8"))
+    assert saved["watched"] == {"connect4": True}
+    assert refusals["left"] == 0, "the refused swaps were retried, not skipped"
+    assert sorted(path.name for path in folder.iterdir()) == ["setup.json"]

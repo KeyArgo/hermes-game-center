@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Windows: a save no longer fails while a poll is reading the file.** Windows refuses to swap a file
+  in while another reader has it open ("Access is denied"), and the setup file and the wallet are
+  read every few seconds without the write lock. Saves to both now retry the swap for a moment
+  instead of losing the change (`shelf/filelock.replace`, `shelf/wallet._replace`); setup reads take the
+  save lock. Found by Windows CI (`test_two_writers_cannot_lose_a_choice`). Guards:
+  `tests/test_first_run.py`, `tests/test_bonus_on_win.py` (both fail on the old code).
+- **The UI harness runs on a CRLF checkout.** A check counted a fixed 700 characters of the bundle and
+  failed on Windows line endings; it now reads normalised text, and `tests/test_harness_crlf.py`
+  runs the whole harness on a CRLF copy so Linux catches the next one.
 - **Blackjack says who is dealing.** The felt only named a dealer when a machine seat was drawn
   as the opponent chip, and a table is created `white=human black=human` — so the state a person
   meets on a fresh table named nobody. One line under the DEALER label now always says it:

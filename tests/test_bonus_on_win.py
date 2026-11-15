@@ -72,3 +72,30 @@ def test_a_won_table_calls_the_bonus_sink_once_and_a_draw_never_does():
         assert drawn["score"]["draws"] == 1
     finally:
         kit.set_bonus_sink(None)
+
+
+def test_a_wallet_save_survives_windows_refusing_the_replace(tmp_path, monkeypatch):
+    """Windows refuses to swap the wallet in while a poll has it open ("Access is denied").
+
+    The Games page and the Inference Auto Play button read the wallet every few seconds without the
+    write lock, so a spin's save can land on a read. The swap is retried briefly; the chips change is
+    never lost and never raised as an error.
+    """
+    spec = importlib.util.spec_from_file_location("wallet_replace_test", REPO / "shelf" / "wallet.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    real_replace = module.os.replace
+    refusals = {"left": 3}
+
+    def busy_replace(source, target):
+        if refusals["left"]:
+            refusals["left"] -= 1
+            raise PermissionError(5, "Access is denied")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(module.os, "replace", busy_replace)
+    wallet = module.Wallet(tmp_path / "wallet.json")
+    before = int(wallet.read()["chips"])
+    wallet.credit(500)
+    assert int(wallet.read()["chips"]) == before + 500
+    assert refusals["left"] == 0

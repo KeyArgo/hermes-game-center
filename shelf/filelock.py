@@ -82,3 +82,24 @@ def file_lock(path: Path, *, best_effort: bool = False):
         finally:
             handle.seek(0)
             msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+# Windows refuses to swap a file in while another thread or process has the target open for
+# reading ("Access is denied", PermissionError). Readers here do not lock, so a save that lands
+# on a poll is tried again for a moment instead of losing the write.
+REPLACE_TRIES = 20
+REPLACE_WAIT = 0.025
+
+
+def replace(source, target) -> None:
+    """os.replace, retried briefly while Windows says the target is held open."""
+    import os
+
+    for attempt in range(REPLACE_TRIES):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == REPLACE_TRIES - 1:
+                raise
+            time.sleep(REPLACE_WAIT)
