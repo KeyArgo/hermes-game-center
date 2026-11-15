@@ -139,7 +139,9 @@ def test_the_local_board_game_shell_wears_the_approved_words():
         "button('Resign'",
         "button('Leave table'",
     ]
-    positions = [part.index(anchor) for anchor in order]
+    # Blackjack's seat buttons carry a Leave table of their own earlier in the part, so the row's
+    # own Leave table is the last one.
+    positions = [part.index(anchor) for anchor in order[:-1]] + [part.rindex(order[-1])]
     assert positions == sorted(positions), f"the action row is out of order: {positions}"
 
     # And the browser invite path is gone from this screen, not hidden behind a fold.
