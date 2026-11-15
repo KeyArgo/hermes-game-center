@@ -5932,7 +5932,9 @@ async function refereeBadgeContract() {
   assert.ok(table.includes('onSetting'), 'the table accepts its own API door')
   assert.ok(table.includes("slotsSetting('/jackpot/autoplay', { on }, onSetting)"), 'the switch uses that door')
   const page = source.slice(source.indexOf("? jsx(drawnView === 'blackjack' ? BlackjackTable : SlotsTable"))
-  assert.ok(page.slice(0, 700).includes('onSetting: (path, body) => ctx.rest'), 'the game page hands over the door')
+  // Line endings are not characters of the call: a Windows checkout writes CRLF, so the window is
+  // measured on the normalised text, wide enough for every prop the felt is handed.
+  assert.ok(page.replace(/\r\n/g, '\n').slice(0, 1500).includes('onSetting: (path, body) => ctx.rest'), 'the game page hands over the door')
   assert.ok(source.includes('onSetting: (path, body) => ctx.rest(path, { method: \'POST\', body })'), 'the wait pane hands it over too')
   console.log('slots: the auto-spin switch writes through a real door: passed')
 }
