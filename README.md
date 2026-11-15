@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=release/1.0.0" alt="CI"></a>
@@ -61,7 +61,7 @@ The **Play** shelf is the curated list in [shelf/curated.json](shelf/curated.jso
 
 **Blackjack** (one hand against the house) and **Slots** (the Jackpot cabinet) are the two Play games that are not boards. The four **talking tables**, the two experiments **Doctrine** and **Olympus Arena**, and the workshop prototypes sit behind the small **Experimental** link.
 
-The page opens on **Play** with the lobby beside it, and four links above it: **How to play**, the **Experimental** shelf, **Settings** and **Community creations** (the **Champions** tab beside *Games* is a placeholder — see below). **Settings** carries your name, the per-game match alerts, table sounds and the Jackpot over-chat switch, and shows the **version chip** for this install at the top — `v1.0.0 · 2026-11-11 · <commit>`, click to copy. The same chip is drawn at the top of the Games screen, so the build on screen can be named at a glance.
+The page opens on **Play** with the lobby beside it, and four links above it: **How to play**, the **Experimental** shelf, **Settings** and **Community creations** (the **Champions** tab beside *Games* is a placeholder — see below). **Settings** carries your name, the per-game match alerts, table sounds and the Jackpot backdrop switch, and shows the **version chip** for this install at the top — `v1.0.0 · 2026-11-11 · <commit>`, click to copy. The same chip is drawn at the top of the Games screen, so the build on screen can be named at a glance.
 
 ### Playing
 
@@ -110,7 +110,9 @@ Two machines sit above the reels, and you can switch between them mid-session: *
 
 A win climbs a ladder of recorded sound tiers — a small CHING, then NICE! and BIG WIN!, then HUGE WIN! with the alarm, and a full JACKPOT of coins — with coins spilling, a chip counter climbing and, for a big one, a gold flash. The overlay and the flash are fixed, click-through and take no focus, so a big win never stops you typing. The sounds are recorded clips (Mixkit's free slot set) with a synthesised fallback; provenance is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-**Show over chat** draws a see-through copy of the cabinet at the top centre of the conversation, over the chat column — anchored to the composer's own slot, so it appears exactly while the conversation does and never over the Games page, Settings or another plugin's page. It is sized from that slot: the slot's width is the limit, the copy takes half of it when both machines are on, and it is drawn no wider than the composer and no taller than 320 px or two fifths of the window, so the conversation behind it stays readable. The size control (25–200%) and opacity control (25–100%) share one setting with the cabinet's own panel, the status bar and Settings, so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
+**Inference Auto Play** is the button at the top of the Games page: one press turns on both halves of "spin while Hermes thinks" — the wallet's automatic spin and the Jackpot backdrop that gives it a machine on screen — and a second press turns both off. It reads both switches rather than remembering the last press, so flipping either one in the cabinet, the status bar or Settings moves the button with it; "on" means both. If the shelf refuses, the button returns to its real state and says so in one line.
+
+**Show as backdrop** draws a see-through copy of the cabinet at the top centre of the conversation, over the chat column — anchored to the composer's own slot, so it appears exactly while the conversation does and never over the Games page, Settings or another plugin's page. It is sized from that slot: the slot's width is the limit, the copy takes half of it when both machines are on, and it is drawn no wider than the composer. **Backdrop size** is a share of the size the copy has always had — 100% is unchanged — and it may now grow to 60% of the window's height (720 px at the very most). **Small**, **Medium** and **Large** beside the slider set 75%, 100% and 160% in one press. The size control (25–200%) and **Backdrop opacity** (25–100%) share one setting with the cabinet's own panel, the status bar and Settings, so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
 
 ### Learn, hint, and your own model
 

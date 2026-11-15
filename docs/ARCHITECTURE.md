@@ -1,6 +1,6 @@
 # Architecture
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
 
 What the pieces are, how a move travels through them, and where the data lives.
 
@@ -60,7 +60,7 @@ The page never judges a move. The same `kit.py` referee answers a click, a typed
 |---|---|
 | `<game_id>/state.json` | The current table for that game: seats, turn, move history, status, result and refusals. Written to a temp file and swapped in, so an interrupted write leaves the last good table. Read through `kit.load()`, which repairs the shelf's own fields (a turn, a score, a move list) when a file from an older build or a hand edit has the wrong types, and leaves the game's own fields as written. |
 | `<game_id>/learn.json`, `lesson.json` | Shipped lesson content, read by the game; not written by play. |
-| `wallet.json` and `wallet.lock` | Chips, points (`bonus`), token counters, slot settings, over-chat size and opacity, streaks and the recent spin feed. |
+| `wallet.json` and `wallet.lock` | Chips, points (`bonus`), token counters, slot settings, backdrop size and opacity, streaks and the recent spin feed. |
 | `setup.json` | The first-run welcome, per-game alert switches, pause and the local AI-seat choice (`shelf/setup.py`). |
 | `players.json` | Local display names, per platform identity (`shelf/who.py`). |
 | `champions/` | Saved champion playbooks (`shelf/champions.py`). |

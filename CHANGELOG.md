@@ -4,6 +4,40 @@ Versions follow `VERSIONING-STANDARD.md`: `plugin.yaml` names the release target
 carries the real identity (version · commit · date · dirty) from `version_stamp.py`, surfaced at the
 top of Game Center's Settings and at `GET /v1/version`.
 
+## Unreleased
+
+- **Inference Auto Play has a button, on the Games screen.** "Spin while Hermes thinks" was two
+  settings in two places — the wallet's autoplay switch (`POST /jackpot/autoplay`) and the Jackpot
+  backdrop switch (`jackpot2.overchat`) — and the shelf refuses a reply's spin while no machine reports
+  itself visible, so either one alone looked like a feature that did nothing. The row beside the chips
+  and points at the top of the Games page now carries one button: **Start Inference Auto Play** turns
+  both on, **Stop Inference Auto Play** turns both off, and the on state is a filled red pill with an
+  **On** word beside it. It is ON only while BOTH are on, because it reads the wallet and the store
+  rather than remembering the last press: a switch flipped in the cabinet, the status bar or Settings
+  moves the button with it. A refused request returns it to its real state and says why in one line.
+  (`desktop/src/70-home.js`, `InferenceAutoPlayButton`.)
+- **The copy over the chat is called a backdrop.** Every label a person reads says backdrop now —
+  **Show as backdrop**, **Backdrop opacity**, **Backdrop size**, **Jackpot backdrop: …**, **Close
+  backdrop** — and the cabinet's auto-spin switch reads **Inference Auto Play (spin when Hermes
+  thinks)**. Only the words changed: every storage key (`jackpot2.overchat`, `jackpot2.alpha`,
+  `jackpot2.size`, `gameshelf.slots.overchat`, `gameshelf.slots.overchat_alpha`,
+  `gameshelf.slots.scale`), data attribute and contribution id is exactly what it was, so no stored
+  choice needs a migration.
+- **The backdrop may grow to 60% of the window.** The stage took 42% of the window and the machines
+  were hard-capped at 320 px, which is why the size slider above 100% changed nothing on screen. The
+  stage is 60% of the window now (720 px absolute ceiling), and 100% still draws exactly the copy it
+  always did: the extra room is what the slider spends above 100%, and the fit stops at the room it was
+  given rather than drawing past it and being clipped. **Small**, **Medium** and **Large** beside the
+  size slider set 75%, 100% and 160% in one press. Still never wider than the chat column, still
+  `pointer-events: none`, still see-through.
+  (`desktop/src/78-overchat-slot.js`, `desktop/src/19-jackpot-overlay.js`.)
+- **Tests.** `tests/inference_autoplay_harness.cjs` (run from the suite by
+  `tests/test_inference_autoplay.py`) draws the real Games page from the built bundle, presses the
+  button and reads the posts and the stored switch, proves a refused request leaves it honest, checks
+  the button follows both switches, pins the stage's 600 px at a 1000 px window, that 100% is still the
+  320 px copy, that 160% is taller, and that the three quick sizes write 0.75 / 1 / 1.6. The same
+  module fails if any of the old over-chat wording comes back into `desktop/src`.
+
 ## 1.0.0 — in catalog review
 
 First public release.

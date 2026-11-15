@@ -1,6 +1,6 @@
 # Configuration
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
 
 Every setting, environment variable and stored preference the code reads, with the default it uses.
 
@@ -33,8 +33,8 @@ All three credential fields are `type: secret`: Hermes shows them in Settings as
 | `setup.json` | `ai` | `null` | `true`/`false` pins the AI-seat choice; `null` follows `allow_ai`. |
 | `wallet.json` | `bet` | `25` | The last slot bet (minimum 25 chips). |
 | `wallet.json` | `overchat` | `false` | Whether the see-through slot cabinet is shown over the conversation, anchored to the composer's underside slot and drawn at the top of the chat column. |
-| `wallet.json` | `overchat_alpha` | `0.2` | Over-chat opacity; accepted values are 0.05–0.6. |
-| `wallet.json` | `overchat_scale` | `1.0` | Over-chat size; accepted values are 0.1–3.0, as a share of the room the slot gives it. |
+| `wallet.json` | `overchat_alpha` | `0.2` | Backdrop opacity; accepted values are 0.05–0.6. |
+| `wallet.json` | `overchat_scale` | `1.0` | Backdrop size; accepted values are 0.1–3.0. 1.0 is the size the copy has always been; above that it grows up to 60% of the window's height. |
 | `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or the Olympus machine. |
 | `online.json` | `on` | `false` | Whether online play is on. |
 

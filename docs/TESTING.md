@@ -1,6 +1,6 @@
 # Testing
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
 
 How to run every suite, what each one covers, and the counts measured on this commit.
 
@@ -13,6 +13,7 @@ node tests/table_ui_harness.cjs                  # the Desktop page's state mach
 node tests/jackpot_overlay_harness.cjs           # the over-chat slot cabinet
 node tests/jackpot2_harness.cjs                  # the Jackpot v2 copy, its switch and the fit
 node tests/jackpot2_look_harness.cjs             # the Jackpot v2 tint, and the ink it keeps readable
+node tests/inference_autoplay_harness.cjs        # the Inference Auto Play button, and the backdrop's height
 node tests/timers_harness.cjs                    # every surface closes its clocks
 node tests/submit_harness.cjs                    # add your own game: the form and the issue it builds
 node tests/slot_fit_regression.mjs               # fits the page, in real headless Chrome
@@ -20,7 +21,7 @@ scripts/test.sh                                  # all of the above, plus the Ch
 scripts/test.sh --fast                           # skip the Chrome fit check
 ```
 
-CI (`.github/workflows/tests.yml`) runs the pytest suite and the six Node harnesses on Python 3.13: `table_ui_harness.cjs`, `jackpot_overlay_harness.cjs`, `jackpot2_harness.cjs`, `jackpot2_look_harness.cjs`, `timers_harness.cjs` and `submit_harness.cjs`. The Chrome fit check is a local/owner check, not a CI step.
+CI (`.github/workflows/tests.yml`) runs the pytest suite and the seven Node harnesses on Python 3.13: `table_ui_harness.cjs`, `jackpot_overlay_harness.cjs`, `jackpot2_harness.cjs`, `jackpot2_look_harness.cjs`, `inference_autoplay_harness.cjs`, `timers_harness.cjs` and `submit_harness.cjs`. `tests/test_inference_autoplay.py` runs the autoplay harness from the suite as well, so it is covered twice. The Chrome fit check is a local/owner check, not a CI step.
 
 ## Counts at this commit
 
@@ -45,6 +46,7 @@ The pane fill check adds one Python test and one Desktop-harness contract to the
 - **Python suite (`tests/`).** The rules engines, the referee and refusals, the table lifecycle, seats and consent, the wallet and points arithmetic, the jackpot and slot odds, lessons and tutorials, the catalogue and curated list, the ship gate, the online client and server, the talking tables, the dashboard API, the page's data contracts, docs stamps and the bundle build. It is offline: no model, no network, no GPU. Three files keep the shelf's own promises: `tests/test_catalog_review_guards.py` (the catalog review's five fixes, each a scan or a seam that fails if the defect returns), `tests/test_corrupt_state.py` (a state file that is not UTF-8, or holds the right keys with the wrong types) and `tests/test_resilience.py` (random legal play in every turn-based game, hostile input to every game, four threads on one table, and a scan that no state file is written in place).
 - **Desktop page harness (`tests/table_ui_harness.cjs`).** The built `desktop/plugin.js` is imported and its pure helpers and rendered contracts are checked: shelves, seats, referee badges, talking tables, the lobby, the model picker, the library and the version chip.
 - **Over-chat slot harness (`tests/jackpot_overlay_harness.cjs`).** The see-through cabinet is drawn only over the conversation, its settings persist, the size slider scales, and there is one centered layer.
+- **Inference Auto Play harness (`tests/inference_autoplay_harness.cjs`, run by `tests/test_inference_autoplay.py`).** The Games page draws the button above the Play shelf, one press posts `/jackpot/autoplay` on and sets the `jackpot2.overchat` switch, a second press turns both off, a refused request leaves the button in its real state with a one-line note, and the button is on only while both switches are. It also pins the backdrop's room (60% of a 1000 px window is 600 px), that 100% still draws the 320 px copy, that 160% draws a taller one, and that Small / Medium / Large set 0.75 / 1 / 1.6. The same module scans `desktop/src` for the old over-chat wording.
 - **Slot fit regression (`tests/slot_fit_regression.mjs`).** Real headless Chrome checks that the cabinet fits the Games page. Needs Chrome; not run by CI.
 - **Over-chat live render (`tests/overchat_slot_live.mjs`).** The one check a stubbed-hooks harness cannot make: it opens the pane with both see-through switches off, clicks the cabinet's own switch (a real React state change, no reload), expects the machine inside the composer slot at a visible size, resizes narrower than the height cap and back, then turns it off. `tests/test_overchat_slot_live.py` runs it from the suite and skips — naming the missing piece — when there is no node, no Chrome or no `uvicorn` for the QA server. GitHub's runner has the first two but not `uvicorn`, so CI skips it; a developer machine runs it.
 - **Pane fill (`tests/pane_fill_checks.mjs`).** The pane beside the chat opens at 720 px and drags from 300 px to 1200 px, so its contents must answer to the pane's own width and not the window's. Headless Chrome lays the real pane out at 300, 320, 640, 720 and 1000 px and measures it: the pane root is its own query container, the game view and the lobby each use at least 90% of the pane, nothing scrolls sideways, the sections sit in two columns once the container is 640 px wide and stack below that, the game tiles fill their column, and the board fills its column with the turn beside it. `tests/test_pane_fill.py` runs it from the ordinary suite (about 25 s) and skips, naming the missing piece, when there is no node, no Chrome or no `uvicorn`. `paneFillContract` in `tests/table_ui_harness.cjs` pins the same rules on the rendered tree — the container declaration, the wide rules on the pane's own classes, and that no element caps its own width in pixels.

@@ -1,6 +1,6 @@
 # Development
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
 
 Repo layout, how to build the Desktop bundle, how to run each suite, and what CI does.
 
@@ -50,6 +50,7 @@ node tests/table_ui_harness.cjs                  # Desktop page state machine
 node tests/jackpot_overlay_harness.cjs           # over-chat slot cabinet
 node tests/jackpot2_harness.cjs                  # Jackpot v2 copy, switch and fit
 node tests/jackpot2_look_harness.cjs             # Jackpot v2 tint and contrast
+node tests/inference_autoplay_harness.cjs        # Inference Auto Play button and backdrop height
 node tests/pane_fill_checks.mjs                  # the pane beside the chat fills its frame
 ```
 

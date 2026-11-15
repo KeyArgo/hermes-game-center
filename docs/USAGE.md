@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -9,6 +9,12 @@ A walkthrough of each user-facing feature, from the shelf to a finished game.
 In Hermes Desktop, choose **Games** in the sidebar. The Play shelf opens with the lobby beside it. The version chip at the top names this install: `v1.0.0 · 2026-11-11 · <commit>`, click to copy.
 
 ![The Play shelf](../screenshots/game-center-home.png)
+
+Above the Play shelf, beside your chips and points, is **Inference Auto Play** — **Start Inference Auto Play** turns the
+wallet's automatic spin and the Jackpot backdrop on together, so the machine really spins each time Hermes starts
+thinking; **Stop Inference Auto Play** turns both off. The button follows both switches: if either is turned off in the
+cabinet, the status bar or Settings, it reads **Start** again. A refused request returns it to its real state and says why
+in one line.
 
 The eleven Play cards are the curated list. **Experimental**, **Settings** and **Community creations** are side links above them. `/games` in chat lists the same shelf as text.
 
@@ -81,7 +87,7 @@ Open **Slots** on the Play shelf. Pick a bet (25 chips up) and press **Spin**.
 - **Classic** is a nine-window, five-payline machine; **Hermes Olympus** is one line on three Greek reels. You can switch mid-session.
 - **Auto-spin** spins while Hermes is working: one per reply and one per tool call, only while a machine is on screen.
 - **Auto-bet** sizes each stake by what the reply cost.
-- **Show over chat** draws a see-through copy at the top centre of the conversation, centred over the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. Its size and opacity controls are shared by the cabinet, the status bar and Settings.
+- **Show as backdrop** draws a see-through copy at the top centre of the conversation, centred over the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. **Backdrop size** and **Backdrop opacity** are shared by the cabinet, the status bar and Settings. 100% is the size the copy has always been; it may grow to 60% of the window's height, and **Small** / **Medium** / **Large** set 75% / 100% / 160% in one press.
 
 The screen prints no odds. The mechanics and payouts are in `shelf/jackpot.py` and `shelf/slotplay.py`; the audit script is `scripts/slot-audit.py`.
 
@@ -109,7 +115,7 @@ Both live on the Experimental shelf; their cards are locked for now.
 
 ## Settings
 
-**Settings** holds your display name, the per-game match-alert switches, **Pause all of these**, the AI-seat switch, table sounds and the Jackpot over-chat switch. Every choice stays on this machine.
+**Settings** holds your display name, the per-game match-alert switches, **Pause all of these**, the AI-seat switch, table sounds and the Jackpot backdrop switch. Every choice stays on this machine.
 
 ![Game Center settings](../screenshots/game-center-settings.png)
 
