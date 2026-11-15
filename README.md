@@ -76,7 +76,7 @@ The page opens on **Play** with the lobby beside it, and four links above it: **
 - Go — `move e5`, a1 at the top left; `pass` twice ends the game.
 - Hex — `move f6`, a1 at the top left.
 - Sea Battle — `place carrier a1 h` and `fire e5`; on the page, drag a ship onto your waters, a click turns it.
-- Blackjack — `hit`, `stand`, `double`; Slots — `bet50`, then `spin`.
+- Blackjack — `hit`, `stand`, `double`, `split`; Slots — `bet50`, then `spin`.
 
 In Hermes Desktop, **Games** in the sidebar opens the graphical table and you move by clicking the board. The page does not judge moves; it sends the move to the referee, which does.
 

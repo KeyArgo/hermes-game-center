@@ -98,6 +98,32 @@ Three more fixes, and one sweep of the state files:
   the README's network bullet says so now, and `tests/test_catalog_review_guards.py` fails if any
   host the shipped code names is missing from it.
 
+### Fourth pass
+
+- **Blackjack deals a real Split.** Two cards of the same rank now offer **Split**: the rules
+  (`blackjack/game.py`) put a second wager of the same size on the felt and deal one card to each
+  hand, and the round keeps two or more hands, each with its own cards, wager, total and result.
+  The hand being played comes first and is named on the felt; the dealer plays only once every hand
+  is finished, and not at all when they all busted. Split aces take exactly one card each, and an
+  ace with a ten after a split is 21 that pays even money, not a 3:2 blackjack. Pairs split on the
+  same rank only (a king and a queen sit behind `SPLIT_EQUAL_VALUE`, off by default); resplitting
+  aces is off (`RESPLIT_ACES`); double after a split is allowed, never on split aces; a round holds
+  up to four hands (`MAX_HANDS`).
+- **Double was already right, and stays right.** One card, then that hand stands, for twice its
+  wager; it is offered on the first two cards only and needs the chips to match. The doubled hand
+  now carries its original bet and total wager as separate numbers, so the felt can say
+  "Original Bet: 1,000 | Total Wager: 2,000 (Doubled)" without either number becoming the next
+  hand's bet.
+- **The felt draws every hand.** `desktop/src/17-blackjack.js` draws each hand with its own wager
+  and result, marks the one being played, offers **Split** as a move of its own (drawn disabled when
+  the rules do not offer it) and states the round's net as the sum of its hands. `picture()` carries
+  `player_hands`, `active_hand`, `total_wager` and `original_bet`; `legal()`, `parse()`, `bot()` and
+  `explain()` know `split` too.
+- **Older saves keep playing.** A `state.json` written before Split holds one hand in
+  `state["hand"]`; `blackjack/game.py` lifts it into a hand record on read, so an interrupted
+  session loads and settles exactly as before. `tests/test_blackjack_split.py` covers the round;
+  `tests/table_ui_harness.cjs` fails on a build without the Split button.
+
 ## Development history (before 1.0.0)
 
 The notes below were written during development, before the first public release.
