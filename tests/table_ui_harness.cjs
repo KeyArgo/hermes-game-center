@@ -6989,5 +6989,13 @@ async function gcextrasContract() {
     'the net line is the sum of the hands: ' + words(settled))
   assert.ok(words(settled).includes('Win') && words(settled).includes('Lose'),
     'and each hand carries its own result')
+  // A split round can be won and lost at once: 'mixed' says nothing about the money, so the
+  // sound follows the net - the sum of the hands.
+  assert.equal(evaluate("bjRoundSound({ outcome: 'mixed', won: 10 })"), 'win',
+    'a split round that came out ahead cheers')
+  assert.equal(evaluate("bjRoundSound({ outcome: 'mixed', won: -10 })"), 'lose',
+    'one that came out behind does not')
+  assert.equal(evaluate("bjRoundSound({ outcome: 'win', won: 10 })"), 'win')
+  assert.equal(evaluate("bjRoundSound({ outcome: '', won: 0 })"), 'deal')
   console.log('blackjack split: two hands, the active one marked, Split offered only when legal: passed')
 }

@@ -31,6 +31,18 @@ function bjChips(value) {
   return String(Math.round(Number(value) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+// One sound per settled round. A split round can be won and lost at once, so the net - the
+// sum of its hands - picks the sound; the round's own word is 'mixed' and says nothing about
+// whether the person came out ahead.
+function bjRoundSound(picture) {
+  const outcome = (picture && picture.outcome) || ''
+  if (!outcome) return 'deal'
+  if (outcome === 'push') return 'push'
+  if (outcome === 'win' || outcome === 'blackjack') return 'win'
+  if (outcome === 'mixed') return Number((picture && picture.won) || 0) > 0 ? 'win' : 'lose'
+  return 'lose'
+}
+
 function bjResultWord(result) {
   if (result === 'blackjack') return 'Blackjack 3:2'
   if (result === 'win') return 'Win'
@@ -150,10 +162,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
     const first = !heard.current
     heard.current = soundKey
     if (first) return
-    if (picture.outcome === 'push') gamesSound('push')
-    else if (picture.outcome === 'win' || picture.outcome === 'blackjack') gamesSound('win')
-    else if (picture.outcome) gamesSound('lose')
-    else gamesSound('deal')
+    gamesSound(bjRoundSound(picture))
   }, [soundKey])
   // A split round is drawn hand by hand: the rules send every hand's cards, total, wager and
   // result, and the felt names the one being played. A picture from a table that never split
