@@ -551,6 +551,15 @@ def _settle_round(state: dict) -> str:
     net = [0, 0]
     results = []
     for hand in hands:
+        owner = _owner(hand)
+        wager = int(hand["wager"])
+        if hand.get("result"):
+            # Already settled and paid: a save that still reads phase "play" must never collect
+            # this hand's chips twice. The result it carries is the one that was paid.
+            results.append(str(hand["result"]))
+            net[owner] += _hand_net(hand)
+            hand["done"] = True
+            continue
         total = _hand_value(hand["cards"])
         natural = _is_natural(hand)
         if total > 21:
@@ -569,8 +578,6 @@ def _settle_round(state: dict) -> str:
             result = "lose"
         hand["done"] = True
         hand["result"] = result
-        owner = _owner(hand)
-        wager = int(hand["wager"])
         paid[owner] += _payout(result, wager)
         net[owner] += _payout(result, wager) - wager
         results.append(result)
@@ -792,6 +799,10 @@ def legal(state: dict) -> list[str]:
         return ["stand"]
     if state.get("phase") == "play":
         hand = _live_hand(state)
+        if hand is not None and hand.get("done"):
+            # A finished hand has no move left. A save that still reads "play" (a write cut
+            # short) must not let a paid hand be played, or collected, a second time.
+            return []
         held = _stack(state, _owner(hand)) if hand is not None else 0
         if hand is not None and hand.get("split_aces"):
             # A split ace has had its one card: it stands, unless a resplit is on offer.
@@ -888,6 +899,13 @@ def play(state: dict, move) -> str:
     if state.get("phase") == "dealer":
         state["turn"] = "white"
         return _dealer_plays(state)
+    # A settled hand is not playable, whatever the phase says: a save that still reads "play"
+    # with a paid hand in it (a write cut short, a hand-edited file) is refused here too, before
+    # any move can add a card or take chips for it.
+    finished = _live_hand(state) if state.get("phase") == "play" else None
+    if finished is not None and finished.get("done"):
+        state["note"] = "That hand is finished. Place your next bet."
+        return state["note"]
     # A move the table is not offering is refused here too, not only hidden in the UI:
     # after a hand is settled the phase goes back to betting, so a stray "double" must
     # never touch a finished hand's chips or stake.

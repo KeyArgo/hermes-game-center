@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A settled hand cannot be played, or paid, a second time.** What was playable was decided from
+  `phase` alone, never from a hand's own `done` flag, and `_settle_round` paid every hand in the list
+  again whatever its `result` already said. A save that still read `phase: "play"` with a paid hand
+  in it (a write cut short, a hand-edited file) let that hand take another card and collect again.
+  `legal()` and `play()` now refuse a finished hand ("That hand is finished. Place your next bet.",
+  a refusal the UI reads as one), and `_settle_round` skips any hand that already carries a result.
+  Not reachable from the UI (the round goes back to `bet` in the same write), so this is defensive.
+  `blackjack/game.py`, `dashboard/plugin_api.py`. Guard: `tests/test_blackjack_damaged_save.py`
+  (`test_a_settled_hand_cannot_be_played_again`, `test_a_round_is_never_settled_twice`).
 - **A repaired guest record is kept.** Player 2's table-only stack (`state["guest"]`) is written by
   `setup` alone, so a hand-edited or half-written save can read `players: 2` with no guest at all.
   `_guest()` rebuilt that record and returned it **without storing it**, so every caller worked on a

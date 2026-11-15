@@ -1017,6 +1017,7 @@ _REFUSAL_PREFIXES = (
     "No game in progress", "No game named", "Join from your own chat", "The AI here",
     "Name the AI seat", "Your agent", "Your own agent", "It's ", "Hints are only",
     "No lesson", "That was the last step", "Lesson steps are", "Nothing",
+    "That hand is finished",
 )
 
 
