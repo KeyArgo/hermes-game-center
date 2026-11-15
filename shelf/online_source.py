@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -30,6 +29,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urlsplit
 
+from shelf import filelock
 from shelf.kitref import kit
 from shelf.who import suggest_name
 
@@ -275,7 +275,7 @@ class Online:
             path = self.folder / STATE_FILE
             temporary = path.with_suffix(".json.tmp")
             temporary.write_text(json.dumps(self._state), encoding="utf-8")
-            os.replace(temporary, path)
+            filelock.replace(temporary, path)
         except OSError:
             log.warning("the online-play state could not be saved", exc_info=True)
 

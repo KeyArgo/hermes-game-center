@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from . import filelock
+
 _FILE = "directory.json"
 _STATUSES = {"live", "starting", "stopped", "missing"}
 
@@ -49,7 +51,7 @@ class Directory:
         self.folder.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(state), encoding="utf-8")
-        os.replace(temporary, self.path)
+        filelock.replace(temporary, self.path)
 
     def unit(self, unit_id: str) -> dict[str, Any]:
         return dict(self.load()["units"].get(unit_id) or {})

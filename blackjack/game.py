@@ -92,6 +92,22 @@ def _wallet() -> "wallet.Wallet":
     return _WALLET
 
 
+def chips_now() -> int:
+    """What the wallet holds, for the table's own undo when a save never lands."""
+    return int(_wallet().read()["chips"])
+
+
+def chips_refund(chips: int) -> None:
+    """Put chips back after a state that could not be written: the bet was never staked.
+
+    The table calls this when Windows refuses the state swap (a poll has the file open) after a
+    bet has already left the wallet. It is a plain credit: no hand is counted, because no hand
+    was played.
+    """
+    if int(chips) > 0:
+        _wallet().credit(int(chips))
+
+
 def create(root: Path, settings: dict | None = None):
     settings = settings or {}
     root = Path(root)

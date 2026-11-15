@@ -12,6 +12,7 @@ from pathlib import Path
 _FILE = "installed.json"
 _ID_MAX = 32
 
+from . import filelock
 from .filelock import file_lock
 
 log = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class Library:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 handle.write(payload)
-            os.replace(temporary, self.path)
+            filelock.replace(temporary, self.path)
         finally:
             if os.path.exists(temporary):
                 try:

@@ -78,6 +78,17 @@ def use_wallet(path: Path) -> None:
     _wallet = wallet_module.Wallet(Path(path))
 
 
+def chips_now() -> int:
+    """What the wallet holds, for the table's own undo when a save never lands."""
+    return int(_wallet.read()["chips"])
+
+
+def chips_refund(chips: int) -> None:
+    """Put chips back after a state that could not be written: the spin was never paid for."""
+    if int(chips) > 0:
+        _wallet.credit(int(chips))
+
+
 def fresh() -> dict:
     # A fresh table is playable right away: the spin costs the wallet's bet, so no
     # bet move is needed first. A table read as "idle" looks never started to the

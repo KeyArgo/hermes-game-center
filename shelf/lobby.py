@@ -6,10 +6,10 @@ When the referee profile sits in a HermesNet IRC channel, everyone in that chann
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 
+from . import filelock
 from .who import Player
 
 _KEEP = 40
@@ -187,4 +187,4 @@ def _save(folder: Path, state: dict) -> None:
     path = folder / _FILE
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(state), encoding="utf-8")
-    os.replace(temporary, path)
+    filelock.replace(temporary, path)

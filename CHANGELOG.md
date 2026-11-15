@@ -6,6 +6,20 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Windows: the retry reaches the table state, and a save that fails costs no chips.** The Windows
+  retry covered `setup.json` and `wallet.json` but not `state.json`, so a reader holding a table open
+  turned a move into an unhandled error **after** the wallet had taken the bet: 100 chips gone, the
+  table with no record of it, and a `state.json.tmp` left behind. `kit.write` and `kit.save` (and the
+  remembered level) now swap through `shelf/filelock.replace`; a failed swap removes its temp file;
+  and a command whose state cannot be written **puts the chips back** for every game that stakes them
+  (`chips_now` / `chips_refund` in `blackjack/game.py` and `slots/game.py`). The dashboard's command
+  route catches the `OSError` and answers "The table could not be saved … Nothing was staked" instead
+  of a 500. The remaining bare swaps in `shelf/` (champions, directory, library, playbook,
+  online_source, lobby, tournament, who) use the same retry, and the budget is now **about two
+  seconds** (40 × 50 ms, was 20 × 25 ms = 0.475 s) in both `shelf/filelock.py` and
+  `shelf/wallet.py`. Guards: `tests/test_save_retry.py` (a save that survives three refusals in
+  every module, a bet and a spin refunded when the save never lands, the dashboard's words, the
+  budget).
 - **A solo table keeps its action row: Hint no longer disappears.** While a session was active the
   page dropped the whole row under the board because the row above already carried **Leave table**,
   and that row is where **Hint** and **Undo move** live. Blackjack is the only solo table that sets

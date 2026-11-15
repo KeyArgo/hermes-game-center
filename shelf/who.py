@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import unicodedata
 from pathlib import Path
+
+from . import filelock
 
 
 # The word filter every name passes through. Short and conservative, matched on
@@ -163,7 +164,7 @@ class NameBook:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(data), encoding="utf-8")
-        os.replace(temporary, self.path)
+        filelock.replace(temporary, self.path)
 
 
 def identify(platform: object, source: object, book: NameBook) -> Player:

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import time
 import unicodedata
 import uuid
 from pathlib import Path
+
+from . import filelock
 
 MAX_NAME = 32
 MAX_MOTTO = 80
@@ -157,7 +158,7 @@ class ChampionStore:
             temporary = self.folder / ('.' + uuid.uuid4().hex + '.tmp')
             try:
                 temporary.write_text(json.dumps(champion, ensure_ascii=False), encoding='utf-8')
-                os.replace(temporary, path)
+                filelock.replace(temporary, path)
             finally:
                 temporary.unlink(missing_ok=True)
             return champion, ''

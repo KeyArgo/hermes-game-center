@@ -6,13 +6,12 @@ import copy
 import itertools
 import json
 import logging
-import os
 import threading
 import time
 import uuid
 from pathlib import Path
 
-from . import elo, myth
+from . import elo, filelock, myth
 from . import playbook
 from .champions import persona
 from .kitref import kit
@@ -339,7 +338,7 @@ def _write(path, data):
     temporary = path.parent / ('.' + uuid.uuid4().hex + '.tmp')
     try:
         temporary.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
-        os.replace(temporary, path)
+        filelock.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 

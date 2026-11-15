@@ -7,6 +7,7 @@ import re
 import time
 import uuid
 from pathlib import Path
+from . import filelock
 from .champions import clean_text, persona, story
 
 CAP_TOTAL_WORDS = 250
@@ -69,7 +70,7 @@ def _write(path, data):
     tmp = path.parent / ('.' + uuid.uuid4().hex + '.tmp')
     try:
         tmp.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
-        os.replace(tmp, path)
+        filelock.replace(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
 

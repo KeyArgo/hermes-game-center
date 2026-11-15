@@ -12,6 +12,7 @@ Real failure modes the code handles or the README already names, and what to do 
 | The page sits on **Loading Game Center…** | The page is waiting for `/api/view`; on a cold start the catalogue imports every game module first. | Wait a few seconds. If it never arrives, reload desktop plugins and check the Hermes log for the plugin. |
 | **404 Plugin not found** on Windows | Older builds imported `fcntl` unguarded in the wallet. Fixed on 2026-11-11. | Update to this version; the wallet now falls back to `msvcrt` on Windows. |
 | A card opens but the board is empty | The game's `game.py` did not import. | The card normally says why in one sentence. Check that the game folder has `game.json` and an entry file inside its own folder. |
+| **The table could not be saved** | Another program (a poll, an antivirus scan, a network folder) held the table's `state.json` open for longer than the two-second retry. | Nothing was staked: the chips a bet took are put back and no half-written file is left. Do the move again. Every save — the table state, the wallet, champions, the library, the lobby, tournaments, the playbook and the online source — retries the swap for about two seconds (`shelf/filelock.replace`). |
 
 ## AI seats, hints and models
 

@@ -86,9 +86,11 @@ def file_lock(path: Path, *, best_effort: bool = False):
 
 # Windows refuses to swap a file in while another thread or process has the target open for
 # reading ("Access is denied", PermissionError). Readers here do not lock, so a save that lands
-# on a poll is tried again for a moment instead of losing the write.
-REPLACE_TRIES = 20
-REPLACE_WAIT = 0.025
+# on a poll is tried again for a moment instead of losing the write. The budget is about two
+# seconds in total: a poll, an antivirus scan or a network-folder reader can hold the file for
+# longer than the first half-second, and a save that gives up is a move the person has to repeat.
+REPLACE_TRIES = 40
+REPLACE_WAIT = 0.05
 
 
 def replace(source, target) -> None:

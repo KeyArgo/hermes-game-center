@@ -7,7 +7,6 @@ import copy
 import inspect
 import json
 import logging
-import os
 import queue
 import random
 import re
@@ -212,7 +211,7 @@ def remember_level(root: Path, chosen: str, levels: tuple[str, ...] = LEVELS) ->
         folder.mkdir(parents=True, exist_ok=True)
         temporary = folder / "level.json.tmp"
         temporary.write_text(json.dumps({"level": chosen}), encoding="utf-8")
-        os.replace(temporary, folder / "level.json")
+        _swap_state(temporary, folder / "level.json")
     except OSError:
         log.debug("the chosen level could not be remembered", exc_info=True)
 
@@ -288,13 +287,31 @@ def write(root: Path, state: dict) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     temporary = folder / "state.json.tmp"
     temporary.write_text(json.dumps(state), encoding="utf-8")
-    os.replace(temporary, folder / "state.json")
+    try:
+        _swap_state(temporary, folder / "state.json")
+    except OSError:
+        # A swap that never landed must not leave its temp file behind: the next write would
+        # find a stale one, and a person watching the folder sees a save that never happened.
+        with contextlib.suppress(OSError):
+            temporary.unlink()
+        raise
+
+
+def _swap_state(source: Path, target: Path) -> None:
+    """os.replace, retried while Windows says the target is held open (shelf/filelock.py).
+
+    Windows refuses to swap a file in while another process has it open for reading - and every
+    surface here reads state.json without taking the write lock, so a move that lands on a poll
+    used to be lost. kit loads the same module for its lock, however kit itself was loaded.
+    """
+    filelock = _filelock_module()
+    filelock.replace(source, target)
 
 
 _FILELOCK_IMPORT_LOCK = threading.Lock()
 
 
-def _file_lock():
+def _filelock_module():
     """Load shelf/filelock.py beside this file, however kit itself was loaded."""
     import importlib.util
     import sys
@@ -302,12 +319,12 @@ def _file_lock():
     name = "hermes_gameshelf_filelock"
     found = sys.modules.get(name)
     if found is not None:
-        return found.file_lock
+        return found
     with _FILELOCK_IMPORT_LOCK:
         # Another thread may have finished the load while we waited.
         found = sys.modules.get(name)
         if found is not None:
-            return found.file_lock
+            return found
         path = Path(__file__).resolve().parent / "shelf" / "filelock.py"
         spec = importlib.util.spec_from_file_location(name, path)
         if spec is None or spec.loader is None:
@@ -317,7 +334,11 @@ def _file_lock():
         # a half-loaded module.
         spec.loader.exec_module(module)
         sys.modules[name] = module
-        return module.file_lock
+        return module
+
+
+def _file_lock():
+    return _filelock_module().file_lock
 
 
 @contextlib.contextmanager
@@ -625,6 +646,35 @@ def set_bonus_sink(fn) -> None:
     BONUS_SINK = fn
 
 
+def _chips(rules) -> int | None:
+    """What the game's own wallet holds, when it keeps one (blackjack and the slots do).
+
+    ``chips_now`` is the game's door to its chips; a board game has none and nothing is read.
+    """
+    read = getattr(rules, "chips_now", None)
+    if not callable(read):
+        return None
+    try:
+        value = read()
+        return int(value) if isinstance(value, (int, float, str)) else None
+    except (TypeError, ValueError):  # a game whose chips cannot be read has none to give back
+        log.debug("the chips could not be read", exc_info=True)
+        return None
+
+
+def _refund(rules, held: int | None) -> None:
+    """Give back what this request took from the wallet when its state was never written."""
+    give = getattr(rules, "chips_refund", None)
+    if held is None or not callable(give):
+        return
+    try:
+        left = _chips(rules)
+        if left is not None and left < held:
+            give(held - left)
+    except Exception:  # noqa: BLE001 - the save failure is the error worth reporting
+        log.debug("the chips could not be given back", exc_info=True)
+
+
 class Table:
     """Two seats, white moves first. ``rules`` is a module with the game's rules.
 
@@ -632,6 +682,10 @@ class Table:
     fresh() -> dict, parse(words) -> move | None, legal(state) -> list,
     play(state, move) -> note, bot(state) -> move, show(move) -> str, draw(state) -> list[str].
     play() sets state turn, status ("active", "win", "draw") and winner.
+
+    A game that stakes chips (blackjack, the slots) also provides ``chips_now() -> int`` and
+    ``chips_refund(chips)``: the table puts a bet back when the state it was staked on could not
+    be written to disk. A board game has neither, and nothing is read for it.
     """
 
     def __init__(self, root: Path, rules) -> None:
@@ -656,6 +710,20 @@ class Table:
             "lesson", "learn", "review", "hint",
         }:
             return "Refused (consent_required)."
+        # What the table's own wallet held before this request. Windows can refuse the state swap
+        # while a poll has the file open, and a bet taken for a move that was never saved has to
+        # come back: the chips are the person's, and a lost save must not cost them.
+        held = _chips(rules)
+        try:
+            said = self._dispatch(head, rest, source, player)
+        except OSError:
+            _refund(rules, held)
+            raise
+        return self.help() if said is None else said
+
+    def _dispatch(self, head: str, rest: list[str], source: str, player) -> str | None:
+        """One command, inside the table's file lock. None when nothing here handles it."""
+        rules = self.rules
         with locked(self.root):
             state = load(self.root)
             if head == "new":
@@ -697,7 +765,7 @@ class Table:
                 return self._abandon(state, player)
             if head == "review":
                 return self._review(state, player)
-        return self.help()
+        return None
 
     def help(self) -> str:
         rules = self.rules

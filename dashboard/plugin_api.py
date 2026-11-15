@@ -1045,7 +1045,18 @@ def command(body: dict | None = None) -> dict:
             "ok": False,
         }
     line = raw if importing else raw.replace("\n", " ")
-    text = _say(line)
+    try:
+        text = _say(line)
+    except OSError:
+        # Windows refuses to swap a table's file in while another program has it open. The table's
+        # own command already put the chips back, so the person reads a plain sentence instead of a
+        # 500 - and nothing was staked for a move that was never saved.
+        log.warning("a table could not be saved while running a command", exc_info=True)
+        return {
+            "text": "The table could not be saved: another program may have its file open. "
+                    "Nothing was staked, so the chips are where they were. Try again in a moment.",
+            "ok": False,
+        }
     answer: dict[str, Any] = {"text": text, "ok": not _is_refusal(text)}
     # The board this command left behind, so the table paints the moment the move lands instead of
     # asking again. Sea Battle fires one shot per click, and the extra round trip was most of the

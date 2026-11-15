@@ -26,9 +26,10 @@ except ImportError:  # pragma: no cover - Windows has no fcntl, and an unguarded
 
 # Windows refuses to swap the wallet in while a reader has it open ("Access is denied"); reads do
 # not take the write lock, so a save that lands on a poll is retried for a moment instead of being
-# lost. This module is loaded on its own (load_fresh), so it keeps its own copy of the retry.
-_REPLACE_TRIES = 20
-_REPLACE_WAIT = 0.025
+# lost. This module is loaded on its own (load_fresh), so it keeps its own copy of the retry, and
+# the budget matches shelf/filelock.py: about two seconds in total.
+_REPLACE_TRIES = 40
+_REPLACE_WAIT = 0.05
 
 
 def _replace(source: Path, target: Path) -> None:
