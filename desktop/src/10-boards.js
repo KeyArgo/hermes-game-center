@@ -154,7 +154,7 @@ function startingPicture(id) {
   }
   // Card and slot tables draw their own screens; the preview only has to say which one.
   if (id === 'blackjack') {
-    return { view: 'blackjack', game: id, preview: true, status: 'idle', phase: 'bet', hand: [], dealer: [], legal: [], bets: [], chips: 0, bet: 0, outcome: '' }
+    return { view: 'blackjack', game: id, preview: true, status: 'idle', phase: 'bet', hand: [], dealer: [], legal: [], bets: [], chips: 0, bet: 0, outcome: '', two_players: true }
   }
   if (id === 'slots') {
     return { view: id, game: id, preview: true, status: 'idle', reels: ['7', '7', '7'], legal: [], history: [], paytable: [], chips: 0, bet: 0, last_win: 0 }

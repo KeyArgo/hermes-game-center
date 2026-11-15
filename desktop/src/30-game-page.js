@@ -208,6 +208,40 @@ function opponentWords(pictured, view, solo, opts) {
   }
 }
 
+// Who is dealing, in the words the felt puts beside its DEALER label.
+//
+// Blackjack's dealer seat is the black side, and a fresh table is created with nobody in
+// it yet: the "You vs ..." chip names no opponent then, which is how the person ended up
+// unable to tell whether their own model was playing the dealer's cards. This line is
+// drawn in every setup, and it says what each dealer really costs: the built-in computer
+// answers inside the move, the person's Hermes model thinks before it deals.
+function dealerWords(pictured, view) {
+  const seats = (pictured && pictured.seats) || []
+  const seat = seats.find(item => item.side === 'black') || null
+  const given = String((pictured && pictured.dealer_kind) || '')
+  const kind = ['agent', 'local'].includes(given) ? given : String((seat && seat.kind) || 'human')
+  const model = String((view && view.opponent && view.opponent.model) || '')
+  if (kind === 'agent') {
+    return {
+      kind: 'agent',
+      who: `Hermes model${model ? ` ${model}` : ''}`,
+      pace: 'thinks each turn',
+      why: `Your Hermes model${model ? ` (${model})` : ''} deals these cards, one call per hand — it thinks before it fires.`
+        + (model ? '' : ' Pick the model in Hermes Settings → Models → "Game Shelf opponent".')
+    }
+  }
+  if (kind === 'local') {
+    return {
+      kind: 'local', who: 'Computer', pace: 'instant',
+      why: 'The built-in computer deals these cards by the house rules and answers at once; it never uses your chat model.'
+    }
+  }
+  return {
+    kind: 'house', who: 'Computer', pace: 'house rules, instant',
+    why: 'The house deals these cards: the table plays the dealer out itself, at once, and no model is asked.'
+  }
+}
+
 // The label itself: one chip, with the whole story behind it on hover.
 function OpponentLine({ pictured, view, solo, shared, style }) {
   const said = opponentWords(pictured, view, solo, { shared })
@@ -459,11 +493,27 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // comes back and nothing is thrown away. While a game IS active the row's "Leave table"
   // asks once and says that leaving forfeits the game — a resignation
   // against another person, and a thrown-away board against the computer or a shared keyboard.
+  // A session table between hands is the exception: nothing is on the felt, so leaving
+  // costs nothing and the table never threatens a forfeit it cannot take. A hand being
+  // played is said in the hand's own words - a bet is lost, nobody resigns.
+  const sessionPhase = String((pictured && pictured.phase) || '')
+  const leavingCostsNothing = Boolean(solo) && sessionPhase === 'bet'
+    && !(pictured && pictured.mid_round)
+  const leavingMidHand = Boolean(solo) && ['play', 'deal', 'dealer'].includes(sessionPhase)
   const leaveTable = async () => {
     if (status !== 'active' || !ownSeats.length) {
       alive.current = false
       stopWatching()
       onBack()
+      return
+    }
+    if (leavingCostsNothing) {
+      const ok = await command(`${game.id} abandon`)
+      if (ok && alive.current) setLeftSeat(true)
+      return
+    }
+    if (leavingMidHand) {
+      ask('leave table', 'Leave this table? The hand on the felt is still being played, so its bet is lost.', `${game.id} abandon`, () => setLeftSeat(true), 'Leave', 'Keep playing')
       return
     }
     if (againstPeople) {
@@ -674,11 +724,17 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // session standing on the felt first - the table's own rule refuses a new one while
   // hands are played. Nothing staked yet is one press; a session in play asks once, the
   // same two-press rule the side pane keeps.
+  // A solo table that can seat a second person on this screen says so on its own board
+  // (picture.two_players), so the third way in is offered without naming any game here.
+  const seatsTwoPeople = Boolean(pictured && pictured.two_players)
   const soloNew = who => {
-    const line = `allow-ai ${game.id} black=${who === 'agent' ? 'agent' : 'local'} level=${levelId}`
-    const after = () => setLocalSetup(who === 'agent' ? 'human-agent' : 'human-bot')
+    const dealer = who === 'agent' ? 'agent' : 'local'
+    // Two people on this screen is a table of its own: the dealer is the built-in computer
+    // and the second person gets a table-only stack, so a guest never spends the wallet.
+    const line = `allow-ai ${game.id} black=${dealer} level=${levelId}${who === 'two' ? ' players=2' : ''}`
+    const after = () => setLocalSetup(who === 'agent' ? 'human-agent' : who === 'two' ? 'two-people' : 'human-bot')
     if (status === 'active' && Number(pictured.plies || 0) > 0) {
-      ask('new game', `Starting a new game ends this session and deals a new one against ${who === 'agent' ? 'your Hermes model' : 'the computer'}. Chips already bet on a settled hand stay settled.`, `${game.id} abandon`, () => command(line))
+      ask('new game', `Starting a new game ends this session and deals a new one against ${who === 'agent' ? 'your Hermes model' : who === 'two' ? 'the dealer, with a second player on this screen' : 'the computer'}. Chips already bet on a settled hand stay settled.`, `${game.id} abandon`, () => command(line))
       return
     }
     command(line).then(ok => { if (ok && alive.current) after() })
@@ -687,15 +743,23 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
     'data-gm-solo-opponents': '1',
     style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' },
     children: [
-      button('New game vs computer', () => soloNew('computer'), lock({
+      button(seatsTwoPeople ? 'Play vs computer dealer' : 'New game vs computer', () => soloNew('computer'), lock({
         primary: true,
         disabled: startOff,
         title: `The built-in player takes ${vsBlack}: the game's own rules, no model needed.`
       })),
-      agentChoice ? button('Play my Hermes model', () => soloNew('agent'), lock({
+      agentChoice ? button(seatsTwoPeople ? 'Play vs my Hermes model dealer' : 'Play my Hermes model', () => soloNew('agent'), lock({
         disabled: startOff,
         title: startOff ? 'AI seats are off for this profile.' : `Your own Hermes model plays ${vsBlack}, one call per move.`
-      })) : null
+      })) : null,
+      seatsTwoPeople ? button('Two players (same screen)', () => soloNew('two'), lock({
+        disabled: startOff,
+        title: 'A second person on this screen against the dealer. Their chips are a table-only stack, so the Jackpot wallet is never spent for them.'
+      })) : null,
+      // While seated, leaving is here with the opponent buttons - the one obvious place.
+      !showStart && status === 'active'
+        ? button('Leave table', leaveTable, lock({ disabled: Boolean(confirmation), title: 'Leave the table. Chips on a settled hand stay settled.' }))
+        : null
     ]
   }) : null
   // What sits above the playing surface while a game is on: who is across the table for a
@@ -915,7 +979,11 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // actually do is drawn, and both Resign and Leave table confirm before they act
   // (leaveTable above says whether leaving keeps or forfeits the game).
   const canUndo = Boolean(pictured && pictured.lesson && pictured.lesson.undo)
-  const actionRow = jsxs('div', {
+  // A session table keeps its one Leave table with the opponent buttons above the felt.
+  // Two identical buttons on one screen is not "one obvious place", so the row below the
+  // board is only drawn when there is no row above it carrying the same button.
+  const leaveAtTop = Boolean(soloControls) && !showStart && status === 'active'
+  const actionRow = leaveAtTop ? null : jsxs('div', {
     className: 'games-actions',
     role: 'group',
     'aria-label': 'Table actions',
@@ -1257,8 +1325,9 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
               drawnView === 'blackjack' || drawnView === 'slots'
                 ? jsx(drawnView === 'blackjack' ? BlackjackTable : SlotsTable, {
                     picture: pictured,
-                    // The felt says who is across it.
+                    // Who is across the felt, and who is dealing it.
                     against: opponentWords(pictured, view, solo),
+                    dealer: dealerWords(pictured, view),
                     interactive: Boolean(game.installed && access.can_move && !busy && !confirmation),
                     busy,
                     onMove: token => {

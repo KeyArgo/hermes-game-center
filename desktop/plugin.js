@@ -1282,7 +1282,7 @@ function startingPicture(id) {
   }
   // Card and slot tables draw their own screens; the preview only has to say which one.
   if (id === 'blackjack') {
-    return { view: 'blackjack', game: id, preview: true, status: 'idle', phase: 'bet', hand: [], dealer: [], legal: [], bets: [], chips: 0, bet: 0, outcome: '' }
+    return { view: 'blackjack', game: id, preview: true, status: 'idle', phase: 'bet', hand: [], dealer: [], legal: [], bets: [], chips: 0, bet: 0, outcome: '', two_players: true }
   }
   if (id === 'slots') {
     return { view: id, game: id, preview: true, status: 'idle', reels: ['7', '7', '7'], legal: [], history: [], paytable: [], chips: 0, bet: 0, last_win: 0 }
@@ -4020,7 +4020,65 @@ function bjButton(label, token, canPress, onMove, options = {}) {
   }, token)
 }
 
-function BlackjackTable({ picture, interactive, busy, onMove, against }) {
+// One hand of the round, as the felt draws it: its label, its wager, its cards, its total
+// and how it finished. A split round draws several of these; a table with two people draws
+// each person's hands under their own name.
+function bjHandCard(entry, index, title) {
+  const cards = entry.cards || []
+  const active = Boolean(entry.active)
+  const wager = entry.doubled
+    ? `Original Bet: ${bjChips(entry.original == null ? Number(entry.wager || 0) / 2 : entry.original)} | Total Wager: ${bjChips(entry.wager)} (Doubled)`
+    : `Bet: ${bjChips(entry.wager)}`
+  const resultWord = bjResultWord(entry.result)
+  return jsxs('div', {
+    'data-bj-hand': index + 1,
+    'data-bj-active': active ? 'yes' : 'no',
+    style: {
+      display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px',
+      boxSizing: 'border-box', borderRadius: 12,
+      border: `1px solid ${active ? accent : 'rgba(248, 245, 236, 0.22)'}`,
+      background: active ? 'rgba(227, 179, 65, 0.12)' : 'transparent',
+      boxShadow: active ? `0 0 0 1px ${accent}` : 'none',
+      opacity: entry.done && !active ? 0.88 : 1
+    },
+    children: [
+      jsxs('div', {
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+        children: [
+          jsx('div', {
+            style: { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: active ? text.primary : text.tertiary },
+            children: active ? `${title} · playing` : title
+          }, 'label'),
+          jsx('div', {
+            style: { fontSize: 12, fontWeight: 700, color: text.secondary, fontFamily: 'var(--font-mono, monospace)' },
+            children: wager
+          }, 'wager')
+        ]
+      }, 'head'),
+      jsx(BJCardRow, { cards, label: `${title} cards` }, 'cards'),
+      jsxs('div', {
+        style: { display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' },
+        children: [
+          jsx('div', {
+            style: { fontSize: 13, fontWeight: 700, color: text.secondary },
+            children: `${title === 'You' ? 'Your total' : 'Total'} ${Number(entry.total || 0)}${entry.soft ? ' (soft)' : ''}`
+          }, 'total'),
+          resultWord
+            ? jsx('div', {
+                style: {
+                  fontSize: 12, fontWeight: 800,
+                  color: entry.result === 'win' || entry.result === 'blackjack' ? BJ_CHIP : text.secondary
+                },
+                children: resultWord
+              }, 'result')
+            : null
+        ]
+      }, 'total-row')
+    ]
+  }, `hand-${index}`)
+}
+
+function BlackjackTable({ picture, interactive, busy, onMove, against, dealer: dealerSaid }) {
   const legal = (picture && picture.legal) || []
   const phase = (picture && picture.phase) || 'bet'
   const hand = (picture && picture.hand) || []
@@ -4029,6 +4087,24 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
   const outcome = (picture && picture.outcome) || ''
   const bet = Number((picture && picture.bet) || 0)
   const chips = Number((picture && picture.chips) || 0)
+  // Who is dealing, on the felt beside the DEALER label: the dealer line is always drawn,
+  // because a table that names nobody leaves a person unable to tell whether their own
+  // model is the one playing the dealer's cards. The page passes the named line (the model
+  // name lives there); the picture's own kind is the fallback.
+  const dealerKind = (picture && picture.dealer_kind) || 'house'
+  const dealerWords = dealerSaid || {
+    kind: dealerKind,
+    who: dealerKind === 'agent' ? 'Hermes model' : 'Computer',
+    pace: dealerKind === 'agent' ? 'thinks each turn'
+      : dealerKind === 'local' ? 'instant' : 'house rules, instant',
+    why: ''
+  }
+  const dealerLine = `Dealer: ${dealerWords.who}${dealerWords.pace ? ` (${dealerWords.pace})` : ''}`
+  // Two people on one screen: each has their own hands, chips and turn. The rules send one
+  // entry per player; a table with one player (or an older picture) draws the single seat.
+  const players = Array.isArray(picture && picture.players) ? picture.players : []
+  const twoPlayers = players.length > 1
+  const activePlayer = twoPlayers ? players.find(player => player.active) : null
   // The table stays open between hands: a finished hand is back in the bet phase with its
   // outcome set, so the result shows above the next bet's chips instead of ending the game.
   const won = Number((picture && picture.won) || 0)
@@ -4049,7 +4125,9 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
   // (or an older one) has only the single hand, which becomes one entry here.
   const hands = Array.isArray(picture && picture.player_hands) && picture.player_hands.length
     ? picture.player_hands
-    : [{
+    // Two people at the table have no "one hand" to fall back on: their own blocks read
+    // the picture's `players`, and a bet in progress has no cards yet.
+    : twoPlayers ? [] : [{
         cards: hand, total: Number((picture && picture.player_total) || 0), wager: bet,
         original: bet, doubled: false, active: phase === 'play', done: over, bust: false,
         blackjack: false, result: over ? outcome : ''
@@ -4057,6 +4135,12 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
   const totalWager = hands.reduce((sum, entry) => sum + Number(entry.wager || 0), 0) || bet
   const result = (() => {
     if (!over) return ''
+    if (twoPlayers) {
+      // Each player's round is their own: the felt says who came out where, not one net.
+      const said = players.map(player =>
+        `${player.name} ${Number(player.net || 0) > 0 ? '+' : ''}${bjChips(player.net || 0)}`)
+      return `Round settled · ${said.join(' · ')}`
+    }
     if (hands.length > 1) {
       return `${hands.length} hands settled · net ${won > 0 ? '+' : ''}${bjChips(won)}`
     }
@@ -4070,11 +4154,16 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
   // is not showing: hit and stand always, double and split only when they are on offer.
   const moves = ['hit', 'stand', ...(legal.includes('double') ? ['double'] : []),
     ...(legal.includes('split') ? ['split'] : [])]
+  const moving = activePlayer ? `${activePlayer.name}'s move` : 'Your move'
+  const bettor = twoPlayers ? players.find(player => player.betting) : null
+  const dealerBusy = picture && picture.dealer_note
   const phaseLine = over
-    ? `${result} · place your next bet, or leave the table`
-    : phase === 'bet'
-      ? 'Place your bet'
-      : `Your move: ${moves.slice(0, -1).join(', ')} or ${moves[moves.length - 1]}`
+    ? `${result} · ${twoPlayers ? 'place your next bets' : 'place your next bet'}, or leave the table`
+    : phase === 'dealer'
+      ? `${dealerBusy || 'The dealer is dealing the cards out.'}`
+      : phase === 'bet'
+        ? (bettor ? `${bettor.name} to bet` : 'Place your bet')
+        : `${moving}: ${moves.slice(0, -1).join(', ')} or ${moves[moves.length - 1]}`
   const betTokens = ((picture && picture.bets) || [10, 25, 50, 100, 500, 1000]).map(amount => `bet${amount}`)
   return jsxs('div', {
     'data-blackjack': 'table',
@@ -4112,6 +4201,8 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
             style: { display: 'flex', gap: 12, fontSize: 12, fontFamily: 'var(--font-mono, monospace)', color: text.secondary },
             children: [
               jsx('span', { children: `Chips ${chips}` }, 'chips'),
+              ...players.filter(player => Number(player.seat) > 0).map(player =>
+                jsx('span', { children: `${player.name} ${bjChips(player.chips)}` }, `chips-${player.seat}`)),
               jsx('span', { children: `Bet ${bjChips(totalWager)}` }, 'bet')
             ]
           }, 'wallet')
@@ -4120,69 +4211,92 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
       jsxs('div', {
         style: { display: 'flex', flexDirection: 'column', gap: 6 },
         children: [
-          jsx('div', { style: { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: text.tertiary }, children: 'Dealer' }, 'dealer-label'),
+          jsxs('div', {
+            style: { display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' },
+            children: [
+              jsx('div', { style: { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: text.tertiary }, children: 'Dealer' }, 'dealer-label'),
+              // The one line that says who is dealing, in every setup - including a table
+              // that has not seated a machine yet.
+              jsx('div', {
+                'data-bj-dealer': dealerWords.kind || 'house',
+                title: dealerWords.why || dealerLine,
+                'aria-label': dealerLine,
+                style: { fontSize: 12, fontWeight: 650, color: 'rgba(248, 245, 236, 0.82)', overflowWrap: 'anywhere' },
+                children: dealerLine
+              }, 'dealer-who')
+            ]
+          }, 'dealer-head'),
           jsx(BJCardRow, { cards: dealer, label: 'Dealer cards' }, 'dealer'),
           jsx('div', { style: { fontSize: 13, fontWeight: 700, color: text.secondary }, children: `Dealer shows ${Number((picture && picture.dealer_total) || 0)}` }, 'dealer-total')
         ]
       }, 'dealer-seat'),
-      jsx('div', {
-        style: { display: 'flex', flexDirection: 'column', gap: 8 },
-        children: hands.map((entry, index) => {
-          const cards = entry.cards || []
-          const active = Boolean(entry.active)
-          const title = hands.length > 1 ? `Hand ${index + 1} of ${hands.length}` : 'You'
-          const wager = entry.doubled
-            ? `Original Bet: ${bjChips(entry.original == null ? Number(entry.wager || 0) / 2 : entry.original)} | Total Wager: ${bjChips(entry.wager)} (Doubled)`
-            : `Bet: ${bjChips(entry.wager)}`
-          const resultWord = bjResultWord(entry.result)
-          return jsxs('div', {
-            'data-bj-hand': index + 1,
-            'data-bj-active': active ? 'yes' : 'no',
-            style: {
-              display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px',
-              boxSizing: 'border-box', borderRadius: 12,
-              border: `1px solid ${active ? accent : 'rgba(248, 245, 236, 0.22)'}`,
-              background: active ? 'rgba(227, 179, 65, 0.12)' : 'transparent',
-              boxShadow: active ? `0 0 0 1px ${accent}` : 'none',
-              opacity: entry.done && !active ? 0.88 : 1
-            },
-            children: [
-              jsxs('div', {
-                style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+      twoPlayers
+        // Two people on this screen: each seat is drawn by name, with its own chips, its
+        // own net and its own hands, and the one on move is the one marked.
+        ? jsx('div', {
+            style: { display: 'flex', flexDirection: 'column', gap: 10 },
+            children: players.map(player => {
+              const seat = Number(player.seat)
+              const mine = hands.filter(entry => Number(entry.seat === undefined ? 0 : entry.seat) === seat)
+              const active = Boolean(player.active)
+              const resultWord = bjResultWord(player.outcome)
+              const state = active ? 'playing'
+                : player.betting ? `${phase === 'bet' ? 'to bet' : 'waiting'}`
+                  : resultWord || (player.done ? 'done' : '')
+              return jsxs('div', {
+                'data-bj-player': seat + 1,
+                'data-bj-player-active': active ? 'yes' : 'no',
+                style: {
+                  display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px',
+                  boxSizing: 'border-box', borderRadius: 12,
+                  border: `1px solid ${active ? accent : 'rgba(248, 245, 236, 0.22)'}`,
+                  background: active ? 'rgba(227, 179, 65, 0.10)' : 'transparent'
+                },
                 children: [
-                  jsx('div', {
-                    style: { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: active ? text.primary : text.tertiary },
-                    children: active ? `${title} · playing` : title
-                  }, 'label'),
-                  jsx('div', {
-                    style: { fontSize: 12, fontWeight: 700, color: text.secondary, fontFamily: 'var(--font-mono, monospace)' },
-                    children: wager
-                  }, 'wager')
-                ]
-              }, 'head'),
-              jsx(BJCardRow, { cards, label: `${title} cards` }, 'cards'),
-              jsxs('div', {
-                style: { display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' },
-                children: [
-                  jsx('div', {
-                    style: { fontSize: 13, fontWeight: 700, color: text.secondary },
-                    children: `${hands.length > 1 ? 'Total' : 'Your total'} ${Number(entry.total || 0)}${entry.soft ? ' (soft)' : ''}`
-                  }, 'total'),
-                  resultWord
+                  jsxs('div', {
+                    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+                    children: [
+                      jsx('div', {
+                        style: { fontSize: 13, fontWeight: 800, letterSpacing: 0.4, color: active ? text.primary : text.secondary },
+                        children: `${player.name}${state ? ` · ${state}` : ''}`
+                      }, 'name'),
+                      jsxs('div', {
+                        style: { fontSize: 12, fontWeight: 700, color: text.secondary, fontFamily: 'var(--font-mono, monospace)' },
+                        children: [
+                          jsx('span', { children: `Chips ${bjChips(player.chips)}` }, 'chips'),
+                          Number(player.net || 0)
+                            ? jsx('span', { style: { marginLeft: 8 }, children: `Net ${Number(player.net) > 0 ? '+' : ''}${bjChips(player.net)}` }, 'net')
+                            : null,
+                          player.bet ? jsx('span', { style: { marginLeft: 8 }, children: `Bet ${bjChips(player.bet)}` }, 'bet') : null
+                        ]
+                      }, 'money')
+                    ]
+                  }, 'head'),
+                  mine.length
+                    ? mine.map((entry, index) => bjHandCard(
+                        entry, index,
+                        mine.length > 1 ? `Hand ${index + 1} of ${mine.length}` : player.name))
+                    : jsx('div', {
+                        style: { fontSize: 12, color: text.tertiary, fontFamily: 'var(--font-mono, monospace)' },
+                        children: player.betting ? 'Bet to start the round' : 'No cards yet'
+                      }, 'empty'),
+                  // A guest never spends the owner's chips: their stack lives on this table.
+                  seat > 0
                     ? jsx('div', {
-                        style: {
-                          fontSize: 12, fontWeight: 800,
-                          color: entry.result === 'win' || entry.result === 'blackjack' ? BJ_CHIP : text.secondary
-                        },
-                        children: resultWord
-                      }, 'result')
+                        style: { fontSize: 11, color: text.tertiary },
+                        children: `${player.name} plays a table-only stack, not the Jackpot wallet.`
+                      }, 'stack-note')
                     : null
                 ]
-              }, 'total-row')
-            ]
-          }, `hand-${index}`)
-        })
-      }, 'player-seat'),
+              }, `player-${seat}`)
+            })
+          }, 'player-seat')
+        : jsx('div', {
+            style: { display: 'flex', flexDirection: 'column', gap: 8 },
+            children: hands.map((entry, index) => bjHandCard(
+              entry, index,
+              hands.length > 1 ? `Hand ${index + 1} of ${hands.length}` : 'You'))
+          }, 'player-seat'),
       jsxs('div', {
         role: 'status',
         'aria-live': 'polite',
@@ -4204,7 +4318,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
             'aria-label': 'Bet chips',
             style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
             children: [
-              jsx('span', { style: { fontSize: 12, color: text.tertiary }, children: 'Bet chips:' }, 'label'),
+              jsx('span', { style: { fontSize: 12, color: text.tertiary }, children: bettor ? `${bettor.name}’s bet:` : 'Bet chips:' }, 'label'),
               ...betTokens.map(token => jsx('span', {
                 children: bjButton(`Bet ${token.slice(3)}`, token, canPress, onMove, { chip: true })
               }, token))
@@ -10961,6 +11075,40 @@ function opponentWords(pictured, view, solo, opts) {
   }
 }
 
+// Who is dealing, in the words the felt puts beside its DEALER label.
+//
+// Blackjack's dealer seat is the black side, and a fresh table is created with nobody in
+// it yet: the "You vs ..." chip names no opponent then, which is how the person ended up
+// unable to tell whether their own model was playing the dealer's cards. This line is
+// drawn in every setup, and it says what each dealer really costs: the built-in computer
+// answers inside the move, the person's Hermes model thinks before it deals.
+function dealerWords(pictured, view) {
+  const seats = (pictured && pictured.seats) || []
+  const seat = seats.find(item => item.side === 'black') || null
+  const given = String((pictured && pictured.dealer_kind) || '')
+  const kind = ['agent', 'local'].includes(given) ? given : String((seat && seat.kind) || 'human')
+  const model = String((view && view.opponent && view.opponent.model) || '')
+  if (kind === 'agent') {
+    return {
+      kind: 'agent',
+      who: `Hermes model${model ? ` ${model}` : ''}`,
+      pace: 'thinks each turn',
+      why: `Your Hermes model${model ? ` (${model})` : ''} deals these cards, one call per hand — it thinks before it fires.`
+        + (model ? '' : ' Pick the model in Hermes Settings → Models → "Game Shelf opponent".')
+    }
+  }
+  if (kind === 'local') {
+    return {
+      kind: 'local', who: 'Computer', pace: 'instant',
+      why: 'The built-in computer deals these cards by the house rules and answers at once; it never uses your chat model.'
+    }
+  }
+  return {
+    kind: 'house', who: 'Computer', pace: 'house rules, instant',
+    why: 'The house deals these cards: the table plays the dealer out itself, at once, and no model is asked.'
+  }
+}
+
 // The label itself: one chip, with the whole story behind it on hover.
 function OpponentLine({ pictured, view, solo, shared, style }) {
   const said = opponentWords(pictured, view, solo, { shared })
@@ -11212,11 +11360,27 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // comes back and nothing is thrown away. While a game IS active the row's "Leave table"
   // asks once and says that leaving forfeits the game — a resignation
   // against another person, and a thrown-away board against the computer or a shared keyboard.
+  // A session table between hands is the exception: nothing is on the felt, so leaving
+  // costs nothing and the table never threatens a forfeit it cannot take. A hand being
+  // played is said in the hand's own words - a bet is lost, nobody resigns.
+  const sessionPhase = String((pictured && pictured.phase) || '')
+  const leavingCostsNothing = Boolean(solo) && sessionPhase === 'bet'
+    && !(pictured && pictured.mid_round)
+  const leavingMidHand = Boolean(solo) && ['play', 'deal', 'dealer'].includes(sessionPhase)
   const leaveTable = async () => {
     if (status !== 'active' || !ownSeats.length) {
       alive.current = false
       stopWatching()
       onBack()
+      return
+    }
+    if (leavingCostsNothing) {
+      const ok = await command(`${game.id} abandon`)
+      if (ok && alive.current) setLeftSeat(true)
+      return
+    }
+    if (leavingMidHand) {
+      ask('leave table', 'Leave this table? The hand on the felt is still being played, so its bet is lost.', `${game.id} abandon`, () => setLeftSeat(true), 'Leave', 'Keep playing')
       return
     }
     if (againstPeople) {
@@ -11427,11 +11591,17 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // session standing on the felt first - the table's own rule refuses a new one while
   // hands are played. Nothing staked yet is one press; a session in play asks once, the
   // same two-press rule the side pane keeps.
+  // A solo table that can seat a second person on this screen says so on its own board
+  // (picture.two_players), so the third way in is offered without naming any game here.
+  const seatsTwoPeople = Boolean(pictured && pictured.two_players)
   const soloNew = who => {
-    const line = `allow-ai ${game.id} black=${who === 'agent' ? 'agent' : 'local'} level=${levelId}`
-    const after = () => setLocalSetup(who === 'agent' ? 'human-agent' : 'human-bot')
+    const dealer = who === 'agent' ? 'agent' : 'local'
+    // Two people on this screen is a table of its own: the dealer is the built-in computer
+    // and the second person gets a table-only stack, so a guest never spends the wallet.
+    const line = `allow-ai ${game.id} black=${dealer} level=${levelId}${who === 'two' ? ' players=2' : ''}`
+    const after = () => setLocalSetup(who === 'agent' ? 'human-agent' : who === 'two' ? 'two-people' : 'human-bot')
     if (status === 'active' && Number(pictured.plies || 0) > 0) {
-      ask('new game', `Starting a new game ends this session and deals a new one against ${who === 'agent' ? 'your Hermes model' : 'the computer'}. Chips already bet on a settled hand stay settled.`, `${game.id} abandon`, () => command(line))
+      ask('new game', `Starting a new game ends this session and deals a new one against ${who === 'agent' ? 'your Hermes model' : who === 'two' ? 'the dealer, with a second player on this screen' : 'the computer'}. Chips already bet on a settled hand stay settled.`, `${game.id} abandon`, () => command(line))
       return
     }
     command(line).then(ok => { if (ok && alive.current) after() })
@@ -11440,15 +11610,23 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
     'data-gm-solo-opponents': '1',
     style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' },
     children: [
-      button('New game vs computer', () => soloNew('computer'), lock({
+      button(seatsTwoPeople ? 'Play vs computer dealer' : 'New game vs computer', () => soloNew('computer'), lock({
         primary: true,
         disabled: startOff,
         title: `The built-in player takes ${vsBlack}: the game's own rules, no model needed.`
       })),
-      agentChoice ? button('Play my Hermes model', () => soloNew('agent'), lock({
+      agentChoice ? button(seatsTwoPeople ? 'Play vs my Hermes model dealer' : 'Play my Hermes model', () => soloNew('agent'), lock({
         disabled: startOff,
         title: startOff ? 'AI seats are off for this profile.' : `Your own Hermes model plays ${vsBlack}, one call per move.`
-      })) : null
+      })) : null,
+      seatsTwoPeople ? button('Two players (same screen)', () => soloNew('two'), lock({
+        disabled: startOff,
+        title: 'A second person on this screen against the dealer. Their chips are a table-only stack, so the Jackpot wallet is never spent for them.'
+      })) : null,
+      // While seated, leaving is here with the opponent buttons - the one obvious place.
+      !showStart && status === 'active'
+        ? button('Leave table', leaveTable, lock({ disabled: Boolean(confirmation), title: 'Leave the table. Chips on a settled hand stay settled.' }))
+        : null
     ]
   }) : null
   // What sits above the playing surface while a game is on: who is across the table for a
@@ -11668,7 +11846,11 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   // actually do is drawn, and both Resign and Leave table confirm before they act
   // (leaveTable above says whether leaving keeps or forfeits the game).
   const canUndo = Boolean(pictured && pictured.lesson && pictured.lesson.undo)
-  const actionRow = jsxs('div', {
+  // A session table keeps its one Leave table with the opponent buttons above the felt.
+  // Two identical buttons on one screen is not "one obvious place", so the row below the
+  // board is only drawn when there is no row above it carrying the same button.
+  const leaveAtTop = Boolean(soloControls) && !showStart && status === 'active'
+  const actionRow = leaveAtTop ? null : jsxs('div', {
     className: 'games-actions',
     role: 'group',
     'aria-label': 'Table actions',
@@ -12010,8 +12192,9 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
               drawnView === 'blackjack' || drawnView === 'slots'
                 ? jsx(drawnView === 'blackjack' ? BlackjackTable : SlotsTable, {
                     picture: pictured,
-                    // The felt says who is across it.
+                    // Who is across the felt, and who is dealing it.
                     against: opponentWords(pictured, view, solo),
+                    dealer: dealerWords(pictured, view),
                     interactive: Boolean(game.installed && access.can_move && !busy && !confirmation),
                     busy,
                     onMove: token => {

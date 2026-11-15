@@ -3912,7 +3912,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackTwoPlayersContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -6998,4 +6998,213 @@ async function gcextrasContract() {
   assert.equal(evaluate("bjRoundSound({ outcome: 'win', won: 10 })"), 'win')
   assert.equal(evaluate("bjRoundSound({ outcome: '', won: 0 })"), 'deal')
   console.log('blackjack split: two hands, the active one marked, Split offered only when legal: passed')
+}
+
+
+
+// ---- Blackjack: who is dealing, the three ways in, and two players on one screen ------
+// The owner could not tell who was playing the dealer's cards, and there was no way back
+// to the table with a different opponent. A fresh table is created white=human black=human,
+// so the "opponent chip" named nobody at all: the felt now always says who is dealing. The
+// start screen offers the three ways in by name, and leaving between hands (nothing on the
+// felt) never threatens a forfeit.
+async function blackjackDealerContract() {
+  const tick = () => new Promise(resolve => setImmediate(resolve))
+  const seat = (side, kind, name, open) => ({ side, kind, name, open })
+  const me = { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false }
+  sandbox.bjView = { viewer_id: 'me', player: { id: 'me' }, allow_ai: true, opponent: { model: 'glm-5.3-flash' } }
+  const tableShape = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white', plies: 0,
+    side_words: { white: 'You', black: 'Dealer' },
+    levels: [{ id: 'intermediate', label: 'Intermediate' }], level: 'intermediate',
+    legal: ['bet10'], bets: [10], chips: 10000, bet: 0, outcome: '', won: 0, hands: 0,
+    hand: [], dealer: [], player_hands: [], total_wager: 0, table_players: 1, two_players: true,
+    permissions: { can_move: true, can_manage: true, can_step: true }
+  }
+
+  // A. WHO IS DEALING. The dealer's seat has not been handed to a machine yet: that is the
+  // state a table is created in, and it used to draw no dealer line anywhere on the page.
+  const house = { ...tableShape, seats: [me, seat('black', 'human', '', true)] }
+  sandbox.bjHouse = house
+  assert.equal(evaluate('opponentWords(bjHouse, bjView, true)'), null,
+    'the plain house is not an opponent chip')
+  assert.equal(evaluate('dealerWords(bjHouse, bjView).who'), 'Computer')
+  assert.ok(/house rules/.test(evaluate('dealerWords(bjHouse, bjView).pace')),
+    'the house dealer says it plays the house rules')
+  const houseFelt = evaluate('BlackjackTable({ picture: bjHouse, dealer: dealerWords(bjHouse, bjView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(houseFelt).includes('Dealer: Computer (house rules, instant)'),
+    'the felt names the dealer even with no machine seat: ' + words(houseFelt).slice(0, 240))
+  const houseLine = nodes(houseFelt).find(node => node.props && node.props['data-bj-dealer'])
+  assert.ok(houseLine && houseLine.props.title, 'and the dealer line explains itself on hover')
+
+  // The built-in computer and the person's own model are named differently on the felt: one
+  // answers at once, the other thinks each turn.
+  const local = { ...house, seats: [me, seat('black', 'local', 'Local', false)], dealer_kind: 'local' }
+  sandbox.bjLocal = local
+  assert.equal(evaluate('dealerWords(bjLocal, bjView).pace'), 'instant')
+  const localFelt = evaluate('BlackjackTable({ picture: bjLocal, dealer: dealerWords(bjLocal, bjView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(localFelt).includes('Dealer: Computer (instant)'), words(localFelt).slice(0, 200))
+  const agent = { ...house, seats: [me, seat('black', 'agent', 'Your agent', false)], dealer_kind: 'agent' }
+  sandbox.bjAgent = agent
+  const agentDealer = evaluate('dealerWords(bjAgent, bjView)')
+  assert.equal(agentDealer.kind, 'agent')
+  const agentFelt = evaluate('BlackjackTable({ picture: bjAgent, dealer: dealerWords(bjAgent, bjView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(agentFelt).includes('Dealer: Hermes model glm-5.3-flash (thinks each turn)'),
+    'the felt names the model that is dealing: ' + words(agentFelt).slice(0, 240))
+  // While it thinks, the felt says so in its own line.
+  const dealing = { ...agent, phase: 'dealer', turn: 'black', legal: ['stand'], dealer_note: 'Hermes model is dealing…' }
+  sandbox.bjDealing = dealing
+  const dealingFelt = evaluate('BlackjackTable({ picture: bjDealing, dealer: dealerWords(bjDealing, bjView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(dealingFelt).includes('Hermes model is dealing…'),
+    'the model dealer is named while it deals: ' + words(dealingFelt).slice(0, 240))
+
+  // C. THE THREE WAYS IN. Leaving and sitting back down has one clear name per opponent.
+  const sent = []
+  const drawPage = () => {
+    cursor = 0
+    const drawn = evaluate('PlayTable(bjPageProps)')
+    const queued = effects
+    effects = []
+    queued.forEach(run => run())
+    return drawn
+  }
+  const page = (picture, game) => {
+    reset()
+    sandbox.bjPageProps = {
+      game: game || { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true, solo: true },
+      view: sandbox.bjView,
+      board: { picture },
+      send: async line => { sent.push(line); return { text: 'Table updated.', ok: true } },
+      playMove: async (id, token) => sent.push(`${id} move ${token}`),
+      onBack: () => sent.push('back'), ctx: {}
+    }
+    return drawPage()
+  }
+  const idle = { ...house, status: 'idle', seats: [], legal: [] }
+  let panel = page(idle)
+  assert.ok(findButton(panel, 'Play vs computer dealer'), 'the computer dealer is named for what it is')
+  assert.ok(findButton(panel, 'Play vs my Hermes model dealer'), 'and the person’s own model dealer too')
+  assert.ok(findButton(panel, 'Two players (same screen)'), 'and a second player on this screen')
+  assert.equal(findButton(panel, 'New game vs computer'), undefined,
+    'the older, vaguer names are gone from the table that seats a dealer')
+  assert.equal(findButton(panel, 'Play my Hermes model'), undefined)
+  findButton(panel, 'Play vs computer dealer').props.onClick()
+  await tick()
+  assert.equal(sent.at(-1), 'allow-ai blackjack black=local level=intermediate',
+    'the computer dealer takes the seat through the same line every table takes')
+  panel = page(idle)
+  findButton(panel, 'Play vs my Hermes model dealer').props.onClick()
+  await tick()
+  assert.equal(sent.at(-1), 'allow-ai blackjack black=agent level=intermediate',
+    'and so does the model dealer')
+  panel = page(idle)
+  findButton(panel, 'Two players (same screen)').props.onClick()
+  await tick()
+  assert.equal(sent.at(-1), 'allow-ai blackjack black=local level=intermediate players=2',
+    'two players is a table of its own, not a second game')
+
+  // While seated the same row carries Leave table, and it is the only one on the page.
+  let seated = page({ ...local, phase: 'bet', plies: 2, legal: ['bet10'] })
+  const leaveButtons = nodes(seated).filter(node => node.type === 'button' && words(node) === 'Leave table')
+  assert.equal(leaveButtons.length, 1, 'one obvious Leave table while seated at a session table')
+  const top = nodes(seated).find(node => node.props && node.props.className === 'games-table-top')
+  assert.ok(top && nodes(top).some(node => node.type === 'button' && words(node) === 'Leave table'),
+    'and it sits with the opponent buttons above the felt')
+  // Between hands nothing is on the felt: one press leaves, and nothing mentions a forfeit.
+  await leaveButtons[0].props.onClick()
+  await tick()
+  assert.equal(sent.at(-1), 'blackjack abandon', 'leaving between hands is one press')
+  assert.equal(sent.filter(line => /forfeit/i.test(String(line))).length, 0)
+
+  // A session table with nobody to seat (Slots) keeps its one Leave table in the row under
+  // the board: the top row is not drawn there, so hiding the bottom one would leave none.
+  const slots = page({ view: 'slots', game: 'slots', status: 'active', machines: [], legal: ['spin'],
+    chips: 100, bet: 5, bets: [5], feed: [], paytable: [] },
+  { id: 'slots', title: 'Slots', kind: 'table', installed: true, bots: true, solo: true })
+  assert.ok(findButton(slots, 'Close table'), 'a session table with no opponent row keeps its one door out')
+  assert.equal(nodes(slots).filter(node => node.type === 'button' && /^(Leave|Close) table$/.test(words(node))).length, 1,
+    'exactly one way out of a solo table')
+
+  // A hand still being played: the table asks, and says what is really at stake - the bet.
+  seated = page({ ...local, phase: 'play', plies: 3, legal: ['hit', 'stand'], player_hands: [
+    { cards: ['10S', '9S'], total: 19, wager: 10, original: 10, active: true, done: false, result: '' }
+  ] })
+  findButton(seated, 'Leave table').props.onClick()
+  const asking = drawPage()
+  const wordsNow = words(asking)
+  assert.ok(/still being played/.test(wordsNow), 'leaving mid-hand says the hand is at stake: ' + wordsNow.slice(-200))
+  assert.ok(!/forfeits/i.test(wordsNow), 'and never the word forfeit at a table where nobody resigns')
+  reset()
+
+  console.log('blackjack: the dealer is named, and the three ways in: passed')
+}
+
+
+// ---- Blackjack: two players on one screen ---------------------------------------------
+// Player 1 and Player 2 against one dealer. The felt names both seats, shows each one's
+// chips and net, and marks the seat whose move it is; the guest's chips are a table-only
+// stack, and the felt says so.
+function blackjackTwoPlayersContract() {
+  const seat = (side, kind, name, open) => ({ side, kind, name, open })
+  sandbox.bjTwoView = { viewer_id: 'me', player: { id: 'me' }, allow_ai: true, opponent: {} }
+  const hands = [
+    { seat: 0, name: 'Player 1', cards: ['10S', '9S'], total: 19, soft: false, wager: 10, original: 10, active: false, done: true, bust: false, blackjack: false, result: '' },
+    { seat: 1, name: 'Player 2', cards: ['8D', 'KD'], total: 18, soft: false, wager: 10, original: 10, active: true, done: false, bust: false, blackjack: false, result: '' },
+    { seat: 1, name: 'Player 2', cards: ['8C', '3C'], total: 11, soft: false, wager: 10, original: 10, active: false, done: false, bust: false, blackjack: false, result: '' }
+  ]
+  const players = [
+    { seat: 0, name: 'Player 1', chips: 9990, wallet: true, bet: 10, wager: 10, net: 0, outcome: '', active: false, betting: false, done: true },
+    { seat: 1, name: 'Player 2', chips: 9980, wallet: false, bet: 10, wager: 20, net: 0, outcome: '', active: true, betting: false, done: false }
+  ]
+  sandbox.bjTwo = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'play', turn: 'white', plies: 5,
+    seats: [seat('white', 'human', 'Ada', false), seat('black', 'local', 'Local', false)],
+    side_words: { white: 'You', black: 'Dealer' }, dealer_kind: 'local',
+    dealer: ['10H', '??'], dealer_total: 10, player_total: 18, hand: ['8D', 'KD'],
+    chips: 9990, bet: 10, total_wager: 20, outcome: '', won: 0, hands: 2,
+    legal: ['hit', 'stand'], bets: [10, 25], table_players: 2, two_players: true, betting: 0,
+    players, player_hands: hands, note: 'Player 2, Hand 1 of 2: 18. Your move.'
+  }
+  const felt = evaluate('BlackjackTable({ picture: bjTwo, dealer: dealerWords(bjTwo, bjTwoView), interactive: true, busy: false, onMove: () => {} })')
+  const said = words(felt)
+  assert.ok(said.includes('Player 1') && said.includes('Player 2'), 'both seats are named: ' + said.slice(0, 300))
+  assert.ok(said.includes('Chips 9,990') && said.includes('Chips 9,980'),
+    'each person reads their own chips: ' + said.slice(0, 400))
+  assert.ok(said.includes('Player 2 plays a table-only stack, not the Jackpot wallet.'),
+    'a guest’s stack is not the wallet, and the felt says so')
+  assert.ok(said.includes("Player 2's move: hit or stand"),
+    'the move line names the person whose turn it is: ' + said.slice(0, 400))
+  const seats = nodes(felt).filter(node => node.props && node.props['data-bj-player'])
+  assert.equal(seats.length, 2, 'two player seats are drawn')
+  const activeSeat = seats.find(node => node.props['data-bj-player-active'] === 'yes')
+  assert.ok(activeSeat && words(activeSeat).includes('Player 2'),
+    'the seat on move is the one highlighted')
+  assert.equal(seats.filter(node => node.props['data-bj-player-active'] === 'yes').length, 1,
+    'and only one seat is highlighted at a time')
+  const guestHands = nodes(activeSeat).filter(node => node.props && node.props['data-bj-hand'])
+  assert.equal(guestHands.length, 2, 'both of Player 2’s split hands are drawn under their name')
+  assert.ok(words(activeSeat).includes('Hand 1 of 2') && words(activeSeat).includes('Hand 2 of 2'))
+
+  // Whose bet the table is waiting for, and each round's own result.
+  sandbox.bjTwoBetting = {
+    ...sandbox.bjTwo, phase: 'bet', legal: ['bet10'], betting: 1, players: [
+      { ...players[0], active: false, betting: false, net: 0 },
+      { ...players[1], active: false, betting: true, net: 0 }
+    ], player_hands: [], note: ''
+  }
+  const bettingFelt = evaluate('BlackjackTable({ picture: bjTwoBetting, dealer: dealerWords(bjTwoBetting, bjTwoView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(bettingFelt).includes('Player 2 to bet'), 'the felt says whose bet it is')
+  assert.ok(words(bettingFelt).includes('Player 2’s bet:'), 'and the chip row is the second person’s')
+  sandbox.bjTwoSettled = {
+    ...sandbox.bjTwo, phase: 'bet', outcome: 'win', won: 10, legal: ['bet10'], betting: 0,
+    players: [
+      { ...players[0], active: false, outcome: 'win', net: 10 },
+      { ...players[1], active: false, outcome: 'lose', net: -10 }
+    ],
+    player_hands: hands.map(hand => ({ ...hand, active: false, done: true, result: hand.seat ? 'lose' : 'win' }))
+  }
+  const settledFelt = evaluate('BlackjackTable({ picture: bjTwoSettled, dealer: dealerWords(bjTwoSettled, bjTwoView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(settledFelt).includes('Round settled · Player 1 +10 · Player 2 -10'),
+    'each person’s round is their own: ' + words(settledFelt).slice(0, 300))
+  console.log('blackjack two players: two named seats, the active one highlighted, table-only guest chips: passed')
 }
