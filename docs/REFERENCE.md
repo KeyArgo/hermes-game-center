@@ -1,6 +1,6 @@
 # Reference
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-15 (99b43c9f)_
 
 Every tool, command, hook, HTTP route and config key the plugin exposes, in tables. The prose for each setting is in [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -49,7 +49,7 @@ The shelf verbs are in `shelf/commands.py`; the table verbs are in `kit.py`.
 | `draw` | `/games chess draw`, `draw accept` | Offer or accept a draw. |
 | `rematch` | `/games chess rematch` | Ask for a rematch (both identified people must agree). |
 | `abandon` | `/games chess abandon` | End the table without awarding a win. |
-| `allow-ai` | `/games chess allow-ai black=local` or `black=agent` | Consent to an AI seat. `level=beginner\|intermediate\|advanced\|expert` also works. |
+| `allow-ai` | `/games chess allow-ai black=local` or `black=agent` | Consent to an AI seat. `level=beginner\|intermediate\|advanced\|expert` also works. Blackjack also takes `players=1\|players=2`: `players=2` seats a second person on the same screen, with their own table-only chips. |
 
 ## Hooks
 

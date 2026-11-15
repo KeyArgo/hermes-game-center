@@ -1,6 +1,6 @@
 # Troubleshooting
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (4d49f59e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-15 (99b43c9f)_
 
 Real failure modes the code handles or the README already names, and what to do about each.
 

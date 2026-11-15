@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-14 (1739d3d7)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-15 (99b43c9f)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -83,6 +83,12 @@ See the wallet file and its keys in [ARCHITECTURE.md](ARCHITECTURE.md) and [CONF
 ## Blackjack
 
 Open **Blackjack** on the Play shelf and bet chips from the wallet. The dealer stands on all 17s, and the table stays open between hands.
+
+**Who is dealing is written on the felt**, in one line under the DEALER label, in every setup: `Dealer: Computer (instant)` for the built-in computer, `Dealer: Hermes model <name> (thinks each turn)` for your own model, and `Dealer: Computer (house rules, instant)` for a table that has not seated a machine yet. The built-in dealer answers inside the bet and the stand: nothing is left waiting on a second request. A Hermes-model dealer takes one turn a hand — the cards are dealt out when you stand — and the felt says **Hermes model is dealing…** while it thinks.
+
+**The three ways in** are on the start screen by name: **Play vs computer dealer**, **Play vs my Hermes model dealer**, and **Two players (same screen)**. **Leave table** sits beside them above the felt while you are seated. Leaving between hands costs nothing and is one press; leaving with a hand still being played asks first and says that hand's bet is lost — a session table never uses the word forfeit.
+
+**Two players on one screen** is two seats against one dealer. Both bet (Player 1, then Player 2), both are dealt, Player 1 plays every hand of their round, then Player 2, and only then does the dealer play. Each hand settles on its own. Player 2's chips are a **table-only stack of 10,000** kept in the table state: a guest never spends or wins the Jackpot wallet's chips, and the felt says so under their seat. `players=2` on the setup line is what seats them (`/games blackjack allow-ai black=local players=2`).
 
 - **The moves are the table's, not the page's.** Hit, Stand, Double and Split are drawn from the rules: a move that is not on offer is disabled, and a hand with a short stack gets no Double or Split.
 - **Double** is offered on the first two cards only. It puts a second bet of the same size on the felt, deals exactly one more card, and that hand stands. A doubled hand wins or loses twice its wager, and the next hand starts from what you bet, not from the double.

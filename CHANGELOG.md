@@ -6,6 +6,43 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Blackjack says who is dealing.** The felt only named a dealer when a machine seat was drawn
+  as the opponent chip, and a table is created `white=human black=human` — so the state a person
+  meets on a fresh table named nobody. One line under the DEALER label now always says it:
+  `Dealer: Computer (instant)`, `Dealer: Hermes model <name> (thinks each turn)` (the name comes
+  from Settings → Models → "Game Shelf opponent"), or `Dealer: Computer (house rules, instant)` for
+  a table with no machine seat yet. `blackjack/game.py` sends `dealer_kind` / `dealer_line` /
+  `dealer_note`; `desktop/src/30-game-page.js` (`dealerWords`) turns the seat plus the model name
+  into the words, and `desktop/src/17-blackjack.js` draws them. Guard:
+  `tests/test_blackjack_dealer.py`, and the `blackjackDealerContract` block in
+  `tests/table_ui_harness.cjs`.
+- **The built-in dealer is instant; only a model dealer thinks.** `_ai_dealer` handed the dealer's
+  two quiet turns to any AI seat: the deal check (`phase "deal"`) and the play-out (`phase
+  "dealer"`). Against the built-in computer the rules sat in `"deal"` until a second request ticked
+  them over, and against a Hermes model **every hand cost two model calls**, one of them for a check
+  the rules answer themselves. The deal is now checked inside the bet, the built-in dealer plays out
+  inside the stand (a hand settles in 4–9 ms with no model call), and a Hermes-model dealer gets
+  exactly **one** turn a hand with the felt saying "Hermes model is dealing…". `_defer_or_play` only
+  defers for an `agent` seat. Guards: `tests/test_blackjack_dealer.py` (`test_the_built_in_dealer_*`,
+  `test_a_model_dealer_gets_one_turn_per_hand`,
+  `test_the_model_dealer_is_asked_once_per_hand_and_the_computer_never`).
+- **Leaving blackjack, and sitting back down.** The start screen offers the three ways in by name —
+  **Play vs computer dealer**, **Play vs my Hermes model dealer**, **Two players (same screen)** —
+  and **Leave table** sits with them above the felt while seated (one obvious place: the row under
+  the board is no longer drawn twice for a session table). Leaving between hands, with nothing on
+  the felt, is one press and never says "forfeits"; leaving mid-hand asks once and says that hand's
+  bet is lost.
+- **Two players on one screen.** Blackjack now seats Player 1 and Player 2 against one dealer: both
+  bet, both are dealt (Player 1, Player 2, dealer, twice), Player 1 plays every hand of their round,
+  then Player 2, then the dealer once. Each hand settles to the person who staked it. Player 2's
+  chips are a **table-only stack of 10,000** held in the table state, so a guest never spends or wins
+  the Jackpot wallet's chips; the felt names both seats, marks the one on move, and says whose chips
+  are whose. Hands carry a `player` seat, so old single-player saves load and play unchanged.
+  `players=2` travels on the setup line (`allow-ai blackjack black=local players=2`) through a small
+  generic `rules.setup(state, options)` hook in `kit.py`; `game.json` says `players: "1-2"`. Guards:
+  `tests/test_blackjack_two_players.py` and `blackjackTwoPlayersContract` in
+  `tests/table_ui_harness.cjs`.
+
 - **One name for auto-spin.** The Jackpot cabinet's own switch said "Auto-spin" while the Games-page
   button said Inference Auto Play. Both now say **Inference Auto Play** (README and USAGE too); the
   stored setting is the same one. Guard: `tests/test_backdrop_wording.py`.
