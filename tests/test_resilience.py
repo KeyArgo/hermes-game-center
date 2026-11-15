@@ -152,7 +152,8 @@ def test_every_state_file_is_written_through_a_temp_file() -> None:
                 line = text[:match.start()].count("\n") + 1
                 direct.append(f"{path.relative_to(ROOT)}:{line}: {receiver}.write...")
         if "write_text(" in text or "write_bytes(" in text:
-            assert "os.replace(" in text or "os.rename(" in text, (
+            # filelock.replace is os.replace with the Windows retry (a reader holding the file open).
+            assert "os.replace(" in text or "os.rename(" in text or "filelock.replace(" in text, (
                 f"{path.relative_to(ROOT)} writes a file but never swaps one into place"
             )
     assert not direct, "these write a state file in place instead of a temp file:\n" + "\n".join(direct)
