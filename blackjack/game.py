@@ -714,6 +714,18 @@ def _split(state: dict) -> str:
     return state["note"]
 
 
+def _own_hand_number(state: dict, hand: dict) -> tuple[int, int]:
+    """This hand's number among its own person's hands, and how many that person holds.
+
+    The felt numbers each person's hands from one, so a note must too: with two people at the
+    table, Player 2's only hand was called "Hand 3 of 3" (or "Hand 5 of 5" after splits) because
+    the numbering counted every hand on the table.
+    """
+    mine = [item for item in (_migrate(state) or []) if _owner(item) == _owner(hand)]
+    number = next((index for index, item in enumerate(mine, start=1) if item is hand), 1)
+    return number, len(mine)
+
+
 def _advance(state: dict) -> str:
     """Play the next unfinished hand, or finish the round.
 
@@ -729,7 +741,8 @@ def _advance(state: dict) -> str:
             if len(hands) > 1:
                 whose = (f"{_player_name(state, _owner(hand))}, "
                          if _table_players(state) == 2 else "")
-                state["note"] = (f"{whose}Hand {index + 1} of {len(hands)}: "
+                number, count = _own_hand_number(state, hand)
+                state["note"] = (f"{whose}Hand {number} of {count}: "
                                  f"{_hand_value(hand['cards'])}. Your move.")
             return ""
     if hands and all(_hand_value(hand["cards"]) > 21 for hand in hands):
@@ -975,10 +988,14 @@ def play(state: dict, move) -> str:
         if total == 21:
             hand["done"] = True
             return _after_hand(state, f"Twenty-one: {total}. That hand stands.")
-        if len(state["player_hands"]) > 1:
-            state["note"] = (f"Hand {_active(state) + 1} draws: {total}.")
-        elif _table_players(state) == 2:
-            state["note"] = f"{_player_name(state, _owner(hand))} drew a card. The total is {total}."
+        if _table_players(state) == 2:
+            number, count = _own_hand_number(state, hand)
+            state["note"] = (f"{_player_name(state, _owner(hand))}, Hand {number} of {count} "
+                             f"draws: {total}.")
+        elif len(state["player_hands"]) > 1:
+            # One person at the table: the table's order is their own, so the phase's own
+            # hand order numbers it.
+            state["note"] = f"Hand {_active(state) + 1} draws: {total}."
         else:
             state["note"] = f"You drew a card. Your total is {total}."
         return state["note"]

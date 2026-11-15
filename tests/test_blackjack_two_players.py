@@ -276,3 +276,38 @@ def test_a_repaired_guest_record_is_stored_on_the_table(bj):
     assert int(state["guest"]["chips"]) == GUEST_START - 10, state["guest"]
     assert guest_chips(bj, state) == GUEST_START - 10, "the guest's own bet is really taken"
     assert chips(bj) == START - 10, "seat 0's bet still comes from the wallet"
+
+
+def test_each_person_reads_their_own_hand_numbers(bj):
+    """A note numbers a hand among its own person's hands, not the table's.
+
+    Player 2's only hand was called "Hand 3 of 3" (or "Hand 5 of 5" after splits) because the
+    numbering counted every hand on the table, while the felt numbers each person's hands from 1.
+    """
+    state = start(bj, [], players="2")
+    state["phase"] = "play"
+    state["dealer"] = ["10H", "7D"]
+    state["player_hands"] = [
+        {"cards": ["10S", "9S"], "wager": 10, "base": 10, "player": 0, "done": True, "result": "win"},
+        {"cards": ["7S", "6D"], "wager": 10, "base": 10, "player": 0, "done": True},
+        {"cards": ["8D", "KD"], "wager": 10, "base": 10, "player": 1, "done": False},
+    ]
+    state["active_hand"] = 0
+
+    bj._advance(state)
+
+    assert state["active_hand"] == 2
+    assert state["note"] == "Player 2, Hand 1 of 1: 18. Your move.", state["note"]
+
+    # And Player 1's own second hand is the second of their two, not the second on the table.
+    state["player_hands"] = [
+        {"cards": ["10S", "9S"], "wager": 10, "base": 10, "player": 0, "done": True, "result": "win"},
+        {"cards": ["7S", "6D"], "wager": 10, "base": 10, "player": 0, "done": False},
+        {"cards": ["8D", "KD"], "wager": 10, "base": 10, "player": 1, "done": True, "result": "lose"},
+    ]
+    state["active_hand"] = 0
+
+    bj._advance(state)
+
+    assert state["active_hand"] == 1
+    assert state["note"] == "Player 1, Hand 2 of 2: 13. Your move.", state["note"]

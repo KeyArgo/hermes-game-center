@@ -6,6 +6,12 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Each person's hands are numbered among their own hands, in the note as well as on the felt.**
+  With two people at the table the note counted every hand on the table, so Player 2's first and
+  only hand was "Hand 2 of 2" (or "Hand 5 of 5" after splits), while the felt drew it as hand 1 of 1.
+  `_advance` and the hit note now number a hand among its owner's hands (`_own_hand_number`), and a
+  two-player draw names the person: `Player 2, Hand 1 of 1 draws: 18.` `blackjack/game.py`. Guard:
+  `test_each_person_reads_their_own_hand_numbers` in `tests/test_blackjack_two_players.py`.
 - **A shoe rebuilt inside a round is a new shuffle.** The shoe is shuffled from the table's own seed
   so a replay re-deals the same cards, but the seed was `f"{shoe}:{hands}"` and `hands` only moves at
   settlement: a rebuild inside a round reproduced the hand that round started with, from the same end
