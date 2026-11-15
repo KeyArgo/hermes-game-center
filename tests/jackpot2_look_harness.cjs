@@ -2,7 +2,7 @@
 //
 //   python3 tools/build_plugin.py && node tests/jackpot2_look_harness.cjs
 //
-// tests/jackpot2_harness.cjs pins where the two settings sit (the same panel as Show over chat,
+// tests/jackpot2_harness.cjs pins where the two settings sit (the same panel as Show as backdrop,
 // See-through and Size), that their default is exactly the copy that was there before them, and that
 // no offset can push the machine out of the conversation or over the composer. This file goes after
 // what reading a panel cannot settle:
@@ -309,9 +309,9 @@ assert.ok(nodes(cabinetPanel).some(node => node.props && node.props['data-jp2-oc
 const namedButtons = nodes(cabinetPanel)
   .filter(node => node.type === 'button' && typeof node.props.children === 'string')
   .map(node => node.props.children).sort()
-assert.deepEqual(plain(namedButtons), ['Reset look'],
-  'and both buttons say what they are — an empty button is a defect the panel layout hides')
-assert.ok(words(rows[1]).includes('See-through') && words(rows[1]).includes('Size'),
+assert.deepEqual(plain(namedButtons), ['Large', 'Medium', 'Reset look', 'Small'],
+  'and every button says what it is — an empty button is a defect the panel layout hides; Small, Medium and Large ride on the size row')
+assert.ok(words(rows[1]).includes('See-through') && words(rows[1]).includes('Backdrop size'),
   `both sliders on the shared row keep their name (${words(rows[1]).trim()})`)
 assert.ok(words(rows[2]).includes('Colour') && words(rows[2]).includes('Teal (current)'),
   `the colour row names the setting and the gradient (${words(rows[2]).trim()})`)

@@ -232,10 +232,10 @@ const layerFacts = () => evaluate(`(() => {
 })()`)
 
 if (chip && chip.ok) {
-  // Switch it on from the cabinet's own panel: open Slots, tick Show over chat, come back.
+  // Switch it on from the cabinet's own panel: open Slots, tick Show as backdrop, come back.
   await click('[data-game-tile="slots"]')
   await sleep(2500)
-  check('the cabinet offers the Show over chat switch', (await switchOn()) === true)
+  check('the cabinet offers the Show as backdrop switch', (await switchOn()) === true)
   await click('[data-jp2="full-back"]')
   await sleep(2000)
   const on = await layerFacts()

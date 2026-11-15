@@ -396,7 +396,7 @@ console.log('jackpot2: the old machine shows no odds numbers, and its session pl
   console.log('jackpot2: the copy is drawn with no document and no window: passed')
 }
 // ---- 8. one switch: the cabinet's own panel and Settings, on the same keys ----
-// A clear "Show over chat" switch INSIDE the Jackpot panel beside
+// A clear "Show as backdrop" switch INSIDE the Jackpot panel beside
 // Auto-spin/Auto-bet, and the same switch with the size and see-through sliders in Settings (the
 // page's and the pane's, which is one component). One source of truth: the keys the status bar
 // already writes.

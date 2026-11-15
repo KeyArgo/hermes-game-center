@@ -6026,7 +6026,7 @@ async function refereeBadgeContract() {
   assert.ok(source.includes('const hold = big ? Math.min(300, Math.max(20, tier.seconds)) : Math.min(10, tier.seconds)'),
     'a normal win rains at most 10 s, a jackpot at most 5 minutes')
   assert.ok(source.includes('if (!celebrate) return undefined'), 'the overlay clears itself on its own deadline')
-  assert.ok(source.includes('smClearCelebrations()'), 'toggling "Show over chat" clears a celebration at once')
+  assert.ok(source.includes('smClearCelebrations()'), 'toggling "Show as backdrop" clears a celebration at once')
   assert.ok(source.includes("data-sm-stop"), 'the person can stop a celebration by hand')
   // A handle used but never declared is a crash `node --check` cannot see: the bundle loaded, the
   // machine threw "celebrateTimer is not defined" on the first result, and the desktop closed the

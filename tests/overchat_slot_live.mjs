@@ -10,7 +10,7 @@
 // tests/browser_table_server.py:
 //
 //   1. the pane page opens with both switches off: no strip, no copy;
-//   2. the switch is turned on by CLICKING the cabinet's own "Show over chat" checkbox — a real React
+//   2. the switch is turned on by CLICKING the cabinet's own "Show as backdrop" checkbox — a real React
 //      state change, no reload — and the copy must be drawn at the TOP of the window, centred over the
 //      slot it hangs off, and at least 200 px tall at 1280x800;
 //   3. the window is resized: the copy must re-measure to the new slot width and follow its centre;
@@ -197,7 +197,7 @@ const FACTS = `(() => {
 const middle = (left, right) => (Number(left) + Number(right)) / 2
 
 // The pane opens on its own lobby: pick Slots inside it, the way a person does, so the cabinet (and its
-// own Show over chat switch) is on the page before anything is measured.
+// own Show as backdrop switch) is on the page before anything is measured.
 const openPane = async () => {
   const opened = await evaluate(`(() => {
     const cont = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Continue')
@@ -237,7 +237,7 @@ const clicked = await evaluate(`(() => {
   box.click()
   return 'clicked'
 })()`)
-check('the cabinet offers its own Show over chat switch', clicked === 'clicked',
+check('the cabinet offers its own Show as backdrop switch', clicked === 'clicked',
   `${clicked}: ${JSON.stringify(offAtMount && offAtMount.errors)}`)
 await sleep(2500)
 

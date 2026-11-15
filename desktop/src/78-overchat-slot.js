@@ -19,9 +19,9 @@
 //   - the anchor has no height, so the composer keeps its own, and THE ANCHOR IS THE ONLY THING MEASURED:
 //     its own left edge and width, with a ResizeObserver and a window resize listener.
 //   - the machines are drawn in a child of the anchor that is position: fixed at the top of the window,
-//     as wide as the anchor and centred over it, and no taller than OVERCHAT_MAX_HEIGHT or a share of
-//     the window. They keep their own opacity, their own size preference and their own aspect ratio: the
-//     cabinet is a picture that scales, never a box that stretches.
+//     as wide as the anchor and centred over it, and no taller than 60% of the window nor than
+//     OVERCHAT_MAX_HEIGHT. They keep their own opacity, their own size preference and their own aspect
+//     ratio: the cabinet is a picture that scales, never a box that stretches.
 //   - the machines decide their own look, and are watch-only: nothing here takes a click the
 //     conversation wanted, and each machine's own dismissal controls opt back in.
 //
@@ -44,8 +44,9 @@ const OVERCHAT_TOP = 56
 const OVERCHAT_TOP_SLACK = 6
 
 // The most of the window's height the machines may use. The conversation behind them is the point: they
-// are a see-through picture on top of it, not a page of their own.
-const OVERCHAT_VIEW_SHARE = 0.42
+// are a see-through picture on top of it, not a page of their own. 60% is the owner's ask — the machine
+// is worth watching, and the top three fifths of the window is where it is allowed to be big.
+const OVERCHAT_VIEW_SHARE = 0.60
 
 // What one machine's cell looks like. `minWidth: 0` matters: without it a flex item refuses to shrink
 // below its content, and a wide cabinet would push the row past the composer instead of being fitted.
@@ -69,8 +70,10 @@ function overchatAnchor(ref) {
 }
 
 // How tall the drawn machines may be. The window's own height is a viewing policy — how much of what the
-// person is looking at the machines may cover — not a measurement of the app, and it is capped by the
-// height budget a machine in a conversation is allowed at all.
+// person is looking at the machines may cover — not a measurement of the app: 60% of it, with
+// OVERCHAT_MAX_HEIGHT as the ceiling. What the machinery DRAWS at that room is the fit's business
+// (overchatFitScale in 19-jackpot-overlay.js): 100% is still the size the copy has always had, and the
+// extra room is what the size slider spends above 100%.
 function overchatStageHeight() {
   const win = overchatWindow()
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0

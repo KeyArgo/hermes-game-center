@@ -154,7 +154,7 @@ const machineTree = draw('SlotMachine(slotProps)')
 const overlayText = words(overlay)
 const machineText = words(machineTree)
 assert.ok(overlayText.includes('Slots'), 'the header says Slots: ' + overlayText)
-assert.ok(machineText.includes('Auto-spin on every message'), 'the auto-spin checkbox is labelled: ' + machineText)
+assert.ok(machineText.includes('Inference Auto Play (spin when Hermes thinks)'), 'the auto-spin checkbox is labelled: ' + machineText)
 assert.ok(machineText.includes('Bet'), 'the bet ladder is labelled: ' + machineText)
 assert.ok(machineText.includes('12,340'), 'chips are formatted with commas: ' + machineText)
 assert.ok(nodes(machineTree).some(node => node.type === 'button' && node.props && node.props['data-sm-spin']), 'the overlay offers SPIN')
@@ -169,7 +169,7 @@ sandbox.centreSlotProps = { ...slotNode.props, bare: true }
 const centreTree = draw('SlotMachine(centreSlotProps)')
 const centreText = words(centreTree)
 assert.ok(!centreText.includes('SPIN'), 'the bare machine has no SPIN: ' + centreText)
-assert.ok(!centreText.includes('Auto-spin on every message'), 'the bare machine has no auto-spin checkbox: ' + centreText)
+assert.ok(!centreText.includes('Inference Auto Play (spin when Hermes thinks)'), 'the bare machine has no auto-spin checkbox: ' + centreText)
 assert.ok(centreText.includes('Show'), 'the bare machine offers Show: ' + centreText)
 assert.ok(nodes(centreTree).some(node => node.props && node.props['aria-label'] === 'Close'), 'the bare machine offers a Close control')
 reset()
@@ -317,15 +317,15 @@ const tableTree = draw('SlotMachine(tableProps)')
   assert.equal(storage['gameshelf.slots.scale'], '1', 'reset returns to the Game Center size')
   assert.equal(evaluate('SM_SCALE_STATE.value'), 1, 'and the over-chat copy matches the cabinet again')
 }
-const overLabel = nodes(tableTree).find(node => node.type === 'label' && words(node).includes('Show over chat'))
-assert.ok(overLabel, 'the machine offers a Show over chat checkbox')
+const overLabel = nodes(tableTree).find(node => node.type === 'label' && words(node).includes('Show as backdrop'))
+assert.ok(overLabel, 'the machine offers a Show as backdrop checkbox')
 // The opacity control appears with the over-chat machine and steps in 5% increments.
 {
   const alphaRow = nodes(tableTree).find(node => node.props && node.props['data-sm-alpha'] === '1')
-  assert.ok(!alphaRow, 'the opacity control is hidden until Show over chat is on')
+  assert.ok(!alphaRow, 'the opacity control is hidden until Show as backdrop is on')
 }
 {
-  const box = nodes(nodes(tableTree).find(node => node.type === 'label' && words(node).includes('Show over chat'))).find(node => node.type === 'input')
+  const box = nodes(nodes(tableTree).find(node => node.type === 'label' && words(node).includes('Show as backdrop'))).find(node => node.type === 'input')
   box.props.onChange({ target: { checked: true } })
   const after = draw('SlotMachine(tableProps)')
   const row = nodes(after).find(node => node.props && node.props['data-sm-alpha'] === '1')
@@ -440,7 +440,7 @@ function drawCopy(width) {
   console.log('slots: the copy is drawn inside the composer slot, fitted to it: passed')
 }
 const offTree = draw('SlotMachine(tableProps)')
-const offLabel = nodes(offTree).find(node => node.type === 'label' && words(node).includes('Show over chat'))
+const offLabel = nodes(offTree).find(node => node.type === 'label' && words(node).includes('Show as backdrop'))
 assert.equal(nodes(offLabel).find(node => node.type === 'input').props.checked, false,
   'the table checkbox unticks when the over-chat machine is closed')
 

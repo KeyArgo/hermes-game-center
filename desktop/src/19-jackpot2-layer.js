@@ -129,6 +129,15 @@ const JP2L_RANGES = {
   hue: { min: JP2L_HUE_MIN, max: JP2L_HUE_MAX, step: 1 }
 }
 
+// Three sizes in one press, beside the size slider: the smaller copy, the size it has always been, and
+// the big one the taller stage now allows. They write the slider's own value — not a second scale — so
+// the readout, the stored number and the fit cannot disagree.
+const JP2L_SIZE_PRESETS = [
+  { id: 'small', label: 'Small', size: 0.75 },
+  { id: 'medium', label: 'Medium', size: 1 },
+  { id: 'large', label: 'Large', size: 1.6 }
+]
+
 function jp2LWin() {
   return typeof window === 'undefined' ? null : window
 }
@@ -529,7 +538,7 @@ function jp2LStage(ctx, geo, mode, tintNow) {
       overlay ? jsx('style', { children: jp2LStyleRules(tint) }, 'rules') : null,
       jp2LMachine(ctx, mode || 'overlay'),
       overlay ? jsx('button', {
-        type: 'button', 'data-jp2-close': '1', 'aria-label': 'Close Slots over chat',
+        type: 'button', 'data-jp2-close': '1', 'aria-label': 'Close backdrop',
         onClick: () => jp2LSetOverchat(false, ctx),
         style: { position: 'absolute', right: 12, top: 12, zIndex: 10, pointerEvents: 'auto', cursor: 'pointer', border: '1px solid #3ee0c5', borderRadius: 6, background: '#173044', color: '#fff', fontSize: 20 },
         children: '×'
@@ -567,8 +576,8 @@ function Jackpot2OverChatControls({ ctx, tone }) {
     max: JP2L_RANGES[key].max,
     step: JP2L_RANGES[key].step,
     value,
-    'aria-label': `Jackpot over chat: ${label}`,
-    title: `Jackpot over chat: ${label}`,
+    'aria-label': `Jackpot backdrop: ${label}`,
+    title: `Jackpot backdrop: ${label}`,
     'data-jp2-oc-range': key,
     onChange: event => onChange(Number(event.target.value)),
     style: { width: dark ? 68 : 108, margin: 0, accentColor: glow, cursor: 'pointer', pointerEvents: 'auto' }
@@ -618,7 +627,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
   const swatch = item => jsx('button', {
     type: 'button',
     'data-jp2-oc-swatch': String(item.hue),
-    'aria-label': `Jackpot over chat: tint ${item.name}`,
+    'aria-label': `Jackpot backdrop: tint ${item.name}`,
     'aria-pressed': tint.hue === item.hue,
     title: `${item.name} (hue ${item.hue})`,
     onClick: () => tintActions.setHue(item.hue),
@@ -658,18 +667,25 @@ function Jackpot2OverChatControls({ ctx, tone }) {
                 onChange: event => setOn(event.target.checked),
                 style: { accentColor: glow, cursor: 'pointer' }
               }, 'box'),
-              jsx('span', { children: 'Show over chat' }, 'text')
+              jsx('span', { children: 'Show as backdrop' }, 'text')
             ]
           }, 'toggle'),
-          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The over-chat switch itself is left as it is.', () => tintActions.reset())
+          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The backdrop switch itself is left as it is.', () => tintActions.reset())
         ]
       }, 'switch'),
       row('alpha', 'See-through', [
         slider('alpha', 'see-through', alpha, setAlpha),
         readout('alpha', `${Math.round(alpha * 100)}%`),
-        tag('Size', 'size-tag'),
+        tag('Backdrop size', 'size-tag'),
         slider('size', 'size', size, setSize),
-        readout('size', `${Math.round(size * 100)}%`)
+        readout('size', `${Math.round(size * 100)}%`),
+        // The slider's own three stops, so the backdrop can be made big without dragging for it.
+        ...JP2L_SIZE_PRESETS.map(preset => button(
+          `size-${preset.id}`,
+          preset.label,
+          `Backdrop size: ${preset.label.toLowerCase()}, ${Math.round(preset.size * 100)}% of the size it has always been`,
+          () => setSize(preset.size)
+        ))
       ], dark ? 64 : 74),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.
@@ -679,7 +695,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         readout('hue', `${tint.hue}°`),
         jsx('select', {
           'data-jp2-oc-select': 'gradient',
-          'aria-label': 'Jackpot over chat: gradient',
+          'aria-label': 'Jackpot backdrop: gradient',
           title: 'Gradient: how the tint is laid across the frame. The teal is the frame the cabinet has always worn.',
           value: tint.gradient,
           onChange: event => tintActions.setGradient(event.target.value),

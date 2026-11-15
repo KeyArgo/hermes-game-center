@@ -93,7 +93,7 @@ function useSmScale() {
   }, [])
   return [scale, smSetScale]
 }
-// The "Show over chat" setting is per viewer and shared by every mounted machine.
+// The "Show as backdrop" setting is per viewer and shared by every mounted machine.
 const SM_OVERCHAT_KEY = 'gameshelf.slots.overchat'
 const SM_OVERCHAT = { on: false, listeners: new Set() }
 
@@ -139,7 +139,7 @@ function smSetOverchat(value, { save = true } = {}) {
   SM_OVERCHAT.listeners.forEach(listener => listener(on))
   // Toggling the see-through copy is also the person's manual escape from a celebration that is
   // still raining: every mounted machine drops its coins at once, so a stuck overlay can never
-  // survive a click on "Show over chat".
+  // survive a click on "Show as backdrop".
   smClearCelebrations()
 }
 
@@ -177,7 +177,7 @@ function useSmOverchat() {
 }
 
 // How see-through the over-chat copy is. A viewing preference, not a game rule: it lives in
-// this browser, the control sits beside "Show over chat", and every mounted copy of the
+// this browser, the control sits beside "Show as backdrop", and every mounted copy of the
 // machine follows it the moment it changes. The default is 20%, five points more opaque than the
 // 15% it was.
 const SM_ALPHA_KEY = 'gameshelf.slots.overchat_alpha'
@@ -675,7 +675,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
     if (typeof SM_flushPrefs === 'function') SM_flushPrefs()
   }, [])
 
-  // The person's manual escape: toggling "Show over chat" clears any celebration this machine is
+  // The person's manual escape: toggling "Show as backdrop" clears any celebration this machine is
   // still drawing, so a stuck rain ends on a click instead of a reload.
   const clearShow = useCallback(() => {
     setCelebrate(null)
@@ -1732,7 +1732,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             },
             children: `SPIN · ${bet || ''}`.trim()
           }),
-          checkbox('Auto-spin on every message', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
+          checkbox('Inference Auto Play (spin when Hermes thinks)', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
           checkbox('Auto-bet sizes itself', autobetShown, flipAutobet, 'Turn starting or a tool running: 1x. A reply under 20k tokens: 2x. Then 3x at 40k, 4x at 80k, 6x at 160k, 8x at 320k and above - 1x is 25 chips, the smallest bet on the table. Never more than the cap, and the odds are identical at every bet: a bigger bet is a bigger swing, not a better chance.'),
           jsx('button', {
             type: 'button',
@@ -1749,7 +1749,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             style: { fontSize: 11, lineHeight: 1.45, color: text.tertiary, maxWidth: 420, padding: '4px 0 0 2px' },
             children: AUTOBET_RULES
           }) : null,
-          checkbox('Show over chat', overchat, value => setOverchat(value), 'Show a see-through copy of this machine over the chat, where you can watch it without leaving the conversation.'),
+          checkbox('Show as backdrop', overchat, value => setOverchat(value), 'Show a see-through copy of this machine as a backdrop over the chat, where you can watch it without leaving the conversation.'),
           overchat ? jsxs('div', {
             'data-sm-alpha': '1',
             style: {
@@ -1757,7 +1757,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary)
             },
             children: [
-              jsx('span', { children: 'Over-chat opacity' }),
+              jsx('span', { children: 'Backdrop opacity' }),
               jsx('button', {
                 type: 'button', 'data-sm-alpha-down': '1', title: 'Fainter', onClick: () => smNudgeOverchatAlpha(-1),
                 style: { cursor: 'pointer', borderRadius: SM_px(6), border: `1px solid ${smEdge()}`, background: 'transparent', color: 'inherit', fontSize: SM_px(12), lineHeight: 1, padding: `${SM_px(2)}px ${SM_px(7)}px` },
@@ -1780,11 +1780,11 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary), width: '100%'
             },
             children: [
-              jsx('span', { children: 'Over-chat size' }),
+              jsx('span', { children: 'Backdrop size' }),
               jsx('input', {
                 type: 'range', 'data-sm-scale-range': '1', min: SM_SCALE_MIN, max: SM_SCALE_MAX, step: SM_SCALE_STEP,
                 value: scale, title: 'Drag left to make the see-through machine smaller. It never grows past the Game Center size.',
-                'aria-label': `Over-chat machine size, ${Math.round(scale * 100)} percent`,
+                'aria-label': `Backdrop size, ${Math.round(scale * 100)} percent`,
                 onChange: event => setScale(Number(event.target.value)),
                 style: { accentColor: smAccent(), width: SM_px(120), cursor: 'pointer' }
               }),

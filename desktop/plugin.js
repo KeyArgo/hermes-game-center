@@ -5949,7 +5949,7 @@ function useSmScale() {
   }, [])
   return [scale, smSetScale]
 }
-// The "Show over chat" setting is per viewer and shared by every mounted machine.
+// The "Show as backdrop" setting is per viewer and shared by every mounted machine.
 const SM_OVERCHAT_KEY = 'gameshelf.slots.overchat'
 const SM_OVERCHAT = { on: false, listeners: new Set() }
 
@@ -5995,7 +5995,7 @@ function smSetOverchat(value, { save = true } = {}) {
   SM_OVERCHAT.listeners.forEach(listener => listener(on))
   // Toggling the see-through copy is also the person's manual escape from a celebration that is
   // still raining: every mounted machine drops its coins at once, so a stuck overlay can never
-  // survive a click on "Show over chat".
+  // survive a click on "Show as backdrop".
   smClearCelebrations()
 }
 
@@ -6033,7 +6033,7 @@ function useSmOverchat() {
 }
 
 // How see-through the over-chat copy is. A viewing preference, not a game rule: it lives in
-// this browser, the control sits beside "Show over chat", and every mounted copy of the
+// this browser, the control sits beside "Show as backdrop", and every mounted copy of the
 // machine follows it the moment it changes. The default is 20%, five points more opaque than the
 // 15% it was.
 const SM_ALPHA_KEY = 'gameshelf.slots.overchat_alpha'
@@ -6531,7 +6531,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
     if (typeof SM_flushPrefs === 'function') SM_flushPrefs()
   }, [])
 
-  // The person's manual escape: toggling "Show over chat" clears any celebration this machine is
+  // The person's manual escape: toggling "Show as backdrop" clears any celebration this machine is
   // still drawing, so a stuck rain ends on a click instead of a reload.
   const clearShow = useCallback(() => {
     setCelebrate(null)
@@ -7588,7 +7588,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             },
             children: `SPIN · ${bet || ''}`.trim()
           }),
-          checkbox('Auto-spin on every message', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
+          checkbox('Inference Auto Play (spin when Hermes thinks)', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
           checkbox('Auto-bet sizes itself', autobetShown, flipAutobet, 'Turn starting or a tool running: 1x. A reply under 20k tokens: 2x. Then 3x at 40k, 4x at 80k, 6x at 160k, 8x at 320k and above - 1x is 25 chips, the smallest bet on the table. Never more than the cap, and the odds are identical at every bet: a bigger bet is a bigger swing, not a better chance.'),
           jsx('button', {
             type: 'button',
@@ -7605,7 +7605,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             style: { fontSize: 11, lineHeight: 1.45, color: text.tertiary, maxWidth: 420, padding: '4px 0 0 2px' },
             children: AUTOBET_RULES
           }) : null,
-          checkbox('Show over chat', overchat, value => setOverchat(value), 'Show a see-through copy of this machine over the chat, where you can watch it without leaving the conversation.'),
+          checkbox('Show as backdrop', overchat, value => setOverchat(value), 'Show a see-through copy of this machine as a backdrop over the chat, where you can watch it without leaving the conversation.'),
           overchat ? jsxs('div', {
             'data-sm-alpha': '1',
             style: {
@@ -7613,7 +7613,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary)
             },
             children: [
-              jsx('span', { children: 'Over-chat opacity' }),
+              jsx('span', { children: 'Backdrop opacity' }),
               jsx('button', {
                 type: 'button', 'data-sm-alpha-down': '1', title: 'Fainter', onClick: () => smNudgeOverchatAlpha(-1),
                 style: { cursor: 'pointer', borderRadius: SM_px(6), border: `1px solid ${smEdge()}`, background: 'transparent', color: 'inherit', fontSize: SM_px(12), lineHeight: 1, padding: `${SM_px(2)}px ${SM_px(7)}px` },
@@ -7636,11 +7636,11 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary), width: '100%'
             },
             children: [
-              jsx('span', { children: 'Over-chat size' }),
+              jsx('span', { children: 'Backdrop size' }),
               jsx('input', {
                 type: 'range', 'data-sm-scale-range': '1', min: SM_SCALE_MIN, max: SM_SCALE_MAX, step: SM_SCALE_STEP,
                 value: scale, title: 'Drag left to make the see-through machine smaller. It never grows past the Game Center size.',
-                'aria-label': `Over-chat machine size, ${Math.round(scale * 100)} percent`,
+                'aria-label': `Backdrop size, ${Math.round(scale * 100)} percent`,
                 onChange: event => setScale(Number(event.target.value)),
                 style: { accentColor: smAccent(), width: SM_px(120), cursor: 'pointer' }
               }),
@@ -8609,22 +8609,34 @@ function JackpotOverlay({ ctx, onClose, data }) {
 // window.innerWidth, a textarea's position, or another element's rect.
 //
 // The height budget both copies share, at most. A see-through machine over the conversation is a picture
-// over it: this is the tallest it may be, whatever room its share of the width would allow.
-const OVERCHAT_MAX_HEIGHT = 320
+// over it: this is the tallest it may ever be, whatever room its share of the width would allow. The
+// stage gives it up to 60% of the window (78-overchat-slot.js) and this is the absolute ceiling that
+// share may not pass, however tall the window is.
+const OVERCHAT_MAX_HEIGHT = 720
 
-// Fit a cabinet of `natural` size into `room` pixels of width. "100%" is the largest the room allows —
-// whichever runs out first, the width or the height budget (`ceiling`, OVERCHAT_MAX_HEIGHT when the
-// caller has no budget of its own) — and the person's own size slider multiplies it from there, still
-// never past the width. 0 while either number is unknown (the first paint, before the cabinet has been
+// What "100%" means. A copy over the conversation used to be capped at this height, and the person's
+// size slider is a multiplier OF THAT SIZE — so 100% must stay exactly the machine they already have.
+// The stage is allowed to be taller now (60% of the window, up to OVERCHAT_MAX_HEIGHT); that extra room
+// is what the slider above 100% spends, not a bigger default.
+const OVERCHAT_BASE_HEIGHT = 320
+
+// Fit a cabinet of `natural` size into `room` pixels of width. "100%" is the largest the room allows
+// within the size the copy has always been drawn at (OVERCHAT_BASE_HEIGHT) — whichever runs out first,
+// the width or that height — and the person's own size slider multiplies it from there: still never
+// past the width, and never past the `ceiling` it was handed (the stage's own height, at most
+// OVERCHAT_MAX_HEIGHT). 0 while either number is unknown (the first paint, before the cabinet has been
 // laid out).
 function overchatFitScale(natural, room, multiplier, ceiling) {
   const width = Math.max(0, Number(room) || 0)
-  const budget = Number(ceiling) > 0 ? Number(ceiling) : OVERCHAT_MAX_HEIGHT
+  const budget = Number(ceiling) > 0 ? Math.min(Number(ceiling), OVERCHAT_MAX_HEIGHT) : OVERCHAT_MAX_HEIGHT
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
-  const byHeight = budget / natural.height
-  const scale = Math.min(Math.min(byWidth, byHeight) * factor, byWidth)
+  // The 100% size: the smaller of the share's width and the size the copy has always had.
+  const byBase = Math.min(OVERCHAT_BASE_HEIGHT, budget) / natural.height
+  // The hard stop above 100%: the room it was given, never past the absolute ceiling.
+  const byRoom = budget / natural.height
+  const scale = Math.min(Math.min(byWidth, byBase) * factor, byWidth, byRoom)
   // Below two percent is not a small copy, it is an invisible one: draw nothing rather than a smudge.
   return scale > 0.02 ? Math.floor(scale * 10000) / 10000 : 0
 }
@@ -8900,6 +8912,15 @@ const JP2L_RANGES = {
   size: { min: JP2L_SIZE_MIN, max: JP2L_SIZE_MAX, step: 0.05 },
   hue: { min: JP2L_HUE_MIN, max: JP2L_HUE_MAX, step: 1 }
 }
+
+// Three sizes in one press, beside the size slider: the smaller copy, the size it has always been, and
+// the big one the taller stage now allows. They write the slider's own value — not a second scale — so
+// the readout, the stored number and the fit cannot disagree.
+const JP2L_SIZE_PRESETS = [
+  { id: 'small', label: 'Small', size: 0.75 },
+  { id: 'medium', label: 'Medium', size: 1 },
+  { id: 'large', label: 'Large', size: 1.6 }
+]
 
 function jp2LWin() {
   return typeof window === 'undefined' ? null : window
@@ -9301,7 +9322,7 @@ function jp2LStage(ctx, geo, mode, tintNow) {
       overlay ? jsx('style', { children: jp2LStyleRules(tint) }, 'rules') : null,
       jp2LMachine(ctx, mode || 'overlay'),
       overlay ? jsx('button', {
-        type: 'button', 'data-jp2-close': '1', 'aria-label': 'Close Slots over chat',
+        type: 'button', 'data-jp2-close': '1', 'aria-label': 'Close backdrop',
         onClick: () => jp2LSetOverchat(false, ctx),
         style: { position: 'absolute', right: 12, top: 12, zIndex: 10, pointerEvents: 'auto', cursor: 'pointer', border: '1px solid #3ee0c5', borderRadius: 6, background: '#173044', color: '#fff', fontSize: 20 },
         children: '×'
@@ -9339,8 +9360,8 @@ function Jackpot2OverChatControls({ ctx, tone }) {
     max: JP2L_RANGES[key].max,
     step: JP2L_RANGES[key].step,
     value,
-    'aria-label': `Jackpot over chat: ${label}`,
-    title: `Jackpot over chat: ${label}`,
+    'aria-label': `Jackpot backdrop: ${label}`,
+    title: `Jackpot backdrop: ${label}`,
     'data-jp2-oc-range': key,
     onChange: event => onChange(Number(event.target.value)),
     style: { width: dark ? 68 : 108, margin: 0, accentColor: glow, cursor: 'pointer', pointerEvents: 'auto' }
@@ -9390,7 +9411,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
   const swatch = item => jsx('button', {
     type: 'button',
     'data-jp2-oc-swatch': String(item.hue),
-    'aria-label': `Jackpot over chat: tint ${item.name}`,
+    'aria-label': `Jackpot backdrop: tint ${item.name}`,
     'aria-pressed': tint.hue === item.hue,
     title: `${item.name} (hue ${item.hue})`,
     onClick: () => tintActions.setHue(item.hue),
@@ -9430,18 +9451,25 @@ function Jackpot2OverChatControls({ ctx, tone }) {
                 onChange: event => setOn(event.target.checked),
                 style: { accentColor: glow, cursor: 'pointer' }
               }, 'box'),
-              jsx('span', { children: 'Show over chat' }, 'text')
+              jsx('span', { children: 'Show as backdrop' }, 'text')
             ]
           }, 'toggle'),
-          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The over-chat switch itself is left as it is.', () => tintActions.reset())
+          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The backdrop switch itself is left as it is.', () => tintActions.reset())
         ]
       }, 'switch'),
       row('alpha', 'See-through', [
         slider('alpha', 'see-through', alpha, setAlpha),
         readout('alpha', `${Math.round(alpha * 100)}%`),
-        tag('Size', 'size-tag'),
+        tag('Backdrop size', 'size-tag'),
         slider('size', 'size', size, setSize),
-        readout('size', `${Math.round(size * 100)}%`)
+        readout('size', `${Math.round(size * 100)}%`),
+        // The slider's own three stops, so the backdrop can be made big without dragging for it.
+        ...JP2L_SIZE_PRESETS.map(preset => button(
+          `size-${preset.id}`,
+          preset.label,
+          `Backdrop size: ${preset.label.toLowerCase()}, ${Math.round(preset.size * 100)}% of the size it has always been`,
+          () => setSize(preset.size)
+        ))
       ], dark ? 64 : 74),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.
@@ -9451,7 +9479,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         readout('hue', `${tint.hue}°`),
         jsx('select', {
           'data-jp2-oc-select': 'gradient',
-          'aria-label': 'Jackpot over chat: gradient',
+          'aria-label': 'Jackpot backdrop: gradient',
           title: 'Gradient: how the tint is laid across the frame. The teal is the frame the cabinet has always worn.',
           value: tint.gradient,
           onChange: event => tintActions.setGradient(event.target.value),
@@ -23460,9 +23488,9 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
 //   - the anchor has no height, so the composer keeps its own, and THE ANCHOR IS THE ONLY THING MEASURED:
 //     its own left edge and width, with a ResizeObserver and a window resize listener.
 //   - the machines are drawn in a child of the anchor that is position: fixed at the top of the window,
-//     as wide as the anchor and centred over it, and no taller than OVERCHAT_MAX_HEIGHT or a share of
-//     the window. They keep their own opacity, their own size preference and their own aspect ratio: the
-//     cabinet is a picture that scales, never a box that stretches.
+//     as wide as the anchor and centred over it, and no taller than 60% of the window nor than
+//     OVERCHAT_MAX_HEIGHT. They keep their own opacity, their own size preference and their own aspect
+//     ratio: the cabinet is a picture that scales, never a box that stretches.
 //   - the machines decide their own look, and are watch-only: nothing here takes a click the
 //     conversation wanted, and each machine's own dismissal controls opt back in.
 //
@@ -23485,8 +23513,9 @@ const OVERCHAT_TOP = 56
 const OVERCHAT_TOP_SLACK = 6
 
 // The most of the window's height the machines may use. The conversation behind them is the point: they
-// are a see-through picture on top of it, not a page of their own.
-const OVERCHAT_VIEW_SHARE = 0.42
+// are a see-through picture on top of it, not a page of their own. 60% is the owner's ask — the machine
+// is worth watching, and the top three fifths of the window is where it is allowed to be big.
+const OVERCHAT_VIEW_SHARE = 0.60
 
 // What one machine's cell looks like. `minWidth: 0` matters: without it a flex item refuses to shrink
 // below its content, and a wide cabinet would push the row past the composer instead of being fitted.
@@ -23510,8 +23539,10 @@ function overchatAnchor(ref) {
 }
 
 // How tall the drawn machines may be. The window's own height is a viewing policy — how much of what the
-// person is looking at the machines may cover — not a measurement of the app, and it is capped by the
-// height budget a machine in a conversation is allowed at all.
+// person is looking at the machines may cover — not a measurement of the app: 60% of it, with
+// OVERCHAT_MAX_HEIGHT as the ceiling. What the machinery DRAWS at that room is the fit's business
+// (overchatFitScale in 19-jackpot-overlay.js): 100% is still the size the copy has always had, and the
+// extra room is what the size slider spends above 100%.
 function overchatStageHeight() {
   const win = overchatWindow()
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
