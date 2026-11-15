@@ -72,3 +72,11 @@ def test_the_stored_keys_are_untouched():
     assert "'gameshelf.slots.scale'" in overlay, "and its size"
     assert "'jackpot2.overchat'" in layer, "and Jackpot v2 keeps its own"
     assert "'jackpot2.size'" in layer and "'jackpot2.alpha'" in layer, "with its own size and opacity"
+
+
+def test_the_jackpot_cabinet_names_its_auto_spin_switch_inference_auto_play():
+    # One feature, one name: the Games-page button and the cabinet's own switch both say
+    # Inference Auto Play, so a person who turned it on in one place can find it in the other.
+    source = (SRC / "18-jackpot2-machine.js").read_text(encoding="utf-8")
+    assert "toggle('autoplay', 'Auto-spin'," not in source
+    assert "toggle('autoplay', 'Inference Auto Play'," in source

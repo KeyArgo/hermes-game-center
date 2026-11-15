@@ -6,6 +6,9 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **One name for auto-spin.** The Jackpot cabinet's own switch said "Auto-spin" while the Games-page
+  button said Inference Auto Play. Both now say **Inference Auto Play** (README and USAGE too); the
+  stored setting is the same one. Guard: `tests/test_backdrop_wording.py`.
 - **Inference Auto Play has a button, on the Games screen.** "Spin while Hermes thinks" was two
   settings in two places — the wallet's autoplay switch (`POST /jackpot/autoplay`) and the Jackpot
   backdrop switch (`jackpot2.overchat`) — and the shelf refuses a reply's spin while no machine reports
