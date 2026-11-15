@@ -48,9 +48,18 @@ HELP = [
     "Double doubles your bet for one more card. The dealer stands on all 17s.",
     "Split two cards of the same rank into two hands, each with a bet of its own; split aces "
     "take one card each and a 21 there is not a blackjack.",
+    "The dealer is the built-in computer unless your Hermes model takes the seat; a model "
+    "thinks before it deals, and the felt says which one is dealing.",
+    "Two people can share this screen: allow-ai blackjack black=local players=2 seats a second "
+    "player, whose chips are a table-only stack and never the Jackpot wallet's.",
 ]
 
 _BETS = (10, 25, 50, 100, 500, 1000)
+# A second person on this screen sits down with a stack of their own, kept in the table
+# state and never in the Jackpot wallet: a guest at the table cannot spend the owner's chips,
+# and the owner's chips cannot be won by a guest.
+GUEST_CHIPS = 10_000
+GUEST_NAME = "Player 2"
 _RANKS = ("A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
 _SUITS = ("S", "H", "D", "C")
 
@@ -120,10 +129,39 @@ def fresh() -> dict:
         "outcome": "",
         "note": "",
         # The round's hands in the order they are played, and which one is being played. A
-        # round with no split holds exactly one; a split holds two or more.
+        # round with no split holds exactly one; a split holds two or more. A table with two
+        # people holds one block per person, in seat order.
         "player_hands": [],
         "active_hand": 0,
+        # One person on this table until a second sits down (setup, players=2).
+        "players": 1,
     }
+
+
+def setup(state: dict, options: dict) -> str:
+    """Table options that come on the same line as the seats.
+
+    ``allow-ai blackjack black=local players=2`` seats a second person on this screen: both
+    play against the dealer, each from their own stack, and the first person's chips are the
+    Jackpot wallet's. Anything else is refused in words, so a typo never silently deals a
+    table nobody asked for.
+    """
+    said = str(options.get("players") or "").strip().lower()
+    if not said:
+        return ""
+    if said not in {"1", "2"}:
+        return "Usage: /games blackjack allow-ai black=local players=1|players=2 (one or two people)"
+    if said == "2":
+        state["players"] = 2
+        state["guest"] = {"name": GUEST_NAME, "chips": GUEST_CHIPS, "last_bet": 0}
+        state["betting"] = 0
+        state["round_bets"] = [0, 0]
+    else:
+        state["players"] = 1
+        state.pop("guest", None)
+        state.pop("betting", None)
+        state.pop("round_bets", None)
+    return ""
 
 
 def parse(words: list[str]) -> str | None:
@@ -193,13 +231,15 @@ def _is_natural(hand: dict) -> bool:
 
 
 def _make_hand(cards, wager: int, *, base: int | None = None, from_split: bool = False,
-               split_aces: bool = False) -> dict:
+               split_aces: bool = False, player: int = 0) -> dict:
     """One hand of a round: its cards, what is staked on it, and how it finished."""
     return {
         "cards": [str(card) for card in cards],
         "wager": int(wager),
         # What the hand was bet before any double, so the felt can show both numbers.
         "base": int(wager if base is None else base),
+        # Which person at the table owns this hand: 0 is the wallet's player, 1 the guest.
+        "player": 1 if player == 1 else 0,
         "doubled": False,
         "from_split": bool(from_split),
         "split_aces": bool(split_aces),
@@ -228,7 +268,8 @@ def _plain_hand(record: object) -> dict | None:
     base = base if isinstance(base, int) and not isinstance(base, bool) and base > 0 else wager
     hand = _make_hand([str(card) for card in record["cards"]], wager, base=base,
                       from_split=record.get("from_split") is True,
-                      split_aces=record.get("split_aces") is True)
+                      split_aces=record.get("split_aces") is True,
+                      player=1 if record.get("player") == 1 else 0)
     hand["doubled"] = record.get("doubled") is True
     hand["done"] = record.get("done") is True
     hand["result"] = str(record.get("result") or "")[:16]
@@ -242,6 +283,91 @@ def _active(state: dict) -> int:
     if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < len(hands):
         return 0
     return index
+
+
+# --- the people at the table -------------------------------------------------------
+# Seat 0 is the person whose chips are the Jackpot wallet's. Seat 1 exists only on a table
+# set up with players=2: a second person on this screen, with their own stack kept in the
+# table state. Hands carry the seat they belong to, so a round is settled hand by hand,
+# each to the person who owns it.
+
+def _table_players(state: dict) -> int:
+    value = state.get("players")
+    if isinstance(value, bool) or value is None:
+        return 2 if value is True else 1
+    if isinstance(value, int):
+        return 2 if value == 2 else 1
+    return 2 if str(value).strip() == "2" else 1
+
+
+def _guest(state: dict) -> dict:
+    """The second person's table-only stack. Missing or broken reads as a fresh one."""
+    guest = state.get("guest")
+    if not isinstance(guest, dict):
+        guest = {}
+    guest["name"] = str(guest.get("name") or GUEST_NAME)
+    chips = guest.get("chips")
+    guest["chips"] = chips if isinstance(chips, int) and not isinstance(chips, bool) and chips >= 0 else GUEST_CHIPS
+    return guest
+
+
+def _owner(hand: dict) -> int:
+    value = hand.get("player") if isinstance(hand, dict) else 0
+    return 1 if value == 1 or value == "1" else 0
+
+
+def _player_name(state: dict, owner: int) -> str:
+    return str(_guest(state)["name"]) if owner else "Player 1"
+
+
+def _stack(state: dict, owner: int) -> int:
+    return int(_guest(state)["chips"]) if owner else int(_wallet().read()["chips"])
+
+
+def _stake(state: dict, owner: int, amount: int) -> bool:
+    """Take a wager from the person who made it: the wallet, or the guest's table stack."""
+    amount = int(amount)
+    if not owner:
+        return _wallet().debit(amount)
+    guest = _guest(state)
+    if int(guest["chips"]) < amount:
+        return False
+    guest["chips"] = int(guest["chips"]) - amount
+    return True
+
+
+def _credit(state: dict, owner: int, amount: int) -> None:
+    """Pay a finished hand back to the stack it was staked from - never across people."""
+    amount = int(amount)
+    if not owner:
+        _wallet().credit(amount, hand=True)
+        return
+    guest = _guest(state)
+    guest["chips"] = int(guest["chips"]) + amount
+
+
+def _betting_owner(state: dict) -> int:
+    """Whose bet the table is waiting for: seat 0 first, then the guest."""
+    if _table_players(state) != 2:
+        return 0
+    return 1 if state.get("betting") == 1 else 0
+
+
+def _round_bets(state: dict) -> list[int]:
+    bets = state.get("round_bets")
+    if not isinstance(bets, list) or len(bets) != 2:
+        bets = [0, 0]
+    cleaned = [int(value) if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+               for value in bets]
+    state["round_bets"] = cleaned
+    return cleaned
+
+
+def _hand_net(hand: dict) -> int:
+    """What one finished hand gave back over what it staked."""
+    result = str(hand.get("result") or "")
+    wager = int(hand.get("wager") or 0)
+    return _payout(result, wager) - wager if result else 0
 
 
 def _migrate(state: dict) -> list[dict]:
@@ -312,15 +438,21 @@ def _draw(state: dict) -> str:
 
 
 def _deal(state: dict) -> None:
+    """Two cards each, one to the dealer between rounds.
+
+    A table with one player deals exactly as it always did: player, dealer, player,
+    dealer. A second person sits between them in the deal, so the order is Player 1,
+    Player 2, dealer, twice - every hand and the dealer's two cards from the same shoe.
+    """
     if not state["deck"]:
         state["deck"] = _new_deck(f"{state.get('shoe') or ''}:{int(state.get('hands') or 0)}")
-    hand = _live_hand(state)
-    if hand is None:
+    hands = _migrate(state)
+    if not hands:
         return
-    hand["cards"].append(_draw(state))
-    state["dealer"].append(_draw(state))
-    hand["cards"].append(_draw(state))
-    state["dealer"].append(_draw(state))
+    for _ in range(2):
+        for hand in hands:
+            hand["cards"].append(_draw(state))
+        state["dealer"].append(_draw(state))
     _sync(state)
 
 
@@ -368,8 +500,26 @@ def _round_note(results: list[str], net: int) -> str:
     return f"{said}. Net {net_words} chips."
 
 
+def _two_player_note(state: dict, hands: list[dict]) -> str:
+    """One sentence per person: what their own hands came to, and their own net."""
+    parts = []
+    for owner in (0, 1):
+        mine = [hand for hand in hands if _owner(hand) == owner]
+        if not mine:
+            continue
+        results = [str(hand.get("result") or "") for hand in mine]
+        net = sum(_hand_net(hand) for hand in mine)
+        said = _round_outcome(results)
+        word = _RESULT_VERBS.get(said, said)
+        if len(mine) > 1:
+            word = ", ".join(f"hand {number} {_RESULT_VERBS.get(result, result)}"
+                             for number, result in enumerate(results, start=1))
+        parts.append(f"{_player_name(state, owner)} {word} ({net:+,})")
+    return " · ".join(parts) + "." if parts else ""
+
+
 def _settle_round(state: dict) -> str:
-    """Settle every hand of the round against the dealer in one wallet change.
+    """Settle every hand of the round against the dealer, each to the person who owns it.
 
     The table stays open: a finished round goes straight back to betting, with the cards
     left face up so the result can be read, until the person leaves the table.
@@ -377,8 +527,8 @@ def _settle_round(state: dict) -> str:
     hands = _migrate(state)
     dealer_total = _hand_value(state["dealer"])
     dealer_natural = _is_blackjack(state["dealer"])
-    paid = 0
-    net = 0
+    paid = [0, 0]
+    net = [0, 0]
     results = []
     for hand in hands:
         total = _hand_value(hand["cards"])
@@ -399,17 +549,26 @@ def _settle_round(state: dict) -> str:
             result = "lose"
         hand["done"] = True
         hand["result"] = result
+        owner = _owner(hand)
         wager = int(hand["wager"])
-        paid += _payout(result, wager)
-        net += _payout(result, wager) - wager
+        paid[owner] += _payout(result, wager)
+        net[owner] += _payout(result, wager) - wager
         results.append(result)
-    # One change for the round: the chips left the stack when the bet (and the split, and
-    # the double) was taken, so only what is owed back moves here.
-    _wallet().credit(paid, hand=True)
+    # One change per person for the round: the chips left that person's stack when the bet
+    # (and the split, and the double) was taken, so only what is owed back moves here. A
+    # guest's winnings go back to the guest's table stack, never into the wallet. The
+    # wallet's own count of finished hands moves on every round, lost or won.
+    _credit(state, 0, paid[0])
+    if paid[1]:
+        _credit(state, 1, paid[1])
     state["phase"] = "bet"
-    state["outcome"] = _round_outcome(results)
-    state["won"] = net
+    state["outcome"] = _round_outcome([str(hand.get("result") or "") for hand in hands
+                                       if _owner(hand) == 0] or results)
+    state["won"] = net[0]
     state["hands"] = int(state.get("hands") or 0) + 1
+    state["betting"] = 0
+    state["round_bets"] = [0, 0]
+    state["mid_round"] = False
     # A doubled or split round put more on the felt for that round only; the next bet starts
     # from what the person chose, not from the wagers it grew to. No hand is being played any
     # more, so the felt reads them from the first.
@@ -418,7 +577,10 @@ def _settle_round(state: dict) -> str:
     _sync(state)
     if base:
         state["bet"] = int(base)
-    state["note"] = _round_note(results, net)
+    if _table_players(state) == 2:
+        state["note"] = _two_player_note(state, hands)
+        return state["note"]
+    state["note"] = _round_note(results, net[0])
     return state["note"]
 
 
@@ -463,9 +625,12 @@ def _can_split(state: dict, hand: dict, chips: int | None = None) -> bool:
     # Splitting aces is the first split; splitting the ace that comes back is the flag.
     if ranks[0] == "A" and hand.get("from_split") and not RESPLIT_ACES:
         return False
-    if len(_migrate(state)) >= MAX_HANDS:
+    # Four hands is one person's ceiling, not the table's: a guest splitting must never
+    # cost the other person a split of their own.
+    owner = _owner(hand)
+    if len([item for item in _migrate(state) if _owner(item) == owner]) >= MAX_HANDS:
         return False
-    held = _wallet().read()["chips"] if chips is None else chips
+    held = _stack(state, owner) if chips is None else chips
     return held >= int(hand.get("wager") or 0)
 
 
@@ -475,13 +640,14 @@ def _split(state: dict) -> str:
     index = _active(state)
     hand = hands[index]
     stake = int(hand["wager"])
-    if not _wallet().debit(stake):
+    owner = _owner(hand)
+    if not _stake(state, owner, stake):
         state["note"] = "Not enough chips to split."
         return state["note"]
     cards = list(hand["cards"])
     aces = cards[0][:-1] == cards[1][:-1] == "A"
-    first = _make_hand(cards[:1], stake, from_split=True, split_aces=aces)
-    second = _make_hand(cards[1:], stake, from_split=True, split_aces=aces)
+    first = _make_hand(cards[:1], stake, from_split=True, split_aces=aces, player=owner)
+    second = _make_hand(cards[1:], stake, from_split=True, split_aces=aces, player=owner)
     # The first hand keeps the seat and the new one sits beside it, so the two read left to
     # right in the order they are played.
     hands[index:index + 1] = [first, second]
@@ -513,7 +679,8 @@ def _advance(state: dict) -> str:
     """Play the next unfinished hand, or finish the round.
 
     The dealer plays only once every hand is done, and not at all when they all busted:
-    there is nothing left to beat.
+    there is nothing left to beat. A round of nothing but naturals has nothing for the
+    dealer to beat either, so it settles without drawing a card.
     """
     hands = _migrate(state)
     for index, hand in enumerate(hands):
@@ -521,10 +688,14 @@ def _advance(state: dict) -> str:
             state["active_hand"] = index
             _sync(state)
             if len(hands) > 1:
-                state["note"] = (f"Hand {index + 1} of {len(hands)}: "
+                whose = (f"{_player_name(state, _owner(hand))}, "
+                         if _table_players(state) == 2 else "")
+                state["note"] = (f"{whose}Hand {index + 1} of {len(hands)}: "
                                  f"{_hand_value(hand['cards'])}. Your move.")
             return ""
     if hands and all(_hand_value(hand["cards"]) > 21 for hand in hands):
+        return _settle_round(state)
+    if hands and all(_is_natural(hand) for hand in hands):
         return _settle_round(state)
     return _defer_or_play(state)
 
@@ -532,11 +703,17 @@ def _advance(state: dict) -> str:
 def _turn_line(state: dict) -> str:
     """The moves on offer, in words, so a note can never promise one the rules refuse."""
     offered = legal(state)
+    hands = _migrate(state)
+    # Two people on this screen: name the one whose move it is, so a note is never
+    # addressed to the wrong person.
+    who = "Your move"
+    if _table_players(state) == 2 and hands:
+        who = f"{_player_name(state, _owner(hands[_active(state)]))}'s move"
     if not offered:
         return "No moves are on offer."
     if len(offered) == 1:
-        return f"Your move: {offered[0]}."
-    return "Your move: " + ", ".join(offered[:-1]) + f" or {offered[-1]}."
+        return f"{who}: {offered[0]}."
+    return who + ": " + ", ".join(offered[:-1]) + f" or {offered[-1]}."
 
 
 def _after_hand(state: dict, said: str) -> str:
@@ -549,22 +726,47 @@ def _after_hand(state: dict, said: str) -> str:
     return state["note"]
 
 
-def _ai_dealer(state: dict) -> bool:
-    """True when the dealer seat is the built-in player or the person's agent.
+def _dealer_seat(state: dict) -> str:
+    """Who is dealing: the built-in computer, the person's Hermes model, or the house.
 
-    A person plays only the white seat, so the dealer's two quiet turns (checking
-    the deal, then playing out) are handed to an AI seat when one is seated. With
-    a human dealer seat the rules resolve both inside this module at once.
+    The dealer's seat is the black side. ``local`` is the built-in player, ``agent`` is
+    the person's own model, and anything else is the plain house: the rules deal and
+    play out those cards themselves, with nobody to wait for.
     """
-    return kit.seat_kind(str(state.get("black") or "")) in kit.AI_KINDS
+    kind = kit.seat_kind(str(state.get("black") or ""))
+    return kind if kind in {"local", "agent"} else "house"
+
+
+# The one line the felt reads next to its DEALER label. It names the dealer in every
+# setup, including a table that has not seated a machine yet (the house), because a
+# table that names nobody leaves a person unable to tell whether their own model is
+# the one playing the dealer's cards.
+_DEALER_LINES = {
+    "local": "Dealer: Computer (instant)",
+    "agent": "Dealer: Hermes model (thinks each turn)",
+    "house": "Dealer: Computer (house rules, instant)",
+}
+
+
+def _ai_dealer(state: dict) -> bool:
+    """True when a machine is seated in the dealer's seat (the built-in one or a model)."""
+    return _dealer_seat(state) in {"local", "agent"}
+
+
+def _dealer_thinks(state: dict) -> bool:
+    """Only the person's model takes a turn: the built-in dealer answers inside the move."""
+    return _dealer_seat(state) == "agent"
 
 
 def legal(state: dict) -> list[str]:
     if state.get("status") != "active":
         return []
-    held = _wallet().read()
     if state.get("phase") == "bet":
-        moves = [f"bet{amount}" for amount in _BETS if amount <= held["chips"]]
+        # The bet on offer is the one the person whose turn it is to bet can afford: the
+        # wallet for seat 0, the guest's table stack for seat 1.
+        owner = _betting_owner(state)
+        held = _stack(state, owner)
+        moves = [f"bet{amount}" for amount in _BETS if amount <= held]
         # Out of chips: one honest move that deals a fresh stack, instead of a table with no
         # legal move at all (which is how a player got stranded before).
         return moves or ["topup"]
@@ -572,28 +774,91 @@ def legal(state: dict) -> list[str]:
         return ["stand"]
     if state.get("phase") == "play":
         hand = _live_hand(state)
+        held = _stack(state, _owner(hand)) if hand is not None else 0
         if hand is not None and hand.get("split_aces"):
             # A split ace has had its one card: it stands, unless a resplit is on offer.
-            return ["stand"] + (["split"] if _can_split(state, hand, held["chips"]) else [])
+            return ["stand"] + (["split"] if _can_split(state, hand, held) else [])
         moves = ["hit", "stand"]
         if hand is not None:
             # Double and split are offered by the rules, never guessed at by the felt, and
             # both need the chips for the extra wager before they are on offer.
-            if _can_double(state, hand, held["chips"]):
+            if _can_double(state, hand, held):
                 moves.append("double")
-            if _can_split(state, hand, held["chips"]):
+            if _can_split(state, hand, held):
                 moves.append("split")
         return moves
     return []
 
 
 def _defer_or_play(state: dict) -> str:
-    if _ai_dealer(state):
+    """Hand the dealer's cards out, unless the person's own model is dealing.
+
+    The built-in computer answers inside the same move: there is nothing to wait for,
+    and asking it for a turn of its own made a bet look like a stalled table. Only a
+    Hermes model takes a turn, and the table says so while it thinks.
+    """
+    if _dealer_thinks(state):
         state["phase"] = "dealer"
         state["turn"] = "black"
-        state["note"] = "The dealer plays out the hand."
+        state["note"] = "Hermes model is dealing… it thinks before it fires."
         return state["note"]
     return _dealer_plays(state)
+
+
+def _after_deal(state: dict) -> str | None:
+    """The first look at a dealt round: a natural finishes a hand before anybody plays.
+
+    One person at the table keeps the old rule: a natural (or a dealer natural) settles the
+    hand at once. With two people the round can only settle at once when the dealer has a
+    natural - otherwise each natural hand simply stands and the other person still plays.
+    """
+    hands = _migrate(state)
+    if len(hands) <= 1:
+        return _resolve_natural(state)
+    if _is_blackjack(state["dealer"]):
+        return _settle_round(state)
+    for hand in hands:
+        if _is_natural(hand):
+            hand["done"] = True
+    settled = _advance(state)
+    return settled or None
+
+
+def _start_round(state: dict, bets: list[int]) -> str:
+    """Both bets are in: clear the felt, deal, and say whose move it is."""
+    two = _table_players(state) == 2
+    # A new hand clears the last one off the felt. The shoe carries over between
+    # hands and is reshuffled once it runs low.
+    if int(state.get("hands") or 0) and len(state.get("deck") or []) < 15:
+        state["deck"] = []
+    state["dealer"] = []
+    state["outcome"] = ""
+    state["won"] = 0
+    state["bet"] = int(bets[0])
+    state["player_hands"] = [_make_hand([], int(bets[0]), player=0)]
+    if two:
+        state["player_hands"].append(_make_hand([], int(bets[1]), player=1))
+        guest = _guest(state)
+        guest["last_bet"] = int(bets[1])
+    state["active_hand"] = 0
+    # What the person chose is remembered for the whole round: a double or a split grows
+    # the felt's wagers, and the next bet starts from this, not from them.
+    state["base_bet"] = int(bets[0])
+    state["betting"] = 0
+    state["mid_round"] = True
+    state["phase"] = "play"
+    _deal(state)
+    settled = _after_deal(state)
+    if settled is not None:
+        return settled
+    # The deal check is the rules' own work: it is not a turn, and it never was.
+    # A model dealer is handed the cards at the end of the round, once.
+    if two:
+        state["note"] = (f"Bets in: {_player_name(state, 0)} {int(bets[0]):,}, "
+                         f"{_player_name(state, 1)} {int(bets[1]):,}. {_turn_line(state)}")
+    else:
+        state["note"] = f"Bet {int(bets[0])}. {_turn_line(state)}"
+    return state["note"]
 
 
 def play(state: dict, move) -> str:
@@ -615,6 +880,12 @@ def play(state: dict, move) -> str:
         state["note"] = "That move is not on offer. " + ", ".join(offered) + "."
         return state["note"]
     if token == "topup":
+        owner = _betting_owner(state)
+        if owner:
+            guest = _guest(state)
+            guest["chips"] = GUEST_CHIPS
+            state["note"] = f"{guest['name']} is out of chips. A fresh {GUEST_CHIPS:,} table chips."
+            return state["note"]
         given = _wallet().topup(min(_BETS))
         state["note"] = (
             f"Out of chips. A fresh {given:,} to play with." if given
@@ -623,34 +894,26 @@ def play(state: dict, move) -> str:
         return state["note"]
     if token.startswith("bet"):
         amount = int(token[3:])
-        if not _wallet().debit(amount):
+        owner = _betting_owner(state)
+        two = _table_players(state) == 2
+        if not _stake(state, owner, amount):
             state["note"] = "Not enough chips for that bet."
             return state["note"]
-        # A new hand clears the last one off the felt. The shoe carries over between
-        # hands and is reshuffled once it runs low.
-        if int(state.get("hands") or 0) and len(state.get("deck") or []) < 15:
-            state["deck"] = []
-        state["dealer"] = []
-        state["outcome"] = ""
-        state["won"] = 0
-        state["bet"] = amount
-        state["player_hands"] = [_make_hand([], amount)]
-        state["active_hand"] = 0
-        # What the person chose is remembered for the whole round: a double or a split grows
-        # the felt's wagers, and the next bet starts from this, not from them.
-        state["base_bet"] = amount
-        state["phase"] = "play"
-        _deal(state)
-        natural = _resolve_natural(state)
-        if natural is not None:
-            return natural
-        if _ai_dealer(state):
-            state["phase"] = "deal"
-            state["turn"] = "black"
-            state["note"] = "Dealer checks the deal."
-            return state["note"]
-        state["note"] = f"Bet {amount}. {_turn_line(state)}"
-        return state["note"]
+        if two:
+            bets = _round_bets(state)
+            bets[owner] = amount
+            if owner == 0:
+                # The first person's bet is taken, and the table waits for the second: the
+                # deal needs both, so nothing is staked on cards nobody has been dealt.
+                state["betting"] = 1
+                state["mid_round"] = True
+                state["bet"] = amount
+                state["note"] = (f"{_player_name(state, 0)} bets {amount:,}. "
+                                 f"{_player_name(state, 1)} to bet.")
+                return state["note"]
+        else:
+            bets = [amount, 0]
+        return _start_round(state, bets)
     if token == "hit":
         hand = _live_hand(state)
         if hand is None:
@@ -668,6 +931,8 @@ def play(state: dict, move) -> str:
             return _after_hand(state, f"Twenty-one: {total}. That hand stands.")
         if len(state["player_hands"]) > 1:
             state["note"] = (f"Hand {_active(state) + 1} draws: {total}.")
+        elif _table_players(state) == 2:
+            state["note"] = f"{_player_name(state, _owner(hand))} drew a card. The total is {total}."
         else:
             state["note"] = f"You drew a card. Your total is {total}."
         return state["note"]
@@ -677,7 +942,7 @@ def play(state: dict, move) -> str:
             state["note"] = "There is no hand to double."
             return state["note"]
         stake = int(hand["wager"])
-        if not _wallet().debit(stake):
+        if not _stake(state, _owner(hand), stake):
             state["note"] = "Not enough chips to double."
             return state["note"]
         # A double is one extra card and then that hand stands — there is no third decision,
@@ -738,12 +1003,31 @@ def draw(state: dict) -> list[str]:
     dealer_total = _hand_value(visible) if visible else 0
     hands = _migrate(state)
     held = _wallet().read()
+    two = _table_players(state) == 2
     lines = [
         f"Dealer: {' '.join(dealer_cards) or '(no cards)'}",
         f"Dealer shows: {dealer_total}",
+        f"Dealing: {_DEALER_LINES[_dealer_seat(state)].split(': ', 1)[-1]}",
         "",
     ]
-    if len(hands) > 1:
+    if two:
+        # Two people at one table read their own hands by name, and their own stack.
+        for owner in (0, 1):
+            mine = [(number, hand) for number, hand in enumerate(hands, start=1)
+                    if _owner(hand) == owner]
+            lines.append(f"{_player_name(state, owner)} — chips {_stack(state, owner):,}")
+            if not mine:
+                lines.append("  no bet yet")
+                continue
+            for number, hand in mine:
+                cards = " ".join(hand["cards"]) or "(no cards)"
+                wager = f"bet {int(hand['wager']):,}" + (" (doubled)" if hand.get("doubled") else "")
+                result = f", {hand['result']}" if hand.get("result") else ""
+                current = " <-- playing" if playing and number - 1 == _active(state) else ""
+                lines.append(f"  Hand {number}: {cards} = {_hand_value(hand['cards'])} "
+                             f"({wager}{result}){current}")
+        lines.append(f"Total bet: {sum(int(hand['wager']) for hand in hands):,} chips")
+    elif len(hands) > 1:
         # A split round is read hand by hand: the cards, the wager on them and how each one
         # finished. The hand being played is named, so the next move is never a guess.
         for number, hand in enumerate(hands, start=1):
@@ -758,7 +1042,8 @@ def draw(state: dict) -> list[str]:
         lines.append(f"Your hand: {' '.join(state.get('hand') or []) or '(no cards)'}")
         lines.append(f"Your total: {_hand_value(state.get('hand') or [])}")
         lines.append(f"Bet: {state.get('bet') or 0} chips")
-    lines.append(f"Chips: {held['chips']}")
+    if not two:
+        lines.append(f"Chips: {held['chips']}")
     if state.get("note"):
         lines.append("")
         lines.append(str(state["note"]))
@@ -773,10 +1058,11 @@ def draw(state: dict) -> list[str]:
     return lines
 
 
-def _shown_hand(hand: dict, number: int, active: int, playing: bool) -> dict:
+def _shown_hand(hand: dict, number: int, active: int, playing: bool, state: dict | None = None) -> dict:
     """One hand as the felt draws it: cards, total, what is staked, and how it went."""
     cards = list(hand.get("cards") or [])
     total = _hand_value(cards)
+    owner = _owner(hand)
     return {
         "cards": cards,
         "total": total,
@@ -785,6 +1071,9 @@ def _shown_hand(hand: dict, number: int, active: int, playing: bool) -> dict:
         "original": int(hand.get("base") or hand.get("wager") or 0),
         "doubled": bool(hand.get("doubled")),
         "from_split": bool(hand.get("from_split")),
+        # Which person at the table owns this hand, and what the felt calls them.
+        "seat": owner,
+        "name": _player_name(state, owner) if state is not None else "",
         "active": bool(playing and number == active),
         "done": bool(hand.get("done")),
         "bust": total > 21,
@@ -792,6 +1081,37 @@ def _shown_hand(hand: dict, number: int, active: int, playing: bool) -> dict:
         "blackjack": _is_natural(hand),
         "result": str(hand.get("result") or ""),
     }
+
+
+def _shown_players(state: dict, hands: list[dict], active: int, playing: bool) -> list[dict]:
+    """One entry per person at the table: their name, their stack and their round.
+
+    A single-player table answers with one entry too, so the felt reads the same shape in
+    every setup; ``wallet`` says whose chips are the Jackpot wallet's.
+    """
+    phase = str(state.get("phase") or "bet")
+    bets = _round_bets(state)
+    current = _owner(hands[active]) if hands and 0 <= active < len(hands) else -1
+    saying = []
+    for owner in range(_table_players(state)):
+        mine = [hand for hand in hands if _owner(hand) == owner]
+        results = [str(hand.get("result") or "") for hand in mine if hand.get("result")]
+        net = sum(_hand_net(hand) for hand in mine)
+        staked = sum(int(hand.get("wager") or 0) for hand in mine)
+        saying.append({
+            "seat": owner,
+            "name": _player_name(state, owner),
+            "chips": _stack(state, owner),
+            "wallet": owner == 0,
+            "bet": int(bets[owner]) or staked,
+            "wager": staked,
+            "net": net,
+            "outcome": _round_outcome(results),
+            "done": bool(mine) and all(bool(hand.get("done")) for hand in mine) and not playing,
+            "active": bool(playing and current == owner),
+            "betting": phase == "bet" and _betting_owner(state) == owner,
+        })
+    return saying
 
 
 def picture(state: dict, player=None) -> dict:
@@ -804,9 +1124,16 @@ def picture(state: dict, player=None) -> dict:
     held = _wallet().read()
     hands = _migrate(state)
     active = _active(state) if hands else 0
+    dealer_seat = _dealer_seat(state)
     return {
         "view": "blackjack",
         "phase": state.get("phase", "bet"),
+        # Who is dealing, in one line for the felt next to its DEALER label, and in a word
+        # for anything that wants to branch. Never blank: the plain house is a dealer too.
+        "dealer_kind": dealer_seat,
+        "dealer_line": _DEALER_LINES[dealer_seat],
+        "dealer_note": ("Hermes model is dealing…" if state.get("phase") == "dealer"
+                        and dealer_seat == "agent" else ""),
         # The one hand on the felt, and every hand of the round: the first is what older
         # surfaces read, the second is what the felt draws when a hand was split.
         "hand": list(state.get("hand") or []),
@@ -818,9 +1145,19 @@ def picture(state: dict, player=None) -> dict:
         "outcome": str(state.get("outcome") or ""),
         "won": int(state.get("won") or 0),
         "hands": int(state.get("hands") or 0),
-        "player_hands": [_shown_hand(hand, number, active, playing)
+        "player_hands": [_shown_hand(hand, number, active, playing, state)
                          for number, hand in enumerate(hands)],
         "active_hand": int(active),
+        # The people at this table: one entry on a single-player table, two when a second
+        # person sat down. Each carries their own stack, their own bet and their own round.
+        "players": _shown_players(state, hands, active, playing),
+        # What this table can seat (a second person, or not) and what it has seated now,
+        # so the page offers the three ways in without naming any game itself.
+        "two_players": True,
+        "table_players": _table_players(state),
+        "betting": _betting_owner(state),
+        # Chips already staked in a round that has not been dealt: leaving is not free then.
+        "mid_round": bool(state.get("mid_round")),
         "total_wager": sum(int(hand["wager"]) for hand in hands),
         "original_bet": int(state.get("base_bet") or (hands[0]["base"] if hands else 0) or 0),
         "bets": list(_BETS),

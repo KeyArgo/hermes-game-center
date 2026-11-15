@@ -819,6 +819,16 @@ class Table:
                 remember_level(self.root, said, offered)
         else:
             fresh.pop("level", None)
+        # Options that are not seats travel on the same line (`players=2`) and the game
+        # decides what they mean. A game with no such option ignores what it does not know,
+        # as it always has; a game that has one refuses a value it cannot seat, in words.
+        options = {str(key): str(value) for key, value in seats.items()
+                   if key not in {"white", "black"}}
+        hook = getattr(rules, "setup", None)
+        if options and callable(hook):
+            refused = hook(fresh, options)
+            if refused:
+                return str(refused)
         return self._finish(fresh, [])
 
     def _allow(self, state: dict | None, rest: list[str], source: str, player) -> str:
@@ -846,8 +856,12 @@ class Table:
             return f"Name the AI seat. /games {rules.ID} allow-ai black=local (or black=agent)"
         if learning and sorted([seat_kind(white), seat_kind(black)]) != ["human", "local"]:
             return "Name one built-in player for learn mode."
-        return self._new(state, [f"white={white}", f"black={black}"], player, agreed=True,
-                         level="easy" if learning else said, learning=learning)
+        # Options that are not seats (`players=2`) ride through to the game unchanged.
+        options = {key: value for key, value in seats.items()
+                   if key not in {"white", "black"}}
+        return self._new(state, [f"white={white}", f"black={black}",
+                                 *[f"{key}={value}" for key, value in options.items()]],
+                         player, agreed=True, level="easy" if learning else said, learning=learning)
 
     def _join(self, state: dict, player) -> str:
         if player is not None:

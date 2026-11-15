@@ -233,6 +233,9 @@ def test_the_table_controls_seat_the_computer_and_the_model(tmp_path: Path) -> N
     state["deck"] = list(reversed(["10S", "10H", "9S", "7H"]))  # deal order: player, dealer, player, dealer
     state_path.write_text(json.dumps(state))
     table.command("move bet10", complete=complete, player=ME)
+    assert not asked, "the deal check is the rules' own work, not a model turn"
+    # The dealer is asked once, when the hand is done: the model deals the cards out.
+    table.command("move stand", complete=complete, player=ME)
     assert asked, "the model seated as the dealer was never asked to play"
     assert table.picture(player=ME)["legal"], "the table is still playable after the dealer's turn"
 
