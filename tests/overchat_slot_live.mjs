@@ -15,7 +15,7 @@
 //      slot it hangs off, and at least 200 px tall at 1280x800;
 //   3. the window is resized: the copy must re-measure to the new slot width and follow its centre;
 //   4. both switches on: two machines, side by side, still at the top;
-//   5. a host whose slot has a transform traps fixed positioning inside itself: the placement check has to
+//   5. a host whose status bar has a transform traps even the stage: the placement check has to
 //      see that and fall back to drawing in the slot, where the copy is still visible;
 //   6. the switch is turned off again: the copy and the strip must both go.
 //
@@ -242,8 +242,10 @@ check('the cabinet offers its own Show over chat switch', clicked === 'clicked',
 await sleep(2500)
 
 const onNow = await evaluate(FACTS)
-check('turning it on draws the copy inside the composer slot, at a size a person can see',
-  Boolean(onNow && onNow.strip && onNow.copy && onNow.copyInsideSlot
+// The composer dock is centred with a transform (as the Desktop's is), so the copy is drawn by the
+// status-bar stage, not inside the slot: the slot keeps only the zero-height anchor.
+check('turning it on draws the copy from the status-bar stage, with only an anchor left in the slot',
+  Boolean(onNow && onNow.strip && onNow.copy && !onNow.copyInsideSlot && onNow.anchorHeight === 0
     && onNow.copyWidth > 40 && onNow.copyHeight > 40 && onNow.copyPosition !== 'fixed'),
   JSON.stringify(onNow))
 // The fit has TWO limits and the tighter one wins: its share of the slot's width, or the height budget the
@@ -342,7 +344,7 @@ check('and both are at the top of the window with the slot, not stacked on each 
 await shot('overchat-both')
 
 // ---------------------------------------------------------------- 6. a host that traps fixed positioning
-// `?trap=1` puts a transform on the slot, which makes the slot the containing block for the fixed stage, so
+// `?trap=1` puts a transform on the status bar, which makes it the containing block for the fixed stage, so
 // the stage lands beside the composer instead of at the top of the window. The placement check has to
 // notice from the stage's own rect and fall back to drawing in the slot — visible, just not at the top.
 await cdp('Page.navigate', { url: `${URL_BASE}pane?trap=1` })

@@ -2266,10 +2266,13 @@ async function paneContract() {
   assert.equal(entries.find(item => item.id === 'version'), undefined, 'the version is not a status-bar item')
   assert.equal(entries.find(item => item.area === 'right' && item.data && item.data.version), undefined,
     'and nothing else registers it in the status bar')
-  assert.equal(entries.filter(item => item.area === 'right').length, 1,
-    'the status bar has one Slots item and nothing else')
-  // The two see-through machines are a composer-slot contribution now: the app owns
-  // where they go, so nothing has to be anchored in the status bar or floated over the app's markup.
+  // One visible item, plus the over-chat stage: it draws nothing while both switches are off, and is in
+  // the status bar only because the composer dock's transform traps a fixed box drawn from the slot.
+  assert.deepEqual(entries.filter(item => item.area === 'right').map(item => item.id).sort(), ['overchat-stage', 'status'],
+    'the status bar has the one Games item and the invisible over-chat stage, nothing else')
+  assert.equal(entries.find(item => item.id === 'overchat-stage').render().type.name, 'OverChatStage',
+    'and the stage item is the over-chat stage')
+  // The composer slot still owns WHERE the machines go: its anchor is the only thing measured.
   assert.ok(entries.find(item => item.area === 'composer.underside' && item.id === 'overchat'),
     'the over-chat machines are contributed to the composer underside slot')
   assert.equal(entries.find(item => item.id === 'jackpot2'), undefined,

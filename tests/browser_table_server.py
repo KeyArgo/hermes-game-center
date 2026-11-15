@@ -385,10 +385,11 @@ body{font-family:system-ui;background:#0b1220;color:#e8edf4}
       style="width:100%;resize:none;font:inherit;font-size:13px;padding:8px 10px;border-radius:10px;border:1px solid #394656;background:#101820;color:#e8edf4"></textarea>
     <!-- The composer's underside slot, as the Desktop draws it: the chrome-free strip below the
          composer that both see-through machines are contributed to (composer.underside).
-         `?trap=1` gives the slot a transform, which makes it the containing block for a fixed
-         child — the one thing a host can do that stops a fixed box reaching the top of the window,
-         and the case the fallback layout exists for. -->
-    <div id="composer-slot" aria-label="Composer underside"__SLOT_STYLE__></div>
+         A transform makes an element the containing block for a fixed child — the one thing a host
+         can do that stops a fixed box reaching the top of the window. The dock around it is centred with a transform,
+         exactly like the Desktop's composer dock (`-translate-x-1/2`), so a fixed box drawn from the slot
+         is ALWAYS trapped here, as it is in the real app. -->
+    <div id="composer-dock" style="transform:translateX(0)"><div id="composer-slot" aria-label="Composer underside"></div></div>
     <div class="controls">
       <button id="working">Start a Hermes turn</button>
       <button id="finished">Finish the Hermes turn</button>
@@ -398,7 +399,9 @@ body{font-family:system-ui;background:#0b1220;color:#e8edf4}
   </section>
   <section id="pane" aria-label="Game pane"></section>
 </div>
-<div id="statusbar"></div>
+<!-- `?trap=1` gives the status bar a transform too, so even the stage drawn from it is trapped: the case
+     the in-slot fallback exists for. -->
+<div id="statusbar"__BAR_STYLE__></div>
 <div id="label">ISOLATED QA · real pane and board · stub chat</div>
 <script>window.qa={errors:[],consoleErrors:[],calls:[],notices:[],actions:[],revealed:[]};const originalError=console.error.bind(console);console.error=(...args)=>{qa.consoleErrors.push(args.map(String).join(' '));originalError(...args)};addEventListener('error',e=>qa.errors.push(e.message));addEventListener('unhandledrejection',e=>qa.errors.push(String(e.reason)));</script>
 <script type="module">
@@ -468,7 +471,7 @@ document.getElementById('working').onclick = () => { host.state.busy.set(true); 
 document.getElementById('finished').onclick = () => { host.state.busy.set(false); fire('message.complete'); document.getElementById('chat-turn').textContent = 'Hermes finished' }
 document.getElementById('approval').onclick = () => { fire('approval.request'); document.getElementById('chat-turn').textContent = 'waiting for an approval' }
 </script>'''.replace('__PANE_W__', str(pane_width)).replace(
-            '__SLOT_STYLE__', ' style="transform:translateZ(0)"' if trap else ''))
+            '__BAR_STYLE__', ' style="transform:translateZ(0)"' if trap else ''))
 
     @app.get('/favicon.ico')
     def favicon():

@@ -83,6 +83,15 @@ export default {
         id: 'overchat',
         area: COMPOSER_AREAS.underside,
         render: () => jsx(OverChatStrip, { ctx })
+      },
+      {
+        // The fixed stage that draws those machines at the top of the window. It lives in the status bar
+        // because the composer dock is centred with a transform, which traps a fixed box drawn inside it
+        // (78-overchat-slot.js). It renders nothing while both switches are off.
+        id: 'overchat-stage',
+        area: STATUSBAR_AREAS.right,
+        order: 141,
+        render: () => jsx(OverChatStage, { ctx })
       }
     ])
   }

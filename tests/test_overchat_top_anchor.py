@@ -125,3 +125,18 @@ def test_both_switches_are_off_by_default():
     # Jackpot v2's: the stored value defaults to false and is coerced, never trusted raw.
     assert "const JP2L_STORE = {\n  ctx: null,\n  overchat: false," in layer, "the v2 store starts off"
     assert "jp2LStored(ctx, JP2L_OVERCHAT_KEY, false)" in layer, "and its stored default is false"
+
+
+def test_the_fixed_stage_is_drawn_from_the_status_bar_not_the_composer_dock():
+    """The Desktop centres its composer dock with a CSS transform (`-translate-x-1/2`), and a transform
+    traps a fixed child: a stage drawn from the composer slot always landed under the composer (owner's
+    screenshot, 2026-11-14). The stage is drawn from a status-bar item instead; the slot keeps the anchor."""
+    text = _code_only(SLOT.read_text(encoding="utf-8"))
+    strip = text[text.index("function OverChatStrip("):text.index("function OverChatStage(")]
+    stage = text[text.index("function OverChatStage("):]
+    assert "position: 'fixed'" not in strip, "the composer slot must not draw the fixed stage: the dock traps it"
+    assert "position: 'fixed'" in stage, "the status-bar stage draws the fixed box"
+    plugin = _code_only((SRC / "80-plugin.js").read_text(encoding="utf-8"))
+    entry = plugin[plugin.index("id: 'overchat-stage'"):][:200]
+    assert "area: STATUSBAR_AREAS.right" in entry, "the stage is a status-bar contribution"
+    assert "OverChatStage" in entry, "and it renders the stage"

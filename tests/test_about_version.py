@@ -73,9 +73,11 @@ def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
     assert "id: 'version'" not in bundle, "the version is not a status-bar item"
     # The other status-bar items: one, the Slots chip. The old Slots item was retired when Slots became
     # one game on the Jackpot machine, and the Jackpot v2 item went with the overlay it existed to anchor:
-    # both see-through machines are a composer-slot contribution now.
-    assert bundle.count("area: STATUSBAR_AREAS.right") == 1
+    # both see-through machines are a composer-slot contribution now. The one other status-bar entry is
+    # the invisible over-chat stage, there only because the composer dock's transform traps a fixed box.
+    assert bundle.count("area: STATUSBAR_AREAS.right") == 2
     assert "id: 'status'" in bundle
+    assert "id: 'overchat-stage'" in bundle
     assert "id: 'jackpot'" not in bundle
     assert "id: 'jackpot2'" not in bundle
     assert "area: COMPOSER_AREAS.underside" in bundle
