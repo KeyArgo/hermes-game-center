@@ -3881,7 +3881,7 @@ function seaBattleCover(width, height) {
 // ---- 17-blackjack.js: Blackjack against the house dealer, with Jackpot wallet chips
 // The contract the page relies on: BlackjackTable({ picture, interactive, busy, onMove,
 // against }) where picture.view === 'blackjack' and onMove(token) sends one of
-// picture.legal (bet10, bet25, bet50, bet100, hit, stand, double). The table never
+// picture.legal (bet10, bet25, bet50, bet100, hit, stand, double, split). The table never
 // judges a move. `against` is who is across the felt - { who, why } from
 // opponentWords() in 30-game-page.js ("vs Computer (the dealer)", "vs Hermes model: x")
 // - drawn on the felt with the whole story on hover. It is words only: the table still
@@ -3905,6 +3905,20 @@ const BJ_SHADOW = 'rgba(0, 0, 0, 0.35)'
 
 const BJ_SUITS = { S: '\u2660', H: '\u2665', D: '\u2666', C: '\u2663' }
 const BJ_SUIT_NAMES = { S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' }
+
+// 1,000 rather than 1000: the felt names the wagers the way the wallet and the docs do.
+function bjChips(value) {
+  return String(Math.round(Number(value) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+function bjResultWord(result) {
+  if (result === 'blackjack') return 'Blackjack 3:2'
+  if (result === 'win') return 'Win'
+  if (result === 'push') return 'Push'
+  if (result === 'bust') return 'Bust'
+  if (result === 'lose') return 'Lose'
+  return ''
+}
 
 function bjCardLabel(card) {
   if (!card || card === '??') return 'Face-down card'
@@ -4021,19 +4035,37 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
     else if (picture.outcome) gamesSound('lose')
     else gamesSound('deal')
   }, [soundKey])
+  // A split round is drawn hand by hand: the rules send every hand's cards, total, wager and
+  // result, and the felt names the one being played. A picture from a table that never split
+  // (or an older one) has only the single hand, which becomes one entry here.
+  const hands = Array.isArray(picture && picture.player_hands) && picture.player_hands.length
+    ? picture.player_hands
+    : [{
+        cards: hand, total: Number((picture && picture.player_total) || 0), wager: bet,
+        original: bet, doubled: false, active: phase === 'play', done: over, bust: false,
+        blackjack: false, result: over ? outcome : ''
+      }]
+  const totalWager = hands.reduce((sum, entry) => sum + Number(entry.wager || 0), 0) || bet
   const result = (() => {
     if (!over) return ''
+    if (hands.length > 1) {
+      return `${hands.length} hands settled · net ${won > 0 ? '+' : ''}${bjChips(won)}`
+    }
     if (outcome === 'blackjack') return `Blackjack! +${won}`
     if (outcome === 'win') return `You win +${won}`
     if (outcome === 'push') return 'Push — your bet comes back'
     if (outcome === 'bust') return `Bust ${won}`
     return `Dealer wins ${won}`
   })()
+  // The move line is built from what the rules offer, so it can never name a move the felt
+  // is not showing: hit and stand always, double and split only when they are on offer.
+  const moves = ['hit', 'stand', ...(legal.includes('double') ? ['double'] : []),
+    ...(legal.includes('split') ? ['split'] : [])]
   const phaseLine = over
     ? `${result} · place your next bet, or leave the table`
     : phase === 'bet'
       ? 'Place your bet'
-      : 'Your move: hit, stand or double'
+      : `Your move: ${moves.slice(0, -1).join(', ')} or ${moves[moves.length - 1]}`
   const betTokens = ((picture && picture.bets) || [10, 25, 50, 100, 500, 1000]).map(amount => `bet${amount}`)
   return jsxs('div', {
     'data-blackjack': 'table',
@@ -4071,7 +4103,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
             style: { display: 'flex', gap: 12, fontSize: 12, fontFamily: 'var(--font-mono, monospace)', color: text.secondary },
             children: [
               jsx('span', { children: `Chips ${chips}` }, 'chips'),
-              jsx('span', { children: `Bet ${bet}` }, 'bet')
+              jsx('span', { children: `Bet ${bjChips(totalWager)}` }, 'bet')
             ]
           }, 'wallet')
         ]
@@ -4084,13 +4116,63 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
           jsx('div', { style: { fontSize: 13, fontWeight: 700, color: text.secondary }, children: `Dealer shows ${Number((picture && picture.dealer_total) || 0)}` }, 'dealer-total')
         ]
       }, 'dealer-seat'),
-      jsxs('div', {
-        style: { display: 'flex', flexDirection: 'column', gap: 6 },
-        children: [
-          jsx('div', { style: { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: text.tertiary }, children: 'You' }, 'you-label'),
-          jsx(BJCardRow, { cards: hand, label: 'Your cards' }, 'hand'),
-          jsx('div', { style: { fontSize: 13, fontWeight: 700, color: text.secondary }, children: `Your total ${Number((picture && picture.player_total) || 0)}` }, 'player-total')
-        ]
+      jsx('div', {
+        style: { display: 'flex', flexDirection: 'column', gap: 8 },
+        children: hands.map((entry, index) => {
+          const cards = entry.cards || []
+          const active = Boolean(entry.active)
+          const title = hands.length > 1 ? `Hand ${index + 1} of ${hands.length}` : 'You'
+          const wager = entry.doubled
+            ? `Original Bet: ${bjChips(entry.original == null ? Number(entry.wager || 0) / 2 : entry.original)} | Total Wager: ${bjChips(entry.wager)} (Doubled)`
+            : `Bet: ${bjChips(entry.wager)}`
+          const resultWord = bjResultWord(entry.result)
+          return jsxs('div', {
+            'data-bj-hand': index + 1,
+            'data-bj-active': active ? 'yes' : 'no',
+            style: {
+              display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px',
+              boxSizing: 'border-box', borderRadius: 12,
+              border: `1px solid ${active ? accent : 'rgba(248, 245, 236, 0.22)'}`,
+              background: active ? 'rgba(227, 179, 65, 0.12)' : 'transparent',
+              boxShadow: active ? `0 0 0 1px ${accent}` : 'none',
+              opacity: entry.done && !active ? 0.88 : 1
+            },
+            children: [
+              jsxs('div', {
+                style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+                children: [
+                  jsx('div', {
+                    style: { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: active ? text.primary : text.tertiary },
+                    children: active ? `${title} · playing` : title
+                  }, 'label'),
+                  jsx('div', {
+                    style: { fontSize: 12, fontWeight: 700, color: text.secondary, fontFamily: 'var(--font-mono, monospace)' },
+                    children: wager
+                  }, 'wager')
+                ]
+              }, 'head'),
+              jsx(BJCardRow, { cards, label: `${title} cards` }, 'cards'),
+              jsxs('div', {
+                style: { display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' },
+                children: [
+                  jsx('div', {
+                    style: { fontSize: 13, fontWeight: 700, color: text.secondary },
+                    children: `${hands.length > 1 ? 'Total' : 'Your total'} ${Number(entry.total || 0)}${entry.soft ? ' (soft)' : ''}`
+                  }, 'total'),
+                  resultWord
+                    ? jsx('div', {
+                        style: {
+                          fontSize: 12, fontWeight: 800,
+                          color: entry.result === 'win' || entry.result === 'blackjack' ? BJ_CHIP : text.secondary
+                        },
+                        children: resultWord
+                      }, 'result')
+                    : null
+                ]
+              }, 'total-row')
+            ]
+          }, `hand-${index}`)
+        })
       }, 'player-seat'),
       jsxs('div', {
         role: 'status',
@@ -4127,7 +4209,8 @@ function BlackjackTable({ picture, interactive, busy, onMove, against }) {
             children: [
               bjButton('Hit', 'hit', canPress, onMove, { primary: true }),
               bjButton('Stand', 'stand', canPress, onMove),
-              bjButton('Double', 'double', canPress, onMove)
+              bjButton('Double', 'double', canPress, onMove),
+              bjButton('Split', 'split', canPress, onMove)
             ]
           }, 'moves')
         : null

@@ -6925,3 +6925,69 @@ async function gcextrasContract() {
   }
   console.log('board label: the game\'s own words for the side to move: passed')
 }
+
+// ---- Blackjack Split ---------------------------------------------------------
+// Two cards of one rank are two hands, each with its own wager, and the felt must show both,
+// mark the one being played, and offer Split as its own move. Split is drawn disabled when the
+// rules do not offer it (a short stack, or a hand that is not a pair), exactly like Double.
+{
+  const seat = (side, kind, name, open) => ({ side, kind, name, open })
+  const splitPicture = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'play', turn: 'white',
+    plies: 3, seats: [seat('white', 'human', 'Ada', false), seat('black', 'local', 'Local', false)],
+    hand: ['AS', 'KC'], dealer: ['9H', '??'], player_total: 21, dealer_total: 9,
+    bet: 2000, chips: 7000, outcome: '', won: 0, hands: 3, total_wager: 2000, original_bet: 1000,
+    legal: ['hit', 'stand', 'double', 'split'], bets: [10, 25, 50, 100, 500, 1000],
+    player_hands: [
+      { cards: ['AS', 'KC'], total: 21, soft: true, wager: 2000, original: 1000, doubled: true,
+        from_split: true, active: true, done: false, bust: false, blackjack: false, result: '' },
+      { cards: ['AD', '5C'], total: 16, soft: true, wager: 1000, original: 1000, doubled: false,
+        from_split: true, active: false, done: false, bust: false, blackjack: false, result: '' }
+    ],
+    note: ''
+  }
+  const sent = []
+  sandbox.splitPicture = splitPicture
+  sandbox.splitSent = sent
+  const felt = evaluate('BlackjackTable({ picture: splitPicture, interactive: true, busy: false, onMove: token => splitSent.push(token) })')
+  const splitButton = findButton(felt, 'Split')
+  assert.ok(splitButton, 'a pair draws a Split button')
+  assert.equal(splitButton.props.disabled, false, 'and it can be pressed while the rules offer it')
+  splitButton.props.onClick()
+  assert.deepEqual(sent, ['split'], 'Split sends the split move and nothing else')
+  const feltWords = words(felt)
+  assert.ok(feltWords.includes('Hand 1 of 2') && feltWords.includes('Hand 2 of 2'),
+    'both hands are drawn by name: ' + feltWords)
+  assert.ok(feltWords.includes('Original Bet: 1,000 | Total Wager: 2,000 (Doubled)'),
+    'a doubled hand says what it was bet and what is on it now: ' + feltWords)
+  assert.ok(feltWords.includes('Bet: 1,000'), 'the other hand says its own wager')
+  assert.ok(feltWords.includes('Your move: hit, stand, double or split'),
+    'the move line names split while it is on offer: ' + feltWords)
+  const drawnHands = nodes(felt).filter(node => node.props && node.props['data-bj-hand'])
+  assert.equal(drawnHands.length, 2, 'exactly two hands are drawn')
+  const activeHand = drawnHands.find(node => node.props['data-bj-active'] === 'yes')
+  assert.ok(activeHand && words(activeHand).includes('Hand 1 of 2'), 'the hand being played is the marked one')
+  assert.equal(drawnHands.filter(node => node.props['data-bj-active'] === 'yes').length, 1,
+    'and only one hand is marked at a time')
+  // A short stack, or a hand that is not a pair: the rules do not offer a split, so the
+  // button is drawn and disabled rather than vanishing.
+  sandbox.splitPicture = { ...splitPicture, legal: ['hit', 'stand'], chips: 500 }
+  const shortFelt = evaluate('BlackjackTable({ picture: splitPicture, interactive: true, busy: false, onMove: () => {} })')
+  const shortSplit = findButton(shortFelt, 'Split')
+  assert.ok(shortSplit && shortSplit.props.disabled, 'no chips for a second bet means a disabled Split')
+  assert.ok(!words(shortFelt).includes('split'), 'and the move line does not promise it')
+  // A settled split round says what the round came to, in the sum of its hands.
+  sandbox.splitPicture = {
+    ...splitPicture, phase: 'bet', outcome: 'mixed', won: 0, total_wager: 2000,
+    legal: ['bet10', 'bet25'], player_hands: [
+      { ...splitPicture.player_hands[0], active: false, done: true, result: 'win' },
+      { ...splitPicture.player_hands[1], active: false, done: true, result: 'lose' }
+    ]
+  }
+  const settled = evaluate('BlackjackTable({ picture: splitPicture, interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(settled).includes('2 hands settled · net 0'),
+    'the net line is the sum of the hands: ' + words(settled))
+  assert.ok(words(settled).includes('Win') && words(settled).includes('Lose'),
+    'and each hand carries its own result')
+  console.log('blackjack split: two hands, the active one marked, Split offered only when legal: passed')
+}
