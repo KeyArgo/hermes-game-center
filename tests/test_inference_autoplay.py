@@ -1,4 +1,4 @@
-"""The Inference Auto Play button is on the Games page, and it turns both switches.
+"""The Inference Slot Machine button is on the Games page, and it turns both switches.
 
 The owner could not find the feature. "Spin while Hermes thinks" is two settings — the wallet's
 autoplay switch (`POST /jackpot/autoplay`) and the Jackpot backdrop switch (`jackpot2.overchat`) —
@@ -39,7 +39,7 @@ def test_the_button_and_the_backdrop_are_drawn_and_pressed():
     # A run that skipped a beat is not a pass.
     for beat in (
         "the home button turns both switches, follows them, and stays honest",
-        "the backdrop may grow to 60% of the window, and 100% is unchanged",
+        "the backdrop is twice its old size, in its 60% share of the window",
         "Small, Medium and Large size the backdrop in one press",
     ):
         assert beat in output, f"the harness never reported '{beat}':\n{output}"

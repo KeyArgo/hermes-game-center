@@ -1,8 +1,8 @@
-// tests/inference_autoplay_harness.cjs -- "Inference Auto Play" on the Games page, and a backdrop
+// tests/inference_autoplay_harness.cjs -- "Inference Slot Machine" on the Games page, and a backdrop
 // big enough to be worth the name.
 //
 // The owner asked for three things in one breath: a real button on the main window that says
-// "Inference Auto Play" (the wallet's autoplay switch and the Jackpot backdrop are two settings, and
+// "Inference Slot Machine" (the wallet's autoplay switch and the Jackpot backdrop are two settings, and
 // the button is only ON while both are), backdrop wording instead of "over chat", and a backdrop that
 // may grow further than it could.
 //
@@ -182,7 +182,7 @@ async function press(button) {
 async function main() {
   let page = await settlePage(3)
   const element = buttonElement(page)
-  assert.ok(element, 'the Games page draws an Inference Auto Play button component')
+  assert.ok(element, 'the Games page draws an Inference Slot Machine button component')
   assert.equal(element.props.ctx, ctx, 'handed the page context, so it can reach the shelf')
   // Near the top: it is drawn before the Play shelf's own heading, not buried in the machine.
   const flat = nodes(page)
@@ -195,7 +195,7 @@ async function main() {
   let button = buttonNode(await drawButtonNow())
   assert.ok(button, 'the component draws a button')
   assert.equal(button.type, 'button', 'and it is a real button, not a link or a label')
-  assert.equal(words(button).trim(), 'Start Inference Auto Play', 'which offers to start it')
+  assert.equal(words(button).trim(), 'Start Inference Slot Machine', 'which offers to start it')
   assert.equal(button.props['data-inference-autoplay'], 'off', 'and says it is off')
   assert.equal(button.props['aria-pressed'], false, 'pressed state is off too, for a screen reader')
   assert.equal(button.props.title,
@@ -210,7 +210,7 @@ async function main() {
   assert.equal(storage['jackpot2.overchat'], true,
     'and it turns the Jackpot backdrop on through the switch\'s own key, so the copy really draws')
   button = buttonNode(root)
-  assert.equal(words(button).trim(), 'Stop Inference Auto Play', 'the button now offers to stop it')
+  assert.equal(words(button).trim(), 'Stop Inference Slot Machine', 'the button now offers to stop it')
   assert.equal(button.props['data-inference-autoplay'], 'on', 'with an on look the tree can read')
   assert.ok(nodes(root).some(node => node.props && node.props['data-inference-autoplay-state'] === 'on'),
     'and the state word says On')
@@ -222,14 +222,14 @@ async function main() {
   assert.equal(shelf.posts[1].on, false, 'turning autoplay off')
   assert.equal(storage['jackpot2.overchat'], false, 'and hiding the backdrop')
   button = buttonNode(root)
-  assert.equal(words(button).trim(), 'Start Inference Auto Play', 'and it is back to Start')
+  assert.equal(words(button).trim(), 'Start Inference Slot Machine', 'and it is back to Start')
 
   // ---- 4. a refused request leaves the button honest ------------------------
   shelf.failAutoplay = true
   root = await press(button)
   assert.equal(storage['jackpot2.overchat'], false, 'a refused turn-on does not leave the backdrop on')
   button = buttonNode(root)
-  assert.equal(words(button).trim(), 'Start Inference Auto Play', 'the button is back in its real state')
+  assert.equal(words(button).trim(), 'Start Inference Slot Machine', 'the button is back in its real state')
   const note = nodes(root).find(node => node.props && node.props['data-inference-autoplay-note'] === '1')
   assert.ok(note, 'and it says what happened')
   assert.ok(String(words(note)).trim().length > 0, `in a short line (${JSON.stringify(words(note).trim())})`)
@@ -251,7 +251,7 @@ async function main() {
   button = buttonNode(await drawButtonNow())
   assert.equal(button.props['data-inference-autoplay'], 'on',
     'autoplay and the backdrop together are on')
-  assert.equal(words(button).trim(), 'Stop Inference Auto Play', 'and the label agrees')
+  assert.equal(words(button).trim(), 'Stop Inference Slot Machine', 'and the label agrees')
   // A switch moved elsewhere (the cabinet's panel, Settings, the status bar) moves this button.
   evaluate('jp2LSetOverchat(false, pageCtx)')
   reset()
@@ -262,23 +262,30 @@ async function main() {
   reset()
   console.log('inference autoplay: the home button turns both switches, follows them, and stays honest: passed')
 
-  // ---- 6. the stage is tall enough, and 100% is the size it always was ----
+  // ---- 6. the stage is tall enough, and 100% is twice the old 320 px copy ----
+  // The owner: "make the on screen slot machine twice the size but same area". 100% is now 640 px
+  // tall where the window allows it, still drawn in the same top-centre stage, still capped by 60% of
+  // the window and by the chat column's width.
   const budget = evaluate('overchatStageHeight()')
   assert.equal(budget, 600, `a 1000 px window gives the backdrop 60% of it (${budget})`)
+  const tall100 = evaluate('overchatFitScale({ width: 560, height: 720 }, 900, 1, 720)')
+  assert.equal(Math.round(720 * tall100), 640, `100% draws twice the old 320 px copy (${720 * tall100})`)
   const at100 = evaluate('overchatFitScale({ width: 560, height: 720 }, 900, 1, 600)')
-  const at160 = evaluate('overchatFitScale({ width: 560, height: 720 }, 900, 1.6, 600)')
-  assert.equal(Math.round(720 * at100), 320, `100% still draws the 320 px copy it always did (${720 * at100})`)
-  assert.ok(720 * at160 > 720 * at100, `and 160% draws a taller cabinet (${720 * at160} > ${720 * at100})`)
-  assert.ok(720 * at160 <= 600 + 0.5, `never taller than the room it was given (${720 * at160} <= 600)`)
+  assert.equal(Math.round(720 * at100), 600, `on a 1000 px window it fills its 60% share (${720 * at100})`)
+  const half = evaluate('overchatFitScale({ width: 560, height: 720 }, 900, 0.5, 720)')
+  assert.equal(Math.round(720 * half), 320, `50% is the size it used to be (${720 * half})`)
+  const at160 = evaluate('overchatFitScale({ width: 560, height: 720 }, 900, 1.6, 720)')
+  assert.ok(720 * at160 > 720 * tall100, `and 160% draws a taller cabinet (${720 * at160} > ${720 * tall100})`)
+  assert.ok(720 * at160 <= 720 + 0.5, `never taller than the room it was given (${720 * at160} <= 720)`)
   const narrow = evaluate('overchatFitScale({ width: 560, height: 720 }, 300, 1.6, 600)')
   assert.ok(560 * narrow <= 300 + 0.5, `and never wider than the chat column (${560 * narrow} <= 300)`)
   assert.ok(evaluate('OVERCHAT_MAX_HEIGHT') <= 720, 'with a sane absolute ceiling (720)')
-  console.log('inference autoplay: the backdrop may grow to 60% of the window, and 100% is unchanged: passed')
+  console.log('inference autoplay: the backdrop is twice its old size, in its 60% share of the window: passed')
 
   // ---- 7. Small / Medium / Large beside the size slider ------------------
   sandbox.panelProps = { ctx, tone: 'settings' }
   const panel = evaluate('Jackpot2OverChatControls(panelProps)')
-  for (const [label, value] of [['Small', 0.75], ['Medium', 1], ['Large', 1.6]]) {
+  for (const [label, value] of [['Small', 0.5], ['Medium', 1], ['Large', 1.6]]) {
     const quick = nodes(panel).find(node => node.type === 'button' && words(node).trim() === label)
     assert.ok(quick, `the backdrop controls offer ${label}`)
     evaluate('jp2LSetSize(0.5, panelProps.ctx)')

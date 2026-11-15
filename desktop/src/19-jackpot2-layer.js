@@ -133,7 +133,7 @@ const JP2L_RANGES = {
 // the big one the taller stage now allows. They write the slider's own value — not a second scale — so
 // the readout, the stored number and the fit cannot disagree.
 const JP2L_SIZE_PRESETS = [
-  { id: 'small', label: 'Small', size: 0.75 },
+  { id: 'small', label: 'Small', size: 0.5 },
   { id: 'medium', label: 'Medium', size: 1 },
   { id: 'large', label: 'Large', size: 1.6 }
 ]

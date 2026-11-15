@@ -253,9 +253,13 @@ check('turning it on draws the copy from the status-bar stage, with only an anch
 // hold at every size is "inside the slot, never zero".
 check('and it is fitted to the slot it was given: inside its share, capped by the height budget',
   Boolean(onNow && onNow.stripWidth > 0 && onNow.copyWidth > 40
-    && onNow.copyWidth <= Math.min(onNow.stripWidth, 249) + 1
-    && onNow.copyHeight <= 321),
+    && onNow.copyWidth <= onNow.stripWidth + 1
+    && onNow.copyHeight <= onNow.stageHeight + 1),
   `copy ${onNow && onNow.copyWidth}x${onNow && onNow.copyHeight} in strip ${onNow && onNow.stripWidth}`)
+// Twice the old 320 px copy at 100% (640 px), so in an 800 px window the copy fills its whole 60% share.
+check('and at 100% it is twice the old 320 px copy, up to its 60% share of the window',
+  Boolean(onNow && onNow.copyHeight >= Math.min(640, onNow.stageHeight) - 2),
+  `copy ${onNow && onNow.copyHeight} tall, stage ${onNow && onNow.stageHeight}`)
 // The point of the anchor: the machines are drawn at the TOP of the window, over the conversation, not in
 // the composer's underside where the slot happens to sit.
 check('the copy is drawn at the top of the window, over the conversation',

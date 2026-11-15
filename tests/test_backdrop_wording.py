@@ -3,7 +3,7 @@
 The owner asked for the slot machine's wording to be fixed: "Show over chat", "Over-chat opacity",
 "Jackpot over chat: …" and "Close Slots over chat" became **Show as backdrop**, **Backdrop opacity**,
 **Backdrop size**, **Jackpot backdrop: …** and **Close backdrop**, and the cabinet's auto-spin switch
-is **Inference Auto Play (spin when Hermes thinks)**.
+is **Inference Slot Machine (spins when Hermes thinks)**.
 
 Only the words changed. Every storage key, data attribute and contribution id is exactly what it was,
 so the switch a person already set is still read and nothing needs a migration — that is the second
@@ -38,7 +38,7 @@ NEW_WORDS = (
     "Backdrop size",
     "Jackpot backdrop:",
     "Close backdrop",
-    "Inference Auto Play (spin when Hermes thinks)",
+    "Inference Slot Machine (spins when Hermes thinks)",
 )
 
 
@@ -76,7 +76,7 @@ def test_the_stored_keys_are_untouched():
 
 def test_the_jackpot_cabinet_names_its_auto_spin_switch_inference_auto_play():
     # One feature, one name: the Games-page button and the cabinet's own switch both say
-    # Inference Auto Play, so a person who turned it on in one place can find it in the other.
+    # Inference Slot Machine, so a person who turned it on in one place can find it in the other.
     source = (SRC / "18-jackpot2-machine.js").read_text(encoding="utf-8")
     assert "toggle('autoplay', 'Auto-spin'," not in source
-    assert "toggle('autoplay', 'Inference Auto Play'," in source
+    assert "toggle('autoplay', 'Inference Slot Machine'," in source

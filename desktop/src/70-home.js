@@ -1,6 +1,6 @@
 // ---- 70-home.js: the Games page: Play, Experimental Games, the lobby and the tabs
 
-// ---- Inference Auto Play: one button, on the screen people arrive at ----------
+// ---- Inference Slot Machine: one button, on the screen people arrive at ----------
 // "Spin while Hermes thinks" is TWO settings, and both are needed:
 //
 //   - the wallet's autoplay switch (POST /jackpot/autoplay) is permission for a hook to spin at all;
@@ -57,7 +57,7 @@ function InferenceAutoPlayButton({ ctx }) {
     } catch (error) {
       // Back to the truth that is known: the wallet refused, so nothing would have spun.
       setBackdrop(!want)
-      setTrouble(`Inference Auto Play could not ${want ? 'start' : 'stop'}: ${jp2Reason(error)}.`)
+      setTrouble(`Inference Slot Machine could not ${want ? 'start' : 'stop'}: ${jp2Reason(error)}.`)
     } finally {
       setBusy(false)
     }
@@ -75,7 +75,7 @@ function InferenceAutoPlayButton({ ctx }) {
         disabled: busy,
         title: INFERENCE_AUTOPLAY_TIP,
         onClick: press,
-        children: on ? 'Stop Inference Auto Play' : 'Start Inference Auto Play',
+        children: on ? 'Stop Inference Slot Machine' : 'Start Inference Slot Machine',
         style: {
           padding: '8px 13px', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
           cursor: busy ? 'progress' : 'pointer',

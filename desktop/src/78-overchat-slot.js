@@ -72,8 +72,8 @@ function overchatAnchor(ref) {
 // How tall the drawn machines may be. The window's own height is a viewing policy — how much of what the
 // person is looking at the machines may cover — not a measurement of the app: 60% of it, with
 // OVERCHAT_MAX_HEIGHT as the ceiling. What the machinery DRAWS at that room is the fit's business
-// (overchatFitScale in 19-jackpot-overlay.js): 100% is still the size the copy has always had, and the
-// extra room is what the size slider spends above 100%.
+// (overchatFitScale in 19-jackpot-overlay.js): 100% is 640 px where this room allows it, and the size
+// slider scales from there, never past this room.
 function overchatStageHeight() {
   const win = overchatWindow()
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0

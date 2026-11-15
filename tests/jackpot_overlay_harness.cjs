@@ -154,7 +154,7 @@ const machineTree = draw('SlotMachine(slotProps)')
 const overlayText = words(overlay)
 const machineText = words(machineTree)
 assert.ok(overlayText.includes('Slots'), 'the header says Slots: ' + overlayText)
-assert.ok(machineText.includes('Inference Auto Play (spin when Hermes thinks)'), 'the auto-spin checkbox is labelled: ' + machineText)
+assert.ok(machineText.includes('Inference Slot Machine (spins when Hermes thinks)'), 'the auto-spin checkbox is labelled: ' + machineText)
 assert.ok(machineText.includes('Bet'), 'the bet ladder is labelled: ' + machineText)
 assert.ok(machineText.includes('12,340'), 'chips are formatted with commas: ' + machineText)
 assert.ok(nodes(machineTree).some(node => node.type === 'button' && node.props && node.props['data-sm-spin']), 'the overlay offers SPIN')
@@ -169,7 +169,7 @@ sandbox.centreSlotProps = { ...slotNode.props, bare: true }
 const centreTree = draw('SlotMachine(centreSlotProps)')
 const centreText = words(centreTree)
 assert.ok(!centreText.includes('SPIN'), 'the bare machine has no SPIN: ' + centreText)
-assert.ok(!centreText.includes('Inference Auto Play (spin when Hermes thinks)'), 'the bare machine has no auto-spin checkbox: ' + centreText)
+assert.ok(!centreText.includes('Inference Slot Machine (spins when Hermes thinks)'), 'the bare machine has no auto-spin checkbox: ' + centreText)
 assert.ok(centreText.includes('Show'), 'the bare machine offers Show: ' + centreText)
 assert.ok(nodes(centreTree).some(node => node.props && node.props['aria-label'] === 'Close'), 'the bare machine offers a Close control')
 reset()
@@ -417,7 +417,7 @@ function drawCopy(width) {
   const boxHeight = Number(overWrapper.props.style.height) || 0
   assert.ok(boxWidth > 0 && boxHeight > 0, `drawn at a size a person can see (${boxWidth}x${boxHeight})`)
   assert.ok(boxWidth <= 760 + 0.5, 'never wider than the slot it was given')
-  assert.ok(boxHeight <= 320 + 0.5, 'nor taller than the strip budget allows')
+  assert.ok(boxHeight <= 640 + 0.5, 'nor taller than the 100% height (640 px)')
   // The Games page uses this same SlotMachine; its measurement ref must cover the whole machine,
   // including everything below the decorated cabinet, rather than the cabinet alone.
   sandbox.overSlotProps = bareSlot.props
@@ -638,13 +638,13 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0))
   assert.ok(source.includes('scaleOverride: 1'), 'the machine draws at its own size and the wrapper scales it')
   assert.ok(source.includes('function overchatFitScale'), 'one fit rule, measured against the slot')
   // Half the share at the default size, and the height budget at full size.
-  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 760, 1)'), 0.32,
+  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 760, 1)'), 0.64,
     'a tall cabinet is capped by the strip\'s height budget, not by the window')
   const narrow = evaluate('overchatFitScale({ width: 600, height: 1000 }, 180, 1)')
   assert.ok(600 * narrow <= 180 + 0.5, `never wider than the share it was given (${600 * narrow} of 180)`)
   const doubled = evaluate('overchatFitScale({ width: 600, height: 1000 }, 380, 2)')
   assert.ok(600 * doubled <= 380 + 0.5, 'and the size slider cannot push it past that share either')
-  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 760, 0.5)'), 0.16,
+  assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 760, 0.5)'), 0.32,
     'the slider multiplies the fit')
   assert.equal(evaluate('overchatFitScale(null, 300, 1)'), 0, 'nothing is drawn before the cabinet is measured')
   assert.equal(evaluate('overchatFitScale({ width: 600, height: 1000 }, 0, 1)'), 0,

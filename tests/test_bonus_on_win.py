@@ -77,7 +77,7 @@ def test_a_won_table_calls_the_bonus_sink_once_and_a_draw_never_does():
 def test_a_wallet_save_survives_windows_refusing_the_replace(tmp_path, monkeypatch):
     """Windows refuses to swap the wallet in while a poll has it open ("Access is denied").
 
-    The Games page and the Inference Auto Play button read the wallet every few seconds without the
+    The Games page and the Inference Slot Machine button read the wallet every few seconds without the
     write lock, so a spin's save can land on a read. The swap is retried briefly; the chips change is
     never lost and never raised as an error.
     """

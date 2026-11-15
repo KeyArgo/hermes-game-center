@@ -5765,7 +5765,7 @@ function JackpotMachine(props) {
               jsx('div', {
                 style: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' },
                 children: [
-                  toggle('autoplay', 'Inference Auto Play', autoplay, setAutoplay, 'Spins each time Hermes starts thinking, while this machine is on screen.'),
+                  toggle('autoplay', 'Inference Slot Machine', autoplay, setAutoplay, 'Spins each time Hermes starts thinking, while this machine is on screen.'),
                   toggle('autobet', 'Auto-bet', autobet, setAutobet, 'The machine sizes each stake by what the reply cost. Turn it off to play the table bet.')
                 ]
               }, 'switches')
@@ -7794,7 +7794,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             },
             children: `SPIN · ${bet || ''}`.trim()
           }),
-          checkbox('Inference Auto Play (spin when Hermes thinks)', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
+          checkbox('Inference Slot Machine (spins when Hermes thinks)', autoplay, onAutoplay, 'One spin per message you send, and only while this machine is on screen.'),
           checkbox('Auto-bet sizes itself', autobetShown, flipAutobet, 'Turn starting or a tool running: 1x. A reply under 20k tokens: 2x. Then 3x at 40k, 4x at 80k, 6x at 160k, 8x at 320k and above - 1x is 25 chips, the smallest bet on the table. Never more than the cap, and the odds are identical at every bet: a bigger bet is a bigger swing, not a better chance.'),
           jsx('button', {
             type: 'button',
@@ -8820,14 +8820,14 @@ function JackpotOverlay({ ctx, onClose, data }) {
 // share may not pass, however tall the window is.
 const OVERCHAT_MAX_HEIGHT = 720
 
-// What "100%" means. A copy over the conversation used to be capped at this height, and the person's
-// size slider is a multiplier OF THAT SIZE — so 100% must stay exactly the machine they already have.
-// The stage is allowed to be taller now (60% of the window, up to OVERCHAT_MAX_HEIGHT); that extra room
-// is what the slider above 100% spends, not a bigger default.
-const OVERCHAT_BASE_HEIGHT = 320
+// What "100%" means: 640 px tall, twice the 320 px copy this used to be (the owner asked for the
+// machine over the chat to be twice the size, in the same place). It is still only drawn as tall as
+// the stage allows — 60% of the window, at most OVERCHAT_MAX_HEIGHT — and never wider than the chat
+// column. Small (50%) is the old size.
+const OVERCHAT_BASE_HEIGHT = 640
 
 // Fit a cabinet of `natural` size into `room` pixels of width. "100%" is the largest the room allows
-// within the size the copy has always been drawn at (OVERCHAT_BASE_HEIGHT) — whichever runs out first,
+// within OVERCHAT_BASE_HEIGHT — whichever runs out first,
 // the width or that height — and the person's own size slider multiplies it from there: still never
 // past the width, and never past the `ceiling` it was handed (the stage's own height, at most
 // OVERCHAT_MAX_HEIGHT). 0 while either number is unknown (the first paint, before the cabinet has been
@@ -9123,7 +9123,7 @@ const JP2L_RANGES = {
 // the big one the taller stage now allows. They write the slider's own value — not a second scale — so
 // the readout, the stored number and the fit cannot disagree.
 const JP2L_SIZE_PRESETS = [
-  { id: 'small', label: 'Small', size: 0.75 },
+  { id: 'small', label: 'Small', size: 0.5 },
   { id: 'medium', label: 'Medium', size: 1 },
   { id: 'large', label: 'Large', size: 1.6 }
 ]
@@ -21935,7 +21935,7 @@ function AdminPage({ ctx, view, onBack }) {
 
 // ---- 70-home.js: the Games page: Play, Experimental Games, the lobby and the tabs
 
-// ---- Inference Auto Play: one button, on the screen people arrive at ----------
+// ---- Inference Slot Machine: one button, on the screen people arrive at ----------
 // "Spin while Hermes thinks" is TWO settings, and both are needed:
 //
 //   - the wallet's autoplay switch (POST /jackpot/autoplay) is permission for a hook to spin at all;
@@ -21992,7 +21992,7 @@ function InferenceAutoPlayButton({ ctx }) {
     } catch (error) {
       // Back to the truth that is known: the wallet refused, so nothing would have spun.
       setBackdrop(!want)
-      setTrouble(`Inference Auto Play could not ${want ? 'start' : 'stop'}: ${jp2Reason(error)}.`)
+      setTrouble(`Inference Slot Machine could not ${want ? 'start' : 'stop'}: ${jp2Reason(error)}.`)
     } finally {
       setBusy(false)
     }
@@ -22010,7 +22010,7 @@ function InferenceAutoPlayButton({ ctx }) {
         disabled: busy,
         title: INFERENCE_AUTOPLAY_TIP,
         onClick: press,
-        children: on ? 'Stop Inference Auto Play' : 'Start Inference Auto Play',
+        children: on ? 'Stop Inference Slot Machine' : 'Start Inference Slot Machine',
         style: {
           padding: '8px 13px', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
           cursor: busy ? 'progress' : 'pointer',
@@ -23926,8 +23926,8 @@ function overchatAnchor(ref) {
 // How tall the drawn machines may be. The window's own height is a viewing policy — how much of what the
 // person is looking at the machines may cover — not a measurement of the app: 60% of it, with
 // OVERCHAT_MAX_HEIGHT as the ceiling. What the machinery DRAWS at that room is the fit's business
-// (overchatFitScale in 19-jackpot-overlay.js): 100% is still the size the copy has always had, and the
-// extra room is what the size slider spends above 100%.
+// (overchatFitScale in 19-jackpot-overlay.js): 100% is 640 px where this room allows it, and the size
+// slider scales from there, never past this room.
 function overchatStageHeight() {
   const win = overchatWindow()
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0

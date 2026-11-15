@@ -501,14 +501,14 @@ function JackpotOverlay({ ctx, onClose, data }) {
 // share may not pass, however tall the window is.
 const OVERCHAT_MAX_HEIGHT = 720
 
-// What "100%" means. A copy over the conversation used to be capped at this height, and the person's
-// size slider is a multiplier OF THAT SIZE — so 100% must stay exactly the machine they already have.
-// The stage is allowed to be taller now (60% of the window, up to OVERCHAT_MAX_HEIGHT); that extra room
-// is what the slider above 100% spends, not a bigger default.
-const OVERCHAT_BASE_HEIGHT = 320
+// What "100%" means: 640 px tall, twice the 320 px copy this used to be (the owner asked for the
+// machine over the chat to be twice the size, in the same place). It is still only drawn as tall as
+// the stage allows — 60% of the window, at most OVERCHAT_MAX_HEIGHT — and never wider than the chat
+// column. Small (50%) is the old size.
+const OVERCHAT_BASE_HEIGHT = 640
 
 // Fit a cabinet of `natural` size into `room` pixels of width. "100%" is the largest the room allows
-// within the size the copy has always been drawn at (OVERCHAT_BASE_HEIGHT) — whichever runs out first,
+// within OVERCHAT_BASE_HEIGHT — whichever runs out first,
 // the width or that height — and the person's own size slider multiplies it from there: still never
 // past the width, and never past the `ceiling` it was handed (the stage's own height, at most
 // OVERCHAT_MAX_HEIGHT). 0 while either number is unknown (the first paint, before the cabinet has been
@@ -519,7 +519,7 @@ function overchatFitScale(natural, room, multiplier, ceiling) {
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
-  // The 100% size: the smaller of the share's width and the size the copy has always had.
+  // The 100% size: the smaller of the share's width and OVERCHAT_BASE_HEIGHT.
   const byBase = Math.min(OVERCHAT_BASE_HEIGHT, budget) / natural.height
   // The hard stop above 100%: the room it was given, never past the absolute ceiling.
   const byRoom = budget / natural.height

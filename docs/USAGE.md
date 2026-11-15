@@ -10,9 +10,9 @@ In Hermes Desktop, choose **Games** in the sidebar. The Play shelf opens with th
 
 ![The Play shelf](../screenshots/game-center-home.png)
 
-Above the Play shelf, beside your chips and points, is **Inference Auto Play** — **Start Inference Auto Play** turns the
+Above the Play shelf, beside your chips and points, is **Inference Slot Machine** — **Start Inference Slot Machine** turns the
 wallet's automatic spin and the Jackpot backdrop on together, so the machine really spins each time Hermes starts
-thinking; **Stop Inference Auto Play** turns both off. The button follows both switches: if either is turned off in the
+thinking; **Stop Inference Slot Machine** turns both off. The button follows both switches: if either is turned off in the
 cabinet, the status bar or Settings, it reads **Start** again. A refused request returns it to its real state and says why
 in one line.
 
@@ -103,9 +103,9 @@ Open **Blackjack** on the Play shelf and bet chips from the wallet. The dealer s
 Open **Slots** on the Play shelf. Pick a bet (25 chips up) and press **Spin**.
 
 - **Classic** is a nine-window, five-payline machine; **Hermes Olympus** is one line on three Greek reels. You can switch mid-session.
-- **Inference Auto Play** spins while Hermes is working: one per reply and one per tool call, only while a machine is on screen.
+- **Inference Slot Machine** spins while Hermes is working: one per reply and one per tool call, only while a machine is on screen.
 - **Auto-bet** sizes each stake by what the reply cost.
-- **Show as backdrop** draws a see-through copy at the top centre of the conversation, centred over the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. **Backdrop size** and **Backdrop opacity** are shared by the cabinet, the status bar and Settings. 100% is the size the copy has always been; it may grow to 60% of the window's height, and **Small** / **Medium** / **Large** set 75% / 100% / 160% in one press.
+- **Show as backdrop** draws a see-through copy at the top centre of the conversation, centred over the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. **Backdrop size** and **Backdrop opacity** are shared by the cabinet, the status bar and Settings. 100% is 640 px tall, twice the old copy, and never more than 60% of the window's height; **Small** / **Medium** / **Large** set 50% (the old size) / 100% / 160% in one press.
 
 The screen prints no odds. The mechanics and payouts are in `shelf/jackpot.py` and `shelf/slotplay.py`; the audit script is `scripts/slot-audit.py`.
 

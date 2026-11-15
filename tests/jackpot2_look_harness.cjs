@@ -271,8 +271,8 @@ console.log('jackpot2 look: one rule on the cabinet\'s root, no filter, no text 
 // The offsets are gone with the overlay they moved the copy across. What is left is the one rule the
 // copy is sized by, and it is a rule about the slot it is given: a narrower share is a smaller machine.
 evaluate('jp2LSetHue(170, lookCtx)')
-const fitWide = evaluate('jp2LSlotScale(760, 1)')
-const fitHalf = evaluate('jp2LSlotScale(380, 1)')
+const fitWide = evaluate('jp2LSlotScale(1520, 1)')
+const fitHalf = evaluate('jp2LSlotScale(760, 1)')
 const fitNarrow = evaluate('jp2LSlotScale(190, 1)')
 assert.equal(fitWide, fitHalf, 'a share wider than the strip budget stops growing the copy: it is height-capped')
 assert.ok(fitHalf > fitNarrow, `and below that, a narrower share is a smaller copy (${fitHalf} > ${fitNarrow})`)

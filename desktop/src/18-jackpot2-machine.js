@@ -1422,7 +1422,7 @@ function JackpotMachine(props) {
               jsx('div', {
                 style: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' },
                 children: [
-                  toggle('autoplay', 'Inference Auto Play', autoplay, setAutoplay, 'Spins each time Hermes starts thinking, while this machine is on screen.'),
+                  toggle('autoplay', 'Inference Slot Machine', autoplay, setAutoplay, 'Spins each time Hermes starts thinking, while this machine is on screen.'),
                   toggle('autobet', 'Auto-bet', autobet, setAutobet, 'The machine sizes each stake by what the reply cost. Turn it off to play the table bet.')
                 ]
               }, 'switches')

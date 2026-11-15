@@ -6,6 +6,12 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **"Inference Slot Machine".** The Games-page button is now **Start / Stop Inference Slot Machine**, and the
+  cabinets' switches say **Inference Slot Machine** too (owner's naming). Stored settings are unchanged.
+- **The backdrop is twice the size, in the same place.** 100% is 640 px tall (was 320 px), still top centre,
+  still no more than 60% of the window or the chat column's width. **Small** is now 50%, the old size.
+  Guards: `tests/inference_autoplay_harness.cjs` (twice at 100%, the old size at 50%) and
+  `tests/overchat_slot_live.mjs` (a real browser: the copy fills its 60% share at 1280x800).
 - **Windows: a save no longer fails while a poll is reading the file.** Windows refuses to swap a file
   in while another reader has it open ("Access is denied"), and the setup file and the wallet are
   read every few seconds without the write lock. Saves to both now retry the swap for a moment
