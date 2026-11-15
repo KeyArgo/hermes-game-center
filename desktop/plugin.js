@@ -8838,7 +8838,7 @@ function overchatFitScale(natural, room, multiplier, ceiling) {
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
-  // The 100% size: the smaller of the share's width and the size the copy has always had.
+  // The 100% size: the smaller of the share's width and OVERCHAT_BASE_HEIGHT.
   const byBase = Math.min(OVERCHAT_BASE_HEIGHT, budget) / natural.height
   // The hard stop above 100%: the room it was given, never past the absolute ceiling.
   const byRoom = budget / natural.height
