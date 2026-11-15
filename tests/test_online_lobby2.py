@@ -578,10 +578,12 @@ def test_the_website_lobby_lists_every_game_the_server_can_seat():
     assert titles["connect4"] == "Connect Four" and titles["seabattle"] == "Sea Battle"
 
 
-def test_the_lobby_panel_is_half_its_width_and_the_games_gain_a_column():
+def test_the_lobby_panel_is_wide_enough_to_type_in_and_the_games_keep_their_column():
+    """Owner, 2026-11-14: at 110-140px the lobby's "say something" box held about 20 letters. The column
+    is back to 220-280px; the game cards keep the smaller tile minimum they gained."""
     home = (ROOT / "desktop" / "src" / "70-home.js").read_text(encoding="utf-8")
-    assert "minmax(110px, 140px)" in home, "the lobby column is half its old width"
-    assert "minmax(220px, 280px)" not in home
+    assert "minmax(220px, 280px)" in home, "the lobby column is wide enough to type a sentence in"
+    assert "minmax(110px, 140px)" not in home, "the 140px column squeezed the chat box to ~20 letters"
     tiles = re.search(r"gridTemplateColumns: 'repeat\(auto-fill, minmax\(min\(100%, (\d+)px\), 1fr\)\)'", home)
     assert tiles, "the game card grid is unchanged"
     assert int(tiles.group(1)) < 260, "the freed width buys one more column of game cards"

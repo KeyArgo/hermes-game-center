@@ -600,7 +600,7 @@ function GameCenterPage({ ctx, onArea }) {
     className: 'games-center-layout',
     style: {
       display: 'grid',
-      gridTemplateColumns: playing ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(110px, 140px)',
+      gridTemplateColumns: playing ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(220px, 280px)',
       height: '100%',
       minHeight: 0,
       background: paper,

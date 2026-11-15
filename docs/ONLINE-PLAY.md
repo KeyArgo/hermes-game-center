@@ -63,9 +63,9 @@ your roster asks you for a game (**Ask**, offered only to someone online who acc
 take), you accept, and both of you are seated at a private table — no code to paste. When you are not
 signed in, or online play is off, the Hall is simply closed and the roster empty.
 
-The lobby is a **side panel** with the panels it needs and no more: on the Games screen it takes half the
-width it used to (`minmax(110px, 140px)`), and the width it gives up is spent on one more column of game
-cards (`minmax(min(100%, 200px), 1fr)`).
+The lobby is a **side panel** with the panels it needs and no more: on the Games screen it is
+`minmax(220px, 280px)` wide, enough to type a sentence in its chat box, and the game cards use
+`minmax(min(100%, 200px), 1fr)`.
 
 ## Find a match
 
