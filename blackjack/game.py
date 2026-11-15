@@ -451,9 +451,21 @@ def _new_deck(seed: str = "") -> list[str]:
     return deck
 
 
+def _shoe(state: dict) -> list[str]:
+    """One shuffled shoe for the next deal or rebuild, from the table's own seed.
+
+    The seed carries the round count and a shoe count. The round count alone was not enough: it
+    only moves at settlement, so a shoe rebuilt inside a round reproduced the hand that round
+    started with, from the same end of the same order, and dealt a card twice. The count is kept
+    in the state, so a replay of the same saves deals the same shoes.
+    """
+    state["shoes"] = int(state.get("shoes") or 0) + 1
+    return _new_deck(f"{state.get('shoe') or ''}:{int(state.get('hands') or 0)}:{state['shoes']}")
+
+
 def _draw(state: dict) -> str:
     if not state["deck"]:
-        state["deck"] = _new_deck(f"{state.get('shoe') or ''}:{int(state.get('hands') or 0)}")
+        state["deck"] = _shoe(state)
     return state["deck"].pop()
 
 
@@ -465,7 +477,7 @@ def _deal(state: dict) -> None:
     Player 2, dealer, twice - every hand and the dealer's two cards from the same shoe.
     """
     if not state["deck"]:
-        state["deck"] = _new_deck(f"{state.get('shoe') or ''}:{int(state.get('hands') or 0)}")
+        state["deck"] = _shoe(state)
     hands = _migrate(state)
     if not hands:
         return

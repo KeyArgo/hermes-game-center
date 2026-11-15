@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A shoe rebuilt inside a round is a new shuffle.** The shoe is shuffled from the table's own seed
+  so a replay re-deals the same cards, but the seed was `f"{shoe}:{hands}"` and `hands` only moves at
+  settlement: a rebuild inside a round reproduced the hand that round started with, from the same end
+  of the same order, and dealt the same card again. A shoe count (`state["shoes"]`) is part of the
+  seed now and is bumped on every rebuild, so the second shoe of a round is a different shuffle of
+  the same deck and a replay still follows the same saves. Latent rather than live: a round only
+  rebuilds a shoe it started with, which needs 52+ draws in one hand. `blackjack/game.py`. Guard:
+  `test_a_fresh_shoe_is_dealt_inside_a_round_before_any_card_repeats` in
+  `tests/test_blackjack_damaged_save.py`.
 - **A settled hand cannot be played, or paid, a second time.** What was playable was decided from
   `phase` alone, never from a hand's own `done` flag, and `_settle_round` paid every hand in the list
   again whatever its `result` already said. A save that still read `phase: "play"` with a paid hand

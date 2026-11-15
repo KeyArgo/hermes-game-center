@@ -58,7 +58,7 @@ The page never judges a move. The same `kit.py` referee answers a click, a typed
 
 | Path | What it holds |
 |---|---|
-| `<game_id>/state.json` | The current table for that game: seats, turn, move history, status, result and refusals. Written to a temp file and swapped in, so an interrupted write leaves the last good table. Read through `kit.load()`, which repairs the shelf's own fields (a turn, a score, a move list) when a file from an older build or a hand edit has the wrong types, and leaves the game's own fields as written. |
+| `<game_id>/state.json` | The current table for that game: seats, turn, move history, status, result and refusals. Written to a temp file and swapped in through `shelf/filelock.replace` (the Windows retry), so an interrupted write leaves the last good table, and a failed swap removes its temp file. Read through `kit.load()`, which repairs the shelf's own fields (a turn, a score, a move list) when a file from an older build or a hand edit has the wrong types, and leaves the game's own fields as written. |
 | `<game_id>/learn.json`, `lesson.json` | Shipped lesson content, read by the game; not written by play. |
 | `wallet.json` and `wallet.lock` | Chips, points (`bonus`), token counters, slot settings, backdrop size and opacity, streaks and the recent spin feed. |
 | `setup.json` | The first-run welcome, per-game alert switches, pause and the local AI-seat choice (`shelf/setup.py`). |
