@@ -320,7 +320,11 @@ def _guest(state: dict) -> dict:
     """The second person's table-only stack. Missing or broken reads as a fresh one."""
     guest = state.get("guest")
     if not isinstance(guest, dict):
+        # The repair has to be as durable as the read. A thrown-away dict here made the guest's
+        # bets free and their payouts vanish - the stack read 10,000 for ever - because every
+        # caller worked on a copy nobody kept. ``setup`` is the only other writer of this record.
         guest = {}
+        state["guest"] = guest
     guest["name"] = str(guest.get("name") or GUEST_NAME)
     chips = guest.get("chips")
     guest["chips"] = chips if isinstance(chips, int) and not isinstance(chips, bool) and chips >= 0 else GUEST_CHIPS

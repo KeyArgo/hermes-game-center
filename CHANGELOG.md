@@ -6,6 +6,13 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A repaired guest record is kept.** Player 2's table-only stack (`state["guest"]`) is written by
+  `setup` alone, so a hand-edited or half-written save can read `players: 2` with no guest at all.
+  `_guest()` rebuilt that record and returned it **without storing it**, so every caller worked on a
+  throwaway: the guest's bets were free and their payouts vanished (the stack read 10,000 for ever).
+  The repair is now written back into the state, so it is as durable as the read.
+  `blackjack/game.py`. Guard: `test_a_repaired_guest_record_is_stored_on_the_table` in
+  `tests/test_blackjack_two_players.py`.
 - **Windows: the retry reaches the table state, and a save that fails costs no chips.** The Windows
   retry covered `setup.json` and `wallet.json` but not `state.json`, so a reader holding a table open
   turned a move into an unhandled error **after** the wallet had taken the bet: 100 chips gone, the

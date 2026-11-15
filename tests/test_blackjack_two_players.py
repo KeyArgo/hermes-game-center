@@ -257,3 +257,22 @@ def test_the_second_person_sits_down_through_one_game_center_line(bj, tmp_path):
     saved = json.loads(state_path.read_text())
     assert saved["phase"] == "bet" and saved["guest"]["chips"] == GUEST_START - 10
     assert saved["players"] == 2
+
+
+def test_a_repaired_guest_record_is_stored_on_the_table(bj):
+    """A save with no guest record is repaired into the state, not into a throwaway dict.
+
+    ``setup`` is the only writer of the guest, so a hand-edited or half-written save can read
+    ``players: 2`` with no guest at all. The repair used to be thrown away on every read, which
+    made the guest's bets free and their payouts vanish: the stack said 10,000 for ever.
+    """
+    state = start(bj, ["10S", "8S", "10H", "9S", "7S", "7H"], players="2")
+    del state["guest"]  # the damaged save
+
+    bj.play(state, "bet10")  # Player 1 bets, from the wallet
+    bj.play(state, "bet10")  # the guest bets, from their own stack
+
+    assert isinstance(state.get("guest"), dict), "the repaired guest record was thrown away"
+    assert int(state["guest"]["chips"]) == GUEST_START - 10, state["guest"]
+    assert guest_chips(bj, state) == GUEST_START - 10, "the guest's own bet is really taken"
+    assert chips(bj) == START - 10, "seat 0's bet still comes from the wallet"
