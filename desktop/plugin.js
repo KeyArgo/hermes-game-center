@@ -4095,7 +4095,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against, dealer: d
   const dealerWords = dealerSaid || {
     kind: dealerKind,
     who: dealerKind === 'agent' ? 'Hermes model' : 'Computer',
-    pace: dealerKind === 'agent' ? 'thinks each turn'
+    pace: dealerKind === 'agent' ? 'follows house rules, instant'
       : dealerKind === 'local' ? 'instant' : 'house rules, instant',
     why: ''
   }
@@ -11092,8 +11092,12 @@ function dealerWords(pictured, view) {
     return {
       kind: 'agent',
       who: `Hermes model${model ? ` ${model}` : ''}`,
-      pace: 'thinks each turn',
-      why: `Your Hermes model${model ? ` (${model})` : ''} deals these cards, one call per hand — it thinks before it fires.`
+      // The dealer has no choices in blackjack, so a model in that seat is named and no more:
+      // the house rules play those cards out inside the request, and nothing is asked of it.
+      pace: 'follows house rules, instant',
+      why: `Your Hermes model${model ? ` (${model})` : ''} is named as the dealer, and that is all: `
+        + 'the dealer has no decisions, so the house rules play these cards out at once and nothing '
+        + 'is asked of your model.'
         + (model ? '' : ' Pick the model in Hermes Settings → Models → "Game Shelf opponent".')
     }
   }
@@ -11617,7 +11621,12 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
       })),
       agentChoice ? button(seatsTwoPeople ? 'Play vs my Hermes model dealer' : 'Play my Hermes model', () => soloNew('agent'), lock({
         disabled: startOff,
-        title: startOff ? 'AI seats are off for this profile.' : `Your own Hermes model plays ${vsBlack}, one call per move.`
+        // A blackjack dealer has nothing to decide, so this button must not promise moves the
+        // model will never be asked for. A board game's model seat does play every move.
+        title: startOff ? 'AI seats are off for this profile.'
+          : seatsTwoPeople
+            ? `Names your Hermes model as the dealer. The dealer has no decisions in blackjack: the house rules play its cards out at once, so nothing is asked of your model.`
+            : `Your own Hermes model plays ${vsBlack}, one call per move.`
       })) : null,
       seatsTwoPeople ? button('Two players (same screen)', () => soloNew('two'), lock({
         disabled: startOff,

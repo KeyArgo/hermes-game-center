@@ -7039,8 +7039,8 @@ async function blackjackDealerContract() {
   const houseLine = nodes(houseFelt).find(node => node.props && node.props['data-bj-dealer'])
   assert.ok(houseLine && houseLine.props.title, 'and the dealer line explains itself on hover')
 
-  // The built-in computer and the person's own model are named differently on the felt: one
-  // answers at once, the other thinks each turn.
+  // The built-in computer and the person's own model are named differently on the felt, and
+  // both say the truth: a dealer answers at once, because a dealer has no decisions.
   const local = { ...house, seats: [me, seat('black', 'local', 'Local', false)], dealer_kind: 'local' }
   sandbox.bjLocal = local
   assert.equal(evaluate('dealerWords(bjLocal, bjView).pace'), 'instant')
@@ -7050,15 +7050,20 @@ async function blackjackDealerContract() {
   sandbox.bjAgent = agent
   const agentDealer = evaluate('dealerWords(bjAgent, bjView)')
   assert.equal(agentDealer.kind, 'agent')
+  assert.equal(agentDealer.pace, 'follows house rules, instant',
+    'the dealer has no decisions, so the model dealer does not claim a think')
+  assert.ok(/no decisions/.test(agentDealer.why), agentDealer.why)
   const agentFelt = evaluate('BlackjackTable({ picture: bjAgent, dealer: dealerWords(bjAgent, bjView), interactive: true, busy: false, onMove: () => {} })')
-  assert.ok(words(agentFelt).includes('Dealer: Hermes model glm-5.3-flash (thinks each turn)'),
-    'the felt names the model that is dealing: ' + words(agentFelt).slice(0, 240))
-  // While it thinks, the felt says so in its own line.
-  const dealing = { ...agent, phase: 'dealer', turn: 'black', legal: ['stand'], dealer_note: 'Hermes model is dealing…' }
-  sandbox.bjDealing = dealing
-  const dealingFelt = evaluate('BlackjackTable({ picture: bjDealing, dealer: dealerWords(bjDealing, bjView), interactive: true, busy: false, onMove: () => {} })')
-  assert.ok(words(dealingFelt).includes('Hermes model is dealing…'),
-    'the model dealer is named while it deals: ' + words(dealingFelt).slice(0, 240))
+  assert.ok(words(agentFelt).includes('Dealer: Hermes model glm-5.3-flash (follows house rules, instant)'),
+    'the felt names the model that is dealing, and says it follows the rules: ' + words(agentFelt).slice(0, 240))
+  // A save written before the dealer stopped being asked for a turn can still read phase
+  // "dealer": the felt says the cards are being played out, and never that a model is thinking.
+  const legacy = { ...agent, phase: 'dealer', turn: 'black', legal: ['stand'], dealer_note: 'The dealer is playing its cards out.' }
+  sandbox.bjLegacy = legacy
+  const legacyFelt = evaluate('BlackjackTable({ picture: bjLegacy, dealer: dealerWords(bjLegacy, bjView), interactive: true, busy: false, onMove: () => {} })')
+  assert.ok(words(legacyFelt).includes('The dealer is playing its cards out.'),
+    'an old mid-dealer save says what is happening: ' + words(legacyFelt).slice(0, 240))
+  assert.ok(!/thinks/.test(words(legacyFelt)), 'and never promises a think that does not happen')
 
   // C. THE THREE WAYS IN. Leaving and sitting back down has one clear name per opponent.
   const sent = []

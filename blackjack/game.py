@@ -48,8 +48,8 @@ HELP = [
     "Double doubles your bet for one more card. The dealer stands on all 17s.",
     "Split two cards of the same rank into two hands, each with a bet of its own; split aces "
     "take one card each and a 21 there is not a blackjack.",
-    "The dealer is the built-in computer unless your Hermes model takes the seat; a model "
-    "thinks before it deals, and the felt says which one is dealing.",
+    "The dealer has no decisions: the house rules play its cards out at once, whoever the "
+    "felt names in that seat (the built-in computer, your Hermes model, or the plain house).",
     "Two people can share this screen: allow-ai blackjack black=local players=2 seats a second "
     "player, whose chips are a table-only stack and never the Jackpot wallet's.",
 ]
@@ -743,7 +743,10 @@ def _dealer_seat(state: dict) -> str:
 # the one playing the dealer's cards.
 _DEALER_LINES = {
     "local": "Dealer: Computer (instant)",
-    "agent": "Dealer: Hermes model (thinks each turn)",
+    # A model in the dealer's seat is named, and the line says what it really does: the house
+    # rules are the whole of a dealer's play, so there is nothing for the model to decide and
+    # nothing to wait for. "Thinks each turn" promised a turn that was never the model's.
+    "agent": "Dealer: Hermes model (follows house rules, instant)",
     "house": "Dealer: Computer (house rules, instant)",
 }
 
@@ -751,11 +754,6 @@ _DEALER_LINES = {
 def _ai_dealer(state: dict) -> bool:
     """True when a machine is seated in the dealer's seat (the built-in one or a model)."""
     return _dealer_seat(state) in {"local", "agent"}
-
-
-def _dealer_thinks(state: dict) -> bool:
-    """Only the person's model takes a turn: the built-in dealer answers inside the move."""
-    return _dealer_seat(state) == "agent"
 
 
 def legal(state: dict) -> list[str]:
@@ -791,17 +789,15 @@ def legal(state: dict) -> list[str]:
 
 
 def _defer_or_play(state: dict) -> str:
-    """Hand the dealer's cards out, unless the person's own model is dealing.
+    """Hand the dealer's cards out by the house rules, whoever is named in that seat.
 
-    The built-in computer answers inside the same move: there is nothing to wait for,
-    and asking it for a turn of its own made a bet look like a stalled table. Only a
-    Hermes model takes a turn, and the table says so while it thinks.
+    The dealer has no choices in blackjack: its play is the rules, not a decision. Asking a
+    seated model for that turn cost two model calls a hand, delayed every hand behind the
+    person's own request, and wrote a "Referee said no" badge for a seat the model was never
+    offered a move in. So the dealer plays out inside the same request for every seat - the
+    built-in computer, the person's model, and the plain house - and the felt names which
+    one it was (`_DEALER_LINES`).
     """
-    if _dealer_thinks(state):
-        state["phase"] = "dealer"
-        state["turn"] = "black"
-        state["note"] = "Hermes model is dealing… it thinks before it fires."
-        return state["note"]
     return _dealer_plays(state)
 
 
@@ -1132,8 +1128,11 @@ def picture(state: dict, player=None) -> dict:
         # for anything that wants to branch. Never blank: the plain house is a dealer too.
         "dealer_kind": dealer_seat,
         "dealer_line": _DEALER_LINES[dealer_seat],
-        "dealer_note": ("Hermes model is dealing…" if state.get("phase") == "dealer"
-                        and dealer_seat == "agent" else ""),
+        # A save written before the dealer stopped being asked for a turn can still read
+        # phase "dealer": the next move hands those cards out at once. The note says what is
+        # happening, never that a model is thinking.
+        "dealer_note": ("The dealer is playing its cards out." if state.get("phase") == "dealer"
+                        else ""),
         # The one hand on the felt, and every hand of the round: the first is what older
         # surfaces read, the second is what the felt draws when a hand was split.
         "hand": list(state.get("hand") or []),

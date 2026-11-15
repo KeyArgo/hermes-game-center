@@ -216,7 +216,8 @@ def test_the_table_controls_seat_the_computer_and_the_model(tmp_path: Path) -> N
     assert "in progress" in table.command("allow-ai black=local level=beginner", player=ME)
     assert table.command("abandon", player=ME).startswith("Game abandoned")
 
-    # Then the person's own model takes the dealer's seat, and really plays it.
+    # Then the person's own model is named as the dealer seat, and nothing is asked of it: a
+    # dealer has no decisions, so its cards are the house rules playing out inside the request.
     asked: list[str] = []
 
     def complete(prompt: str) -> dict:
@@ -234,10 +235,11 @@ def test_the_table_controls_seat_the_computer_and_the_model(tmp_path: Path) -> N
     state_path.write_text(json.dumps(state))
     table.command("move bet10", complete=complete, player=ME)
     assert not asked, "the deal check is the rules' own work, not a model turn"
-    # The dealer is asked once, when the hand is done: the model deals the cards out.
     table.command("move stand", complete=complete, player=ME)
-    assert asked, "the model seated as the dealer was never asked to play"
-    assert table.picture(player=ME)["legal"], "the table is still playable after the dealer's turn"
+    assert not asked, f"the dealer's seat has no decisions, so nothing is asked of the model: {asked}"
+    picture = table.picture(player=ME)
+    assert picture["phase"] == "bet" and picture["outcome"] == "win", picture["note"]
+    assert picture["legal"], "the table is still playable after the dealer's turn"
 
 
 def test_table_never_runs_out_of_bets(tmp_path: Path) -> None:

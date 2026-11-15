@@ -215,7 +215,7 @@ function BlackjackTable({ picture, interactive, busy, onMove, against, dealer: d
   const dealerWords = dealerSaid || {
     kind: dealerKind,
     who: dealerKind === 'agent' ? 'Hermes model' : 'Computer',
-    pace: dealerKind === 'agent' ? 'thinks each turn'
+    pace: dealerKind === 'agent' ? 'follows house rules, instant'
       : dealerKind === 'local' ? 'instant' : 'house rules, instant',
     why: ''
   }

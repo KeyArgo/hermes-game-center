@@ -6,6 +6,18 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The dealer is never asked for a turn, whatever is in that seat.** A model in the dealer's seat
+  used to be handed the play-out as if it were a decision: **two model calls per hand**, both inside
+  the person's own request, and a model that answered anything but `stand` wrote a false "Referee
+  said no" into the ledger for a seat it was never offered a move in. The dealer's cards are the
+  house rules, not a choice, so `_defer_or_play` now plays them out inside the same request for
+  every seat (built-in computer, Hermes model, plain house). The felt line is honest about it:
+  `Dealer: Hermes model (follows house rules, instant)`, and the **Play vs my Hermes model dealer**
+  button says the dealer has no decisions. A save left mid-dealer by an older build says "The dealer
+  is playing its cards out." Guards: `tests/test_blackjack_dealer.py`
+  (`test_a_model_dealer_is_never_asked_for_a_turn`, `test_a_model_dealer_leaves_no_turn_to_wait_for`,
+  `test_the_model_dealer_line_says_it_follows_the_house_rules`) and `blackjackDealerContract` in
+  `tests/table_ui_harness.cjs`.
 - **"Inference Slot Machine".** The Games-page button is now **Start / Stop Inference Slot Machine**, and the
   cabinets' switches say **Inference Slot Machine** too (owner's naming). Stored settings are unchanged.
 - **The backdrop is twice the size, in the same place.** 100% is 640 px tall (was 320 px), still top centre,

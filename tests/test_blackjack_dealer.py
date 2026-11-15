@@ -10,10 +10,11 @@ Two things were wrong for the person at the table:
   sitting in phase "deal" until a second request ticked it over; against a Hermes model
   it spent two model calls per hand, one of them on a check the rules answer themselves.
 
-These tests pin the rules half: the deal is checked inside the bet, the built-in dealer
-plays out inside the stand, and a Hermes-model dealer gets exactly one turn per hand and
-says it is dealing while it thinks. The felt's own words are pinned in
-tests/table_ui_harness.cjs.
+These tests pin the rules half: the deal is checked inside the bet, and the dealer's cards
+are played out inside the stand. The dealer has no choices in blackjack - the house rules
+are the whole of its play - so nobody asks a model for the dealer's turn, whatever is
+seated in that seat, and no refusal is ever recorded for it. The felt's own words are
+pinned in tests/table_ui_harness.cjs.
 """
 
 from __future__ import annotations
@@ -67,37 +68,41 @@ def test_the_built_in_dealer_plays_out_inside_the_stand(bj):
     assert bj._hand_value(state["dealer"]) == 17
 
 
-def test_a_model_dealer_gets_one_turn_per_hand(bj):
-    """The model deals the cards out; it is not asked to approve the deal as well."""
+def test_a_model_dealer_leaves_no_turn_to_wait_for(bj):
+    """The dealer has no decisions, so a model in that seat never takes a turn of its own."""
     state = start(bj, ["10S", "10H", "9S", "7H"], black="agent")
 
     bj.play(state, "bet10")
 
-    assert state["phase"] == "play", f"the deal check is not a model turn: {state['phase']}"
+    assert state["phase"] == "play", f"the deal check is the rules' own work: {state['phase']}"
     assert state["turn"] == "white", "the person's hand comes first"
     assert len(state["dealer"]) == 2
 
     bj.play(state, "stand")
 
-    assert state["phase"] == "dealer" and state["turn"] == "black", "the model's one turn"
-    assert "Hermes model is dealing" in state["note"], state["note"]
-
-    bj.play(state, "stand")
-
-    assert state["phase"] == "bet" and state["outcome"] == "win"
+    assert state["phase"] == "bet", f"the dealer's cards are played out inside the stand: {state['phase']}"
+    assert state["turn"] == "white", "no seat is left waiting on a dealer turn"
+    assert (state["outcome"], state["won"]) == ("win", 10)
+    assert bj._hand_value(state["dealer"]) == 17
 
 
-def test_the_model_dealer_is_asked_once_per_hand_and_the_computer_never(bj, tmp_path):
-    """The whole table: a model dealer costs one call a hand, the built-in dealer none."""
+def test_a_model_dealer_is_never_asked_for_a_turn(bj, tmp_path):
+    """The whole table: the dealer's seat asks the model nothing and records no refusal.
+
+    A model in the dealer's seat used to be handed the play-out as if it were a decision:
+    two calls a hand, and a model that answered anything but "stand" wrote a false
+    "Referee said no" into the ledger for a seat with nothing to decide.
+    """
     asked: list[str] = []
 
     def complete(prompt: str, max_tokens: int = 0) -> dict:
         asked.append(prompt)
-        return {"move": "stand"}
+        # The dealer's seat offers exactly one move, so any model answer is the wrong one.
+        return {"move": "hit"}
 
     table = bj.create(tmp_path / "blackjack")
-    table.command("new", player=SimpleNamespace(id="u1", name="Ada", platform="desktop", bot=False))
     me = SimpleNamespace(id="u1", name="Ada", platform="desktop", bot=False)
+    table.command("new", player=me)
     state_path = tmp_path / "blackjack" / "state.json"
 
     def stack(deck: list[str]) -> None:
@@ -105,35 +110,30 @@ def test_the_model_dealer_is_asked_once_per_hand_and_the_computer_never(bj, tmp_
         state["deck"] = list(reversed(deck))
         state_path.write_text(json.dumps(state))
 
-    table.command("allow-ai black=local level=intermediate", complete=complete, player=me)
-    stack(["10S", "10H", "9S", "7H"])
-    table.command("move bet10", complete=complete, player=me)
-    assert "hit" in table.picture(player=me)["legal"]
-    table.command("move stand", complete=complete, player=me)
-    assert asked == [], "the built-in dealer never asks the person's model for anything"
-
-    table.command("abandon", player=me)
     table.command("allow-ai black=agent level=intermediate", complete=complete, player=me)
-    asked.clear()
     stack(["10S", "10H", "9S", "7H"])
     table.command("move bet10", complete=complete, player=me)
-    assert asked == [], "checking the deal is the rules' own work, not the model's"
-    table.command("move stand", complete=complete, player=me)
+    said = table.command("move stand", complete=complete, player=me)
 
-    assert len(asked) == 1, f"one model turn a hand, not two: {len(asked)}"
-    assert table.picture(player=me)["phase"] == "bet"
+    state = json.loads(state_path.read_text())
+    assert asked == [], f"the dealer's seat has no decisions to ask about: {asked[:1]}"
+    assert not state.get("refusals"), f"no refusal belongs to a dealer turn: {state.get('refusals')}"
+    assert state["phase"] == "bet" and state["outcome"] == "win"
+    assert "refused" not in said.lower(), said
 
 
-def test_a_model_dealer_says_it_is_dealing_while_it_thinks(bj):
+def test_the_model_dealer_line_says_it_follows_the_house_rules(bj):
+    """The felt still names the model, and says the truth about it: no decisions, no wait."""
     state = start(bj, ["10S", "10H", "9S", "7H"], black="agent")
     bj.play(state, "bet10")
     bj.play(state, "stand")
 
     pic = bj.picture(state)
 
-    assert pic["phase"] == "dealer"
     assert pic["dealer_kind"] == "agent", "the felt reads who is dealing off the picture"
-    assert "dealing" in (pic["note"] + " " + pic["dealer_note"]).lower(), pic
+    assert pic["dealer_line"] == "Dealer: Hermes model (follows house rules, instant)", pic["dealer_line"]
+    assert pic["dealer_note"] == "", f"the dealer never sits thinking: {pic['dealer_note']}"
+    assert "dealing" not in (pic["note"] + " " + pic["dealer_note"]).lower(), pic
 
 
 def test_the_picture_names_the_dealer_for_every_setup(bj):
