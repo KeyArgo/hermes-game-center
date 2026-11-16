@@ -85,7 +85,7 @@ const sandbox = {
   setInterval: clock.setInterval, clearInterval: clock.clearInterval,
   requestAnimationFrame: clock.requestAnimationFrame, cancelAnimationFrame: clock.cancelAnimationFrame,
   PANES_AREA: 'panes', PALETTE_AREA: 'palette', ROUTES_AREA: 'routes',
-  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' },
+  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' }, TITLEBAR_AREAS: { right: 'titleBar.right' },
   COMPOSER_AREAS: { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
 }
 sandbox.window = fakeWindow

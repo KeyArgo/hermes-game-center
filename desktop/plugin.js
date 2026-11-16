@@ -10,7 +10,7 @@
  * Plain ESM, jsx() only; imports limited to @hermes/plugin-sdk, react, react/jsx-runtime.
  */
 
-import { COMPOSER_AREAS, host, PALETTE_AREA, PANES_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA, STATUSBAR_AREAS, useValue } from '@hermes/plugin-sdk'
+import { COMPOSER_AREAS, host, PALETTE_AREA, PANES_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA, STATUSBAR_AREAS, TITLEBAR_AREAS, useValue } from '@hermes/plugin-sdk'
 import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
@@ -23963,9 +23963,31 @@ function overchatStageHeight() {
 //   - OverChatStage, in the status bar, DRAWS the fixed stage from those numbers. The status bar has no
 //     transformed ancestor, so a fixed box there is placed against the window.
 //
-// The stage still checks where it landed; if a host traps it anyway, or the status bar is hidden and the
-// stage never mounts, the strip draws the machines in the slot itself, as before.
-const OVERCHAT_SPOT = { left: 0, width: 0, anchored: false, stage: 'none', listeners: new Set() }
+// The status bar is not always there: Simple mode rests it hidden, and anyone may hide it. So a second
+// stage waits in the titlebar's right cluster, which the main window always draws and which is a fixed box
+// with no transform. It is only the stand-in: that cluster sits above the app's panels and dialogs, and a
+// machine drawn from it would sit above them too, so it draws only while the status-bar stage cannot.
+//
+// The stage still checks where it landed; if a host traps both stages, or neither mounts, the strip draws
+// the machines in the slot itself, as before.
+const OVERCHAT_SPOT = { left: 0, width: 0, anchored: false, stage: 'none', drawer: null, stages: {}, listeners: new Set() }
+
+// Which stage draws: the first in this list that is mounted and not trapped.
+const OVERCHAT_STAGE_ORDER = ['statusbar', 'titlebar']
+
+function overchatStageTurn(where) {
+  for (const name of OVERCHAT_STAGE_ORDER) {
+    if (OVERCHAT_SPOT.stages[name] === 'ready') return name === where
+  }
+  return false
+}
+
+function overchatStageMark(where, value) {
+  const stages = { ...OVERCHAT_SPOT.stages }
+  if (value) stages[where] = value
+  else delete stages[where]
+  overchatShare({ stages })
+}
 
 function overchatShare(patch) {
   let changed = false
@@ -24086,7 +24108,7 @@ function OverChatStrip({ ctx }) {
   })
 }
 
-function OverChatStage({ ctx }) {
+function OverChatStage({ ctx, where = 'statusbar' }) {
   const [slotsOn] = useSmOverchat()
   const [jackpotOn] = useJp2LOverchat(ctx)
   const spot = useOverchatSpot()
@@ -24095,7 +24117,16 @@ function OverChatStage({ ctx }) {
   // fixed box once traps it on every render, so retrying would only cost renders.
   const [place, setPlace] = useState('top')
   const on = Boolean(slotsOn || jackpotOn)
-  const drawing = on && spot.anchored && spot.width > 0 && place === 'top'
+
+  // Say this stage is here (and whether it is trapped), and take it back when it goes. An effect, not a
+  // layout effect: it must run after useOverchatSpot has subscribed, or this stage misses its own news.
+  useEffect(() => {
+    overchatStageMark(where, place === 'top' ? 'ready' : 'trapped')
+    return undefined
+  }, [where, place])
+  useEffect(() => () => overchatStageMark(where, null), [where])
+
+  const drawing = on && spot.anchored && spot.width > 0 && place === 'top' && overchatStageTurn(where)
 
   // Did the fixed box actually arrive at the top of the window? Its own rect is the only honest answer:
   // a transform, a filter or `contain` on an ancestor silently moves it into that ancestor.
@@ -24108,18 +24139,19 @@ function OverChatStage({ ctx }) {
     if (!Number.isFinite(top)) return undefined
     if (Math.abs(top - OVERCHAT_TOP) > OVERCHAT_TOP_SLACK) {
       setPlace('slot')
-      overchatShare({ stage: 'trapped' })
+      overchatShare({ stage: 'trapped', drawer: null })
     } else {
-      overchatShare({ stage: 'top' })
+      overchatShare({ stage: 'top', drawer: where })
     }
     return undefined
-  }, [drawing, spot.left, spot.width])
+  }, [drawing, spot.left, spot.width, where])
 
   // A stage that is not drawing hands the machines back to the slot.
   useEffect(() => {
-    if (!drawing && OVERCHAT_SPOT.stage === 'top') overchatShare({ stage: 'none' })
-  }, [drawing])
-  useEffect(() => () => { if (OVERCHAT_SPOT.stage === 'top') overchatShare({ stage: 'none' }) }, [])
+    // Only the stage that is drawing may say so: the stand-in waiting its turn must not wipe the other's 'top'.
+    if (!drawing && OVERCHAT_SPOT.drawer === where) overchatShare({ stage: 'none', drawer: null })
+  }, [drawing, where])
+  useEffect(() => () => { if (OVERCHAT_SPOT.drawer === where) overchatShare({ stage: 'none', drawer: null }) }, [where])
 
   if (!drawing) return null
   const width = spot.width
@@ -24361,7 +24393,16 @@ export default {
         id: 'overchat-stage',
         area: STATUSBAR_AREAS.right,
         order: 141,
-        render: () => jsx(OverChatStage, { ctx })
+        render: () => jsx(OverChatStage, { ctx, where: 'statusbar' })
+      },
+      {
+        // The stand-in for the stage above, for a window whose status bar is hidden (Simple mode rests it
+        // hidden). The titlebar's right cluster is always drawn and has no transform; it draws nothing while
+        // the status-bar stage is drawing (78-overchat-slot.js).
+        id: 'overchat-stage-titlebar',
+        area: TITLEBAR_AREAS.right,
+        order: 999,
+        render: () => jsx(OverChatStage, { ctx, where: 'titlebar' })
       }
     ])
   }

@@ -84,7 +84,7 @@ const sandbox = {
   console: { log: console.log, warn: console.warn, error: console.error, info: (...args) => said.push(args.join(' ')) },
   Set, setTimeout, clearTimeout, setInterval, clearInterval,
   PANES_AREA: 'panes', PALETTE_AREA: 'palette', ROUTES_AREA: 'routes',
-  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' },
+  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' }, TITLEBAR_AREAS: { right: 'titleBar.right' },
   ResizeObserver: class { observe() {} disconnect() {} unobserve() {} },
   requestAnimationFrame: fn => setTimeout(fn, 0),
   cancelAnimationFrame: id => clearTimeout(id)

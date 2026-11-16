@@ -348,8 +348,8 @@ check('and both are at the top of the window with the slot, not stacked on each 
 await shot('overchat-both')
 
 // ---------------------------------------------------------------- 6. a host that traps fixed positioning
-// `?trap=1` puts a transform on the status bar, which makes it the containing block for the fixed stage, so
-// the stage lands beside the composer instead of at the top of the window. The placement check has to
+// `?trap=1` puts a transform on the status bar, which makes it the containing block for the fixed stage, and
+// draws no titlebar (the HUD window has none), so no stage can reach the top of the window. The placement check has to
 // notice from the stage's own rect and fall back to drawing in the slot — visible, just not at the top.
 await cdp('Page.navigate', { url: `${URL_BASE}pane?trap=1` })
 await sleep(7000)
@@ -368,6 +368,30 @@ check('and the machines are still drawn: in the slot, visible, inside it',
     `at ${trappedNow && trappedNow.copyTop}, inside ${trappedNow && trappedNow.copyInsideSlot}, ` +
     `place ${trappedNow && trappedNow.place}`)
 await shot('overchat-trap-fallback')
+
+// ---------------------------------------------------------------- 7. no status bar (Simple mode)
+// Simple mode rests the status bar hidden, so its stage never mounts. The machines must still be drawn at
+// the top of the window - from the titlebar stand-in - not dropped into the slot under the composer.
+await cdp('Page.navigate', { url: `${URL_BASE}pane?nobar=1` })
+await sleep(7000)
+const barlessOpened = await openPane()
+const barless = await evaluate(FACTS)
+check('with no status bar the copy is still drawn at the top of the window, over the conversation',
+  barlessOpened === 'picked' && Boolean(barless && barless.stage && barless.stagePosition === 'fixed'
+    && barless.place === 'top' && barless.copy && barless.copyTop !== null
+    && barless.copyTop < barless.view.height / 2),
+  `place ${barless && barless.place}, stage ${barless && barless.stage}, copy top ${barless && barless.copyTop} of ${barless && barless.view.height}`)
+const stageCount = await evaluate("document.querySelectorAll('[data-overchat=\"stage\"]').length")
+check('and only one stage draws, never two copies', stageCount === 1, `${stageCount} stages`)
+await shot('overchat-nobar-top')
+
+// ---------------------------------------------------------------- 8. both stages present: the status bar draws
+await cdp('Page.navigate', { url: `${URL_BASE}pane` })
+await sleep(7000)
+await openPane()
+const owner = await evaluate("(() => { const s = document.querySelectorAll('[data-overchat=\"stage\"]'); return { count: s.length, inBar: s.length === 1 && Boolean(s[0].closest('#statusbar')) } })()")
+check('with a status bar the status-bar stage draws, and the titlebar stand-in draws nothing',
+  Boolean(owner && owner.count === 1 && owner.inBar), JSON.stringify(owner))
 
 const errors = await evaluate('(window.qa && window.qa.errors) || []')
 check('the page logged no JavaScript error through all of that',

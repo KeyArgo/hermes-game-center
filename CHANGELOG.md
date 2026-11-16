@@ -6,6 +6,13 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The backdrop stays at the top when the status bar is hidden.** It was drawn from a status-bar
+  item, and Simple mode rests the Desktop's status bar hidden (so can a right-click), which dropped
+  the machines into the slot under the message box. A stand-in now waits in the titlebar's right
+  cluster, which the main window always draws, and draws only while the status-bar one cannot, so
+  there is never a second copy. `desktop/src/78-overchat-slot.js`, `desktop/src/80-plugin.js`.
+  Guards: `test_a_window_without_a_status_bar_still_draws_the_machines_at_the_top` and the
+  `?nobar=1` checks in `tests/overchat_slot_live.mjs`.
 - **The Inference Slot Machine switch explains what it now does.** The rename landed but the help
   line under it still said "One spin per message you send", the old behaviour and exactly the
   two-setting confusion the Games-page button was added to end; the Jackpot cabinet said it in a

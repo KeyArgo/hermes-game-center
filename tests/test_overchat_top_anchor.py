@@ -140,3 +140,24 @@ def test_the_fixed_stage_is_drawn_from_the_status_bar_not_the_composer_dock():
     entry = plugin[plugin.index("id: 'overchat-stage'"):][:200]
     assert "area: STATUSBAR_AREAS.right" in entry, "the stage is a status-bar contribution"
     assert "OverChatStage" in entry, "and it renders the stage"
+
+
+def test_a_window_without_a_status_bar_still_draws_the_machines_at_the_top():
+    """Simple mode rests the Desktop's status bar hidden (store/statusbar-prefs.ts), so the status-bar stage
+    never mounts and the machines fell back under the composer - "make sure the overlay for the slots is at
+    the top not the bottom" (owner, 2026-11-15). A stand-in stage lives in the titlebar's right cluster, which
+    the main window always draws; it draws only while the status-bar stage cannot, so there is one copy."""
+    plugin = _code_only((SRC / "80-plugin.js").read_text(encoding="utf-8"))
+    entry = plugin[plugin.index("id: 'overchat-stage-titlebar'"):][:300]
+    assert "area: TITLEBAR_AREAS.right" in entry, "the stand-in is a titlebar contribution"
+    assert "jsx(OverChatStage, { ctx, where: 'titlebar' })" in entry, "and it renders the stage as the titlebar one"
+    status = plugin[plugin.index("id: 'overchat-stage',"):][:300]
+    assert "where: 'statusbar'" in status, "the status-bar stage names itself"
+    text = _code_only(SLOT.read_text(encoding="utf-8"))
+    assert "const OVERCHAT_STAGE_ORDER = ['statusbar', 'titlebar']" in text, \
+        "the status bar draws first: the titlebar cluster sits above the app's dialogs"
+    stage = text[text.index("function OverChatStage("):]
+    assert "overchatStageTurn(where)" in stage, "a stage draws only on its turn, so never two copies"
+    assert "OVERCHAT_SPOT.drawer === where" in stage, "only the drawing stage may clear the shared 'top'"
+    header = (SRC / "00-header.js").read_text(encoding="utf-8")
+    assert "TITLEBAR_AREAS" in header, "the titlebar area comes from the SDK, not a hand-typed string"

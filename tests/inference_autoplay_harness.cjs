@@ -37,7 +37,7 @@ const sandbox = {
   setInterval: () => 1,
   clearInterval: () => {},
   PANES_AREA: 'panes', PALETTE_AREA: 'palette', ROUTES_AREA: 'routes',
-  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' },
+  SIDEBAR_NAV_AREA: 'nav', STATUSBAR_AREAS: { right: 'right' }, TITLEBAR_AREAS: { right: 'titleBar.right' },
   COMPOSER_AREAS: { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
 }
 const windowListeners = {}

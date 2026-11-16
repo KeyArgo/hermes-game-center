@@ -91,7 +91,16 @@ export default {
         id: 'overchat-stage',
         area: STATUSBAR_AREAS.right,
         order: 141,
-        render: () => jsx(OverChatStage, { ctx })
+        render: () => jsx(OverChatStage, { ctx, where: 'statusbar' })
+      },
+      {
+        // The stand-in for the stage above, for a window whose status bar is hidden (Simple mode rests it
+        // hidden). The titlebar's right cluster is always drawn and has no transform; it draws nothing while
+        // the status-bar stage is drawing (78-overchat-slot.js).
+        id: 'overchat-stage-titlebar',
+        area: TITLEBAR_AREAS.right,
+        order: 999,
+        render: () => jsx(OverChatStage, { ctx, where: 'titlebar' })
       }
     ])
   }

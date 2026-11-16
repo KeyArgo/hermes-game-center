@@ -302,6 +302,7 @@ export const PALETTE_AREA = 'palette'
 export const ROUTES_AREA = 'routes'
 export const SIDEBAR_NAV_AREA = 'nav'
 export const STATUSBAR_AREAS = { right: 'right' }
+export const TITLEBAR_AREAS = { right: 'titleBar.right' }
 // The composer's seams. The QA host draws the underside strip below its stub composer, the way the
 // real Desktop does, which is where both see-through machines live (review, 2026-11-12).
 export const COMPOSER_AREAS = { top: 'composer.top', bottom: 'composer.bottom', underside: 'composer.underside' }
@@ -345,7 +346,7 @@ const ctx={os:{openExternal(url){qa.external=(qa.external||[]).concat([url]);let
 </script>'''.replace('__QA_PET_THUMB__', pet_thumb))
 
     @app.get('/pane')
-    def pane_page(w: int = 400, trap: int = 0):
+    def pane_page(w: int = 400, trap: int = 0, nobar: int = 0):
         # The pane beside a stub chat. Only the SDK is stubbed: the pane component,
         # the board and every command are the real ones, and the chat itself is a
         # drawing, because the native Desktop cannot be opened here.
@@ -399,9 +400,12 @@ body{font-family:system-ui;background:#0b1220;color:#e8edf4}
   </section>
   <section id="pane" aria-label="Game pane"></section>
 </div>
-<!-- `?trap=1` gives the status bar a transform too, so even the stage drawn from it is trapped: the case
+<!-- `?trap=1` gives the status bar a transform and draws no titlebar (as the HUD window has none), so even the stage drawn from it is trapped: the case
      the in-slot fallback exists for. -->
+<!-- `?nobar=1` draws no status bar at all, as Simple mode does: only the titlebar's right cluster (a fixed
+     box with no transform, like the Desktop's) is left for the stage. -->
 <div id="statusbar"__BAR_STYLE__></div>
+<div id="titlebar-right" style="position:fixed;top:6px;right:10px;z-index:70;display:flex;align-items:center;gap:6px"></div>
 <div id="label">ISOLATED QA · real pane and board · stub chat</div>
 <script>window.qa={errors:[],consoleErrors:[],calls:[],notices:[],actions:[],revealed:[]};const originalError=console.error.bind(console);console.error=(...args)=>{qa.consoleErrors.push(args.map(String).join(' '));originalError(...args)};addEventListener('error',e=>qa.errors.push(e.message));addEventListener('unhandledrejection',e=>qa.errors.push(String(e.reason)));</script>
 <script type="module">
@@ -450,8 +454,15 @@ const ctx = {
     // renders them all in one bar (useStatusbarContributions reads the whole area); a QA page that
     // keeps only the first one hides whatever the later items draw - including the see-through slot
     // machine the over-chat switch is about, which is why it could never be seen here.
+    // The titlebar's right cluster, which the Desktop draws in every mode.
+    const titleRights = __NO_TITLE__ ? [] : entries.filter(item => item && item.area === 'titleBar.right')
+    for (const entry of titleRights) {
+      const holder = document.createElement('span')
+      document.getElementById('titlebar-right').appendChild(holder)
+      createRoot(holder).render(React.createElement(entry.render))
+    }
     const bar = document.getElementById('statusbar')
-    const rights = entries.filter(item => item && item.area === 'right')
+    const rights = __NO_BAR__ ? [] : entries.filter(item => item && item.area === 'right')
     for (const entry of rights) {
       try {
         const holder = document.createElement('span')
@@ -471,7 +482,9 @@ document.getElementById('working').onclick = () => { host.state.busy.set(true); 
 document.getElementById('finished').onclick = () => { host.state.busy.set(false); fire('message.complete'); document.getElementById('chat-turn').textContent = 'Hermes finished' }
 document.getElementById('approval').onclick = () => { fire('approval.request'); document.getElementById('chat-turn').textContent = 'waiting for an approval' }
 </script>'''.replace('__PANE_W__', str(pane_width)).replace(
-            '__BAR_STYLE__', ' style="transform:translateZ(0)"' if trap else ''))
+            '__BAR_STYLE__', ' style="transform:translateZ(0)"' if trap else ' style="display:none"' if nobar else '').replace(
+            '__NO_BAR__', 'true' if nobar else 'false').replace(
+            '__NO_TITLE__', 'true' if trap else 'false'))
 
     @app.get('/favicon.ico')
     def favicon():
