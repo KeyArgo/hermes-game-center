@@ -275,3 +275,28 @@ def test_a_dropped_socket_never_leaves_a_stale_live_state(monkeypatch):
         assert hall._out.qsize() == 0, "a request was queued while the lobby was down"
     finally:
         hall.stop()
+
+
+def test_two_hermes_halls_on_one_lobby_see_each_other(tmp_path):
+    """Two PCs, each a Hermes signed in under its own name, list each other in the Hall (owner,
+    2026-11-16: "bluewren" and "Locutus" did not see each other). Until now only Hermes-and-browser
+    was covered."""
+    async def scenario():
+        server, client = await started(tmp_path / "server")
+        first = second = None
+        try:
+            wren, wren_token = await sign_in(client, "bluewren")
+            locutus, locutus_token = await sign_in(client, "Locutus")
+            base = str(client.make_url("/")).rstrip("/")
+            first = Hall(_source(tmp_path / "pc-one", base, wren_token))
+            second = Hall(_source(tmp_path / "pc-two", base, locutus_token))
+            first.start()
+            second.start()
+            await wait_snapshot(first, lambda s: locutus["id"] in [r["id"] for r in s["roster"]])
+            await wait_snapshot(second, lambda s: wren["id"] in [r["id"] for r in s["roster"]])
+        finally:
+            for hall in (first, second):
+                if hall:
+                    await asyncio.to_thread(hall.stop)
+            await client.close()
+    run(scenario())
