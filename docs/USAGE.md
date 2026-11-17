@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-15 (99b43c9f)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-16 (e18bfdf0)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -51,7 +51,7 @@ In chat: `/games <game> lesson`, then `/games <game> lesson next`.
 ## Play a person
 
 - **Same screen:** choose **Two players** on the game screen. The second person takes the other seat.
-- **Online:** turn on **Online play** in the lobby, then use the Hall's roster, chat and play requests. The person who receives a request sees *"X wants to play … — Join / Not now"*. Join seats both at a private table.
+- **Online:** turn on **Online play** in the lobby, then use the Hall's roster, chat and play requests. The person who receives a request sees *"X wants to play … — Join / Not now"*. Join seats both at a private table. If the lobby refuses your saved sign-in, the Hall says so (nobody can see you until you sign in again with your name and recovery key, **I have a key**) instead of telling you to turn online play on.
 
 A move never silently takes a seat. The other person must type `/games <game> join` or take the free seat before moving. `resign` ends your seat, `leave` opens it before play, `abandon` ends the table without a win, and `draw` / `draw accept` offer and accept a draw.
 

@@ -1,6 +1,6 @@
 # Development
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-15 (99b43c9f)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-16 (e18bfdf0)_
 
 Repo layout, how to build the Desktop bundle, how to run each suite, and what CI does.
 
@@ -48,6 +48,8 @@ python -m pytest tests -q -p no:cacheprovider   # the Python suite
 python3 tools/build_plugin.py                    # the bundle CI grades
 node tests/table_ui_harness.cjs                  # Desktop page state machine
 node tests/jackpot_overlay_harness.cjs           # over-chat slot cabinet
+# the backdrop stage is drawn from the status bar, or from TITLEBAR_AREAS.right when the bar is hidden
+# (78-overchat-slot.js OVERCHAT_STAGE_ORDER); the two-Hermes Hall case is tests/test_online_hall.py
 node tests/jackpot2_harness.cjs                  # Jackpot v2 copy, switch and fit
 node tests/jackpot2_look_harness.cjs             # Jackpot v2 tint and contrast
 node tests/inference_autoplay_harness.cjs        # Inference Slot Machine button and backdrop height
