@@ -6,6 +6,13 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The Hall says when the lobby refused your sign-in.** A refused sign-in leaves the Hall
+  'off' with online play still on, and the Hall told that person to "Turn online play on" — so
+  they sat invisible to everyone with no clue why (two PCs, each signed in, neither saw the
+  other). It now says the lobby did not accept the sign-in, that nobody can see you until you
+  sign in again, and how (your name and the recovery key you saved, **I have a key**).
+  `desktop/src/72-lobby.js`. Guard: the refused-sign-in check in `hallContract`,
+  `tests/table_ui_harness.cjs`.
 - **The backdrop stays at the top when the status bar is hidden.** It was drawn from a status-bar
   item, and Simple mode rests the Desktop's status bar hidden (so can a right-click), which dropped
   the machines into the slot under the message box. A stand-in now waits in the titlebar's right

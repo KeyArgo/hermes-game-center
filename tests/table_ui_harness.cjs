@@ -4692,6 +4692,15 @@ async function hallContract() {
   let run = makeCtx({ state: 'off', you, prefs: {}, roster: [], requests: [], seated: null })
   let tree = await settle(props({ ctx: run.ctx }))
   assert.ok(words(tree).includes('Turn online play on to see who is here.'), 'off invites turning online play on')
+  // A refused sign-in is also 'off', with online play still ON: telling that person to turn online play
+  // on left them invisible with no clue why (owner, 2026-11-16: two PCs signed in, neither saw the other).
+  reset()
+  run = makeCtx({ state: 'off', error: 'The lobby did not accept your sign-in.', you, prefs: {}, roster: [], requests: [], seated: null })
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.ok(words(tree).includes('The lobby did not accept your sign-in.'), 'a refused sign-in is said, not hidden')
+  assert.ok(words(tree).includes('nobody can see you'), 'and it says what that means: nobody sees you')
+  assert.ok(words(tree).includes('I have a key'), 'and how to fix it: sign in again with the saved key')
+  assert.ok(!words(tree).includes('Turn online play on'), 'never "turn online play on" when it is already on')
   reset()
   run = makeCtx({ state: 'connecting', you, prefs: {}, roster: [], requests: [], seated: null })
   tree = await settle(props({ ctx: run.ctx }))

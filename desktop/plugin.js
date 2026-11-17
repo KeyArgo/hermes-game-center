@@ -23094,6 +23094,12 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   })
   const note = say => shell([jsx('div', { style: muted, children: say })])
 
+  // 'off' also covers a sign-in the lobby refused, with online play still on. Say that, what it means and
+  // the way back; "turn online play on" would send them to a switch that is already on.
+  const refused = snap && typeof snap.error === 'string' ? snap.error.trim() : ''
+  if (state === 'off' && refused) {
+    return note(`${refused} Until you sign in again, nobody can see you and you cannot see anyone. Sign in again with your name and the recovery key you saved (I have a key).`)
+  }
   if (state === 'off') return note('Turn online play on to see who is here.')
   if (state === 'old-server') return note('This lobby server has no Hall yet. Find a match still works.')
   if (state !== 'live') return note(stale ? 'Reconnecting…' : 'Joining the Hall…')

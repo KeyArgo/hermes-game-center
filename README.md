@@ -220,7 +220,7 @@ flowchart LR
   CAT --> G["game folders: game.json + game.py"]
   G --> K["kit.py Table: seats, turns, referee, lessons"]
   K --> ST["state.json per game in the plugin data folder"]
-  A --> W["shelf/wallet.py: wallet.json (chips, points, tokens)"]
+  A --> W["shelf/wallet.py: wallet.json (chips, points, model-token count)"]
   A --> O["shelf/online_source.py"]
   O --> SRV["online/server.py: the optional lobby"]
 ```
