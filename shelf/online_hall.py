@@ -45,6 +45,17 @@ def _is_rejected_upgrade(exc: Exception) -> bool:
 class Hall:
     """One account's lobby presence, as the plugin page sees it."""
 
+    # Redial backoff, in seconds: the first wait, then doubling up to the most.
+    retry_first = 1
+    retry_most = 8
+    # The Hall pings every 20 s and the lobby answers every ping. Nothing at all heard for this
+    # long means the server is gone without closing the socket (a crashed host), so dial again.
+    quiet_limit = 50
+    # After this many failed dials in a row, say in words that the server is not answering.
+    unreachable_after = 2
+    UNREACHABLE = ("The online server is not answering right now. Game Center keeps trying "
+                   "and reconnects by itself when it is back.")
+
     def __init__(self, online):
         self.online = online
         self._lock = threading.RLock()
@@ -55,7 +66,8 @@ class Hall:
         self._out: queue.Queue = queue.Queue()
         self._pending: dict = {}
         self._ref = 0
-        self._delay = 1
+        self._delay = self.retry_first
+        self._misses = 0
         # The view the page reads.
         self._state = "off"
         self._error = ""
@@ -83,7 +95,8 @@ class Hall:
                 self._out = queue.Queue()
                 self._pending = {}
                 self._ref = 0
-                self._delay = 1
+                self._delay = self.retry_first
+                self._misses = 0
                 self._error = ""
                 if self._state in ("off", "old-server"):
                     self._state = "connecting"
@@ -265,18 +278,21 @@ class Hall:
                 with self._lock:
                     self._socket = None
                     self._state = "old-server" if slow else "connecting"
+                    if not slow:
+                        self._missed()
                 if self._stop.wait(60 if slow else self._delay):
                     break
                 if not slow:
-                    self._delay = min(self._delay * 2, 8)
+                    self._delay = min(self._delay * 2, self.retry_most)
                 continue
             except OSError:
                 with self._lock:
                     self._socket = None
                     self._state = "connecting"
+                    self._missed()
                 if self._stop.wait(self._delay):
                     break
-                self._delay = min(self._delay * 2, 8)
+                self._delay = min(self._delay * 2, self.retry_most)
                 continue
             outcome = self._session(sock, key)
             with self._lock:
@@ -301,7 +317,13 @@ class Hall:
             # A plain drop: reconnect with backoff.
             if self._stop.wait(self._delay):
                 break
-            self._delay = min(self._delay * 2, 8)
+            self._delay = min(self._delay * 2, self.retry_most)
+
+    def _missed(self) -> None:
+        """One more failed dial (caller holds the lock); past a couple, say the server is down."""
+        self._misses += 1
+        if self._misses >= self.unreachable_after:
+            self._error = self.UNREACHABLE
 
     def _session(self, sock, key: str) -> str:
         """One connected session. Returns 'stop', 'auth', or '' (dropped)."""
@@ -314,6 +336,7 @@ class Hall:
         except (OSError, wsmod.SocketError):
             return ""
         next_ping = time.monotonic() + 20
+        heard = time.monotonic()
         while not self._stop.is_set():
             try:
                 while True:
@@ -334,7 +357,10 @@ class Hall:
             except (OSError, wsmod.SocketError):
                 return ""
             if not message:
+                if time.monotonic() - heard > self.quiet_limit:
+                    return ""   # not even a pong: the server is gone, so dial again
                 continue
+            heard = time.monotonic()
             if message.get("t") == "error" and message.get("code") == "auth":
                 with self._lock:
                     self._state = "off"
@@ -373,7 +399,8 @@ class Hall:
                                   if isinstance(req, dict) and req.get("id")}
                 self._state = "live"
                 self._error = ""
-                self._delay = 1
+                self._misses = 0
+                self._delay = self.retry_first
             elif kind == "presence":
                 row = message.get("row") or {}
                 if isinstance(row, dict) and row.get("id"):

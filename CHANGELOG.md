@@ -6,6 +6,16 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The Hall recovers by itself after a lobby server outage, and says when the server is down.**
+  A server host that dies without closing the socket (sentinel, 2026-11-18) left the Hall's socket
+  open but silent: the Hall pinged every 20 s but never noticed that no answer came, so it could sit
+  "live" on a dead line long after the server was back. It now dials again when nothing at all has
+  been heard for 50 s. After two failed dials in a row the Hall says "The online server is not
+  answering right now…" instead of "Joining the Hall…", and that line clears by itself once the
+  server answers. Guards: `test_a_server_that_goes_silent_is_dropped_and_dialled_again`,
+  `test_a_server_that_cannot_be_reached_says_so_and_clears_when_it_answers`,
+  `test_two_halls_find_each_other_again_after_the_server_restarts`, and the down-server check in
+  `tests/table_ui_harness.cjs`.
 - **Second-opinion review fixes (Codex, Spark GLM).** A blackjack stand or double that won, or a
   slot spin that paid, on a move whose table state could not be saved kept the payout while the
   table still held the move unplayed, so a retry paid it twice: the failed-save undo in `kit.py` now

@@ -300,3 +300,148 @@ def test_two_hermes_halls_on_one_lobby_see_each_other(tmp_path):
                     await asyncio.to_thread(hall.stop)
             await client.close()
     run(scenario())
+
+
+def test_a_server_that_goes_silent_is_dropped_and_dialled_again(monkeypatch):
+    """A server host that dies without closing the socket (sentinel, 2026-11-18) leaves a socket
+    that never errors. The Hall pings every 20 s; when nothing at all comes back for a while it
+    must give up on that socket and dial again, or it stays "live" on a dead line long after the
+    server is back."""
+    import types
+
+    from shelf import online_hall as mod
+
+    opened = []
+
+    class SilentSock:
+        def __init__(self, url, timeout=5):
+            opened.append(self)
+            self.helloed = False
+
+        def send_json(self, frame):
+            pass
+
+        def receive(self, timeout=0.15):
+            if not self.helloed:
+                self.helloed = True
+                return {"t": "hello", "v": 1, "you": {"id": "web:1", "name": "Bea"},
+                        "prefs": {"open": False, "games": {}}, "roster": [], "requests": [], "rev": 1}
+            time.sleep(timeout)   # the host is gone: no frame, no error, ever
+            return None
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(mod.wsmod, "Socket", SilentSock)
+    online = types.SimpleNamespace(on=True, url="http://127.0.0.1:1", key=lambda: "k", game=lambda: "connect4")
+    hall = mod.Hall(online)
+    hall.quiet_limit = 0.6
+    hall.retry_first = 0.05
+    hall.start()
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and len(opened) < 2:
+            time.sleep(0.02)
+        assert len(opened) >= 2, "a silent socket was kept forever; the Hall never dialled again"
+    finally:
+        hall.stop()
+
+
+def test_a_server_that_cannot_be_reached_says_so_and_clears_when_it_answers(monkeypatch):
+    """While the server is down the Hall must say so in words, not sit on "Joining the Hall…";
+    the words go away by themselves once the server answers again."""
+    import types
+
+    from shelf import online_hall as mod
+
+    up = {"now": False}
+
+    class Sock:
+        def __init__(self, url, timeout=5):
+            if not up["now"]:
+                raise OSError("timed out")
+            self.helloed = False
+
+        def send_json(self, frame):
+            pass
+
+        def receive(self, timeout=0.15):
+            if not self.helloed:
+                self.helloed = True
+                return {"t": "hello", "v": 1, "you": {"id": "web:1", "name": "Bea"},
+                        "prefs": {"open": False, "games": {}}, "roster": [], "requests": [], "rev": 1}
+            time.sleep(0.02)
+            return {"t": "pong"}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(mod.wsmod, "Socket", Sock)
+    online = types.SimpleNamespace(on=True, url="http://127.0.0.1:1", key=lambda: "k", game=lambda: "connect4")
+    hall = mod.Hall(online)
+    hall.retry_first = 0.05
+    hall.retry_most = 0.1
+    hall.start()
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and "error" not in hall.snapshot():
+            time.sleep(0.02)
+        snap = hall.snapshot()
+        assert snap["state"] == "connecting", snap
+        assert "not answering" in snap.get("error", ""), snap
+
+        up["now"] = True
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and hall.snapshot()["state"] != "live":
+            time.sleep(0.02)
+        snap = hall.snapshot()
+        assert snap["state"] == "live", snap
+        assert "error" not in snap, snap
+    finally:
+        hall.stop()
+
+
+def test_two_halls_find_each_other_again_after_the_server_restarts(tmp_path):
+    """The whole outage end to end: two PCs see each other, the lobby server stops (sentinel went
+    down), it comes back on the same address with the same accounts, and both PCs list each other
+    again without anyone touching them."""
+    from aiohttp.test_utils import TestClient, TestServer
+
+    from online.server import App
+    from test_online_server import LOADED
+
+    async def scenario():
+        server, client = await started(tmp_path / "server")
+        port = client.port
+        first = second = None
+        try:
+            wren, wren_token = await sign_in(client, "bluewren")
+            locutus, locutus_token = await sign_in(client, "Locutus")
+            base = str(client.make_url("/")).rstrip("/")
+            first = Hall(_source(tmp_path / "pc-one", base, wren_token))
+            second = Hall(_source(tmp_path / "pc-two", base, locutus_token))
+            for hall in (first, second):
+                hall.retry_first = 0.05
+                hall.retry_most = 0.2
+            first.start()
+            second.start()
+            await wait_snapshot(first, lambda s: locutus["id"] in [r["id"] for r in s["roster"]])
+            await wait_snapshot(second, lambda s: wren["id"] in [r["id"] for r in s["roster"]])
+
+            await client.close()          # the server goes away
+            await wait_snapshot(first, lambda s: s["state"] == "connecting")
+            await asyncio.sleep(0.5)       # down for a while; both keep trying
+
+            again = App(tmp_path / "server", games=LOADED)
+            client = TestClient(TestServer(again.build(), port=port))
+            await client.start_server()    # back on the same address, same accounts
+            await wait_snapshot(first, lambda s: s["state"] == "live"
+                                and locutus["id"] in [r["id"] for r in s["roster"]], timeout=10)
+            await wait_snapshot(second, lambda s: s["state"] == "live"
+                                and wren["id"] in [r["id"] for r in s["roster"]], timeout=10)
+        finally:
+            for hall in (first, second):
+                if hall:
+                    await asyncio.to_thread(hall.stop)
+            await client.close()
+    run(scenario())

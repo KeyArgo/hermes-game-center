@@ -1,5 +1,5 @@
 # Add your game to the Game Center
-_Applies to Game Center 1.0.0 · last revised 2026-11-17 (2e617ccf)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (8cd3b6da)_
 
 Another plugin can put its game on the Game Center shelf by shipping a
 `game.json`. **Automatic means exactly this:** an installed, enabled plugin

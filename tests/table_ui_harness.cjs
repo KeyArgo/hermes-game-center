@@ -4705,6 +4705,13 @@ async function hallContract() {
   run = makeCtx({ state: 'connecting', you, prefs: {}, roster: [], requests: [], seated: null })
   tree = await settle(props({ ctx: run.ctx }))
   assert.ok(words(tree).includes('Joining the Hall'), 'connecting says it is joining')
+  // A server that is not answering says so, not "Joining the Hall…" forever (owner, 2026-11-18: sentinel down).
+  reset()
+  run = makeCtx({ state: 'connecting', error: 'The online server is not answering right now.', you, prefs: {}, roster: [], requests: [], seated: null })
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.ok(words(tree).includes('The online server is not answering right now.'), 'a down server is said, not hidden')
+  assert.ok(words(tree).includes('nobody here can see anyone online'), 'and what that means')
+  assert.ok(!words(tree).includes('Joining the Hall'), 'never "joining" while the server is down')
   reset()
   run = makeCtx({ state: 'old-server', you, prefs: {}, roster: [], requests: [], seated: null })
   tree = await settle(props({ ctx: run.ctx }))

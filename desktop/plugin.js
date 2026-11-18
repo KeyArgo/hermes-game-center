@@ -23157,6 +23157,9 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   }
   if (state === 'off') return note('Turn online play on to see who is here.')
   if (state === 'old-server') return note('This lobby server has no Hall yet. Find a match still works.')
+  // A server that is down says so (the Hall keeps dialling and clears this by itself), rather than
+  // sitting on "Joining the Hall…" for a day (owner, 2026-11-18: sentinel was down, both PCs looked empty).
+  if (state === 'connecting' && refused) return note(`${refused} Until then nobody here can see anyone online.`)
   if (state !== 'live') return note(stale ? 'Reconnecting…' : 'Joining the Hall…')
 
   // The switches, in the order the person meets them: appear offline first (the one
