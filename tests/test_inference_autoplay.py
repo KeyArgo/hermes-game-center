@@ -40,6 +40,7 @@ def test_the_button_and_the_backdrop_are_drawn_and_pressed():
     for beat in (
         "the home button turns both switches, follows them, and stays honest",
         "the backdrop is twice its old size, in its 60% share of the window",
-        "Small, Medium and Large size the backdrop in one press",
+        "Normal, Bigger and Biggest size the backdrop in one press",
+        "one Size (today is the smallest) and one Visibility (50% default) control",
     ):
         assert beat in output, f"the harness never reported '{beat}':\n{output}"
