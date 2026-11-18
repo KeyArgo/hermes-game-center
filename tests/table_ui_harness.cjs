@@ -4565,6 +4565,23 @@ async function lobbyColumnContract() {
   const inputFor = (tree, label) => nodes(tree).find(node => node.type === 'input' && node.props['aria-label'] === label)
   let tree = null
 
+  // 0. The column says whose chat it is (owner, 2026-11-18: two PCs said hi and neither saw the other's).
+  const whereOf = view => {
+    sandbox.lobbyProps = { view, ctx: { os: { openExternal: () => false } }, current: 'connect4', onPlayHere: () => {},
+      chat: '', setChat: () => {}, name: '', setName: () => {}, send: line => sender(line) }
+    cursor = 0
+    const drawn = evaluate('LobbyChatColumn(lobbyProps)')
+    effects = []
+    return drawn
+  }
+  tree = whereOf(named)
+  assert.ok(words(tree).includes('Only this computer.'), 'a chat that is not shared says it stays on this computer')
+  tree = whereOf({ ...named, lobby: { lines: [], looking: [], shared: true, reached: true } })
+  assert.ok(words(tree).includes('Everyone online reads this.'), 'a shared chat says everyone online reads it')
+  assert.ok(!words(tree).includes('Only this computer'), 'and never also says it is local')
+  tree = whereOf({ ...named, lobby: { lines: [], looking: [], shared: true, reached: false } })
+  assert.ok(words(tree).includes('could not be read just now'), 'a lobby that could not be read says so')
+
   // 1. A message the lobby refuses keeps its words in the box, in the server's own words; the
   // same message, once the lobby has taken it, clears the box.
   reset()
@@ -4705,6 +4722,20 @@ async function hallContract() {
   run = makeCtx({ state: 'connecting', you, prefs: {}, roster: [], requests: [], seated: null })
   tree = await settle(props({ ctx: run.ctx }))
   assert.ok(words(tree).includes('Joining the Hall'), 'connecting says it is joining')
+  // Check online is on the Hall in every state, and shows each step with OK or Fix (owner, 2026-11-18:
+  // "can we setup something to troubleshoot and test this").
+  reset()
+  run = makeCtx({ state: 'connecting', you, prefs: {}, roster: [], requests: [], seated: null })
+  run.ctx.rest = (inner => async (path, options) => path === '/online/check'
+    ? { ok: false, steps: [{ name: 'Server', ok: true, text: 'answers (80 ms).' }, { name: 'Account', ok: false, text: 'The lobby did not accept this computer\u2019s key.' }] }
+    : inner(path, options))(run.ctx.rest)
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.ok(findButton(tree, 'Check online'), 'Check online is there even while joining')
+  findButton(tree, 'Check online').props.onClick()
+  tree = await settle(props({ ctx: run.ctx }))
+  const checkRows = nodes(tree).filter(node => node.props && node.props['data-hall-check-row'])
+  assert.deepEqual(checkRows.map(node => node.props['data-hall-check-row']), ['ok', 'fix'], 'each step shows OK or Fix')
+  assert.ok(words(checkRows[1]).includes('Fix · Account:') && words(checkRows[1]).includes('The lobby did not accept'), 'a failing step names itself and says why')
   // A server that is not answering says so, not "Joining the Hall…" forever (owner, 2026-11-18: sentinel down).
   reset()
   run = makeCtx({ state: 'connecting', error: 'The online server is not answering right now.', you, prefs: {}, roster: [], requests: [], seated: null })

@@ -44,6 +44,9 @@ STAFF_KEY_ENV = "HERMES_GAMESHELF_STAFF_KEY"
 STATE_FILE = "online.json"
 
 POLL_SECONDS = 15
+# The #games chat on the Games page is read from the lobby at most this often.
+CHAT_SECONDS = 3
+CHAT_DOWN = "The online server is not answering right now. Your message was not sent."
 LEAGUE_SECONDS = 20
 BACKOFF_SECONDS = (15, 30, 60, 120)
 ALERT_EVERY_SECONDS = 600
@@ -228,6 +231,10 @@ class Online:
         # half minute: the Admin tab is the only thing that reads it.
         self._staff: dict = {}
         self._staff_at = 0.0
+        # The lobby's #games chat, as last read, and whether that read reached the server.
+        self._chat: list[dict] = []
+        self._chat_at = 0.0
+        self._chat_ok = False
         self._state = self._load()
         # A table found just before Hermes was closed is still the person's table:
         # the queue entry is gone from the server, so this line is the only way
@@ -985,6 +992,96 @@ class Online:
         if not self.on or not self.linked:
             return 0, {}
         return self._call(method, path, body, key=self.key(), extra={"X-Staff-Key": self.staff_key()})
+
+    # The #games chat ----------------------------------------------------------
+
+    def chat_shared(self) -> bool:
+        """True when the #games chat is the lobby's, shared with everyone online."""
+        return bool(self.on and self.key())
+
+    def lobby_lines(self, *, force: bool = False) -> list[dict]:
+        """The lobby's #games chat, oldest first, read at most every CHAT_SECONDS.
+
+        A miss keeps the last lines (the page says when it could not read them)."""
+        key = self.key() if self.on else ""
+        if not key:
+            return []
+        now = self.clock()
+        if not force and self._chat_at and now - self._chat_at < CHAT_SECONDS:
+            return [dict(line) for line in self._chat]
+        status, body = self._call("GET", "/api/lobby/chat", key=key)
+        self._chat_at = now
+        rows = body.get("messages") if status == 200 else None
+        if isinstance(rows, list):
+            self._chat = [
+                {"id": str(row.get("id") or ""), "name": str(row.get("name") or ""),
+                 "text": str(row.get("text") or ""), "at": float(row.get("at") or 0)}
+                for row in rows if isinstance(row, dict) and row.get("text")
+            ]
+            self._chat_ok = True
+        else:
+            self._chat_ok = False
+        return [dict(line) for line in self._chat]
+
+    def chat_reached(self) -> bool:
+        """Whether the last #games read reached the server."""
+        return self._chat_ok
+
+    def say_lobby(self, text: str) -> dict:
+        """Post one line to the lobby's #games chat, in the server's own words when refused."""
+        key = self.key() if self.on else ""
+        if not key:
+            return {"ok": False, "text": "Sign in to online play first, then the whole lobby reads you."}
+        status, body = self._call("POST", "/api/lobby/chat", {"text": str(text or "")}, key=key)
+        if status == 200:
+            self._chat_at = 0.0   # the next read shows the line straight away
+            return {"ok": True, "text": "Sent to the lobby."}
+        if status == 0:
+            return {"ok": False, "text": CHAT_DOWN}
+        return {"ok": False, "text": str(body.get("error") or "The lobby did not take that message.")}
+
+    # Check online ------------------------------------------------------------
+
+    def check(self) -> list[dict]:
+        """Each step between this computer and the lobby, in order, with what went wrong in words.
+
+        The Hall's own step is added by the caller. Never carries the key."""
+        steps: list[dict] = []
+
+        def step(name: str, ok: bool, text: str) -> bool:
+            steps.append({"name": name, "ok": bool(ok), "text": text})
+            return ok
+
+        if not step("Online play", self.on, "On." if self.on else "Off. Turn online play on in Settings."):
+            return steps
+        started = time.monotonic()
+        status, _body = self._call("GET", "/api/lobby")
+        took = int((time.monotonic() - started) * 1000)
+        if not step("Server", status == 200,
+                    f"{self.url} answers ({took} ms)." if status == 200 else
+                    f"{self.url} is not answering right now (status {status or 'none'}). "
+                    "Check this computer's network, or the server is down."):
+            return steps
+        key = self.key()
+        if not step("Signed in", bool(key), "This computer has a sign-in key." if key else
+                    "No sign-in key on this computer. Sign in under Online with your name and recovery key."):
+            return steps
+        status, body = self._call("GET", "/api/me", key=key)
+        player = body.get("player") if status == 200 and isinstance(body.get("player"), dict) else {}
+        name = str(player.get("name") or "")
+        if not step("Account", bool(name), f"The lobby knows you as {name}." if name else
+                    "The lobby did not accept this computer's key. Sign in again with your name "
+                    "and the recovery key you saved (I have a key)."):
+            return steps
+        lines = self.lobby_lines(force=True)
+        if self.chat_reached():
+            last = lines[-1] if lines else None
+            text = (f"{len(lines)} message(s) in the last day; the newest is from {last['name']}."
+                    if last else "Readable; nobody has written in the last day.")
+            step("Lobby chat", True, text)
+        else:
+            step("Lobby chat", False, "The lobby chat could not be read.")
+        return steps
 
     def snapshot(self, *, refresh: bool = False) -> dict:
         if refresh:

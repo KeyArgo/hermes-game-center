@@ -555,6 +555,39 @@ def _complete():
     return complete
 
 
+def _lobby_payload(data_root) -> dict:
+    """The #games column. Signed in online, its posts are the lobby's, shared with everyone
+    online; otherwise they are this computer's own (owner, 2026-11-18: two PCs said hi and
+    neither saw the other's). ``shared`` and ``reached`` let the page say which, and when the
+    lobby could not be read."""
+    lobby = snapshot(data_root)
+    lobby["shared"] = False
+    try:
+        source, _ladder = _online_pair()
+        if source.chat_shared():
+            lobby["lines"] = source.lobby_lines()
+            lobby["shared"] = True
+            lobby["reached"] = source.chat_reached()
+    except Exception:
+        log.warning("the lobby chat could not be read", exc_info=True)
+    return lobby
+
+
+def _lobby_say(line: str) -> dict | None:
+    """``chat say …`` goes to the lobby's #games chat when signed in online; None means local."""
+    words = line.split(None, 2)
+    if len(words) < 3 or words[0].lower() != "chat" or words[1].lower() != "say":
+        return None
+    try:
+        source, _ladder = _online_pair()
+        if not source.chat_shared():
+            return None
+        return source.say_lobby(words[2])
+    except Exception:
+        log.warning("a lobby chat line could not be sent", exc_info=True)
+        return {"ok": False, "text": online_source.CHAT_DOWN}
+
+
 def _say(line: str) -> str:
     catalog, book = _open()
     player = identify("desktop", None, book)
@@ -675,7 +708,7 @@ def view() -> dict:
             "store": store["store"],
             "community": community_games(),
             "makers": makers_shelf(),
-            "lobby": snapshot(catalog.data_root),
+            "lobby": _lobby_payload(catalog.data_root),
             "online": _online_payload(),
             # First-run welcome, Settings and the quiet "someone wants a match" line.
             "setup": _setup_payload(catalog, player),
@@ -1046,6 +1079,12 @@ def command(body: dict | None = None) -> dict:
             "ok": False,
         }
     line = raw if importing else raw.replace("\n", " ")
+    shared = None if importing else _lobby_say(line)
+    if shared is not None:
+        return shared
+    if line.lower() in ("online check", "check online"):
+        checked = online_check()
+        return {"ok": checked["ok"], "text": checked["text"]}
     try:
         text = _say(line)
     except OSError:
@@ -1583,6 +1622,42 @@ def online_table_close() -> dict[str, Any]:
     source, _ = _online_pair()
     _online_table(source).close()
     return {"ok": True}
+
+
+def _online_check() -> dict[str, Any]:
+    """Check online: every step from this computer to the lobby, then the Hall and who it lists.
+
+    For the person to read or paste back when two computers cannot see each other."""
+    source, _ = _online_pair()
+    steps = source.check()
+    if steps and all(row["ok"] for row in steps if row["name"] != "Lobby chat"):
+        hall = _online_hall(source)
+        hall.start()
+        snap = hall.snapshot()
+        you = str((snap.get("you") or {}).get("name") or "")
+        others = [str(row.get("name") or "") for row in snap.get("roster") or [] if row.get("name")]
+        if snap.get("state") == "live":
+            text = (f"Connected as {you}. " if you else "Connected. ") + (
+                f"Also here: {', '.join(others[:12])}." if others else
+                "Nobody else is in the Hall right now (or they appear offline).")
+            if (snap.get("you") or {}).get("invisible"):
+                text += " You are set to appear offline, so nobody sees you."
+            steps.append({"name": "The Hall", "ok": True, "text": text})
+        else:
+            steps.append({"name": "The Hall", "ok": False, "text": str(snap.get("error") or
+                          "Still joining. Wait a few seconds and check again.")})
+    ok = bool(steps) and all(row["ok"] for row in steps)
+    lines = [("OK   " if row["ok"] else "FIX  ") + f"{row['name']}: {row['text']}" for row in steps]
+    return {"ok": ok, "steps": steps, "text": "Check online\n" + "\n".join(lines)}
+
+
+@router.get("/online/check")
+def online_check() -> dict[str, Any]:
+    try:
+        return _online_check()
+    except Exception as exc:
+        log.warning("check online failed", exc_info=True)
+        return {"ok": False, "steps": [], "text": f"Check online could not run: {exc}"}
 
 
 @router.get("/online/hall")

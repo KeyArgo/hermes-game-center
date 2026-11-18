@@ -6,6 +6,17 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The #games chat on the Games page is shared online, and The Hall has Check online.** Two PCs
+  signed in as different players each said hi in #games and neither saw the other's (owner,
+  2026-11-18): the column only ever wrote to this computer's own lobby file, though the lobby server
+  has kept a shared #games chat for the website all along. Signed in online, the column now reads
+  and posts the lobby's chat (`GET`/`POST /api/lobby/chat`, read at most every 3 s, refusals in the
+  server's own words) and says "Everyone online reads this."; signed out it stays on this computer
+  and says so. **Check online** on The Hall (also `/games online check`) walks each step: online
+  play, the server, the sign-in key, the account, the lobby chat, then the Hall and who it lists,
+  each marked OK or Fix with what to do. Guards: `tests/test_online_lobby_chat.py` (two PCs on a
+  real local lobby read each other's lines; a down server and a refused line say why; Check online
+  names the broken step) and the chat-label and Check online checks in `tests/table_ui_harness.cjs`.
 - **The Hall recovers by itself after a lobby server outage, and says when the server is down.**
   A server host that dies without closing the socket (sentinel, 2026-11-18) left the Hall's socket
   open but silent: the Hall pinged every 20 s but never noticed that no answer came, so it could sit
