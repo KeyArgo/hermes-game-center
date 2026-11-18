@@ -97,6 +97,14 @@ def chips_now() -> int:
     return int(_wallet().read()["chips"])
 
 
+def chips_reclaim(chips: int) -> None:
+    """Take back a payout made for a state that could not be written: the hand was never settled."""
+    chips = int(chips)
+    if chips > 0:
+        held = int(_wallet().read()["chips"])
+        _wallet().debit(min(chips, held))
+
+
 def chips_refund(chips: int) -> None:
     """Put chips back after a state that could not be written: the bet was never staked.
 

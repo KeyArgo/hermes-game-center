@@ -311,6 +311,15 @@ check('and a wider one grows it back',
   Boolean(wider && wider.copy && wider.copyWidth > (narrower ? narrower.copyWidth : 0)),
   `narrow ${narrower && narrower.copyWidth}, wide ${wider && wider.copyWidth}`)
 
+// Only the window's height changes: the composer keeps its left edge and width, so nothing the anchor
+// shares moves - and the stage's height budget (60% of the window) still has to follow (Codex review).
+await resize(1400, 600)
+const shorter = await evaluate(FACTS)
+check('a window that only gets shorter re-fits the backdrop to the new height',
+  Boolean(shorter && shorter.stage && shorter.stageHeight <= Math.floor(600 * 0.6) + 1 && shorter.stageHeight < wider.stageHeight),
+  `stage ${wider && wider.stageHeight} at 900 tall -> ${shorter && shorter.stageHeight} at 600 tall`)
+await resize(1400, 900)
+
 // ---------------------------------------------------------------- 4. off again
 const clickedOff = await evaluate(`(() => {
   const box = document.querySelector('[data-jp2-oc-box="overchat"]')

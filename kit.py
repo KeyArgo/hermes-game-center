@@ -663,14 +663,21 @@ def _chips(rules) -> int | None:
 
 
 def _refund(rules, held: int | None) -> None:
-    """Give back what this request took from the wallet when its state was never written."""
+    """Undo what this request did to the wallet when its state was never written.
+
+    Both ways: a bet taken comes back, and a payout made (a stand that won, a double that settled)
+    goes back, because the table on disk still holds the hand unplayed and a retry would pay it again.
+    """
     give = getattr(rules, "chips_refund", None)
+    take = getattr(rules, "chips_reclaim", None)
     if held is None or not callable(give):
         return
     try:
         left = _chips(rules)
         if left is not None and left < held:
             give(held - left)
+        elif left is not None and left > held and callable(take):
+            take(left - held)
     except Exception:  # noqa: BLE001 - the save failure is the error worth reporting
         log.debug("the chips could not be given back", exc_info=True)
 

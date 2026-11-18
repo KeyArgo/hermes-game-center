@@ -209,3 +209,48 @@ def test_the_replace_budget_is_about_two_seconds():
 
     assert filelock.REPLACE_TRIES * filelock.REPLACE_WAIT >= 2.0, (
         filelock.REPLACE_TRIES, filelock.REPLACE_WAIT)
+
+
+def test_a_win_is_taken_back_when_the_state_cannot_be_saved(monkeypatch, tmp_path):
+    """A stand that wins pays before the table is written; if that write never lands the table still
+    holds the unplayed hand, so the payout must come back off the wallet - or a retry pays it twice
+    (Codex review, 2026-11-17)."""
+    bj = _load("blackjack")
+    bj.use_wallet(tmp_path / "wallet.json")
+    table = bj.create(tmp_path / "blackjack")
+    me = SimpleNamespace(id="u1", name="Ada", platform="desktop", bot=False)
+    table.command("new", player=me)
+    state_path = tmp_path / "blackjack" / "state.json"
+    # 19 against 17: standing wins 1:1.
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["deck"] = list(reversed(["10S", "10H", "9S", "7H"]))
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    start = bj._wallet().read()["chips"]
+    table.command("move bet100", player=me)
+    staked = bj._wallet().read()["chips"]
+    assert staked == start - 100
+
+    with monkeypatch.context() as patched:
+        patched.setattr(os, "replace", HeldOpen(10_000, only="state.json"))
+        with pytest.raises(OSError):
+            table.command("move stand", player=me)
+    assert bj._wallet().read()["chips"] == staked, "a win paid for a stand that was never saved"
+
+    table.command("move stand", player=me)
+    assert bj._wallet().read()["chips"] == start + 100, "the saved stand pays exactly once"
+
+
+@pytest.mark.parametrize("game", ["blackjack", "slots"])
+def test_every_chip_game_can_take_back_a_payout_for_a_lost_save(game, tmp_path):
+    """kit._refund undoes the wallet both ways; a chip game without chips_reclaim would keep a win
+    paid for a move that never happened."""
+    rules = _load(game)
+    assert callable(getattr(rules, "chips_reclaim", None)), f"{game} has no chips_reclaim"
+    sys.path.insert(0, str(ROOT))
+    import kit
+    rules.use_wallet(tmp_path / "wallet.json") if hasattr(rules, "use_wallet") else None
+    wallet = rules._wallet() if callable(getattr(rules, "_wallet", None)) else rules._wallet
+    held = int(wallet.read()["chips"])
+    wallet.credit(250)
+    kit._refund(rules, held)
+    assert int(wallet.read()["chips"]) == held, "the payout for an unsaved move came back off the wallet"

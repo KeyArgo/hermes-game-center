@@ -24097,7 +24097,11 @@ const OVERCHAT_SPOT = { left: 0, width: 0, anchored: false, stage: 'none', drawe
 // stage rule). Over the conversation that took clicks meant for the chat (owner, 2026-11-17: "the buttons
 // and sliders shouldn't work and should not interfere with other buttons or clickables as it has in the
 // past"). One rule of our own, inside our own elements, wins over all of them: nothing in it takes a click.
-const OVERCHAT_NO_CLICKS = '[data-overchat="stage"], [data-overchat="stage"] *, [data-overchat="strip"], [data-overchat="strip"] * { pointer-events: none !important; cursor: default !important; }'
+// The second selector list out-ranks the cabinet's own `[data-jp2-stage] .jp2-machine [data-jp2="overchat-row"]
+// button { pointer-events: auto !important }` (19-jackpot2-layer.js), which is more specific than `*`.
+const OVERCHAT_NO_CLICKS = '[data-overchat="stage"], [data-overchat="stage"] *, [data-overchat="strip"], [data-overchat="strip"] *, ' +
+  '[data-overchat] [data-jp2-stage] .jp2-machine [data-jp2="overchat-row"] button, [data-overchat] [data-jp2-stage] [data-jp2-control] ' +
+  '{ pointer-events: none !important; cursor: default !important; }'
 const overchatNoClicks = () => jsx('style', { 'data-overchat': 'no-clicks', children: OVERCHAT_NO_CLICKS }, 'no-clicks')
 
 // Which stage draws: the first in this list that is mounted and not trapped.
@@ -24197,7 +24201,12 @@ function OverChatStrip({ ctx }) {
   useJpLayoutEffect(() => {
     if (!on) return undefined
     const box = overchatAnchor(anchor)
-    overchatShare({ left: box.left, width: box.width, anchored: box.width > 0 })
+    // The window's own size goes along: a window that only gets shorter or taller moves nothing the
+    // anchor measures, and the stage's height budget still has to follow it (Codex review, 2026-11-17).
+    const win = overchatWindow()
+    const viewHeight = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
+    const viewWidth = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : 0
+    overchatShare({ left: box.left, width: box.width, anchored: box.width > 0, viewHeight, viewWidth })
     return undefined
   }, [on, resized])
 

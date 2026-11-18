@@ -6,6 +6,17 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Second-opinion review fixes (Codex, Spark GLM).** A blackjack stand or double that won, or a
+  slot spin that paid, on a move whose table state could not be saved kept the payout while the
+  table still held the move unplayed, so a retry paid it twice: the failed-save undo in `kit.py` now
+  takes a payout back as well as returning a bet (`chips_reclaim` in `blackjack/game.py` and
+  `slots/game.py`). A window that only got shorter or taller left the backdrop at its old height:
+  the anchor now shares the window's size with the stage. And the backdrop's no-clicks rule now
+  out-ranks the cabinet's own `!important` row rule. Guards:
+  `test_a_win_is_taken_back_when_the_state_cannot_be_saved`,
+  `test_every_chip_game_can_take_back_a_payout_for_a_lost_save`, and the height-only resize check
+  in `tests/overchat_slot_live.mjs`. Known limit: the undo is the wallet's change during the
+  request, so a spend on another table in the same instant would be counted with it.
 - **Backdrop Size and Visibility on the Games page, and nothing in the backdrop takes a click.**
   Beside **Start Inference Slot Machine**: **Backdrop size** (100%, today's size and the smallest,
   to 200%) with **Normal / Bigger / Biggest** pills, and **Visibility** (5% to 100%, 50% by
