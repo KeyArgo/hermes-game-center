@@ -69,14 +69,13 @@ const JP2L_SUMMARY = 'A second cabinet on the same wallet: futuristic reels, rea
 const JP2L_OVERCHAT_KEY = 'jackpot2.overchat'
 const JP2L_ALPHA_KEY = 'jackpot2.alpha'
 const JP2L_SIZE_KEY = 'jackpot2.size'
-const JP2L_ALPHA_MIN = 0.25
+const JP2L_ALPHA_MIN = 0.05
 const JP2L_ALPHA_MAX = 1
 const JP2L_ALPHA_STEP = 0.05
-// See-through by default: the machine sits under the composer, and the conversation around it has to
-// stay readable. Fully opaque is allowed, and so is fading it back to a quarter — the floor is 0.25,
-// never fully transparent, so the machine can never be there-but-invisible. The default sits at that
-// floor: as see-through as the range goes.
-const JP2L_ALPHA_DEFAULT = JP2L_ALPHA_MIN
+// Half see-through by default (owner, 2026-11-17: "easier and harder to see, with 50% being default"),
+// the same range as the slots cabinet so one Visibility slider on the Games page drives both: from barely
+// there (5%, never fully transparent, so the machine can never be there-but-invisible) to solid.
+const JP2L_ALPHA_DEFAULT = 0.5
 const JP2L_SIZE_MIN = 0.25
 const JP2L_SIZE_MAX = 2
 // Full size by default. "100%" is now the largest the composer's slot allows rather than the whole chat
@@ -422,7 +421,7 @@ function useJp2LTint(ctx) {
 // The cabinet is a fixed 560x720 design, so "its own size" is a constant and the whole rule is the one
 // both machines share (overchatFitScale, 19-jackpot-overlay.js).
 function jp2LSlotScale(width, size, height) {
-  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height)
+  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height, BACKDROP_SIZE.value)
   return scale > 0 ? jp2LFloor(scale) : 0
 }
 

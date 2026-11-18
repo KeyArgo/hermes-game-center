@@ -17,6 +17,41 @@ function inferenceAutoplayOn(autoplay, backdrop) {
   return Boolean(autoplay) && Boolean(backdrop)
 }
 
+// The backdrop's two dials, beside the button that shows it: Size (today's size is the smallest; drag
+// right for bigger) and Visibility (5% barely there to 100% solid, 50% by default). Both machines follow.
+function BackdropControls({ ctx }) {
+  const [size, setSize] = useBackdropSize()
+  const [alpha] = useSmOverchatAlpha()
+  const dial = (label, props, readout) => jsx('label', {
+    style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.tertiary },
+    children: [
+      jsx('span', { children: label }),
+      jsx('input', { type: 'range', style: { width: 110 }, ...props }),
+      jsx('span', { style: { minWidth: 34, fontWeight: 700 }, children: readout })
+    ]
+  })
+  return jsx('div', {
+    'data-backdrop-controls': '1',
+    role: 'group',
+    'aria-label': 'Backdrop size and visibility',
+    style: { display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+    children: [
+      dial('Backdrop size', {
+        'data-backdrop-size': '1', min: BACKDROP_SIZE_MIN, max: BACKDROP_SIZE_MAX, step: BACKDROP_SIZE_STEP, value: size,
+        title: 'Make the see-through slot machine over the chat bigger. 100% is the smallest.',
+        'aria-label': `Backdrop size, ${Math.round(size * 100)} percent`,
+        onChange: event => setSize(Number(event.target.value))
+      }, `${Math.round(size * 100)}%`),
+      dial('Visibility', {
+        'data-backdrop-visibility': '1', min: SM_ALPHA_MIN, max: SM_ALPHA_MAX, step: SM_ALPHA_STEP, value: alpha,
+        title: 'Make the slot machine over the chat easier or harder to see. 50% is the default.',
+        'aria-label': `Backdrop visibility, ${Math.round(alpha * 100)} percent`,
+        onChange: event => backdropSetVisibility(Number(event.target.value), ctx)
+      }, `${Math.round(alpha * 100)}%`)
+    ]
+  })
+}
+
 function InferenceAutoPlayButton({ ctx }) {
   const [backdrop, setBackdrop] = useJp2LOverchat(ctx)
   // null until the wallet has answered once: before that the button is off, never a guess.
@@ -632,6 +667,8 @@ function GameCenterPage({ ctx, onArea }) {
                       // One press, both settings, on the screen people arrive at rather than inside
                       // the machine.
                       jsx(InferenceAutoPlayButton, { ctx }),
+                      // How big and how see-through that backdrop is, for both machines at once.
+                      jsx(BackdropControls, { ctx }),
                       // The obvious door: one press opens the side pane and keeps a game beside
                       // the chat while Hermes works. While the pane is open the same button reads
                       // Close side pane.

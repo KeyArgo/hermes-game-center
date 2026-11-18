@@ -181,9 +181,9 @@ function useSmOverchat() {
 // machine follows it the moment it changes. The default is 20%, five points more opaque than the
 // 15% it was.
 const SM_ALPHA_KEY = 'gameshelf.slots.overchat_alpha'
-const SM_ALPHA_DEFAULT = 0.2
+const SM_ALPHA_DEFAULT = 0.5
 const SM_ALPHA_MIN = 0.05
-const SM_ALPHA_MAX = 0.6
+const SM_ALPHA_MAX = 1
 const SM_ALPHA_STEP = 0.05
 const SM_ALPHA = { value: SM_ALPHA_DEFAULT, listeners: new Set() }
 

@@ -78,7 +78,86 @@ function overchatStageHeight() {
   const win = overchatWindow()
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
   const share = view > 0 ? Math.floor(view * OVERCHAT_VIEW_SHARE) : OVERCHAT_MAX_HEIGHT
-  return Math.max(0, Math.min(OVERCHAT_MAX_HEIGHT, share))
+  const today = Math.max(0, Math.min(OVERCHAT_MAX_HEIGHT, share))
+  const size = BACKDROP_SIZE.value
+  if (!(size > 1)) return today
+  // Bigger than today: grow with the Size slider, but its bottom never past 95% of the window (it is
+  // drawn OVERCHAT_TOP below the window's top edge).
+  const most = view > 0 ? Math.floor(view * BACKDROP_MOST_SHARE) - OVERCHAT_TOP : Math.floor(today * size)
+  return Math.max(today, Math.min(most, Math.floor(today * size)))
+}
+
+// ---- the Games page's two backdrop controls ----------------------------------------------------------
+// Size: 1 is today's size and the smallest (owner, 2026-11-17: "right now the size is the smallest it
+// gets"); dragging right grows the stage and the machines with it. Kept on this machine only.
+const BACKDROP_SIZE_KEY = 'gameshelf.backdrop.size'
+const BACKDROP_SIZE_DEFAULT = 1
+const BACKDROP_SIZE_MIN = 1
+const BACKDROP_SIZE_MAX = 2.5
+const BACKDROP_SIZE_STEP = 0.05
+const BACKDROP_MOST_SHARE = 0.95
+const BACKDROP_SIZE = { value: BACKDROP_SIZE_DEFAULT, listeners: new Set() }
+
+function backdropClampSize(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return BACKDROP_SIZE_DEFAULT
+  const stepped = Math.round(number / BACKDROP_SIZE_STEP) * BACKDROP_SIZE_STEP
+  return Number(Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, stepped)).toFixed(2))
+}
+
+try {
+  const raw = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(BACKDROP_SIZE_KEY) : null
+  if (raw !== null && raw !== '') BACKDROP_SIZE.value = backdropClampSize(raw)
+} catch {
+  // Storage can be missing or refuse reads; today's size it is.
+}
+
+// The stage's span: the composer's own at today's size; a bigger size widens it by the same factor,
+// centred on the composer and kept inside the window, so two machines side by side grow too.
+const BACKDROP_EDGE = 16
+function overchatStageSpan(left, width, size) {
+  const grow = Number(size) > 1 ? Number(size) : 1
+  if (grow === 1) return { left, width }
+  const win = overchatWindow()
+  const view = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : 0
+  if (!view) return { left, width }
+  const wide = Math.min(Math.floor(width * grow), Math.max(width, view - 2 * BACKDROP_EDGE))
+  const centre = left + width / 2
+  const from = Math.min(Math.max(BACKDROP_EDGE, Math.round(centre - wide / 2)), Math.max(BACKDROP_EDGE, view - BACKDROP_EDGE - wide))
+  return { left: from, width: wide }
+}
+
+function backdropSetSize(value) {
+  const next = backdropClampSize(value)
+  BACKDROP_SIZE.value = next
+  try {
+    window.localStorage.setItem(BACKDROP_SIZE_KEY, String(next))
+  } catch {
+    // Storage can be missing or refuse writes; the size still holds for this visit.
+  }
+  BACKDROP_SIZE.listeners.forEach(listener => listener(next))
+  // The stage reads the size when it renders; nudge it the way an anchor move does.
+  overchatShare({ size: next })
+  return next
+}
+
+function useBackdropSize() {
+  const [size, setSize] = useState(BACKDROP_SIZE.value)
+  useEffect(() => {
+    const listener = next => setSize(next)
+    BACKDROP_SIZE.listeners.add(listener)
+    setSize(BACKDROP_SIZE.value)
+    return () => { BACKDROP_SIZE.listeners.delete(listener) }
+  }, [])
+  return [size, backdropSetSize]
+}
+
+// Visibility: one value for both machines, written through each cabinet's own setter so their own
+// sliders, the wallet and the drawn copies all agree. 5% to 100%, 50% by default.
+function backdropSetVisibility(value, ctx) {
+  const next = smSetOverchatAlpha(value)
+  jp2LSetAlpha(next, ctx)
+  return next
 }
 
 // WHERE THE FIXED BOX LIVES. The Desktop's composer dock is centred with a CSS transform
@@ -241,6 +320,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
   const [jackpotOn] = useJp2LOverchat(ctx)
   const spot = useOverchatSpot()
   const stage = useRef(null)
+  const [size] = useBackdropSize()
   // 'top' until the stage's own rect says otherwise. Only ever set away from 'top': a host that traps a
   // fixed box once traps it on every render, so retrying would only cost renders.
   const [place, setPlace] = useState('top')
@@ -282,7 +362,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
   useEffect(() => () => { if (OVERCHAT_SPOT.drawer === where) overchatShare({ stage: 'none', drawer: null }) }, [where])
 
   if (!drawing) return null
-  const width = spot.width
+  const { left, width } = overchatStageSpan(spot.left, spot.width, size)
   const budget = overchatStageHeight()
   return jsx('span', {
     'data-overchat': 'stage-host',
@@ -293,7 +373,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
       style: {
         position: 'fixed',
         top: OVERCHAT_TOP,
-        left: spot.left,
+        left,
         width,
         height: budget || 0,
         display: 'flex',

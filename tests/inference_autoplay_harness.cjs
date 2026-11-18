@@ -184,6 +184,8 @@ async function main() {
   const element = buttonElement(page)
   assert.ok(element, 'the Games page draws an Inference Slot Machine button component')
   assert.equal(element.props.ctx, ctx, 'handed the page context, so it can reach the shelf')
+  assert.ok(nodes(page).some(node => typeof node.type === 'function' && node.type.name === 'BackdropControls'),
+    'the Games page carries the backdrop Size and Visibility controls beside it')
   // Near the top: it is drawn before the Play shelf's own heading, not buried in the machine.
   const flat = nodes(page)
   const playHeading = flat.findIndex(node => words(node).trim() === 'Play' && node !== element)
@@ -293,6 +295,48 @@ async function main() {
     assert.equal(evaluate('JP2L_STORE.size'), value, `${label} sets the size to ${value}`)
   }
   console.log('inference autoplay: Small, Medium and Large size the backdrop in one press: passed')
+
+  // ---- 8. one Size and one Visibility control for the backdrop, on the Games page ----
+  // The owner (2026-11-17): "a sizer for the on chat slots so I can make bigger or smaller, but right
+  // now the size is the smallest it gets. Also something that makes easier and harder to see, with 50%
+  // being default." Today's size is the floor; dragging right grows it past the old 60% share.
+  sandbox.backdropProps = { ctx }
+  const controls = drawWith('BackdropControls(backdropProps)')
+  const sizeRange = nodes(controls).find(node => node.type === 'input' && node.props && node.props['data-backdrop-size'])
+  const seeRange = nodes(controls).find(node => node.type === 'input' && node.props && node.props['data-backdrop-visibility'])
+  assert.ok(sizeRange && seeRange, 'a Size slider and a Visibility slider')
+  assert.equal(Number(sizeRange.props.min), 1, 'Size starts at today\'s size: it is the smallest')
+  assert.ok(Number(sizeRange.props.max) >= 2, 'and grows to at least twice that')
+  assert.equal(Number(seeRange.props.min), 0.05, 'Visibility goes down to barely there')
+  assert.equal(Number(seeRange.props.max), 1, 'and up to solid')
+  assert.equal(evaluate('SM_ALPHA_DEFAULT'), 0.5, 'the slots cabinet starts at 50% visible')
+  assert.equal(evaluate('JP2L_ALPHA_DEFAULT'), 0.5, 'and so does the Jackpot cabinet')
+  assert.equal(evaluate('BACKDROP_SIZE_DEFAULT'), 1, 'and the size starts at today\'s')
+
+  evaluate('backdropSetSize(1)')
+  const floorBudget = evaluate('overchatStageHeight()')
+  assert.equal(floorBudget, 600, `at 100% the stage is today's 60% of a 1000 px window (${floorBudget})`)
+  const floorScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, 1, ${floorBudget}, BACKDROP_SIZE.value)`)
+  assert.equal(Math.round(720 * floorScale), 600, `and the machine is drawn as today (${720 * floorScale})`)
+  sizeRange.props.onChange({ target: { value: '2' } })
+  assert.equal(evaluate('BACKDROP_SIZE.value'), 2, 'dragging the Size slider sets the size')
+  const bigBudget = evaluate('overchatStageHeight()')
+  assert.ok(bigBudget > floorBudget, `a bigger size gives the stage more room (${bigBudget} > ${floorBudget})`)
+  assert.ok(bigBudget <= 950, `but never more than 95% of the window (${bigBudget})`)
+  const bigScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, 1, ${bigBudget}, BACKDROP_SIZE.value)`)
+  assert.ok(720 * bigScale > 720 * floorScale + 100, `and the machine is drawn clearly bigger (${720 * bigScale})`)
+  evaluate('backdropSetSize(0.5)')
+  assert.equal(evaluate('BACKDROP_SIZE.value'), 1, 'it never goes below today\'s size')
+
+  seeRange.props.onChange({ target: { value: '0.8' } })
+  assert.equal(evaluate('SM_ALPHA.value'), 0.8, 'Visibility sets the slots backdrop')
+  assert.equal(evaluate('JP2L_STORE.alpha'), 0.8, 'and the Jackpot backdrop, together')
+  seeRange.props.onChange({ target: { value: '0.05' } })
+  assert.equal(evaluate('SM_ALPHA.value'), 0.05, 'down to barely there')
+  assert.equal(evaluate('JP2L_STORE.alpha'), 0.05, 'for both machines')
+  evaluate('backdropSetVisibility(0.5, backdropProps.ctx)')
+  evaluate('backdropSetSize(1)')
+  console.log('inference autoplay: one Size (today is the smallest) and one Visibility (50% default) control: passed')
 
   reset()
   console.log('inference autoplay harness: passed')

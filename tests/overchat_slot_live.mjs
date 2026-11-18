@@ -393,6 +393,22 @@ const owner = await evaluate("(() => { const s = document.querySelectorAll('[dat
 check('with a status bar the status-bar stage draws, and the titlebar stand-in draws nothing',
   Boolean(owner && owner.count === 1 && owner.inBar), JSON.stringify(owner))
 
+// ---------------------------------------------------------------- 9. the Games-page Size slider grows it
+// Size 1 is today's size and the smallest; 2 must draw the machine clearly taller, still at the top and
+// inside the window (owner, 2026-11-17: "make bigger or smaller, but right now the size is the smallest").
+const before = await evaluate(FACTS)
+await evaluate("localStorage.setItem('gameshelf.backdrop.size', '2'); 1")
+await cdp('Page.navigate', { url: `${URL_BASE}pane` })
+await sleep(7000)
+await openPane()
+const grown = await evaluate(FACTS)
+check('a bigger backdrop size draws the machine clearly taller, still at the top and inside the window',
+  Boolean(before && grown && grown.copy && before.copy && grown.place === 'top'
+    && grown.copyHeight > before.copyHeight * 1.25 && grown.copyBottom <= grown.view.height),
+  `before ${before && before.copyHeight}, after ${grown && grown.copyHeight}, bottom ${grown && grown.copyBottom} of ${grown && grown.view.height}`)
+await shot('overchat-size-2')
+await evaluate("localStorage.removeItem('gameshelf.backdrop.size'); 1")
+
 const errors = await evaluate('(window.qa && window.qa.errors) || []')
 check('the page logged no JavaScript error through all of that',
   Array.isArray(errors) && errors.length === 0, JSON.stringify(errors))

@@ -90,7 +90,7 @@ _BLANK = {"chips": START_CHIPS, "spins": 0, "biggest": 0, "hands": 0, "bet": MIN
           # does not reset them - localStorage alone did not survive a plugin reload, and on/off was
           # the one part still living only in the browser, which is why the copy could vanish after a
           # rebuild.
-          "overchat": False, "overchat_alpha": 0.2, "overchat_scale": 1.0,
+          "overchat": False, "overchat_alpha": 0.5, "overchat_scale": 1.0,
           # The comeback loop, all in play chips: when the last bailout was handed out (epoch
           # seconds), how many days in a row the person has come back, and how many spins are still
           # paying the comeback bonus.
@@ -481,7 +481,7 @@ class Wallet:
                     value = round(float(alpha), 2)
                 except (TypeError, ValueError):
                     value = None
-                if value is not None and 0.05 <= value <= 0.6:
+                if value is not None and 0.05 <= value <= 1.0:
                     data["overchat_alpha"] = value
             if scale is not None:
                 try:

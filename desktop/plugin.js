@@ -6243,9 +6243,9 @@ function useSmOverchat() {
 // machine follows it the moment it changes. The default is 20%, five points more opaque than the
 // 15% it was.
 const SM_ALPHA_KEY = 'gameshelf.slots.overchat_alpha'
-const SM_ALPHA_DEFAULT = 0.2
+const SM_ALPHA_DEFAULT = 0.5
 const SM_ALPHA_MIN = 0.05
-const SM_ALPHA_MAX = 0.6
+const SM_ALPHA_MAX = 1
 const SM_ALPHA_STEP = 0.05
 const SM_ALPHA = { value: SM_ALPHA_DEFAULT, listeners: new Set() }
 
@@ -8832,14 +8832,17 @@ const OVERCHAT_BASE_HEIGHT = 640
 // past the width, and never past the `ceiling` it was handed (the stage's own height, at most
 // OVERCHAT_MAX_HEIGHT). 0 while either number is unknown (the first paint, before the cabinet has been
 // laid out).
-function overchatFitScale(natural, room, multiplier, ceiling) {
+// `grow` is the backdrop Size on the Games page (BACKDROP_SIZE, 1 = today's size and the smallest): it
+// raises the 100% height with it, and the stage hands a matching, taller `ceiling`.
+function overchatFitScale(natural, room, multiplier, ceiling, grow = 1) {
   const width = Math.max(0, Number(room) || 0)
-  const budget = Number(ceiling) > 0 ? Math.min(Number(ceiling), OVERCHAT_MAX_HEIGHT) : OVERCHAT_MAX_HEIGHT
+  const budget = Number(ceiling) > 0 ? Number(ceiling) : OVERCHAT_MAX_HEIGHT
+  const bigger = Number(grow) > 1 ? Number(grow) : 1
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
   // The 100% size: the smaller of the share's width and OVERCHAT_BASE_HEIGHT.
-  const byBase = Math.min(OVERCHAT_BASE_HEIGHT, budget) / natural.height
+  const byBase = Math.min(OVERCHAT_BASE_HEIGHT * bigger, budget) / natural.height
   // The hard stop above 100%: the room it was given, never past the absolute ceiling.
   const byRoom = budget / natural.height
   const scale = Math.min(Math.min(byWidth, byBase) * factor, byWidth, byRoom)
@@ -8918,7 +8921,7 @@ function SlotsOverChatCopy({ ctx, width, height }) {
   }, [])
 
   const natural = overchatNatural(cabinetRef)
-  const scale = overchatFitScale(natural, width, overchatScale, height)
+  const scale = overchatFitScale(natural, width, overchatScale, height, BACKDROP_SIZE.value)
   if (!on) return null
   // The machine is drawn even before it has been measured — at 100%, clipped to nothing — because its own
   // size is what the measurement is of. One frame, and the box below takes the fitted size.
@@ -9059,14 +9062,13 @@ const JP2L_SUMMARY = 'A second cabinet on the same wallet: futuristic reels, rea
 const JP2L_OVERCHAT_KEY = 'jackpot2.overchat'
 const JP2L_ALPHA_KEY = 'jackpot2.alpha'
 const JP2L_SIZE_KEY = 'jackpot2.size'
-const JP2L_ALPHA_MIN = 0.25
+const JP2L_ALPHA_MIN = 0.05
 const JP2L_ALPHA_MAX = 1
 const JP2L_ALPHA_STEP = 0.05
-// See-through by default: the machine sits under the composer, and the conversation around it has to
-// stay readable. Fully opaque is allowed, and so is fading it back to a quarter — the floor is 0.25,
-// never fully transparent, so the machine can never be there-but-invisible. The default sits at that
-// floor: as see-through as the range goes.
-const JP2L_ALPHA_DEFAULT = JP2L_ALPHA_MIN
+// Half see-through by default (owner, 2026-11-17: "easier and harder to see, with 50% being default"),
+// the same range as the slots cabinet so one Visibility slider on the Games page drives both: from barely
+// there (5%, never fully transparent, so the machine can never be there-but-invisible) to solid.
+const JP2L_ALPHA_DEFAULT = 0.5
 const JP2L_SIZE_MIN = 0.25
 const JP2L_SIZE_MAX = 2
 // Full size by default. "100%" is now the largest the composer's slot allows rather than the whole chat
@@ -9412,7 +9414,7 @@ function useJp2LTint(ctx) {
 // The cabinet is a fixed 560x720 design, so "its own size" is a constant and the whole rule is the one
 // both machines share (overchatFitScale, 19-jackpot-overlay.js).
 function jp2LSlotScale(width, size, height) {
-  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height)
+  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height, BACKDROP_SIZE.value)
   return scale > 0 ? jp2LFloor(scale) : 0
 }
 
@@ -21970,6 +21972,41 @@ function inferenceAutoplayOn(autoplay, backdrop) {
   return Boolean(autoplay) && Boolean(backdrop)
 }
 
+// The backdrop's two dials, beside the button that shows it: Size (today's size is the smallest; drag
+// right for bigger) and Visibility (5% barely there to 100% solid, 50% by default). Both machines follow.
+function BackdropControls({ ctx }) {
+  const [size, setSize] = useBackdropSize()
+  const [alpha] = useSmOverchatAlpha()
+  const dial = (label, props, readout) => jsx('label', {
+    style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.tertiary },
+    children: [
+      jsx('span', { children: label }),
+      jsx('input', { type: 'range', style: { width: 110 }, ...props }),
+      jsx('span', { style: { minWidth: 34, fontWeight: 700 }, children: readout })
+    ]
+  })
+  return jsx('div', {
+    'data-backdrop-controls': '1',
+    role: 'group',
+    'aria-label': 'Backdrop size and visibility',
+    style: { display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+    children: [
+      dial('Backdrop size', {
+        'data-backdrop-size': '1', min: BACKDROP_SIZE_MIN, max: BACKDROP_SIZE_MAX, step: BACKDROP_SIZE_STEP, value: size,
+        title: 'Make the see-through slot machine over the chat bigger. 100% is the smallest.',
+        'aria-label': `Backdrop size, ${Math.round(size * 100)} percent`,
+        onChange: event => setSize(Number(event.target.value))
+      }, `${Math.round(size * 100)}%`),
+      dial('Visibility', {
+        'data-backdrop-visibility': '1', min: SM_ALPHA_MIN, max: SM_ALPHA_MAX, step: SM_ALPHA_STEP, value: alpha,
+        title: 'Make the slot machine over the chat easier or harder to see. 50% is the default.',
+        'aria-label': `Backdrop visibility, ${Math.round(alpha * 100)} percent`,
+        onChange: event => backdropSetVisibility(Number(event.target.value), ctx)
+      }, `${Math.round(alpha * 100)}%`)
+    ]
+  })
+}
+
 function InferenceAutoPlayButton({ ctx }) {
   const [backdrop, setBackdrop] = useJp2LOverchat(ctx)
   // null until the wallet has answered once: before that the button is off, never a guess.
@@ -22585,6 +22622,8 @@ function GameCenterPage({ ctx, onArea }) {
                       // One press, both settings, on the screen people arrive at rather than inside
                       // the machine.
                       jsx(InferenceAutoPlayButton, { ctx }),
+                      // How big and how see-through that backdrop is, for both machines at once.
+                      jsx(BackdropControls, { ctx }),
                       // The obvious door: one press opens the side pane and keeps a game beside
                       // the chat while Hermes works. While the pane is open the same button reads
                       // Close side pane.
@@ -23956,7 +23995,86 @@ function overchatStageHeight() {
   const win = overchatWindow()
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
   const share = view > 0 ? Math.floor(view * OVERCHAT_VIEW_SHARE) : OVERCHAT_MAX_HEIGHT
-  return Math.max(0, Math.min(OVERCHAT_MAX_HEIGHT, share))
+  const today = Math.max(0, Math.min(OVERCHAT_MAX_HEIGHT, share))
+  const size = BACKDROP_SIZE.value
+  if (!(size > 1)) return today
+  // Bigger than today: grow with the Size slider, but its bottom never past 95% of the window (it is
+  // drawn OVERCHAT_TOP below the window's top edge).
+  const most = view > 0 ? Math.floor(view * BACKDROP_MOST_SHARE) - OVERCHAT_TOP : Math.floor(today * size)
+  return Math.max(today, Math.min(most, Math.floor(today * size)))
+}
+
+// ---- the Games page's two backdrop controls ----------------------------------------------------------
+// Size: 1 is today's size and the smallest (owner, 2026-11-17: "right now the size is the smallest it
+// gets"); dragging right grows the stage and the machines with it. Kept on this machine only.
+const BACKDROP_SIZE_KEY = 'gameshelf.backdrop.size'
+const BACKDROP_SIZE_DEFAULT = 1
+const BACKDROP_SIZE_MIN = 1
+const BACKDROP_SIZE_MAX = 2.5
+const BACKDROP_SIZE_STEP = 0.05
+const BACKDROP_MOST_SHARE = 0.95
+const BACKDROP_SIZE = { value: BACKDROP_SIZE_DEFAULT, listeners: new Set() }
+
+function backdropClampSize(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return BACKDROP_SIZE_DEFAULT
+  const stepped = Math.round(number / BACKDROP_SIZE_STEP) * BACKDROP_SIZE_STEP
+  return Number(Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, stepped)).toFixed(2))
+}
+
+try {
+  const raw = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(BACKDROP_SIZE_KEY) : null
+  if (raw !== null && raw !== '') BACKDROP_SIZE.value = backdropClampSize(raw)
+} catch {
+  // Storage can be missing or refuse reads; today's size it is.
+}
+
+// The stage's span: the composer's own at today's size; a bigger size widens it by the same factor,
+// centred on the composer and kept inside the window, so two machines side by side grow too.
+const BACKDROP_EDGE = 16
+function overchatStageSpan(left, width, size) {
+  const grow = Number(size) > 1 ? Number(size) : 1
+  if (grow === 1) return { left, width }
+  const win = overchatWindow()
+  const view = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : 0
+  if (!view) return { left, width }
+  const wide = Math.min(Math.floor(width * grow), Math.max(width, view - 2 * BACKDROP_EDGE))
+  const centre = left + width / 2
+  const from = Math.min(Math.max(BACKDROP_EDGE, Math.round(centre - wide / 2)), Math.max(BACKDROP_EDGE, view - BACKDROP_EDGE - wide))
+  return { left: from, width: wide }
+}
+
+function backdropSetSize(value) {
+  const next = backdropClampSize(value)
+  BACKDROP_SIZE.value = next
+  try {
+    window.localStorage.setItem(BACKDROP_SIZE_KEY, String(next))
+  } catch {
+    // Storage can be missing or refuse writes; the size still holds for this visit.
+  }
+  BACKDROP_SIZE.listeners.forEach(listener => listener(next))
+  // The stage reads the size when it renders; nudge it the way an anchor move does.
+  overchatShare({ size: next })
+  return next
+}
+
+function useBackdropSize() {
+  const [size, setSize] = useState(BACKDROP_SIZE.value)
+  useEffect(() => {
+    const listener = next => setSize(next)
+    BACKDROP_SIZE.listeners.add(listener)
+    setSize(BACKDROP_SIZE.value)
+    return () => { BACKDROP_SIZE.listeners.delete(listener) }
+  }, [])
+  return [size, backdropSetSize]
+}
+
+// Visibility: one value for both machines, written through each cabinet's own setter so their own
+// sliders, the wallet and the drawn copies all agree. 5% to 100%, 50% by default.
+function backdropSetVisibility(value, ctx) {
+  const next = smSetOverchatAlpha(value)
+  jp2LSetAlpha(next, ctx)
+  return next
 }
 
 // WHERE THE FIXED BOX LIVES. The Desktop's composer dock is centred with a CSS transform
@@ -24119,6 +24237,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
   const [jackpotOn] = useJp2LOverchat(ctx)
   const spot = useOverchatSpot()
   const stage = useRef(null)
+  const [size] = useBackdropSize()
   // 'top' until the stage's own rect says otherwise. Only ever set away from 'top': a host that traps a
   // fixed box once traps it on every render, so retrying would only cost renders.
   const [place, setPlace] = useState('top')
@@ -24160,7 +24279,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
   useEffect(() => () => { if (OVERCHAT_SPOT.drawer === where) overchatShare({ stage: 'none', drawer: null }) }, [where])
 
   if (!drawing) return null
-  const width = spot.width
+  const { left, width } = overchatStageSpan(spot.left, spot.width, size)
   const budget = overchatStageHeight()
   return jsx('span', {
     'data-overchat': 'stage-host',
@@ -24171,7 +24290,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
       style: {
         position: 'fixed',
         top: OVERCHAT_TOP,
-        left: spot.left,
+        left,
         width,
         height: budget || 0,
         display: 'flex',

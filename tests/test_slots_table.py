@@ -380,3 +380,15 @@ def test_the_overchat_copy_alone_earns_a_spin_per_reply(tmp_path: Path) -> None:
     assert first["auto"] is True
     wallet.set_visible(False)
     assert play.autospin(wallet) is None, "nothing spins once the copy is off screen"
+
+
+def test_the_backdrop_visibility_reaches_solid_and_starts_at_half(tmp_path: Path) -> None:
+    """The Games-page Visibility slider runs 5% to 100% with 50% the default (owner, 2026-11-17), and
+    the wallet keeps the slots backdrop's opacity: a value the slider offers must be stored, not refused."""
+    from shelf.wallet import Wallet, wallet_path
+
+    wallet = Wallet(wallet_path(tmp_path))
+    assert wallet.read()["overchat_alpha"] == 0.5, "a new wallet starts the backdrop at 50% visible"
+    assert wallet.set_overchat(alpha=0.9)["overchat_alpha"] == 0.9, "easier to see than the old 60% cap"
+    assert wallet.set_overchat(alpha=1.0)["overchat_alpha"] == 1.0, "up to solid"
+    assert wallet.set_overchat(alpha=1.5)["overchat_alpha"] == 1.0, "past solid is refused"

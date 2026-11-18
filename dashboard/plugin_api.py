@@ -776,7 +776,7 @@ def _jackpot_payload(wallet, spun: dict | None = None) -> dict:
         "eggs_found": list(held.get("eggs_found") or []),
         # The see-through machine's own look, kept server-side so a reload keeps it.
         "overchat": {"on": bool(held.get("overchat", False)),
-                     "alpha": held.get("overchat_alpha", 0.2), "scale": held.get("overchat_scale", 1.0)},
+                     "alpha": held.get("overchat_alpha", 0.5), "scale": held.get("overchat_scale", 1.0)},
         "spun": spun,
     }
 
@@ -833,7 +833,7 @@ def jackpot_prefs(body: dict | None = None) -> dict:
     return {
         "ok": True,
         "overchat": {"on": bool(held.get("overchat", False)),
-                     "alpha": held.get("overchat_alpha", 0.2), "scale": held.get("overchat_scale", 1.0)},
+                     "alpha": held.get("overchat_alpha", 0.5), "scale": held.get("overchat_scale", 1.0)},
     }
 
 

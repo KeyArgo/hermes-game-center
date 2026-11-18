@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Backdrop Size and Visibility on the Games page.** Beside **Start Inference Slot Machine**, two
+  sliders now drive the see-through machines for both cabinets at once. **Backdrop size** starts at
+  today's size, which is the smallest, and grows to 250%, up to 95% of the window (it used to stop at
+  60%, so the bigger sizes looked no different). **Visibility** runs from 5% (barely there) to 100%
+  (solid), 50% by default; each cabinet's own opacity slider now has the same range, and the wallet
+  stores up to 1.0. A value you already chose is kept. `desktop/src/70-home.js`,
+  `desktop/src/78-overchat-slot.js`, `desktop/src/19-jackpot-overlay.js`, `shelf/wallet.py`. Guards:
+  section 8 of `tests/inference_autoplay_harness.cjs` and
+  `test_the_backdrop_visibility_reaches_solid_and_starts_at_half`.
 - **The Hall says when the lobby refused your sign-in.** A refused sign-in leaves the Hall
   'off' with online play still on, and the Hall told that person to "Turn online play on" — so
   they sat invisible to everyone with no clue why (two PCs, each signed in, neither saw the
