@@ -87,20 +87,11 @@ function overchatStageHeight() {
   return Math.max(today, Math.min(most, Math.floor(today * size)))
 }
 
-// ---- the Games page's two backdrop controls ----------------------------------------------------------
-// Size: the cabinets' OWN size settings (Jackpot's JP2L_STORE.size, the slots' SM_SCALE_STATE), written
-// through the same setters their own sliders call (owner, 2026-11-17: "hook it up to the same function as
-// the slot machine's version, which works"). On the Games page 1 is today's size and the smallest. A size
-// above 1 also grows the stage's room, so a bigger machine really is drawn bigger.
-const BACKDROP_SIZE_MIN = 1
-const BACKDROP_SIZE_MAX = 2
-const BACKDROP_SIZE_STEP = 0.05
+// ---- how big the backdrop is drawn ---------------------------------------------------------------------
+// The cabinets' OWN size settings (Jackpot's JP2L_STORE.size, the slots' SM_SCALE_STATE), set by their own
+// sliders. A size above 1 also grows the stage's room, so a bigger machine really is drawn bigger. (The
+// Games page's copy of these controls was removed, owner 2026-11-18: "don't seem to work, remove those".)
 const BACKDROP_MOST_SHARE = 0.95
-const BACKDROP_SIZE_PILLS = [
-  { label: 'Normal', size: 1 },
-  { label: 'Bigger', size: 1.5 },
-  { label: 'Biggest', size: 2 }
-]
 
 function backdropGrowth() {
   const jackpot = Number(JP2L_STORE.size) || 1
@@ -121,23 +112,6 @@ function overchatStageSpan(left, width, size) {
   const centre = left + width / 2
   const from = Math.min(Math.max(BACKDROP_EDGE, Math.round(centre - wide / 2)), Math.max(BACKDROP_EDGE, view - BACKDROP_EDGE - wide))
   return { left: from, width: wide }
-}
-
-function backdropSetSize(value, ctx) {
-  const number = Number(value)
-  const stepped = Number.isFinite(number) ? Math.round(number / BACKDROP_SIZE_STEP) * BACKDROP_SIZE_STEP : 1
-  const next = Number(Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, stepped)).toFixed(2))
-  jp2LSetSize(next, ctx)
-  smSetScale(next)
-  return next
-}
-
-// Visibility: one value for both machines, written through each cabinet's own setter so their own
-// sliders, the wallet and the drawn copies all agree. 5% to 100%, 50% by default.
-function backdropSetVisibility(value, ctx) {
-  const next = smSetOverchatAlpha(value)
-  jp2LSetAlpha(next, ctx)
-  return next
 }
 
 // WHERE THE FIXED BOX LIVES. The Desktop's composer dock is centred with a CSS transform

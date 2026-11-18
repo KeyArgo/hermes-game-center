@@ -132,7 +132,7 @@ const JP2L_RANGES = {
 // the big one the taller stage now allows. They write the slider's own value — not a second scale — so
 // the readout, the stored number and the fit cannot disagree.
 const JP2L_SIZE_PRESETS = [
-  // The same three as the Games page (BACKDROP_SIZE_PILLS): Normal is today's size, and the others only
+  // Three sizes: Normal is today's size, and the others only
   // ever grow it - "Small" read as a mystery (owner, 2026-11-17).
   { id: 'normal', label: 'Normal', size: 1 },
   { id: 'bigger', label: 'Bigger', size: 1.5 },

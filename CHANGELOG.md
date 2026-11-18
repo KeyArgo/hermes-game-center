@@ -6,6 +6,14 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The Games page no longer carries backdrop Size and Visibility, and the side pane opens at 368 px.**
+  The owner (2026-11-18): the slot machine settings on the Game Center main page "don't seem to work,
+  maybe we should remove those", and "the right pane for the game center should default where it is
+  now". The Games-page copies (and their `backdropSetSize` / `backdropSetVisibility` helpers) are gone;
+  each cabinet's own size and opacity controls stay, and a bigger cabinet size still grows the backdrop.
+  The side pane now opens at 368 px, the width the owner had dragged it to (was 720 px), and still
+  drags from 300 to 1200 px. Guards: `test_pane_opens_where_the_owner_left_it` and the Games-page check
+  in `tests/inference_autoplay_harness.cjs`.
 - **The #games chat on the Games page is shared online, and The Hall has Check online.** Two PCs
   signed in as different players each said hi in #games and neither saw the other's (owner,
   2026-11-18): the column only ever wrote to this computer's own lobby file, though the lobby server

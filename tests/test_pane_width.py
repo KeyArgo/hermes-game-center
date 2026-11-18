@@ -1,4 +1,4 @@
-"""The pane beside the chat opens wide and can be dragged wider or narrower."""
+"""The pane beside the chat opens at the owner's width and can be dragged wider or narrower."""
 import re
 from pathlib import Path
 
@@ -11,8 +11,9 @@ def _px(pattern: str) -> int:
     return int(found.group(1))
 
 
-def test_pane_opens_twice_the_old_width():
-    assert _px(r"const PANE_WIDTH = '(\d+)px'") == 720
+def test_pane_opens_where_the_owner_left_it():
+    # Owner, 2026-11-18: "the right pane for the game center should default where it is now" (368 px).
+    assert _px(r"const PANE_WIDTH = '(\d+)px'") == 368
 
 
 def test_pane_can_be_dragged_both_ways():

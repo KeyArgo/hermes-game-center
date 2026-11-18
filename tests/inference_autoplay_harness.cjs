@@ -184,8 +184,11 @@ async function main() {
   const element = buttonElement(page)
   assert.ok(element, 'the Games page draws an Inference Slot Machine button component')
   assert.equal(element.props.ctx, ctx, 'handed the page context, so it can reach the shelf')
-  assert.ok(nodes(page).some(node => typeof node.type === 'function' && node.type.name === 'BackdropControls'),
-    'the Games page carries the backdrop Size and Visibility controls beside it')
+  // Owner, 2026-11-18: the Games page's own Size and Visibility copies "don't seem to work, remove those".
+  // The machines' own sliders stay; the main page carries none.
+  assert.ok(!nodes(page).some(node => (typeof node.type === 'function' && node.type.name === 'BackdropControls') ||
+    (node.props && (node.props['data-backdrop-controls'] || node.props['data-backdrop-size'] || node.props['data-backdrop-visibility']))),
+    'the Games page carries no backdrop Size or Visibility controls')
   // Near the top: it is drawn before the Play shelf's own heading, not buried in the machine.
   const flat = nodes(page)
   const playHeading = flat.findIndex(node => words(node).trim() === 'Play' && node !== element)
@@ -296,55 +299,23 @@ async function main() {
   }
   console.log('inference autoplay: Normal, Bigger and Biggest size the backdrop in one press: passed')
 
-  // ---- 8. one Size and one Visibility control for the backdrop, on the Games page ----
-  // The owner (2026-11-17): "a sizer for the on chat slots so I can make bigger or smaller, but right
-  // now the size is the smallest it gets. Also something that makes easier and harder to see, with 50%
-  // being default." Today's size is the floor; dragging right grows it past the old 60% share.
-  sandbox.backdropProps = { ctx }
-  const controls = drawWith('BackdropControls(backdropProps)')
-  const sizeRange = nodes(controls).find(node => node.type === 'input' && node.props && node.props['data-backdrop-size'])
-  const seeRange = nodes(controls).find(node => node.type === 'input' && node.props && node.props['data-backdrop-visibility'])
-  assert.ok(sizeRange && seeRange, 'a Size slider and a Visibility slider')
-  assert.equal(Number(sizeRange.props.min), 1, 'Size starts at today\'s size: it is the smallest')
-  assert.ok(Number(sizeRange.props.max) >= 2, 'and grows to at least twice that')
-  assert.equal(Number(seeRange.props.min), 0.05, 'Visibility goes down to barely there')
-  assert.equal(Number(seeRange.props.max), 1, 'and up to solid')
+  // ---- 8. the machines' own size still grows the backdrop (the Games-page copy was removed) ----
+  // Today's size is the floor; a bigger size set by the cabinet's own slider grows the stage past 60%.
   assert.equal(evaluate('SM_ALPHA_DEFAULT'), 0.5, 'the slots cabinet starts at 50% visible')
   assert.equal(evaluate('JP2L_ALPHA_DEFAULT'), 0.5, 'and so does the Jackpot cabinet')
-
-  evaluate('backdropSetSize(1, backdropProps.ctx)')
+  evaluate('jp2LSetSize(1, panelProps.ctx); smSetScale(1)')
   const floorBudget = evaluate('overchatStageHeight()')
   assert.equal(floorBudget, 600, `at 100% the stage is today's 60% of a 1000 px window (${floorBudget})`)
   const floorScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, JP2L_STORE.size, ${floorBudget})`)
   assert.equal(Math.round(720 * floorScale), 600, `and the machine is drawn as today (${720 * floorScale})`)
-  sizeRange.props.onChange({ target: { value: '2' } })
-  // The same functions the cabinets' own size sliders call (owner: "hook it up to the same function as the
-  // slot machine's version, which works").
-  assert.equal(evaluate('JP2L_STORE.size'), 2, 'dragging the Size slider sets the Jackpot backdrop size')
-  assert.equal(evaluate('SM_SCALE_STATE.value'), 2, 'and the slots backdrop size, through their own setters')
+  evaluate('jp2LSetSize(2, panelProps.ctx)')
   const bigBudget = evaluate('overchatStageHeight()')
   assert.ok(bigBudget > floorBudget, `a bigger size gives the stage more room (${bigBudget} > ${floorBudget})`)
   assert.ok(bigBudget <= 950, `but never more than 95% of the window (${bigBudget})`)
   const bigScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, JP2L_STORE.size, ${bigBudget})`)
   assert.ok(720 * bigScale > 720 * floorScale + 100, `and the machine is drawn clearly bigger (${720 * bigScale})`)
-  evaluate('backdropSetSize(0.5, backdropProps.ctx)')
-  assert.equal(evaluate('JP2L_STORE.size'), 1, 'the Games-page slider never goes below today\'s size')
-  for (const [label, value] of [['Normal', 1], ['Bigger', 1.5], ['Biggest', 2]]) {
-    const pill = nodes(drawWith('BackdropControls(backdropProps)')).find(node => node.type === 'button' && words(node).trim() === label)
-    assert.ok(pill, `a ${label} pill beside the slider`)
-    pill.props.onClick()
-    assert.equal(evaluate('JP2L_STORE.size'), value, `${label} sets ${value * 100}%`)
-  }
-
-  seeRange.props.onChange({ target: { value: '0.8' } })
-  assert.equal(evaluate('SM_ALPHA.value'), 0.8, 'Visibility sets the slots backdrop')
-  assert.equal(evaluate('JP2L_STORE.alpha'), 0.8, 'and the Jackpot backdrop, together')
-  seeRange.props.onChange({ target: { value: '0.05' } })
-  assert.equal(evaluate('SM_ALPHA.value'), 0.05, 'down to barely there')
-  assert.equal(evaluate('JP2L_STORE.alpha'), 0.05, 'for both machines')
-  evaluate('backdropSetVisibility(0.5, backdropProps.ctx)')
-  evaluate('backdropSetSize(1, backdropProps.ctx)')
-  console.log('inference autoplay: one Size (today is the smallest) and one Visibility (50% default) control: passed')
+  evaluate('jp2LSetSize(1, panelProps.ctx); smSetScale(1)')
+  console.log('inference autoplay: the cabinet\'s own size grows the backdrop; the Games page has no copy: passed')
 
   reset()
   console.log('inference autoplay harness: passed')

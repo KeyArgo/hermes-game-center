@@ -41,6 +41,6 @@ def test_the_button_and_the_backdrop_are_drawn_and_pressed():
         "the home button turns both switches, follows them, and stays honest",
         "the backdrop is twice its old size, in its 60% share of the window",
         "Normal, Bigger and Biggest size the backdrop in one press",
-        "one Size (today is the smallest) and one Visibility (50% default) control",
+        "the cabinet's own size grows the backdrop; the Games page has no copy",
     ):
         assert beat in output, f"the harness never reported '{beat}':\n{output}"

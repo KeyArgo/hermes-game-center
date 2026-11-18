@@ -7,7 +7,7 @@
 // (tests/browser_table_server.py) and drives muted headless Chrome against its pane page, /pane?w=,
 // whose own frame stands in for the Desktop's divider.
 //
-// The pane opens at 720 px and drags from 300 px to 1200 px, but its pieces were laid out for
+// The pane opens at 368 px and drags from 300 px to 1200 px, but its pieces were laid out for
 // ~360 px - two small game columns and a board with a width of its own. At every width the lobby
 // must fill the pane (>= 90% of it), nothing may scroll sideways, the game tiles must use the
 // width, and the board must fill its column with the turn beside it once there is room.
@@ -40,9 +40,10 @@ const check = (name, ok, detail = '') => {
   if (!ok) failures.push(name)
 }
 
-// 300 px is the narrowest the divider goes, 720 px is where the pane opens, and 320 px and 1000 px are
-// the two the check is asked for. 640 px is the frame the wide rules switch on at.
-const WIDTHS = [300, 320, 640, 720, 1000]
+// 300 px is the narrowest the divider goes, 368 px is where the pane opens (the owner's width,
+// 2026-11-18), 720 px is where it used to open, and 320 px and 1000 px are the two the check is asked
+// for. 640 px is the frame the wide rules switch on at.
+const WIDTHS = [300, 320, 368, 640, 720, 1000]
 
 // The pinned React modules come from the repo when they are there (no network), the way the other
 // browser checks do it.

@@ -15,7 +15,9 @@ const SDK_HOST = typeof host === 'undefined' ? null : host
 const PANE_ID = 'hermes-gameshelf:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
-const PANE_WIDTH = '720px'
+// The width the owner settled on by dragging (2026-11-18: "default where it is now"), so the pane
+// opens at it on every computer; it can still be dragged from 300 px to 1200 px.
+const PANE_WIDTH = '368px'
 // The four quick games. Order is the order they are offered.
 const QUICK_GAMES = ['connect4', 'reversi', 'gomoku', 'breakthrough']
 const QUICK_LEVEL = 'intermediate'

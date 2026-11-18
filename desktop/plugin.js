@@ -9124,7 +9124,7 @@ const JP2L_RANGES = {
 // the big one the taller stage now allows. They write the slider's own value — not a second scale — so
 // the readout, the stored number and the fit cannot disagree.
 const JP2L_SIZE_PRESETS = [
-  // The same three as the Games page (BACKDROP_SIZE_PILLS): Normal is today's size, and the others only
+  // Three sizes: Normal is today's size, and the others only
   // ever grow it - "Small" read as a mystery (owner, 2026-11-17).
   { id: 'normal', label: 'Normal', size: 1 },
   { id: 'bigger', label: 'Bigger', size: 1.5 },
@@ -19173,7 +19173,9 @@ const SDK_HOST = typeof host === 'undefined' ? null : host
 const PANE_ID = 'hermes-gameshelf:pane'
 const PANE_GAME_KEY = 'pane-game'
 const PANE_ALERTS_KEY = 'pane-alerts'
-const PANE_WIDTH = '720px'
+// The width the owner settled on by dragging (2026-11-18: "default where it is now"), so the pane
+// opens at it on every computer; it can still be dragged from 300 px to 1200 px.
+const PANE_WIDTH = '368px'
 // The four quick games. Order is the order they are offered.
 const QUICK_GAMES = ['connect4', 'reversi', 'gomoku', 'breakthrough']
 const QUICK_LEVEL = 'intermediate'
@@ -21973,56 +21975,6 @@ function inferenceAutoplayOn(autoplay, backdrop) {
   return Boolean(autoplay) && Boolean(backdrop)
 }
 
-// The backdrop's two dials, beside the button that shows it: Size (today's size is the smallest; drag
-// right for bigger) and Visibility (5% barely there to 100% solid, 50% by default). Both machines follow.
-function BackdropControls({ ctx }) {
-  const [jackpotSize] = useJp2LSize(ctx)
-  const size = Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, Number(jackpotSize) || 1))
-  const [alpha] = useSmOverchatAlpha()
-  const pill = (label, value) => jsx('button', {
-    type: 'button',
-    'data-backdrop-pill': label.toLowerCase(),
-    'aria-pressed': Math.abs(size - value) < 0.001,
-    title: `Backdrop size ${Math.round(value * 100)}%`,
-    onClick: () => backdropSetSize(value, ctx),
-    style: {
-      padding: '2px 9px', borderRadius: 999, fontSize: 11, cursor: 'pointer',
-      border: `1px solid ${Math.abs(size - value) < 0.001 ? '#3ee0c5' : 'rgba(255,255,255,0.18)'}`,
-      background: Math.abs(size - value) < 0.001 ? 'rgba(62,224,197,0.16)' : 'transparent', color: 'inherit'
-    },
-    children: label
-  })
-  const dial = (label, props, readout) => jsx('label', {
-    style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.tertiary },
-    children: [
-      jsx('span', { children: label }),
-      jsx('input', { type: 'range', style: { width: 110 }, ...props }),
-      jsx('span', { style: { minWidth: 34, fontWeight: 700 }, children: readout })
-    ]
-  })
-  return jsx('div', {
-    'data-backdrop-controls': '1',
-    role: 'group',
-    'aria-label': 'Backdrop size and visibility',
-    style: { display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-    children: [
-      dial('Backdrop size', {
-        'data-backdrop-size': '1', min: BACKDROP_SIZE_MIN, max: BACKDROP_SIZE_MAX, step: BACKDROP_SIZE_STEP, value: size,
-        title: 'Make the see-through slot machine over the chat bigger. 100% is the smallest.',
-        'aria-label': `Backdrop size, ${Math.round(size * 100)} percent`,
-        onChange: event => backdropSetSize(Number(event.target.value), ctx)
-      }, `${Math.round(size * 100)}%`),
-      ...BACKDROP_SIZE_PILLS.map(item => pill(item.label, item.size)),
-      dial('Visibility', {
-        'data-backdrop-visibility': '1', min: SM_ALPHA_MIN, max: SM_ALPHA_MAX, step: SM_ALPHA_STEP, value: alpha,
-        title: 'Make the slot machine over the chat easier or harder to see. 50% is the default.',
-        'aria-label': `Backdrop visibility, ${Math.round(alpha * 100)} percent`,
-        onChange: event => backdropSetVisibility(Number(event.target.value), ctx)
-      }, `${Math.round(alpha * 100)}%`)
-    ]
-  })
-}
-
 function InferenceAutoPlayButton({ ctx }) {
   const [backdrop, setBackdrop] = useJp2LOverchat(ctx)
   // null until the wallet has answered once: before that the button is off, never a guess.
@@ -22638,8 +22590,6 @@ function GameCenterPage({ ctx, onArea }) {
                       // One press, both settings, on the screen people arrive at rather than inside
                       // the machine.
                       jsx(InferenceAutoPlayButton, { ctx }),
-                      // How big and how see-through that backdrop is, for both machines at once.
-                      jsx(BackdropControls, { ctx }),
                       // The obvious door: one press opens the side pane and keeps a game beside
                       // the chat while Hermes works. While the pane is open the same button reads
                       // Close side pane.
@@ -24060,20 +24010,11 @@ function overchatStageHeight() {
   return Math.max(today, Math.min(most, Math.floor(today * size)))
 }
 
-// ---- the Games page's two backdrop controls ----------------------------------------------------------
-// Size: the cabinets' OWN size settings (Jackpot's JP2L_STORE.size, the slots' SM_SCALE_STATE), written
-// through the same setters their own sliders call (owner, 2026-11-17: "hook it up to the same function as
-// the slot machine's version, which works"). On the Games page 1 is today's size and the smallest. A size
-// above 1 also grows the stage's room, so a bigger machine really is drawn bigger.
-const BACKDROP_SIZE_MIN = 1
-const BACKDROP_SIZE_MAX = 2
-const BACKDROP_SIZE_STEP = 0.05
+// ---- how big the backdrop is drawn ---------------------------------------------------------------------
+// The cabinets' OWN size settings (Jackpot's JP2L_STORE.size, the slots' SM_SCALE_STATE), set by their own
+// sliders. A size above 1 also grows the stage's room, so a bigger machine really is drawn bigger. (The
+// Games page's copy of these controls was removed, owner 2026-11-18: "don't seem to work, remove those".)
 const BACKDROP_MOST_SHARE = 0.95
-const BACKDROP_SIZE_PILLS = [
-  { label: 'Normal', size: 1 },
-  { label: 'Bigger', size: 1.5 },
-  { label: 'Biggest', size: 2 }
-]
 
 function backdropGrowth() {
   const jackpot = Number(JP2L_STORE.size) || 1
@@ -24094,23 +24035,6 @@ function overchatStageSpan(left, width, size) {
   const centre = left + width / 2
   const from = Math.min(Math.max(BACKDROP_EDGE, Math.round(centre - wide / 2)), Math.max(BACKDROP_EDGE, view - BACKDROP_EDGE - wide))
   return { left: from, width: wide }
-}
-
-function backdropSetSize(value, ctx) {
-  const number = Number(value)
-  const stepped = Number.isFinite(number) ? Math.round(number / BACKDROP_SIZE_STEP) * BACKDROP_SIZE_STEP : 1
-  const next = Number(Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, stepped)).toFixed(2))
-  jp2LSetSize(next, ctx)
-  smSetScale(next)
-  return next
-}
-
-// Visibility: one value for both machines, written through each cabinet's own setter so their own
-// sliders, the wallet and the drawn copies all agree. 5% to 100%, 50% by default.
-function backdropSetVisibility(value, ctx) {
-  const next = smSetOverchatAlpha(value)
-  jp2LSetAlpha(next, ctx)
-  return next
 }
 
 // WHERE THE FIXED BOX LIVES. The Desktop's composer dock is centred with a CSS transform
