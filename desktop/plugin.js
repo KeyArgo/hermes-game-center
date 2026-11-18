@@ -8832,17 +8832,16 @@ const OVERCHAT_BASE_HEIGHT = 640
 // past the width, and never past the `ceiling` it was handed (the stage's own height, at most
 // OVERCHAT_MAX_HEIGHT). 0 while either number is unknown (the first paint, before the cabinet has been
 // laid out).
-// `grow` is the backdrop Size on the Games page (BACKDROP_SIZE, 1 = today's size and the smallest): it
-// raises the 100% height with it, and the stage hands a matching, taller `ceiling`.
-function overchatFitScale(natural, room, multiplier, ceiling, grow = 1) {
+// The `ceiling` is the stage's room: it grows past OVERCHAT_MAX_HEIGHT when a size above 100% asks for
+// it (78-overchat-slot.js overchatStageHeight), so a bigger size really draws bigger.
+function overchatFitScale(natural, room, multiplier, ceiling) {
   const width = Math.max(0, Number(room) || 0)
   const budget = Number(ceiling) > 0 ? Number(ceiling) : OVERCHAT_MAX_HEIGHT
-  const bigger = Number(grow) > 1 ? Number(grow) : 1
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
   // The 100% size: the smaller of the share's width and OVERCHAT_BASE_HEIGHT.
-  const byBase = Math.min(OVERCHAT_BASE_HEIGHT * bigger, budget) / natural.height
+  const byBase = Math.min(OVERCHAT_BASE_HEIGHT, budget) / natural.height
   // The hard stop above 100%: the room it was given, never past the absolute ceiling.
   const byRoom = budget / natural.height
   const scale = Math.min(Math.min(byWidth, byBase) * factor, byWidth, byRoom)
@@ -8921,7 +8920,7 @@ function SlotsOverChatCopy({ ctx, width, height }) {
   }, [])
 
   const natural = overchatNatural(cabinetRef)
-  const scale = overchatFitScale(natural, width, overchatScale, height, BACKDROP_SIZE.value)
+  const scale = overchatFitScale(natural, width, overchatScale, height)
   if (!on) return null
   // The machine is drawn even before it has been measured — at 100%, clipped to nothing — because its own
   // size is what the measurement is of. One frame, and the box below takes the fitted size.
@@ -9125,9 +9124,11 @@ const JP2L_RANGES = {
 // the big one the taller stage now allows. They write the slider's own value — not a second scale — so
 // the readout, the stored number and the fit cannot disagree.
 const JP2L_SIZE_PRESETS = [
-  { id: 'small', label: 'Small', size: 0.5 },
-  { id: 'medium', label: 'Medium', size: 1 },
-  { id: 'large', label: 'Large', size: 1.6 }
+  // The same three as the Games page (BACKDROP_SIZE_PILLS): Normal is today's size, and the others only
+  // ever grow it - "Small" read as a mystery (owner, 2026-11-17).
+  { id: 'normal', label: 'Normal', size: 1 },
+  { id: 'bigger', label: 'Bigger', size: 1.5 },
+  { id: 'biggest', label: 'Biggest', size: 2 }
 ]
 
 function jp2LWin() {
@@ -9414,7 +9415,7 @@ function useJp2LTint(ctx) {
 // The cabinet is a fixed 560x720 design, so "its own size" is a constant and the whole rule is the one
 // both machines share (overchatFitScale, 19-jackpot-overlay.js).
 function jp2LSlotScale(width, size, height) {
-  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height, BACKDROP_SIZE.value)
+  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height)
   return scale > 0 ? jp2LFloor(scale) : 0
 }
 
@@ -21975,8 +21976,22 @@ function inferenceAutoplayOn(autoplay, backdrop) {
 // The backdrop's two dials, beside the button that shows it: Size (today's size is the smallest; drag
 // right for bigger) and Visibility (5% barely there to 100% solid, 50% by default). Both machines follow.
 function BackdropControls({ ctx }) {
-  const [size, setSize] = useBackdropSize()
+  const [jackpotSize] = useJp2LSize(ctx)
+  const size = Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, Number(jackpotSize) || 1))
   const [alpha] = useSmOverchatAlpha()
+  const pill = (label, value) => jsx('button', {
+    type: 'button',
+    'data-backdrop-pill': label.toLowerCase(),
+    'aria-pressed': Math.abs(size - value) < 0.001,
+    title: `Backdrop size ${Math.round(value * 100)}%`,
+    onClick: () => backdropSetSize(value, ctx),
+    style: {
+      padding: '2px 9px', borderRadius: 999, fontSize: 11, cursor: 'pointer',
+      border: `1px solid ${Math.abs(size - value) < 0.001 ? '#3ee0c5' : 'rgba(255,255,255,0.18)'}`,
+      background: Math.abs(size - value) < 0.001 ? 'rgba(62,224,197,0.16)' : 'transparent', color: 'inherit'
+    },
+    children: label
+  })
   const dial = (label, props, readout) => jsx('label', {
     style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.tertiary },
     children: [
@@ -21995,8 +22010,9 @@ function BackdropControls({ ctx }) {
         'data-backdrop-size': '1', min: BACKDROP_SIZE_MIN, max: BACKDROP_SIZE_MAX, step: BACKDROP_SIZE_STEP, value: size,
         title: 'Make the see-through slot machine over the chat bigger. 100% is the smallest.',
         'aria-label': `Backdrop size, ${Math.round(size * 100)} percent`,
-        onChange: event => setSize(Number(event.target.value))
+        onChange: event => backdropSetSize(Number(event.target.value), ctx)
       }, `${Math.round(size * 100)}%`),
+      ...BACKDROP_SIZE_PILLS.map(item => pill(item.label, item.size)),
       dial('Visibility', {
         'data-backdrop-visibility': '1', min: SM_ALPHA_MIN, max: SM_ALPHA_MAX, step: SM_ALPHA_STEP, value: alpha,
         title: 'Make the slot machine over the chat easier or harder to see. 50% is the default.',
@@ -23996,7 +24012,7 @@ function overchatStageHeight() {
   const view = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
   const share = view > 0 ? Math.floor(view * OVERCHAT_VIEW_SHARE) : OVERCHAT_MAX_HEIGHT
   const today = Math.max(0, Math.min(OVERCHAT_MAX_HEIGHT, share))
-  const size = BACKDROP_SIZE.value
+  const size = backdropGrowth()
   if (!(size > 1)) return today
   // Bigger than today: grow with the Size slider, but its bottom never past 95% of the window (it is
   // drawn OVERCHAT_TOP below the window's top edge).
@@ -24005,28 +24021,24 @@ function overchatStageHeight() {
 }
 
 // ---- the Games page's two backdrop controls ----------------------------------------------------------
-// Size: 1 is today's size and the smallest (owner, 2026-11-17: "right now the size is the smallest it
-// gets"); dragging right grows the stage and the machines with it. Kept on this machine only.
-const BACKDROP_SIZE_KEY = 'gameshelf.backdrop.size'
-const BACKDROP_SIZE_DEFAULT = 1
+// Size: the cabinets' OWN size settings (Jackpot's JP2L_STORE.size, the slots' SM_SCALE_STATE), written
+// through the same setters their own sliders call (owner, 2026-11-17: "hook it up to the same function as
+// the slot machine's version, which works"). On the Games page 1 is today's size and the smallest. A size
+// above 1 also grows the stage's room, so a bigger machine really is drawn bigger.
 const BACKDROP_SIZE_MIN = 1
-const BACKDROP_SIZE_MAX = 2.5
+const BACKDROP_SIZE_MAX = 2
 const BACKDROP_SIZE_STEP = 0.05
 const BACKDROP_MOST_SHARE = 0.95
-const BACKDROP_SIZE = { value: BACKDROP_SIZE_DEFAULT, listeners: new Set() }
+const BACKDROP_SIZE_PILLS = [
+  { label: 'Normal', size: 1 },
+  { label: 'Bigger', size: 1.5 },
+  { label: 'Biggest', size: 2 }
+]
 
-function backdropClampSize(value) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return BACKDROP_SIZE_DEFAULT
-  const stepped = Math.round(number / BACKDROP_SIZE_STEP) * BACKDROP_SIZE_STEP
-  return Number(Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, stepped)).toFixed(2))
-}
-
-try {
-  const raw = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(BACKDROP_SIZE_KEY) : null
-  if (raw !== null && raw !== '') BACKDROP_SIZE.value = backdropClampSize(raw)
-} catch {
-  // Storage can be missing or refuse reads; today's size it is.
+function backdropGrowth() {
+  const jackpot = Number(JP2L_STORE.size) || 1
+  const slots = Number(SM_SCALE_STATE.value) || 1
+  return Math.max(1, jackpot, slots)
 }
 
 // The stage's span: the composer's own at today's size; a bigger size widens it by the same factor,
@@ -24044,29 +24056,13 @@ function overchatStageSpan(left, width, size) {
   return { left: from, width: wide }
 }
 
-function backdropSetSize(value) {
-  const next = backdropClampSize(value)
-  BACKDROP_SIZE.value = next
-  try {
-    window.localStorage.setItem(BACKDROP_SIZE_KEY, String(next))
-  } catch {
-    // Storage can be missing or refuse writes; the size still holds for this visit.
-  }
-  BACKDROP_SIZE.listeners.forEach(listener => listener(next))
-  // The stage reads the size when it renders; nudge it the way an anchor move does.
-  overchatShare({ size: next })
+function backdropSetSize(value, ctx) {
+  const number = Number(value)
+  const stepped = Number.isFinite(number) ? Math.round(number / BACKDROP_SIZE_STEP) * BACKDROP_SIZE_STEP : 1
+  const next = Number(Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, stepped)).toFixed(2))
+  jp2LSetSize(next, ctx)
+  smSetScale(next)
   return next
-}
-
-function useBackdropSize() {
-  const [size, setSize] = useState(BACKDROP_SIZE.value)
-  useEffect(() => {
-    const listener = next => setSize(next)
-    BACKDROP_SIZE.listeners.add(listener)
-    setSize(BACKDROP_SIZE.value)
-    return () => { BACKDROP_SIZE.listeners.delete(listener) }
-  }, [])
-  return [size, backdropSetSize]
 }
 
 // Visibility: one value for both machines, written through each cabinet's own setter so their own
@@ -24095,6 +24091,14 @@ function backdropSetVisibility(value, ctx) {
 // The stage still checks where it landed; if a host traps both stages, or neither mounts, the strip draws
 // the machines in the slot itself, as before.
 const OVERCHAT_SPOT = { left: 0, width: 0, anchored: false, stage: 'none', drawer: null, stages: {}, listeners: new Set() }
+
+// The backdrop is a picture. Every machine copy is a whole cabinet, with its own buttons, sliders and
+// pills, and several of them switch clicks back on for themselves (pointer-events: auto inline, or a
+// stage rule). Over the conversation that took clicks meant for the chat (owner, 2026-11-17: "the buttons
+// and sliders shouldn't work and should not interfere with other buttons or clickables as it has in the
+// past"). One rule of our own, inside our own elements, wins over all of them: nothing in it takes a click.
+const OVERCHAT_NO_CLICKS = '[data-overchat="stage"], [data-overchat="stage"] *, [data-overchat="strip"], [data-overchat="strip"] * { pointer-events: none !important; cursor: default !important; }'
+const overchatNoClicks = () => jsx('style', { 'data-overchat': 'no-clicks', children: OVERCHAT_NO_CLICKS }, 'no-clicks')
 
 // Which stage draws: the first in this list that is mounted and not trapped.
 const OVERCHAT_STAGE_ORDER = ['statusbar', 'titlebar']
@@ -24218,7 +24222,7 @@ function OverChatStrip({ ctx }) {
         // dismissal controls opt back in (19-jackpot2-layer.js, jp2LStyleRules).
         pointerEvents: 'none'
       },
-      children: overchatCells(ctx, slotsOn, jackpotOn, box.width, undefined)
+      children: [overchatNoClicks(), ...overchatCells(ctx, slotsOn, jackpotOn, box.width, undefined)]
     })
   }
 
@@ -24237,7 +24241,10 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
   const [jackpotOn] = useJp2LOverchat(ctx)
   const spot = useOverchatSpot()
   const stage = useRef(null)
-  const [size] = useBackdropSize()
+  // Re-render when either cabinet's size moves: the stage's room grows with it.
+  useJp2LSize(ctx)
+  useSmScale()
+  const size = backdropGrowth()
   // 'top' until the stage's own rect says otherwise. Only ever set away from 'top': a host that traps a
   // fixed box once traps it on every render, so retrying would only cost renders.
   const [place, setPlace] = useState('top')
@@ -24284,7 +24291,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
   return jsx('span', {
     'data-overchat': 'stage-host',
     style: { display: 'inline-block', width: 0, height: 0, overflow: 'visible' },
-    children: jsx('div', {
+    children: [overchatNoClicks(), jsx('div', {
       'data-overchat': 'stage',
       ref: stage,
       style: {
@@ -24306,7 +24313,7 @@ function OverChatStage({ ctx, where = 'statusbar' }) {
         overflow: 'hidden'
       },
       children: overchatCells(ctx, slotsOn, jackpotOn, width, budget)
-    })
+    }, 'stage')]
   })
 }
 

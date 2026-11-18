@@ -20,8 +20,22 @@ function inferenceAutoplayOn(autoplay, backdrop) {
 // The backdrop's two dials, beside the button that shows it: Size (today's size is the smallest; drag
 // right for bigger) and Visibility (5% barely there to 100% solid, 50% by default). Both machines follow.
 function BackdropControls({ ctx }) {
-  const [size, setSize] = useBackdropSize()
+  const [jackpotSize] = useJp2LSize(ctx)
+  const size = Math.min(BACKDROP_SIZE_MAX, Math.max(BACKDROP_SIZE_MIN, Number(jackpotSize) || 1))
   const [alpha] = useSmOverchatAlpha()
+  const pill = (label, value) => jsx('button', {
+    type: 'button',
+    'data-backdrop-pill': label.toLowerCase(),
+    'aria-pressed': Math.abs(size - value) < 0.001,
+    title: `Backdrop size ${Math.round(value * 100)}%`,
+    onClick: () => backdropSetSize(value, ctx),
+    style: {
+      padding: '2px 9px', borderRadius: 999, fontSize: 11, cursor: 'pointer',
+      border: `1px solid ${Math.abs(size - value) < 0.001 ? '#3ee0c5' : 'rgba(255,255,255,0.18)'}`,
+      background: Math.abs(size - value) < 0.001 ? 'rgba(62,224,197,0.16)' : 'transparent', color: 'inherit'
+    },
+    children: label
+  })
   const dial = (label, props, readout) => jsx('label', {
     style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.tertiary },
     children: [
@@ -40,8 +54,9 @@ function BackdropControls({ ctx }) {
         'data-backdrop-size': '1', min: BACKDROP_SIZE_MIN, max: BACKDROP_SIZE_MAX, step: BACKDROP_SIZE_STEP, value: size,
         title: 'Make the see-through slot machine over the chat bigger. 100% is the smallest.',
         'aria-label': `Backdrop size, ${Math.round(size * 100)} percent`,
-        onChange: event => setSize(Number(event.target.value))
+        onChange: event => backdropSetSize(Number(event.target.value), ctx)
       }, `${Math.round(size * 100)}%`),
+      ...BACKDROP_SIZE_PILLS.map(item => pill(item.label, item.size)),
       dial('Visibility', {
         'data-backdrop-visibility': '1', min: SM_ALPHA_MIN, max: SM_ALPHA_MAX, step: SM_ALPHA_STEP, value: alpha,
         title: 'Make the slot machine over the chat easier or harder to see. 50% is the default.',

@@ -1,6 +1,6 @@
 # Architecture
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-17 (a7636bcf)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-17 (0bb0838b)_
 
 What the pieces are, how a move travels through them, and where the data lives.
 

@@ -332,6 +332,22 @@ await cdp('Page.navigate', { url: `${URL_BASE}pane` })
 await sleep(7000)
 const bothOpened = await openPane()
 const both = await evaluate(FACTS)
+// The backdrop is a picture: no button, slider or pill drawn inside it may take a click, or sit over the
+// chat's own controls taking theirs (owner, 2026-11-17: "the buttons and sliders shouldn't work and should
+// not interfere with other buttons or clickables as it has in the past").
+const clickable = await evaluate(`(() => {
+  const roots = [...document.querySelectorAll('[data-overchat="stage"], [data-overchat="strip"]')]
+  const live = []
+  for (const root of roots) for (const node of [root, ...root.querySelectorAll('*')]) {
+    if (getComputedStyle(node).pointerEvents !== 'none') live.push((node.tagName || '') + (node.getAttribute('aria-label') ? ':' + node.getAttribute('aria-label') : ''))
+  }
+  const copies = [...document.querySelectorAll('[data-overchat="stage"] button, [data-overchat="stage"] input')]
+  const hits = copies.filter(node => { const r = node.getBoundingClientRect(); if (!r.width || !r.height) return false
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return top && node.contains(top) })
+  return { live: live.slice(0, 8), count: live.length, controls: copies.length, hits: hits.length }
+})()`)
+check('nothing inside the backdrop takes a click: every button, slider and pill lets it through',
+  Boolean(clickable && clickable.controls > 0 && clickable.count === 0 && clickable.hits === 0), JSON.stringify(clickable))
 const bothCells = (both && both.cells) || []
 check('both switches on draws both machines, each in its own cell',
   bothOpened === 'picked' && Boolean(both && both.strip && both.place === 'top')
@@ -393,11 +409,13 @@ const owner = await evaluate("(() => { const s = document.querySelectorAll('[dat
 check('with a status bar the status-bar stage draws, and the titlebar stand-in draws nothing',
   Boolean(owner && owner.count === 1 && owner.inBar), JSON.stringify(owner))
 
-// ---------------------------------------------------------------- 9. the Games-page Size slider grows it
+// ---------------------------------------------------------------- 9. a bigger size grows it
+// The Games-page Size slider writes the cabinets' own size settings (the same setters as their sliders);
+// here they are set the way those setters store them, and the page reloaded.
 // Size 1 is today's size and the smallest; 2 must draw the machine clearly taller, still at the top and
 // inside the window (owner, 2026-11-17: "make bigger or smaller, but right now the size is the smallest").
 const before = await evaluate(FACTS)
-await evaluate("localStorage.setItem('gameshelf.backdrop.size', '2'); 1")
+await evaluate("localStorage.setItem('qa.jackpot2.size', '2'); localStorage.setItem('gameshelf.slots.scale', '2'); 1")
 await cdp('Page.navigate', { url: `${URL_BASE}pane` })
 await sleep(7000)
 await openPane()
@@ -407,7 +425,7 @@ check('a bigger backdrop size draws the machine clearly taller, still at the top
     && grown.copyHeight > before.copyHeight * 1.25 && grown.copyBottom <= grown.view.height),
   `before ${before && before.copyHeight}, after ${grown && grown.copyHeight}, bottom ${grown && grown.copyBottom} of ${grown && grown.view.height}`)
 await shot('overchat-size-2')
-await evaluate("localStorage.removeItem('gameshelf.backdrop.size'); 1")
+await evaluate("localStorage.removeItem('qa.jackpot2.size'); localStorage.removeItem('gameshelf.slots.scale'); 1")
 
 const errors = await evaluate('(window.qa && window.qa.errors) || []')
 check('the page logged no JavaScript error through all of that',

@@ -2,7 +2,7 @@
 <h1 align="center">Game Center</h1>
 <p align="center"><em>Eleven games Hermes can actually play — and a referee that refuses an illegal move out loud.</em></p>
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-17 (a7636bcf)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-17 (0bb0838b)_
 
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml"><img src="https://github.com/KeyArgo/hermes-game-center/actions/workflows/tests.yml/badge.svg?branch=release/1.0.0" alt="CI"></a>
@@ -112,7 +112,7 @@ A win climbs a ladder of recorded sound tiers — a small CHING, then NICE! and 
 
 **Inference Slot Machine** is the button at the top of the Games page: one press turns on both halves of "spin while Hermes thinks" — the wallet's automatic spin and the Jackpot backdrop that gives it a machine on screen — and a second press turns both off. It reads both switches rather than remembering the last press, so flipping either one in the cabinet, the status bar or Settings moves the button with it; "on" means both. If the shelf refuses, the button returns to its real state and says so in one line.
 
-**Show as backdrop** draws a see-through copy of the cabinet at the top centre of the conversation, over the chat column — anchored to the composer's own slot, so it appears exactly while the conversation does and never over the Games page, Settings or another plugin's page. It is sized from that slot: the slot's width is the limit, the copy takes half of it when both machines are on, and it is drawn no wider than the composer. **Backdrop size** 100% is 640 px tall — twice the old 320 px copy, in the same top-centre place — and it never takes more than 60% of the window's height (720 px at the very most) or the chat column's width. **Small**, **Medium** and **Large** beside the slider set 50% (the old size), 100% and 160% in one press. The size control (25–200%) and **Backdrop opacity** (25–100%) share one setting with the cabinet's own panel, the status bar and Settings, so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
+**Show as backdrop** draws a see-through copy of the cabinet at the top centre of the conversation, over the chat column — anchored to the composer's own slot, so it appears exactly while the conversation does and never over the Games page, Settings or another plugin's page. It is sized from that slot: the slot's width is the limit, the copy takes half of it when both machines are on, and it is drawn no wider than the composer. **Backdrop size** 100% is 640 px tall — twice the old 320 px copy, in the same top-centre place — and it never takes more than 60% of the window's height (720 px at the very most) or the chat column's width. **Normal**, **Bigger** and **Biggest** beside the slider set 100%, 150% and 200% in one press; above 100% the copy may grow past that 60% share, up to 95% of the window. The same pills, a **Backdrop size** slider (100–200%) and a **Visibility** slider (5–100%, 50% by default) sit on the Games page beside **Start Inference Slot Machine**, and drive both machines through their own settings. The copy is a picture: no button or slider in it takes a click. The cabinet's size control (25–200%) and **Backdrop opacity** (5–100%) share one setting with the cabinet's own panel, the status bar and Settings, so every surface shows the same machine. **Table sounds** in Settings has an on/off switch and a volume slider (0–100%).
 
 ### Learn, hint, and your own model
 

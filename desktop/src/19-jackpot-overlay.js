@@ -513,17 +513,16 @@ const OVERCHAT_BASE_HEIGHT = 640
 // past the width, and never past the `ceiling` it was handed (the stage's own height, at most
 // OVERCHAT_MAX_HEIGHT). 0 while either number is unknown (the first paint, before the cabinet has been
 // laid out).
-// `grow` is the backdrop Size on the Games page (BACKDROP_SIZE, 1 = today's size and the smallest): it
-// raises the 100% height with it, and the stage hands a matching, taller `ceiling`.
-function overchatFitScale(natural, room, multiplier, ceiling, grow = 1) {
+// The `ceiling` is the stage's room: it grows past OVERCHAT_MAX_HEIGHT when a size above 100% asks for
+// it (78-overchat-slot.js overchatStageHeight), so a bigger size really draws bigger.
+function overchatFitScale(natural, room, multiplier, ceiling) {
   const width = Math.max(0, Number(room) || 0)
   const budget = Number(ceiling) > 0 ? Number(ceiling) : OVERCHAT_MAX_HEIGHT
-  const bigger = Number(grow) > 1 ? Number(grow) : 1
   if (!natural || !(natural.width > 0) || !(natural.height > 0) || !width) return 0
   const factor = Number(multiplier) > 0 ? Number(multiplier) : 1
   const byWidth = width / natural.width
   // The 100% size: the smaller of the share's width and OVERCHAT_BASE_HEIGHT.
-  const byBase = Math.min(OVERCHAT_BASE_HEIGHT * bigger, budget) / natural.height
+  const byBase = Math.min(OVERCHAT_BASE_HEIGHT, budget) / natural.height
   // The hard stop above 100%: the room it was given, never past the absolute ceiling.
   const byRoom = budget / natural.height
   const scale = Math.min(Math.min(byWidth, byBase) * factor, byWidth, byRoom)
@@ -602,7 +601,7 @@ function SlotsOverChatCopy({ ctx, width, height }) {
   }, [])
 
   const natural = overchatNatural(cabinetRef)
-  const scale = overchatFitScale(natural, width, overchatScale, height, BACKDROP_SIZE.value)
+  const scale = overchatFitScale(natural, width, overchatScale, height)
   if (!on) return null
   // The machine is drawn even before it has been measured — at 100%, clipped to nothing — because its own
   // size is what the measurement is of. One frame, and the box below takes the fitted size.

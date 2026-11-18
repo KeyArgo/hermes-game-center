@@ -103,11 +103,10 @@ def test_the_height_is_capped_by_the_window_and_the_machines_budget():
     assert re.search(r"height: budget", text), "each machine is told the height it may use"
     overlay = _code_only((SRC / "19-jackpot-overlay.js").read_text(encoding="utf-8"))
     layer = _code_only((SRC / "19-jackpot2-layer.js").read_text(encoding="utf-8"))
-    # ...and the Games-page backdrop Size (BACKDROP_SIZE.value), which grows the stage and the fit together.
-    assert "overchatFitScale(natural, width, overchatScale, height, BACKDROP_SIZE.value)" in overlay, (
+    assert "overchatFitScale(natural, width, overchatScale, height)" in overlay, (
         "the cabinet's fit honours the height it was given"
     )
-    assert "overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height, BACKDROP_SIZE.value)" in layer, (
+    assert "overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height)" in layer, (
         "and so does Jackpot v2's"
     )
 

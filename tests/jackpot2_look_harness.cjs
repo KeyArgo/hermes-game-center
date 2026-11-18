@@ -309,8 +309,8 @@ assert.ok(nodes(cabinetPanel).some(node => node.props && node.props['data-jp2-oc
 const namedButtons = nodes(cabinetPanel)
   .filter(node => node.type === 'button' && typeof node.props.children === 'string')
   .map(node => node.props.children).sort()
-assert.deepEqual(plain(namedButtons), ['Large', 'Medium', 'Reset look', 'Small'],
-  'and every button says what it is — an empty button is a defect the panel layout hides; Small, Medium and Large ride on the size row')
+assert.deepEqual(plain(namedButtons), ['Bigger', 'Biggest', 'Normal', 'Reset look'],
+  'and every button says what it is — an empty button is a defect the panel layout hides; Normal, Bigger and Biggest ride on the size row')
 assert.ok(words(rows[1]).includes('See-through') && words(rows[1]).includes('Backdrop size'),
   `both sliders on the shared row keep their name (${words(rows[1]).trim()})`)
 assert.ok(words(rows[2]).includes('Colour') && words(rows[2]).includes('Teal (current)'),

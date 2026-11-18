@@ -287,14 +287,14 @@ async function main() {
   // ---- 7. Small / Medium / Large beside the size slider ------------------
   sandbox.panelProps = { ctx, tone: 'settings' }
   const panel = evaluate('Jackpot2OverChatControls(panelProps)')
-  for (const [label, value] of [['Small', 0.5], ['Medium', 1], ['Large', 1.6]]) {
+  for (const [label, value] of [['Normal', 1], ['Bigger', 1.5], ['Biggest', 2]]) {
     const quick = nodes(panel).find(node => node.type === 'button' && words(node).trim() === label)
     assert.ok(quick, `the backdrop controls offer ${label}`)
     evaluate('jp2LSetSize(0.5, panelProps.ctx)')
     quick.props.onClick()
     assert.equal(evaluate('JP2L_STORE.size'), value, `${label} sets the size to ${value}`)
   }
-  console.log('inference autoplay: Small, Medium and Large size the backdrop in one press: passed')
+  console.log('inference autoplay: Normal, Bigger and Biggest size the backdrop in one press: passed')
 
   // ---- 8. one Size and one Visibility control for the backdrop, on the Games page ----
   // The owner (2026-11-17): "a sizer for the on chat slots so I can make bigger or smaller, but right
@@ -311,22 +311,30 @@ async function main() {
   assert.equal(Number(seeRange.props.max), 1, 'and up to solid')
   assert.equal(evaluate('SM_ALPHA_DEFAULT'), 0.5, 'the slots cabinet starts at 50% visible')
   assert.equal(evaluate('JP2L_ALPHA_DEFAULT'), 0.5, 'and so does the Jackpot cabinet')
-  assert.equal(evaluate('BACKDROP_SIZE_DEFAULT'), 1, 'and the size starts at today\'s')
 
-  evaluate('backdropSetSize(1)')
+  evaluate('backdropSetSize(1, backdropProps.ctx)')
   const floorBudget = evaluate('overchatStageHeight()')
   assert.equal(floorBudget, 600, `at 100% the stage is today's 60% of a 1000 px window (${floorBudget})`)
-  const floorScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, 1, ${floorBudget}, BACKDROP_SIZE.value)`)
+  const floorScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, JP2L_STORE.size, ${floorBudget})`)
   assert.equal(Math.round(720 * floorScale), 600, `and the machine is drawn as today (${720 * floorScale})`)
   sizeRange.props.onChange({ target: { value: '2' } })
-  assert.equal(evaluate('BACKDROP_SIZE.value'), 2, 'dragging the Size slider sets the size')
+  // The same functions the cabinets' own size sliders call (owner: "hook it up to the same function as the
+  // slot machine's version, which works").
+  assert.equal(evaluate('JP2L_STORE.size'), 2, 'dragging the Size slider sets the Jackpot backdrop size')
+  assert.equal(evaluate('SM_SCALE_STATE.value'), 2, 'and the slots backdrop size, through their own setters')
   const bigBudget = evaluate('overchatStageHeight()')
   assert.ok(bigBudget > floorBudget, `a bigger size gives the stage more room (${bigBudget} > ${floorBudget})`)
   assert.ok(bigBudget <= 950, `but never more than 95% of the window (${bigBudget})`)
-  const bigScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, 1, ${bigBudget}, BACKDROP_SIZE.value)`)
+  const bigScale = evaluate(`overchatFitScale({ width: 560, height: 720 }, 900, JP2L_STORE.size, ${bigBudget})`)
   assert.ok(720 * bigScale > 720 * floorScale + 100, `and the machine is drawn clearly bigger (${720 * bigScale})`)
-  evaluate('backdropSetSize(0.5)')
-  assert.equal(evaluate('BACKDROP_SIZE.value'), 1, 'it never goes below today\'s size')
+  evaluate('backdropSetSize(0.5, backdropProps.ctx)')
+  assert.equal(evaluate('JP2L_STORE.size'), 1, 'the Games-page slider never goes below today\'s size')
+  for (const [label, value] of [['Normal', 1], ['Bigger', 1.5], ['Biggest', 2]]) {
+    const pill = nodes(drawWith('BackdropControls(backdropProps)')).find(node => node.type === 'button' && words(node).trim() === label)
+    assert.ok(pill, `a ${label} pill beside the slider`)
+    pill.props.onClick()
+    assert.equal(evaluate('JP2L_STORE.size'), value, `${label} sets ${value * 100}%`)
+  }
 
   seeRange.props.onChange({ target: { value: '0.8' } })
   assert.equal(evaluate('SM_ALPHA.value'), 0.8, 'Visibility sets the slots backdrop')
@@ -335,7 +343,7 @@ async function main() {
   assert.equal(evaluate('SM_ALPHA.value'), 0.05, 'down to barely there')
   assert.equal(evaluate('JP2L_STORE.alpha'), 0.05, 'for both machines')
   evaluate('backdropSetVisibility(0.5, backdropProps.ctx)')
-  evaluate('backdropSetSize(1)')
+  evaluate('backdropSetSize(1, backdropProps.ctx)')
   console.log('inference autoplay: one Size (today is the smallest) and one Visibility (50% default) control: passed')
 
   reset()

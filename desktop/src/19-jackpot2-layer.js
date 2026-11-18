@@ -132,9 +132,11 @@ const JP2L_RANGES = {
 // the big one the taller stage now allows. They write the slider's own value — not a second scale — so
 // the readout, the stored number and the fit cannot disagree.
 const JP2L_SIZE_PRESETS = [
-  { id: 'small', label: 'Small', size: 0.5 },
-  { id: 'medium', label: 'Medium', size: 1 },
-  { id: 'large', label: 'Large', size: 1.6 }
+  // The same three as the Games page (BACKDROP_SIZE_PILLS): Normal is today's size, and the others only
+  // ever grow it - "Small" read as a mystery (owner, 2026-11-17).
+  { id: 'normal', label: 'Normal', size: 1 },
+  { id: 'bigger', label: 'Bigger', size: 1.5 },
+  { id: 'biggest', label: 'Biggest', size: 2 }
 ]
 
 function jp2LWin() {
@@ -421,7 +423,7 @@ function useJp2LTint(ctx) {
 // The cabinet is a fixed 560x720 design, so "its own size" is a constant and the whole rule is the one
 // both machines share (overchatFitScale, 19-jackpot-overlay.js).
 function jp2LSlotScale(width, size, height) {
-  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height, BACKDROP_SIZE.value)
+  const scale = overchatFitScale(JP2L_SIZE, width, jp2LClampSize(size), height)
   return scale > 0 ? jp2LFloor(scale) : 0
 }
 
