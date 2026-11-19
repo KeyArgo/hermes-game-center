@@ -46,6 +46,7 @@ from shelf import online_hall  # noqa: E402
 from shelf import ladder as ladder_lib  # noqa: E402
 from shelf import myth, tutorials  # noqa: E402
 from shelf.fresh import load_fresh  # noqa: E402
+from shelf import diagnostics  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +64,9 @@ except Exception:  # a host that cannot load kit still serves the page without l
     DEFAULT_LEVEL = "normal"
 
 router = APIRouter()
+# Every route below is watched from here on: an unhandled error lands in the plugin's
+# own log with its traceback, and a call slower than two seconds says so (shelf/diagnostics.py).
+diagnostics.instrument_router(router)
 
 _LINE = 300
 

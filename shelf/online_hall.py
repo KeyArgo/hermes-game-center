@@ -17,6 +17,7 @@ import threading
 import time
 
 from shelf import ws as wsmod
+from shelf import diagnostics
 
 log = logging.getLogger(__name__)
 
@@ -414,6 +415,7 @@ class Hall:
                 sock = wsmod.Socket(wsmod.socket_url(self.online.url, "/api/lobby/socket"), timeout=5)
             except wsmod.SocketError as exc:
                 slow = _is_rejected_upgrade(exc)
+                diagnostics.log.info("lobby connect failed: %s", exc)
                 with self._lock:
                     self._socket = None
                     self._state = "old-server" if slow else "connecting"
@@ -448,7 +450,10 @@ class Hall:
                     continue
                 self._delay = min(self._delay * 2, self.retry_most)
                 continue
+            diagnostics.log.info("lobby connect %s", self.online.url)
+            diagnostics.lobby_opened(sock)
             outcome = self._session(sock, key)
+            diagnostics.lobby_closed(sock)
             with self._lock:
                 self._socket = None
                 if not self._stop.is_set() and outcome == "":
@@ -463,6 +468,8 @@ class Hall:
                 sock.close()
             except Exception:
                 pass
+            if outcome == "":
+                diagnostics.log.info("lobby disconnect (the connection dropped)")
             if outcome == "stop":
                 break
             if outcome == "auth":

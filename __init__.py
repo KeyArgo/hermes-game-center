@@ -16,12 +16,14 @@ try:
     from .shelf.setup import apply_choice
     from .shelf.who import NameBook, identify
     from .shelf.fresh import load_fresh
+    from .shelf import diagnostics
 except ImportError:
     from shelf.fresh import load_fresh
     from shelf.catalog import Catalog, plugin_roots
     from shelf.commands import run
     from shelf.setup import apply_choice
     from shelf.who import NameBook, identify
+    from shelf import diagnostics
 
 
 def open_catalog(
@@ -60,6 +62,13 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
         return open_catalog(root(), settings(), roots, enabled=enabled)
 
     _register_model_slot(ctx)
+
+    # The diagnostic log lives in the plugin's own data folder, beside its state.
+    # Opening it must never stop the plugin from loading.
+    try:
+        diagnostics.attach(root())
+    except Exception:
+        log.debug("the diagnostic log could not be opened", exc_info=True)
 
     # Slots: with auto-spin on, a spin happens at the moment the person's turn starts, and only
     # while the machine is on screen AND only for the chat on screen. Nothing is banked: a turn with
@@ -116,7 +125,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             tokens = spent_by_session.pop(session, 0)
             slots.autospin(wallet, kind="message", tokens=tokens, session_id=session)
         except Exception:
-            log.debug("the automatic spin after a turn did not run", exc_info=True)
+            diagnostics.log.error("the automatic spin after a turn did not run", exc_info=True)
 
     # Tokens: every API reply the person spends pays points - 10 per 1M tokens in or out, one
     # whole point per 100k - because points are the account currency that shows how much Hermes is
@@ -148,7 +157,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
                     spent_by_session.clear()
                 spent_by_session[session] = spent_by_session.get(session, 0) + spent
         except Exception:
-            log.debug("the automatic spin after a reply did not run", exc_info=True)
+            diagnostics.log.error("the automatic spin after a reply did not run", exc_info=True)
 
     # Tools: the most frequent hook there is, and the cheapest, so it pays the smallest automatic
     # bet. One spin per burst: a run of parallel tool calls is one moment to the ear, and spinning
@@ -170,7 +179,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
                 return None
             slots.autospin(wallet, kind="tool", session_id=str(kwargs.get("session_id") or ""))
         except Exception:
-            log.debug("the automatic spin after a tool call did not run", exc_info=True)
+            diagnostics.log.error("the automatic spin after a tool call did not run", exc_info=True)
 
     register_hook = getattr(ctx, "register_hook", None)
     if callable(register_hook):
@@ -189,7 +198,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
             wallets.Wallet(wallets.wallet_path(root())).award_bonus(WIN_BONUS)
         except Exception:
-            log.debug("the win bonus was not awarded", exc_info=True)
+            diagnostics.log.error("the win bonus was not awarded", exc_info=True)
 
     try:
         import kit as kit_module
