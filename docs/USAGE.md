@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (3e1a0d4e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (c130dbdd)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -149,6 +149,7 @@ The wording comes from the table's refusal path in `kit.py`; the page draws it f
 
 The pane on the right of the conversation is its own small Games screen. Open it from the Games header, from the status bar item, or with its command in the palette.
 
+- The pane is always on the right of the chat. Its dock hint is enforced, so the host re-homes it there on every start: a pane that was once dragged somewhere else, or moved by a host update, goes back to the right instead of staying wrong for good.
 - The pane opens at 368 px. Drag its edge: it goes down to 300 px and out to 1200 px.
 - Everything inside answers to that width. The game list fills the row it is in, and the pane's sections (the game list, online play, alerts) sit two abreast once there is room, then stack again when the pane is narrow.
 - A game in the pane draws its board as large as the pane allows, capped by the pane's height so the turn line stays in view, and puts the turn beside the board when there is room for both. Nothing scrolls sideways, down to 300 px.

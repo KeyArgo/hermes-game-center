@@ -6,6 +6,13 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The Play pane always opens on the right of the chat.** The host adopts a contributed pane once and
+  then remembers where the person put it, so a pane that had ever been dragged elsewhere - or that a
+  host update re-homed into the wrong group - stayed wrong for good (owner, 2026-11-18: "#4 pane always
+  right"). Its dock hint now carries `enforce: true`, which the host re-asserts on every boot's first
+  adoption pass with no user-placement exemption (`enforceDockedPanes` in the Desktop's pane-shell
+  store). On Windows the check is: restart the Desktop app, then look. Guards:
+  `tests/test_play_pane_always_right.py`.
 - **The Jackpot cabinet always shows all three reel rows, and Normal / Bigger / Biggest stay on one
   line.** The cabinet's content column is a flex column inside a fixed 720 px machine, so a taller
   panel below the reels was paid for out of the reel window - measured at 271 px against the design

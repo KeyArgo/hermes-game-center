@@ -16,7 +16,13 @@ export default {
       // its own Close (that would disable the whole plugin); our × unregisters it.
       data: {
         placement: 'right',
-        dock: { pane: 'workspace', pos: 'right' },
+        // `enforce` is the host's standing invariant, not a one-time migration: it re-homes the pane
+        // onto this anchor at every boot's first adoption pass when it is anywhere else, with no user
+        // exemption (apps/desktop/src/components/pane-shell/tree/store.ts, enforceDockedPanes). The
+        // pane stayed wrong for good otherwise - the host adopts a contributed pane once and then
+        // remembers where it was, so one drag, or one host update, was permanent (owner, 2026-11-18:
+        // "pane always right").
+        dock: { pane: 'workspace', pos: 'right', enforce: true },
         width: PANE_WIDTH,
         minWidth: '300px',
         maxWidth: '1200px',
