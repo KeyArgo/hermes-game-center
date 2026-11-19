@@ -24626,14 +24626,26 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
     if (answer && answer.ok === false) { setSayProblem(String(answer.text || 'That name was not taken. Try again.')); return }
     setName('')
   }
+  // One message goes once: the box empties at the press and a second press (or Enter) while the
+  // first is on its way does nothing (owner, 2026-11-19: "easy to accidently send the same message
+  // 3 times"). A message the lobby refuses comes back into the box with the reason.
+  const sending = useRef(false)
   const sendChat = async () => {
-    if (!signedIn) return
+    if (!signedIn || sending.current) return
     const said = chat.trim()
     if (!said) return
+    sending.current = true
     setSayProblem('')
-    const answer = await say(`chat say ${said}`)
-    if (answer && answer.ok === false) { setSayProblem(String(answer.text || 'The lobby did not take that message. Try again.')); return }
     setChat('')
+    try {
+      const answer = await say(`chat say ${said}`)
+      if (answer && answer.ok === false) {
+        setChat(said)
+        setSayProblem(String(answer.text || 'The lobby did not take that message. Try again.'))
+      }
+    } finally {
+      sending.current = false
+    }
   }
   const muted = { fontSize: 11, color: text.tertiary }
   return jsxs('div', {

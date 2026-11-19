@@ -4839,6 +4839,22 @@ async function lobbyColumnContract() {
   tree = whereOf({ ...named, lobby: { lines: [], looking: [], shared: true, reached: false } })
   assert.ok(words(tree).includes('could not be read just now'), 'a lobby that could not be read says so')
 
+  // 0b. One message is sent once, however fast Send or Enter is pressed while it is on its way
+  // (owner, 2026-11-19: "its easy to accidently send the same message 3 times").
+  reset()
+  drafts.chat = 'lets go'
+  let land = null
+  sender = line => { sends.push(line); return new Promise(done => { land = done }) }
+  tree = paint()
+  findButton(tree, 'Send').props.onClick()
+  findButton(tree, 'Send').props.onClick()
+  inputFor(tree, 'Say something in the lobby chat').props.onKeyDown({ key: 'Enter', preventDefault: () => {} })
+  assert.deepEqual(sends, ['chat say lets go'], 'three presses while it is on its way: one chat line')
+  assert.equal(drafts.chat, '', 'the box empties at the press, so there is nothing left to send again')
+  land({ ok: true, text: 'OK' })
+  tree = await settleTrips()
+  sends.length = 0
+
   // 1. A message the lobby refuses keeps its words in the box, in the server's own words; the
   // same message, once the lobby has taken it, clears the box.
   reset()
