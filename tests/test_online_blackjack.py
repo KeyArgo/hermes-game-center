@@ -249,6 +249,68 @@ def test_a_hand_being_played_is_not_left_in_the_middle(setup):
     assert rooms.state(room)["white_id"] == people["Ada"]["id"]
 
 
+def test_leaving_after_a_hand_does_not_resign_and_the_other_plays_on(setup):
+    """Blackjack stays open. One person getting up is not a win for the other."""
+    store, rooms, people, _root = setup
+    room = dealt(rooms, people)
+    while rooms.state(room)["phase"] == "play":
+        ada = rooms.picture(room, people["Ada"]["id"])
+        who = people["Ada"] if ada["permissions"]["can_move"] else people["Bea"]
+        answer = rooms.run(room, who, "move", ["stand"])
+        assert answer["ok"], answer["text"]
+    assert rooms.state(room)["phase"] == "bet"
+    assert int(rooms.state(room).get("plies") or 0) > 0
+    left = rooms.run(room, people["Ada"], "leave")
+    assert left["ok"], left["text"]
+    state = rooms.state(room)
+    assert state["status"] == "active", state["status"]
+    assert not state.get("white_id")
+    assert state["black_id"] == people["Bea"]["id"]
+    assert not store.room(room["id"])["closed"], "Bea is still at the table"
+    again = rooms.run(room, people["Bea"], "move", ["bet10"])
+    assert again["ok"], again["text"]
+    after = rooms.state(room)
+    assert after["status"] == "active"
+    assert after["hands"] >= 2 or after["phase"] == "play"
+
+
+def test_an_undealt_bet_is_refunded_when_someone_leaves(setup):
+    """A bet that has not been dealt is not a hand, so leaving gives it back."""
+    _store, rooms, people, _root = setup
+    room = pinned(rooms, people)
+    assert rooms.run(room, people["Ada"], "move", ["bet10"])["ok"]
+    assert rooms.state(room)["mid_round"] and rooms.state(room)["phase"] == "bet"
+    assert rooms.state(room)["stacks"][0] == 9990
+    left = rooms.run(room, people["Bea"], "leave")
+    assert left["ok"], left["text"]
+    state = rooms.state(room)
+    assert state["stacks"][0] == 10000, "Ada's un-dealt bet came back"
+    assert not state["mid_round"]
+    assert rooms.run(room, people["Ada"], "move", ["bet10"])["ok"], "Ada is not stuck waiting"
+    room = pinned(rooms, people)
+    assert rooms.run(room, people["Ada"], "move", ["bet10"])["ok"]
+    left = rooms.run(room, people["Ada"], "leave")
+    assert left["ok"], left["text"]
+    assert rooms.state(room)["stacks"][0] == 10000
+
+
+def test_leaving_slots_is_not_a_resignation(setup):
+    store, rooms, people, _root = setup
+    room, text = rooms.create("slots", people["Ada"], public=True)
+    assert room, text
+    state = rooms.state(room)
+    state["plies"] = 2
+    state["status"] = "active"
+    state["white"] = "human"
+    state["white_id"] = people["Ada"]["id"]
+    state["white_name"] = "Ada"
+    kit.write(rooms.folder(room["id"]), state)
+    answer = rooms.run(room, people["Ada"], "leave")
+    assert answer["ok"], answer["text"]
+    assert rooms.state(room)["status"] == "active"
+    assert not store.room(room["id"])["closed"] or not rooms.state(room).get("white_id")
+
+
 def test_resigning_is_refused_because_there_is_no_match(setup):
     store, rooms, people, _root = setup
     room = dealt(rooms, people)

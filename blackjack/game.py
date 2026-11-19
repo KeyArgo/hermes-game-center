@@ -379,16 +379,40 @@ def _two_seats(state: dict) -> int:
     return 2 if str(value).strip() == "2" else 1
 
 
+def _occupied_owners(state: dict) -> list[int]:
+    """Lobby seats that still have a person. A local table is not this list."""
+    if not _table_chips(state):
+        return []
+    found = []
+    if str(state.get("white_id") or ""):
+        found.append(0)
+    if str(state.get("black_id") or ""):
+        found.append(1)
+    return found
+
+
+def _lone_owner(state: dict) -> int | None:
+    """The one person left, when the other seat has got up. None when it is not that case."""
+    occupied = _occupied_owners(state)
+    if len(occupied) == 1:
+        return occupied[0]
+    return None
+
+
 def _table_players(state: dict) -> int:
     """How many people are really at the table.
 
     ``players=2`` is the shape a table is set up with: a second stack and a bet each. A lobby
     table is set up before anybody has sat in that seat, and a seat with nobody in it is not a
     second player - the host plays their own hand until a person sits down between hands.
+    The same is true the other way: if the first person gets up and the second stays, the
+    second person plays on alone instead of waiting for an empty seat.
     """
     if _two_seats(state) != 2:
         return 1
-    if _table_chips(state) and not str(state.get("black_id") or ""):
+    if _table_chips(state):
+        return 2 if len(_occupied_owners(state)) >= 2 else 1
+    if not str(state.get("black_id") or ""):
         return 1
     return 2
 
@@ -469,10 +493,27 @@ def _credit(state: dict, owner: int, amount: int) -> None:
 
 
 def _betting_owner(state: dict) -> int:
-    """Whose bet the table is waiting for: seat 0 first, then the guest."""
+    """Whose bet the table is waiting for: seat 0 first, then the guest.
+
+    One person left in the second seat bets from that seat, not from the empty one.
+    """
     if _table_players(state) != 2:
+        lone = _lone_owner(state)
+        if lone is not None:
+            return lone
         return 0
     return 1 if state.get("betting") == 1 else 0
+
+
+def refund_undealt(state: dict) -> None:
+    """Give back chips staked for a round that was never dealt."""
+    bets = _round_bets(state)
+    for owner, amount in enumerate(list(bets)):
+        if amount:
+            _credit(state, owner, int(amount))
+    state["round_bets"] = [0, 0]
+    state["mid_round"] = False
+    state["betting"] = 0
 
 
 def _round_bets(state: dict) -> list[int]:
@@ -995,16 +1036,24 @@ def _start_round(state: dict, bets: list[int]) -> str:
     state["dealer"] = []
     state["outcome"] = ""
     state["won"] = 0
-    state["bet"] = int(bets[0])
-    state["player_hands"] = [_make_hand([], int(bets[0]), player=0)]
     if two:
+        state["bet"] = int(bets[0])
+        state["player_hands"] = [_make_hand([], int(bets[0]), player=0)]
         state["player_hands"].append(_make_hand([], int(bets[1]), player=1))
         guest = _guest(state)
         guest["last_bet"] = int(bets[1])
+        state["base_bet"] = int(bets[0])
+    else:
+        owner = _lone_owner(state)
+        if owner is None:
+            owner = 0
+        stake = int(bets[owner] if owner < len(bets) else 0)
+        state["bet"] = stake
+        state["player_hands"] = [_make_hand([], stake, player=owner)]
+        state["base_bet"] = stake
     state["active_hand"] = 0
     # What the person chose is remembered for the whole round: a double or a split grows
     # the felt's wagers, and the next bet starts from this, not from them.
-    state["base_bet"] = int(bets[0])
     state["betting"] = 0
     state["mid_round"] = True
     state["phase"] = "play"
@@ -1040,8 +1089,9 @@ def _sync_turn(state: dict) -> None:
     """
     if _table_players(state) != 2 or kit.seat_kind(str(state.get("black") or "")) != "human":
         # One person at the table, or the local two-person screen where the second seat is the
-        # machine's: the move stays on the human side, as it always did.
-        state["turn"] = "white"
+        # machine's: the move stays on the human side, as it always did. The person who stayed
+        # in the second seat is that human side now.
+        state["turn"] = "black" if _lone_owner(state) == 1 else "white"
         return
     state["turn"] = "black" if _acting_owner(state) else "white"
 
@@ -1120,8 +1170,9 @@ def _play(state: dict, move) -> str:
                 state["note"] = (f"{_player_name(state, 0)} bets {amount:,}. "
                                  f"{_player_name(state, 1)} to bet.")
                 return state["note"]
-        else:
-            bets = [amount, 0]
+            return _start_round(state, bets)
+        bets = [0, 0]
+        bets[owner] = amount
         return _start_round(state, bets)
     if token == "hit":
         hand = _live_hand(state)
@@ -1306,7 +1357,12 @@ def _shown_players(state: dict, hands: list[dict], active: int, playing: bool) -
     bets = _round_bets(state)
     current = _owner(hands[active]) if hands and 0 <= active < len(hands) else -1
     saying = []
-    for owner in range(_table_players(state)):
+    if _table_players(state) == 2:
+        owners = (0, 1)
+    else:
+        lone = _lone_owner(state)
+        owners = (lone if lone is not None else 0,)
+    for owner in owners:
         mine = [hand for hand in hands if _owner(hand) == owner]
         results = [str(hand.get("result") or "") for hand in mine if hand.get("result")]
         net = sum(_hand_net(hand) for hand in mine)

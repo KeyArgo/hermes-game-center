@@ -336,10 +336,19 @@ class Rooms:
         state = self.state(room)
         if action == "leave" and room.get("game") == "blackjack":
             phase = str((state or {}).get("phase") or "")
-            if phase != "bet" or (state or {}).get("mid_round"):
+            if phase != "bet":
                 return {"ok": False,
                         "text": "Finish this hand, then leave the table.",
                         "finished": None}
+            # A chip on the felt before the deal is not a hand. Give it back, then
+            # the seat can be cleared. Otherwise the other person is stuck in mid_round.
+            bets = (state or {}).get("round_bets") or []
+            if (state or {}).get("mid_round") or any(isinstance(value, int) and not isinstance(value, bool) and value for value in bets):
+                module = self.games.get("blackjack")
+                refund = getattr(module, "refund_undealt", None) if module else None
+                if refund is not None:
+                    self._write_state(room, refund)
+                    state = self.state(room)
         if action == "resign" and room.get("game") == "blackjack":
             # A session table has no match to resign. Leaving is how a person gets up,
             # and that is a seat, not a result.
@@ -377,7 +386,7 @@ class Rooms:
         elif action == "draw":
             line = "draw accept" if args[:1] == ["accept"] else "draw"
         elif action == "leave" and self._seated(state, player["id"]) and state and state.get("status") == "active" \
-                and int(state.get("plies") or 0):
+                and int(state.get("plies") or 0) and str(room.get("game") or "") not in NO_COLOUR_SWAP:
             # The kit resigns and then clears the seat in one write, which would record the
             # result without the leaver. Resign on its own first so the record names them.
             resigned = self._command(room, player, "resign")
@@ -400,6 +409,11 @@ class Rooms:
         if action == "rematch" and answer.get("ok"):
             self._after_rematch(room)
         if action == "leave" and answer.get("ok"):
+            if str(room.get("game") or "") == "blackjack":
+                module = self.games.get("blackjack")
+                sync = getattr(module, "_sync_turn", None) if module else None
+                if sync is not None:
+                    self._write_state(room, sync)
             self._close_when_empty(room)
         return answer
 

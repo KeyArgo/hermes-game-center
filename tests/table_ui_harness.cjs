@@ -4843,6 +4843,33 @@ async function onlineTableContract() {
   assert.ok(words(tree).includes('Ada declined a rematch.'), 'and shows the closing sentence')
   assert.ok(findButton(tree, 'Back to games'), 'Back to games is the way out')
 
+  // Two people at online blackjack choose the next bet. One person still gets the timed deal.
+  const bjBase = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white',
+    hands: 1, next_bet: 10, mid_round: false, legal: ['bet10', 'bet25'],
+    permissions: { can_move: true }
+  }
+  const realTimeout = sandbox.setTimeout
+  const realClear = sandbox.clearTimeout
+  const betDelays = []
+  sandbox.setTimeout = (fn, ms) => { betDelays.push(ms); return betDelays.length }
+  sandbox.clearTimeout = () => {}
+  const pairRun = makeCtx(live({ ...bjBase, table_players: 2 }, { opponent: { name: 'Bea' } }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
+    game: { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true },
+    ctx: pairRun.ctx, roomId: 'r1', onBack: () => {}
+  })
+  assert.ok(!betDelays.includes(1600), 'a two-player table does not auto-bet: ' + betDelays.join(','))
+  betDelays.length = 0
+  const soloRun = makeCtx(live({ ...bjBase, table_players: 1 }, { opponent: { name: 'Bea' } }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
+    game: { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true },
+    ctx: soloRun.ctx, roomId: 'r1', onBack: () => {}
+  })
+  assert.ok(betDelays.includes(1600), 'one player still deals the next hand')
+  sandbox.setTimeout = realTimeout
+  sandbox.clearTimeout = realClear
+
   reset()
 
   // A room the server refuses is not opened, and the next Hall read does not ask again.

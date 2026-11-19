@@ -25261,9 +25261,12 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
-  // Blackjack deals the next hand on its own, for the same bet. Leave table is how a person gets up.
+  // One person at an online blackjack table deals the next hand for the same bet.
+  // Two people choose. A timed bet used to lock the round before either could leave.
   const dealtHand = useRef(0)
+  const crowd = Number((picture && picture.table_players) || 0)
   useEffect(() => {
+    if (crowd >= 2) return undefined
     const token = blackjackNextBet(picture)
     if (!token || !canMove) return undefined
     const hand = Number(picture.hands || 0)
@@ -25274,7 +25277,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       command('move', [token])
     }, BLACKJACK_NEXT_HAND_MS)
     return () => clearTimeout(timer)
-  }, [picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
+  }, [crowd, picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
 
   // Back, Close table, and a room the server has already closed all leave this
   // screen. The request is a courtesy. A refused leave, a dead socket, or no
