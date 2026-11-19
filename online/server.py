@@ -89,6 +89,8 @@ class App:
         self.data_root = Path(data_root)
         self.store = Store(self.data_root / "online.sqlite3")
         self.admin = admin.AdminAPI(self)
+        from online.doctor import install_recent_problems
+        install_recent_problems(log)
         self.rooms = Rooms(self.store, self.data_root, games=games, clock=clock)
         self.cards = game_cards(self.rooms.games)
         self.clock = clock
@@ -1523,6 +1525,7 @@ class App:
         app.router.add_get("/b/{bot}", self.index)
         app.router.add_get("/board.js", self.board_js)
         app.router.add_get("/api/health", self.health)
+        app.router.add_get("/admin/doctor", self.admin.doctor_page)
         app.router.add_route("*", "/api/admin/{path:.*}", self.admin.handle)
         app.router.add_post("/api/reports", self.report)
         app.router.add_get("/api/blocks", self.blocks)

@@ -138,6 +138,7 @@ The hooks return no text, so the prompt is untouched. The win bonus is a kit sin
 | `GET` | `/api/online/admin/user` | `online_admin_user` |
 | `GET` | `/api/online/admin/users` | `online_admin_users` |
 | `GET` | `/api/online/admin/audit` | `online_admin_audit` |
+| `GET` | `/api/online/admin/doctor` | `online_admin_doctor` |
 | `POST` | `/api/online/admin/action` | `online_admin_action` |
 | `POST` | `/api/online/report` | `online_report` |
 | `GET` | `/api/online/blocks` | `online_blocks` |

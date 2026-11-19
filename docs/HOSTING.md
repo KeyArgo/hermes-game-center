@@ -60,6 +60,29 @@ on loopback and put a reverse proxy in front.
 - Publishing a contact address for reports. `SECURITY.md` asks for private disclosure; a hosted service
   needs a real inbox behind it.
 
+## Troubleshooting a live server
+
+Two read-only doors, and neither one writes to the database or the journal.
+
+**On the machine, over ssh.** `tools/gc-server-doctor.sh` reads the target from
+`GC_SERVER_SSH` (required; the script says how to set it — nothing in this repo names a machine).
+`GC_SERVER_APP` is the directory that contains the `online` package (default
+`/opt/gameshelf-online/app`). `GC_SERVER_DATA` is the server's `--data` directory (default
+`/var/lib/gameshelf-online`, the path in the unit file). The script runs `python3 -m online.doctor`
+against that directory's `online.sqlite3`, opened with sqlite's `mode=ro`, then
+`journalctl -u gameshelf-online --since -1h` filtered to WARNING and ERROR lines.
+
+`python3 -m online.doctor --db PATH [--json]` prints open rooms (id, game, host, age, idle time,
+seats), recent presence when it is not inside the server process, looking and availability rows,
+open play requests, rooms the idle sweep would close, and the last 20 chat lines as id, author and
+time — never the text — plus counts.
+
+**In the browser, as staff.** `/admin/doctor` on the lobby is the same report, plus who is connected
+(the live lobby sockets) and the last warnings and errors this process has logged. It uses the staff
+key the admin routes already check (`Authorization` and `X-Staff-Key`); without them it answers 401.
+There is no new secret. The Admin tab in Game Center has a Doctor section that reads it through the
+same staff call (`GET /api/admin/doctor`).
+
 ## What hosting does not change
 
 Local play, the store, lessons, the ladder estimate and every single-player table keep working with

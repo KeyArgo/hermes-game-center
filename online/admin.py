@@ -528,6 +528,17 @@ class AdminAPI:
                 "INSERT OR REPLACE INTO old_names (name, player_id, until) VALUES (?, ?, ?)",
                 (old, player_id, time.time() + 30 * 86400))
 
+    async def doctor_page(self, request) -> "web.Response":
+        """GET /admin/doctor. The same two keys as every other staff route; HTML, read-only."""
+        _player, _row, refusal = self._who(request)
+        if refusal is not None:
+            return refusal
+        from aiohttp import web
+
+        from .doctor import render_html, report_for_app
+
+        return web.Response(text=render_html(report_for_app(self.app)), content_type="text/html")
+
     # -- one door --------------------------------------------------------------
 
     async def handle(self, request) -> "web.Response":
@@ -567,6 +578,9 @@ class AdminAPI:
                 except ValueError:
                     limit = 100
                 return web_json(self.audit(limit))
+            if head == "doctor" and len(parts) == 1:
+                from .doctor import report_for_app
+                return web_json(report_for_app(self.app))
             if head == "action" and len(parts) == 1 and request.method == "POST":
                 body = await read_body(request)
                 verdict = self.act(player, row, body)

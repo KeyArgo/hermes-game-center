@@ -2146,6 +2146,12 @@ def online_admin_users(q: str = "") -> dict[str, Any]:
     return _admin_answer(*source.admin("GET", "/api/admin/users?q=" + quote(str(q or ""), safe="")))
 
 
+@router.get("/online/admin/doctor")
+def online_admin_doctor() -> dict[str, Any]:
+    source, _ladder = _online_pair()
+    return _admin_answer(*source.admin("GET", "/api/admin/doctor"))
+
+
 @router.get("/online/admin/audit")
 def online_admin_audit(limit: int = 100) -> dict[str, Any]:
     source, _ladder = _online_pair()

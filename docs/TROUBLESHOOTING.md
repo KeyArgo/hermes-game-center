@@ -46,6 +46,7 @@ Real failure modes the code handles or the README already names, and what to do 
 | Sign-in fails after reinstalling | The recovery key is shown once and kept in Hermes's credential store. | Sign in with the key if you saved it, or create a new player. Game Center never writes the key to its own data folder; only the account file you choose to save holds it, in Downloads. |
 | **Let people invite me** is greyed out | The switch is drawn from the lobby socket, so it is held while there is nothing to write to. The sentence beside it says which: "Sign in above first." (no account on this computer) or "Lobby not connected — Retry". | Sign in under **Get online**, then press **Retry** beside the switch — the shelf dials at once, without waiting out a backoff. A sign-in, a Retry and opening the Games page all dial now; until this fix they left a waiting socket alone, so the switch could stay grey for a minute after signing in. |
 | A self-hosted lobby is refused | The plugin only sends to the `lobby_url` you set. | Point `lobby_url` at your server and see [HOSTING.md](HOSTING.md). |
+| A table or a person looks stuck on a lobby you run | The server can be read without changing it. | [HOSTING.md](HOSTING.md) — Troubleshooting a live server: `tools/gc-server-doctor.sh`, or `/admin/doctor` with the staff key. |
 
 ## The Champions tab and Experimental
 

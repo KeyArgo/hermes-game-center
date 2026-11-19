@@ -76,6 +76,7 @@ function AdminPage({ ctx, view, onBack }) {
   const [query, setQuery] = useState('')
   const [newName, setNewName] = useState('')
   const [problem, setProblem] = useState('')
+  const [doctor, setDoctor] = useState(null)
   const role = staff.role
 
   const load = useCallback(async () => {
@@ -99,6 +100,16 @@ function AdminPage({ ctx, view, onBack }) {
   useEffect(() => {
     if (where === 'audit' || where === 'team') load()
   }, [where, load])
+  // The lobby's own read-only doctor. Same staff call as the rest of this tab; the page on the
+  // server is /admin/doctor, and this is the link to it from here.
+  useEffect(() => {
+    if (where !== 'doctor' || !role || !ctx || typeof ctx.rest !== 'function') return undefined
+    let alive = true
+    ctx.rest('/online/admin/doctor').then(answer => { if (alive) setDoctor(answer || null) }).catch(() => {
+      if (alive) setDoctor({ ok: false, text: 'The lobby could not be reached.' })
+    })
+    return () => { alive = false }
+  }, [where, role, version, ctx])
 
   const run = useCallback(async payload => {
     setBusy(true)
@@ -155,7 +166,7 @@ function AdminPage({ ctx, view, onBack }) {
     })
   }
 
-  const places = [['reports', 'Reports'], ['lookup', 'Look up'], ['audit', 'Audit log'], ['team', 'Team']]
+  const places = [['reports', 'Reports'], ['lookup', 'Look up'], ['audit', 'Audit log'], ['team', 'Team'], ['doctor', 'Doctor']]
   const reportCards = (reports || []).map(row => adminCard([
     jsxs('div', {
       style: { display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
@@ -289,6 +300,38 @@ function AdminPage({ ctx, view, onBack }) {
                   : null
               ]
             }))
+        ]
+      }) : null,
+
+      where === 'doctor' ? jsxs('div', {
+        'data-admin-doctor': '1',
+        style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 },
+        children: [
+          adminMuted('Read-only, from the lobby\u2019s /admin/doctor page. Chat text is not included.'),
+          !doctor ? adminMuted('Reading the server\u2026') : doctor.ok === false ? adminMuted(doctor.text || 'The doctor could not be read.') : jsxs('div', {
+            style: { display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 },
+            children: [
+              heading('Open rooms'),
+              ...((doctor.rooms || []).map(room => adminMuted(
+                `${room.game || '?'} \u00b7 ${(room.seats || []).map(seat => seat.name || seat.kind || 'empty').join(', ') || 'no seats'} \u00b7 ${room.status || 'unknown'} \u00b7 ${room.finished_open ? 'finished, still open' : 'not a finished game'}`
+              ))),
+              !(doctor.rooms || []).length ? adminMuted('No open rooms.') : null,
+              heading('Who is connected'),
+              ...((((doctor.presence || {}).players) || []).map(person => adminMuted(person.name || '?'))),
+              !(((doctor.presence || {}).players) || []).length ? adminMuted('Nobody connected.') : null,
+              heading('Looking'),
+              ...((doctor.looking || []).map(row => adminMuted(`${row.name || '?'} \u00b7 ${row.game}`))),
+              !(doctor.looking || []).length ? adminMuted('Nobody looking.') : null,
+              heading('Availability'),
+              ...((doctor.availability || []).map(row => adminMuted(`${row.name || '?'} \u00b7 ${row.open ? 'open' : 'closed'} \u00b7 ${(row.games || []).join(', ') || 'no games'}`))),
+              heading('Open play requests'),
+              ...((doctor.requests || []).map(row => adminMuted(`${row.from_name || '?'} \u2192 ${row.to_name || '?'} \u00b7 ${row.game}`))),
+              !(doctor.requests || []).length ? adminMuted('No open requests.') : null,
+              heading('Last server errors'),
+              ...((doctor.errors || []).map(row => adminMuted(`${row.level || ''} ${row.message || ''}`))),
+              !(doctor.errors || []).length ? adminMuted('No errors in this process.') : null
+            ]
+          })
         ]
       }) : null,
 
