@@ -24160,6 +24160,16 @@ function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busy
 // the requests you have open.
 const HALL_POLL_MS = 3000
 
+// Rooms this person has backed out of. The Hall is unmounted while a table is on screen
+// and mounted again by Back, with an empty "already opened" set, so a seat the lobby
+// still remembers would open the same room again. This set survives that remount.
+const HALL_LEFT = new Set()
+
+function markHallLeft(roomId) {
+  const room = String(roomId == null ? '' : roomId)
+  if (room) HALL_LEFT.add(room)
+}
+
 // post() lets one Hall action through at a time. Every other control on the panel is held
 // while that one is out — and says so on hover, rather than looking pressable and being ignored.
 const HALL_BUSY_NOTE = 'Another Hall action is still going through. Wait for it, then try again.'
@@ -24245,7 +24255,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // for again.
   useEffect(() => {
     const room = seated && seated.room_id ? String(seated.room_id) : ''
-    if (!room || handled.current.has(room)) return
+    // A room this person already left, or one whose game is over, is not a new seat.
+    // Remounting the Hall must not walk them back into it.
+    const seatOver = seated && (seated.finished
+      || ['win', 'draw', 'resigned', 'abandoned', 'done'].includes(String(seated.status || '')))
+    if (!room || HALL_LEFT.has(room) || seatOver || handled.current.has(room)) return
     handled.current.add(room)
     ;(async () => {
       let answer = null
@@ -25000,6 +25014,27 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
+  // Back leaves the room. Hiding the table used to leave the seat in the Hall, and the
+  // Hall, mounted again on the way out, opened that same room.
+  const stepAway = async () => {
+    if (busy) return
+    setBusy(true)
+    const room = String((table && table.room_id) || roomId || '')
+    markHallLeft(room)
+    try {
+      if (ctx && typeof ctx.rest === 'function') {
+        await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
+        await ctx.rest('/online/table/close', { method: 'POST' })
+      }
+    } catch (error) {
+      // The screen still goes back: the seat is marked left either way.
+    }
+    rememberOnlineRoom('')
+    if (alive.current) setBusy(false)
+    if (onBack) onBack()
+    else if (onClose) onClose()
+  }
+
   // Putting the table away is not resigning and not closing the match: the room stays on the
   // lobby server. So it is one press, with no question asked.
   const putAway = async () => {
@@ -25020,7 +25055,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 10, borderBottom: `1px solid ${stroke}` },
     children: [
       jsxs('div', { style: { display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }, children: [
-        button('Back', () => onBack && onBack()),
+        button('Back', stepAway),
         jsxs('div', { style: { minWidth: 0 }, children: [
           jsx('div', { style: { fontSize: 20, fontWeight: 700 }, children: (game && game.title) || (picture && picture.game) || 'Online table' }),
           jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: opponentLine })
@@ -25069,7 +25104,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         jsx('div', { className: 'games-result-why', style: { fontSize: 13, color: text.secondary }, children: `You vs ${opponent}, on the lobby server` }),
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
           // One name per control on this screen: the header already carries Close table.
-          button('Back to games', () => { rememberOnlineRoom(''); if (onBack) onBack() }, { primary: true })
+          button('Back to games', stepAway, { primary: true })
         ] }),
         textLink('Look at the board', () => setResultShown(false))
       ]

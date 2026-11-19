@@ -282,6 +282,27 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
+  // Back leaves the room. Hiding the table used to leave the seat in the Hall, and the
+  // Hall, mounted again on the way out, opened that same room.
+  const stepAway = async () => {
+    if (busy) return
+    setBusy(true)
+    const room = String((table && table.room_id) || roomId || '')
+    markHallLeft(room)
+    try {
+      if (ctx && typeof ctx.rest === 'function') {
+        await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
+        await ctx.rest('/online/table/close', { method: 'POST' })
+      }
+    } catch (error) {
+      // The screen still goes back: the seat is marked left either way.
+    }
+    rememberOnlineRoom('')
+    if (alive.current) setBusy(false)
+    if (onBack) onBack()
+    else if (onClose) onClose()
+  }
+
   // Putting the table away is not resigning and not closing the match: the room stays on the
   // lobby server. So it is one press, with no question asked.
   const putAway = async () => {
@@ -302,7 +323,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 10, borderBottom: `1px solid ${stroke}` },
     children: [
       jsxs('div', { style: { display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }, children: [
-        button('Back', () => onBack && onBack()),
+        button('Back', stepAway),
         jsxs('div', { style: { minWidth: 0 }, children: [
           jsx('div', { style: { fontSize: 20, fontWeight: 700 }, children: (game && game.title) || (picture && picture.game) || 'Online table' }),
           jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: opponentLine })
@@ -351,7 +372,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         jsx('div', { className: 'games-result-why', style: { fontSize: 13, color: text.secondary }, children: `You vs ${opponent}, on the lobby server` }),
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
           // One name per control on this screen: the header already carries Close table.
-          button('Back to games', () => { rememberOnlineRoom(''); if (onBack) onBack() }, { primary: true })
+          button('Back to games', stepAway, { primary: true })
         ] }),
         textLink('Look at the board', () => setResultShown(false))
       ]

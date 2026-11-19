@@ -1090,3 +1090,38 @@ def test_the_worker_dials_with_the_key_the_request_could_read(monkeypatch):
     finally:
         hall.stop()
     assert any(m.get("t") == "auth" for m in sent), "the worker never dialled with the key: %r" % sent
+
+
+def test_leaving_a_table_drops_the_hall_seat(monkeypatch):
+    """Back posts leave, and the Hall must forget that seat or the next mount opens it."""
+    import types
+
+    from dashboard import plugin_api
+
+    hall = plugin_api.online_hall.Hall(types.SimpleNamespace(on=False, key=lambda: "", url="http://127.0.0.1:9"))
+    hall._seated = {"room_id": "room-1", "game": "connect4", "side": "white", "opponent": "Bea"}
+
+    class Table:
+        def command(self, action, args):
+            assert action == "leave"
+            return {"ok": True, "text": "Left.", "picture": {"status": "active"}}
+
+        def snapshot(self):
+            return {"room_id": "room-1", "picture": {"status": "win", "game": "connect4"}}
+
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (hall.online, None))
+    monkeypatch.setattr(plugin_api, "_online_hall", lambda src: hall)
+    monkeypatch.setattr(plugin_api, "_online_table", lambda src: Table())
+
+    # A different room is not this seat.
+    hall.drop_seat("other-room")
+    assert hall.snapshot()["seated"]["room_id"] == "room-1"
+
+    answer = plugin_api.online_table_cmd({"action": "leave", "args": []})
+    assert answer["ok"]
+    assert hall.snapshot()["seated"] is None, "leave drops the seat the Hall would reopen"
+
+    hall._seated = {"room_id": "room-1", "game": "connect4"}
+    viewed = plugin_api.online_table_view()
+    assert viewed["table"]["picture"]["status"] == "win"
+    assert hall.snapshot()["seated"] is None, "a finished table drops the seat too"

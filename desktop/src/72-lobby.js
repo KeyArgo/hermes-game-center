@@ -304,6 +304,16 @@ function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busy
 // the requests you have open.
 const HALL_POLL_MS = 3000
 
+// Rooms this person has backed out of. The Hall is unmounted while a table is on screen
+// and mounted again by Back, with an empty "already opened" set, so a seat the lobby
+// still remembers would open the same room again. This set survives that remount.
+const HALL_LEFT = new Set()
+
+function markHallLeft(roomId) {
+  const room = String(roomId == null ? '' : roomId)
+  if (room) HALL_LEFT.add(room)
+}
+
 // post() lets one Hall action through at a time. Every other control on the panel is held
 // while that one is out — and says so on hover, rather than looking pressable and being ignored.
 const HALL_BUSY_NOTE = 'Another Hall action is still going through. Wait for it, then try again.'
@@ -389,7 +399,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // for again.
   useEffect(() => {
     const room = seated && seated.room_id ? String(seated.room_id) : ''
-    if (!room || handled.current.has(room)) return
+    // A room this person already left, or one whose game is over, is not a new seat.
+    // Remounting the Hall must not walk them back into it.
+    const seatOver = seated && (seated.finished
+      || ['win', 'draw', 'resigned', 'abandoned', 'done'].includes(String(seated.status || '')))
+    if (!room || HALL_LEFT.has(room) || seatOver || handled.current.has(room)) return
     handled.current.add(room)
     ;(async () => {
       let answer = null

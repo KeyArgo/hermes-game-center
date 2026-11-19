@@ -1762,17 +1762,37 @@ def online_table_open(body: dict | None = None) -> dict[str, Any]:
     return _online_table(source).open((body or {}).get("room_id"))
 
 
+# A finished online game is not a seat the Hall should open again. The lobby sends
+# `seated` once, when the match is made, and never takes it back.
+_SEAT_OVER = {"win", "draw", "resigned", "abandoned", "done"}
+
+
+def _drop_finished_seat(source, table: dict | None) -> None:
+    picture = (table or {}).get("picture") if isinstance(table, dict) else None
+    status = str((picture or {}).get("status") or "") if isinstance(picture, dict) else ""
+    if status in _SEAT_OVER:
+        _online_hall(source).drop_seat(str((table or {}).get("room_id") or "") or None)
+
+
 @router.get("/online/table")
 def online_table_view() -> dict[str, Any]:
     source, _ = _online_pair()
-    return {"table": _online_table(source).snapshot() or None}
+    table = _online_table(source).snapshot() or None
+    _drop_finished_seat(source, table)
+    return {"table": table}
 
 
 @router.post("/online/table/cmd")
 def online_table_cmd(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
-    return _online_table(source).command(body.get("action"), body.get("args", []))
+    answer = _online_table(source).command(body.get("action"), body.get("args", []))
+    # Leaving is the end of this seat. A finished picture is too: Back must not
+    # find it still waiting and open the same room again.
+    if str(body.get("action") or "") == "leave" and answer.get("ok"):
+        _online_hall(source).drop_seat()
+    _drop_finished_seat(source, {"picture": answer.get("picture"), "room_id": ""})
+    return answer
 
 
 @router.post("/online/table/chat")

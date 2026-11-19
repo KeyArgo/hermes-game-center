@@ -4621,6 +4621,56 @@ async function onlineTableContract() {
 
   evaluate("rememberOnlineRoom('')")
   reset()
+
+  // 12. Back on a finished online table leaves the room, and a Hall remount does not open it again.
+  const finishedRoom = 'finished-c4'
+  const backed = []
+  const finishedRun = makeCtx(live(wonPicture, { room_id: finishedRoom, finished: true }))
+  const leftProps = {
+    game, ctx: finishedRun.ctx, roomId: finishedRoom, onBack: () => backed.push('back')
+  }
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', leftProps)
+  assert.ok(nodes(tree).some(node => node.props.className === 'games-result'), 'the finished online table is still the online table')
+  findButton(tree, 'Back').props.onClick()
+  await tick()
+  const left = finishedRun.asked.filter(item => item[0] === '/online/table/cmd').pop()
+  assert.equal(left[1].body.action, 'leave', 'Back posts leave to the room')
+  assert.ok(finishedRun.asked.some(item => item[0] === '/online/table/close'), 'and closes the table here')
+  assert.equal(backed.pop(), 'back', 'then the screen goes back')
+  assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'the room is forgotten here')
+  assert.equal(evaluate(`HALL_LEFT.has('${finishedRoom}')`), true, 'and the Hall is told that room was left')
+  // The Hall mounts again (Back unmounted it) and the lobby still has the old seat.
+  reset()
+  const replayed = []
+  const hallCtx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path, options) => {
+      replayed.push([path, options || null])
+      if (path === '/online/hall') {
+        return { state: 'live', you: { id: 'me', name: 'Ada' }, prefs: { open: true, games: {} },
+          roster: [], requests: [], seated: { room_id: finishedRoom, game: 'connect4' } }
+      }
+      return { ok: true }
+    }
+  }
+  sandbox.hallProps = { ctx: hallCtx, current: 'connect4', view: { online: { on: true } }, onPlayHere: match => replayed.push(['play', match]) }
+  cursor = 0
+  evaluate('LobbyHall(hallProps)')
+  effects.forEach(effect => effect())
+  effects = []
+  await tick()
+  cursor = 0
+  evaluate('LobbyHall(hallProps)')
+  effects.forEach(effect => effect())
+  effects = []
+  await tick()
+  assert.equal(replayed.filter(item => item[0] === '/online/table/open').length, 0,
+    'a Hall remount does not open a room this person already left')
+  assert.equal(replayed.filter(item => item[0] === 'play').length, 0, 'and does not hand that room back to the page')
+
+  evaluate("rememberOnlineRoom('')")
+  reset()
   console.log('online table in the plugin: the server board, one command route, the table chat on one route, no local move: passed')
 }
 

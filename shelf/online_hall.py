@@ -266,6 +266,20 @@ class Hall:
                 data["error"] = self._error
             return data
 
+    def drop_seat(self, room_id: str | None = None) -> None:
+        """Forget a seat the person left, or a room whose game has finished.
+
+        The lobby sends ``seated`` once, when the match is made, and nothing later
+        takes it back. Leaving it in place meant Back threw the Hall away and the
+        new Hall opened that same room again.
+        """
+        with self._lock:
+            if not self._seated:
+                return
+            if room_id and str(self._seated.get("room_id") or "") != str(room_id):
+                return
+            self._seated = None
+
     # Client frames -----------------------------------------------------------
 
     def send(self, frame: dict) -> dict:
