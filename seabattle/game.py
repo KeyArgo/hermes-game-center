@@ -380,11 +380,13 @@ def picture(state, player=None):
             side = "white"
         elif pid == black_id:
             side = "black"
-    if not side:
+    if not side and pid is None:
         # A finished game, or a read with no player attached, still has to know whose fleet this
         # is. Without it every shot looked like the enemy's: a sinking was announced as theirs
         # and the player never heard or saw their own hit. One human seat is the person; one
         # machine seat means the other side is the person; two human seats stay colourless.
+        # A viewer who was named and holds no seat is a watcher: the guess above would hand them
+        # the fleet of whoever is sitting there, which is exactly the game's private information.
         humans = [seat for seat in ("white", "black") if kit.seat_kind(str(state.get(seat) or "")) == "human"]
         if len(humans) == 1:
             side = humans[0]

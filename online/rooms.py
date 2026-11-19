@@ -235,7 +235,10 @@ class Rooms:
 
     def picture(self, room: dict, player_id: str) -> dict:
         try:
-            pictured = self.table(room).picture() or {}
+            # Who is looking goes to the table: a game that hides information per seat
+            # (Sea Battle's two fleets) can only draw the right one for someone.
+            viewer = person({"id": player_id, "name": ""}) if player_id else None
+            pictured = self.table(room).picture(player=viewer) or {}
         except ValueError:
             # A room row whose id is not a folder name has no picture. Broadcast walks
             # every connection; one bad row must not end the pass.
