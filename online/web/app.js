@@ -668,6 +668,7 @@ const REQUESTABLE_GAMES = [
   ['hex', 'Hex'],
   ['breakthrough', 'Breakthrough'],
   ['seabattle', 'Sea Battle'],
+  ['blackjack', 'Blackjack'],
 ]
 const REQUESTABLE_IDS = REQUESTABLE_GAMES.map(item => item[0])
 const REQUESTABLE_SET = new Set(REQUESTABLE_IDS)

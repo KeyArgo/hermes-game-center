@@ -6764,7 +6764,7 @@ async function lobbyAsksContract() {
   tree = await settle(props({ ctx: run.ctx }))
   const perGame = nodes(tree).filter(node => node.props && node.props['data-hall-game'] !== undefined)
   assert.deepEqual(perGame.map(node => node.props['data-hall-game']),
-    ['connect4', 'reversi', 'checkers', 'gomoku', 'chessboard', 'go', 'hex', 'breakthrough', 'seabattle'],
+    ['connect4', 'reversi', 'checkers', 'gomoku', 'chessboard', 'go', 'hex', 'breakthrough', 'seabattle', 'blackjack'],
     'every two-player game the server can seat has a switch')
   for (const [, label] of evaluate('LOBBY_GAMES')) {
     assert.ok(words(tree).includes(label), `the switches are labelled: ${label} missing`)
@@ -6818,7 +6818,7 @@ async function lobbyAsksContract() {
   }
   const findPosts = () => findAsked.map(item => item[1])
   tree = drawFind([])
-  assert.equal(chips(tree).length, 10, 'a chip per game, plus All games')
+  assert.equal(chips(tree).length, 11, 'a chip per game, plus All games')
   for (const [id, label] of evaluate('LOBBY_GAMES')) {
     assert.ok(words(chipFor(tree, id)).includes(label), `the chip for ${label} wears its label`)
   }

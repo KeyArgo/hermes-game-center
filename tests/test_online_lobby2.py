@@ -236,6 +236,42 @@ def test_find_match_pairs_two_people_looking_for_the_same_game(world):
     run(scenario())
 
 
+def test_find_match_can_seat_a_blackjack_table(world):
+    """Find match is how two PCs meet for Blackjack: the offer it makes opens the two-seat table."""
+    _store, rooms, people, _clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        assert (await look(service, ada, ["blackjack"]))["ok"]
+        assert offers(hub) == [], "one person looking is not a match"
+        assert (await look(service, bea, ["blackjack"]))["ok"]
+        told = offers(hub)
+        assert {pid for pid, _card in told} == {ada["id"], bea["id"]}, "the offer reaches both"
+        card = told[0][1]
+        assert card["game"] == "blackjack" and card["offer"] is True
+        hub.sent.clear()
+        joined = await service.handle(bea, {"t": "respond", "id": card["id"], "accept": True})
+        assert joined["ok"], joined["text"]
+        seated = {frame["room_id"] for _pid, frame in hub.sent if frame.get("t") == "seated"}
+        assert len(seated) == 1, "both people are told about one table"
+        room = rooms.store.room(seated.pop())
+        state = rooms.state(room)
+        assert room["game"] == "blackjack"
+        # An offer has no asker, so either person may be the seat that opened the table;
+        # what matters is that seat 2 is the other person and nobody else is in the room.
+        assert {str(state["white_id"]), str(state["black_id"])} == {ada["id"], bea["id"]}
+        assert state["white_id"] != state["black_id"], "one person per seat"
+        assert state["players"] == 2
+        for who in (ada, bea):
+            pictured = rooms.picture(room, who["id"])
+            assert pictured["your_seat"] in (0, 1)
+            assert pictured["seats"][pictured["your_seat"]]["id"] == who["id"], "each person in their own seat"
+            assert pictured["table_players"] == 2
+
+    run(scenario())
+
+
 def test_find_match_pairs_with_someone_open_to_requests_and_either_can_join(world):
     store, _rooms, people, _clock, hub, service = world
 
@@ -365,7 +401,8 @@ def test_find_match_takes_every_game_at_once(world):
         told = offers(hub)
         assert {pid for pid, _ in told} == {ada["id"], bea["id"]}
         assert {card["game"] for _pid, card in told} == {"seabattle"}
-        assert (await look(service, ada, ["blackjack"]))["ok"] is False
+        # Slots has no table to sit at, so it is not a game find match can look for.
+        assert (await look(service, ada, ["slots"]))["ok"] is False
         assert (await look(service, ada, []))["ok"] is False
 
     run(scenario())

@@ -148,18 +148,19 @@ def test_bots_cannot_request(world):
     run(scenario())
 
 
-def test_blackjack_and_slots_refused(world):
+def test_slots_cannot_be_requested(world):
     store, _rooms, people, _clock, hub, service = world
 
     async def scenario():
         ada, bea = people["Ada"], people["Bea"]
         await open_up(service, hub, ada, bea)
-        blackjack = await ask(service, ada, bea, "blackjack")
         slots = await ask(service, ada, bea, "slots")
-        assert not blackjack["ok"] and not slots["ok"]
-        assert blackjack["text"] == slots["text"]
-        assert "cannot be requested" in blackjack["text"]
-        assert store.db.execute("SELECT COUNT(*) FROM play_requests").fetchone()[0] == 0
+        assert not slots["ok"]
+        assert "cannot be requested" in slots["text"]
+        # Blackjack is a table two people can sit at, so it is asked for like the board games.
+        blackjack = await ask(service, ada, bea, "blackjack")
+        assert blackjack["ok"], blackjack["text"]
+        assert store.db.execute("SELECT COUNT(*) FROM play_requests").fetchone()[0] == 1
 
     run(scenario())
 
@@ -547,5 +548,47 @@ def test_rest_twins(tmp_path):
             assert play_requests.service is server.requests
         finally:
             await client.close()
+
+    run(scenario())
+
+
+def test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer(world):
+    """Blackjack is a game two people can ask each other for (owner, 2026-11-18).
+
+    The table a request opens must be the online blackjack table and nothing else: both seats
+    human, the asker in the first seat, the person who accepted beside them, and a 10,000-chip
+    stack of each person's own kept in the table state rather than in anybody's wallet.
+    """
+    store, rooms, people, _clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        await open_up(service, hub, ada, bea)
+        ack = await ask(service, ada, bea, "blackjack")
+        assert ack["ok"], ack["text"]
+        rid = service.pending_for(ada["id"])[0]["id"]
+        hub.sent.clear()
+        accepted = await service.handle(bea, {"t": "respond", "id": rid, "accept": True})
+        assert accepted["ok"], accepted["text"]
+        seated = {frame["room_id"] for _pid, frame in hub.sent if frame.get("t") == "seated"}
+        assert len(seated) == 1, "both people are told about one table"
+        room = store.room(seated.pop())
+        assert room["game"] == "blackjack"
+        state = rooms.state(room)
+        assert state["white_id"] == ada["id"], "the person who asked keeps the first seat"
+        assert state["black_id"] == bea["id"], "the person who accepted sits beside them"
+        assert state["players"] == 2, "the table is set up with a seat for each person"
+
+        for who, seat in ((ada, 0), (bea, 1)):
+            pictured = rooms.picture(room, who["id"])
+            assert [item["kind"] for item in pictured["seats"]] == ["human", "human"]
+            assert pictured["table_players"] == 2
+            assert pictured["your_seat"] == seat
+            assert pictured["table_chips"] is True
+            assert pictured["players"][seat]["chips"] == 10000, "each person keeps their own stack"
+            assert all(item["wallet"] is False for item in pictured["players"]), "no wallet at a lobby table"
+            assert pictured["permissions"]["can_manage"] is (seat == 0)
+            assert pictured["permissions"]["can_move"] is (seat == 0), "the first bet is the host's"
+        assert not (rooms.folder(room["id"]) / "wallet.json").exists(), "a lobby table never opens a wallet"
 
     run(scenario())

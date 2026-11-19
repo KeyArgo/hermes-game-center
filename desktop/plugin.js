@@ -23468,14 +23468,15 @@ const LOBBY_GAMES = [
   ['go', 'Go'],
   ['hex', 'Hex'],
   ['breakthrough', 'Breakthrough'],
-  ['seabattle', 'Sea Battle']
+  ['seabattle', 'Sea Battle'],
+  ['blackjack', 'Blackjack']
 ]
 const LOBBY_GAME_IDS = LOBBY_GAMES.map(item => item[0])
 const LOBBY_TITLES = Object.fromEntries(LOBBY_GAMES)
 const lobbyTitle = id => LOBBY_TITLES[id] || id
 
 // A lobby post stays readable for 30 days: that is how long the server keeps the #games chat
-// (online/server.py CHAT_DAYS), so this screen never hides a line the server still has.
+// (online/server.py CHAT_KEEP_DAYS), so this screen never hides a line the server still has.
 const LOBBY_POST_MS = 30 * 24 * 3600 * 1000
 
 // "08-04 21:35" - the date and the time on every post, in this computer's own clock.
@@ -23487,7 +23488,8 @@ function lobbyStamp(at) {
   return `${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}`
 }
 
-// Only lines this screen can date, and only ones from the last day.
+// Only lines this screen can date, and only ones the server still keeps: the lobby chat is
+// thirty days old at most (online/server.py CHAT_KEEP_DAYS), and LOBBY_POST_MS is the same window.
 function freshLobbyLines(lines) {
   const now = Date.now()
   return (Array.isArray(lines) ? lines : []).filter(item =>

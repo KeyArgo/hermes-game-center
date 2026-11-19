@@ -152,6 +152,39 @@ def _level_note(rules, state) -> str:
         return ""
 
 
+def _public_hook(rules):
+    """The game's own answer to "may every viewer read this move?", if it has one.
+
+    A game with no such hook keeps its whole move list public, exactly as before:
+    only a game that hides information per seat needs to name what stays private.
+    """
+    public = getattr(rules, "public_move", None)
+    return public if callable(public) else None
+
+
+def _public_move(public, shown) -> bool:
+    """Whether one shown move may be sent to every viewer. Unknown means no.
+
+    A hook that raises cannot answer for the move, and a leaked placement is
+    worse than a missing line, so the move is dropped.
+    """
+    try:
+        return bool(public(str(shown)))
+    except Exception:
+        log.debug("public_move could not judge %r", shown, exc_info=True)
+        return False
+
+
+def _public_refusal(public, record: dict) -> bool:
+    """A refusal record says the proposed move and the played one: keep it only if both are public."""
+    played = str(record.get("played") or "")
+    if played and not _public_move(public, played):
+        return False
+    said = [str((item or {}).get("proposed") or "") for item in record.get("proposals") or []
+            if isinstance(item, dict)]
+    return all(_public_move(public, text) for text in said if text)
+
+
 def _level_choices(levels: tuple[str, ...], labels: dict[str, str] | None = None) -> str:
     # The ids, not the labels: this sentence is read by a person typing a level
     # name ("level=normal"), and by the tests that quote the default three.
@@ -1621,6 +1654,20 @@ class Table:
             }
             state.update(self.rules.fresh())
         assert state is not None
+        public = _public_hook(self.rules)
+        viewer = str(getattr(player, "id", "") or "") if player is not None else ""
+        # Whose plies the viewer may read in full. A turn seat bound to nobody (a
+        # shared keyboard, a one-human table) leaves this empty: that state file
+        # is on the person's own machine, so nothing is being sent anywhere.
+        turn_id = str(state.get(f"{state.get('turn')}_id") or "")
+        moves = list(state.get("moves", []))
+        last = str(state.get("last") or "")
+        refusals = [dict(record) for record in state.get("refusals") or []]
+        if public:
+            moves = [shown for shown in moves if _public_move(public, shown)]
+            if last and not _public_move(public, last):
+                last = ""
+            refusals = [record for record in refusals if _public_refusal(public, record)]
         params = inspect.signature(fn).parameters
         pictured: dict = dict(fn(state, **({"player": player} if "player" in params else {})))
         offered = game_levels(self.rules)
@@ -1629,10 +1676,10 @@ class Table:
             "table_id": state.get("table_id", ""),
             "owner_id": state.get("owner_id", ""),
             "plies": int(state.get("plies") or 0),
-            "moves": list(state.get("moves", [])),
+            "moves": moves,
             # The moves the referee refused, so the table can badge the ply where
             # the built-in player had to move for a model.
-            "refusals": [dict(record) for record in state.get("refusals") or []],
+            "refusals": refusals,
             "score": dict(state.get("score", {"white": 0, "black": 0, "draws": 0})),
             "rematch": state.get("rematch", {"requested_by": []}),
             "draw_offer": state.get("draw_offer", ""),
@@ -1664,7 +1711,7 @@ class Table:
             "result_detail": str(state.get("result_detail") or ""),
             # False for a game that cannot end level (Hex, Breakthrough, Go with komi).
             "draws_allowed": bool(getattr(self.rules, "DRAWS", True)),
-            "last": str(state.get("last") or ""),
+            "last": last,
             "white": "White" if preview else seat_line(state, "white"),
             "black": "Black" if preview else seat_line(state, "black"),
             # The plain words for the two sides, so the table can say "Red pieces" in
@@ -1691,4 +1738,11 @@ class Table:
         pictured["draws"] = getattr(self.rules, "DRAWS", True) is not False
         if preview or pictured.get("status") != "active":
             pictured["legal"] = []
+        elif public and viewer and turn_id and turn_id != viewer:
+            # The mover's list is their own: the other seat and any watcher get
+            # only the moves that are public anyway, not every placement the
+            # mover could make next. A read with no viewer at all is the machine
+            # that owns the state file, which already holds both fleets.
+            pictured["legal"] = [shown for shown in pictured.get("legal") or []
+                                 if _public_move(public, shown)]
         return pictured

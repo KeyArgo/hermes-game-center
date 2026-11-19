@@ -6,6 +6,29 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Blackjack can be asked for in Find match.** `online/requests.py` `REQUESTABLE` listed every board
+  game and left blackjack out, so a Find match chip for it could not exist and neither the desktop
+  lobby nor the website's Hall offered one - two PCs could not meet for Blackjack, which is the owner's
+  own test (owner, 2026-11-18). Blackjack is on the chips now, in `REQUESTABLE`, in
+  `desktop/src/72-lobby.js` `LOBBY_GAMES` and in the website's `REQUESTABLE_GAMES`; the matched table is
+  the two-seat blackjack one T9 built (both seats human, the person who asked in the first seat, the
+  other beside them, a 10,000-chip stack of each person's own inside the table and no wallet opened).
+  Slots stays out: it has no table to sit at. Also: the lobby comment said the server's chat constant is
+  `CHAT_DAYS`; it is `CHAT_KEEP_DAYS`. Guards: `tests/test_online_requests.py`
+  (`test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer`,
+  `test_slots_cannot_be_requested`), `tests/test_online_lobby2.py`
+  (`test_find_match_can_seat_a_blackjack_table`, and the two list-mirroring tests) and
+  `tests/table_ui_harness.cjs`.
+- **A Sea Battle fleet no longer leaks through the move list.** The boards were drawn per viewer, but
+  every ply is written down as its text, and the picture handed the whole list - plus the mover's own
+  legal list - to the other seat and to anybody watching. `place carrier b2 h` is a fleet, so the other
+  player could rebuild one from moves alone (huddle round 9, found in `kit.py` `Table.picture`). A game
+  can now define `public_move(text) -> bool` and the kit drops every ply it calls private from `moves`,
+  blanks `last` when it is private, drops a refusal record that names a private proposal, and gives a
+  named viewer who is not the seat to move only the public entries of `legal`. Sea Battle's answer is
+  `fire …` and nothing else. Games without the hook are unchanged. Guards:
+  `tests/test_seabattle_private_moves.py` (Black and a watcher hold no placement and no fleet hull
+  mid-placement, White still gets her own next placements, and both keep every shot).
 - **The over-chat slot rests when nothing is happening.** The status chip that feeds the see-through
   machine asked the shelf for `/jackpot` every 600 ms for as long as it was mounted - about a hundred
   reads a minute of a file that only changes while a turn runs, per view of the machine, whether or not
