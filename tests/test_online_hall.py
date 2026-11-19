@@ -1037,3 +1037,56 @@ def test_retry_says_joining_while_the_dial_is_still_running(monkeypatch):
         answer = plugin_api.online_hall_retry()
         assert answer["ok"] is ok, (state, answer)
         assert answer["text"] == text, (state, answer)
+
+
+def test_the_worker_dials_with_the_key_the_request_could_read(monkeypatch):
+    """Hermes's multiplexed gateway gives out a secret only inside the request's profile scope (a
+    context variable). The Hall's worker is a thread, which does not inherit that context, so it
+    read no key, set "off" and stopped - every signed-in computer sat on "Lobby not connected"
+    while #games chat (read inside the request) worked. The worker must dial with the key."""
+    import contextvars
+    import time as _time
+
+    from shelf import online_hall
+
+    scope = contextvars.ContextVar("profile_scope", default=None)
+    sent = []
+
+    class FakeSocket:
+        def __init__(self, url, timeout=5):
+            self.url = url
+
+        def send_json(self, message):
+            sent.append(message)
+
+        def receive(self, timeout=None):
+            _time.sleep(0.05)
+            raise online_hall.wsmod.SocketError("The connection dropped: test")
+
+        def close(self):
+            pass
+
+    class Source:
+        on = True
+        url = "https://lobby.example"
+
+        def key(self):
+            secrets = scope.get()
+            return secrets["HERMES_GAMESHELF_LOBBY_KEY"] if secrets else ""
+
+    monkeypatch.setattr(online_hall.wsmod, "Socket", FakeSocket)
+    hall = Hall(Source())
+    hall.retry_first = 0.01
+    hall.retry_most = 0.02
+    token = scope.set({"HERMES_GAMESHELF_LOBBY_KEY": "k-123"})
+    try:
+        hall.start()          # inside the "request": the key is readable here
+    finally:
+        scope.reset(token)    # the request ends; its scope is gone
+    try:
+        end = _time.monotonic() + 3
+        while _time.monotonic() < end and not any(m.get("t") == "auth" for m in sent):
+            _time.sleep(0.01)
+    finally:
+        hall.stop()
+    assert any(m.get("t") == "auth" for m in sent), "the worker never dialled with the key: %r" % sent

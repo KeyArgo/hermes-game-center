@@ -10,6 +10,7 @@ appears in the snapshot, an error, or a log.
 """
 from __future__ import annotations
 
+import contextvars
 import copy
 import logging
 import queue
@@ -144,9 +145,13 @@ class Hall:
             if not self.online.on:
                 self._say("not opened: online play is off")
                 return
-            if not self.online.key():
+            key = self.online.key()
+            if not key:
                 self._say("not opened: this computer has no sign-in key")
                 return
+            # Hermes gives out a secret only inside the request's profile scope, and a thread does
+            # not inherit it: keep the key this request could read for the worker to dial with.
+            self._key = key
             if self._thread is not None and self._thread.is_alive():
                 with self._lock:
                     if wake and self._state != "live":
@@ -169,7 +174,11 @@ class Hall:
                 # keeps seeing its own stop event set, instead of reading the fresh one a later
                 # start() installs for its successor and dialling beside it.
                 stop, dial = self._stop, self._dial
-            self._thread = threading.Thread(target=self._run, args=(stop, dial), daemon=True)
+            # The worker runs in a copy of this request's context, so a secret read inside it sees
+            # the same profile scope the request did.
+            self._thread = threading.Thread(
+                target=contextvars.copy_context().run, args=(self._run, stop, dial), daemon=True
+            )
             self._thread.start()
 
     def stop(self) -> None:
@@ -182,6 +191,7 @@ class Hall:
         with self._lifecycle:
             with self._lock:
                 self._stop.set()
+                self._key = ""  # a stopped Hall (signed out, turned off) never dials with an old key
                 sock, thread = self._socket, self._thread
                 self._fail_pending("The lobby connection closed.")
             if sock:
@@ -424,8 +434,9 @@ class Hall:
 
     def _run(self, stop: threading.Event, dial: threading.Event) -> None:
         while not stop.is_set():
-            key = self.online.key()
+            key = self.online.key() or getattr(self, "_key", "")
             if not key:
+                self._say("stopped: no sign-in key could be read")
                 with self._lock:
                     self._state = "off"
                 break
