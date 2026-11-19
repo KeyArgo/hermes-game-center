@@ -6,6 +6,18 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The over-chat slot rests when nothing is happening.** The status chip that feeds the see-through
+  machine asked the shelf for `/jackpot` every 600 ms for as long as it was mounted - about a hundred
+  reads a minute of a file that only changes while a turn runs, per view of the machine, whether or not
+  anything was happening (owner, 2026-11-18: "something that works without being noticeable"). Every
+  view in `desktop/src/19-jackpot-overlay.js` now shares one poll loop: 600 ms while the focused chat
+  is working (`host.state.busy`, read the way the wait pane reads it), while a new spin is on the feed,
+  and for the three seconds after either ends - because the payout lands just after the turn does - and
+  a resting 5 s otherwise. A turn starting is read at once rather than at the next beat, a hidden
+  window is not polled at all (and reads once when it comes back), and a host with no busy atom keeps
+  exactly the old 600 ms. The `message.start` pull and its 400 ms follow-up are unchanged, as is the
+  `/jackpot/visible` report. Guards: `tests/jackpot_overlay_poll_harness.cjs`, which counts the reads
+  on a fake clock instead of waiting for them.
 - **No default player name, and a Suggest a name button wherever a name is asked for.** The suggestion
   came from the local player id, which is "local" on every computer, so every PC was offered the same
   name and the welcome asked a question whose answer was already written in (owner, 2026-11-18:

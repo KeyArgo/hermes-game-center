@@ -85,6 +85,149 @@ function jpReason(err) {
   if (!raw) return 'it did not answer'
   return raw.length > 130 ? `${raw.slice(0, 130)}…` : raw
 }
+// ---- how often the machine is asked -----------------------------------------
+//
+// Every view of the machine asked the shelf every 600 ms for as long as it was on screen, whether or not
+// anything was happening: a hundred reads a minute of a wallet file, per view, for numbers that only move
+// while a turn runs or a spin lands. They ask that often only while there is something to watch - the
+// focused chat is working (the spin is recorded at message.start, so the reply is the window in which the
+// reels turn and the payout lands), a new spin has just arrived on the feed, or one of those ended less
+// than JP_POLL_TAIL ago, which is when the last number is worth reading. Otherwise they rest at
+// JP_POLL_IDLE. A host that cannot say whether the chat is busy keeps the cadence it always had.
+const JP_POLL_FAST = 600
+const JP_POLL_IDLE = 5000
+const JP_POLL_TAIL = 3000
+// The reels turn for about 1.2 s and glow for another 0.7 s after a spin lands, and every view of the
+// cabinet draws its own copy of that, so a new spin on the feed is watched for as long as it runs.
+const JP_POLL_REELS = 2000
+
+// Is the window out of sight? A minimized or occluded window needs nothing, and it is the browser that
+// knows; an older host, or a harness, may not carry the flag at all.
+function jpHidden() {
+  try {
+    return Boolean(typeof document !== 'undefined' && document && document.hidden)
+  } catch {
+    return false
+  }
+}
+
+// The focused chat's turn flag, read exactly as 62-pane-state.js's useChatBusy reads it. null means this
+// window cannot say - an older Desktop with no busy atom, or a page with no hook to read it with - and
+// every view then keeps the cadence it always had instead of guessing that the chat is idle.
+function useJpChatBusy() {
+  if (typeof useValue !== 'function') return null
+  const atom = (SDK_HOST && SDK_HOST.state && SDK_HOST.state.busy) || null
+  if (!atom) return null
+  return Boolean(useValue(atom))
+}
+
+// One poll loop per view of the machine: it reads now, then keeps reading on a cadence that follows what
+// is happening, and does not read at all while the window is hidden.
+//   opts.apply(next)  a good answer
+//   opts.fail(err)    a failed one
+//   opts.fast()       true while there is something to watch (the chat is working), or always true on a
+//                     host that cannot say - which is how an older Desktop keeps its 600 ms
+// Returns read(), which asks at once (the message.start pull, and coming back on screen), and stop(),
+// which gives the clock and the visibility listener back.
+function jpPoll(ctx, opts) {
+  const options = opts || {}
+  const fastNow = typeof options.fast === 'function' ? options.fast : () => false
+  let stopped = false
+  let timer = null
+  let inFlight = false
+  let again = false
+  let failures = 0
+  let lastStamp = ''
+  // Until when this view is worth watching closely. A turn in progress pushes it forward on every read,
+  // so it is the tail too: three seconds after the last moment anything was happening.
+  let hotUntil = 0
+  const hot = () => fastNow() !== false || Date.now() < hotUntil
+  const mark = ms => { hotUntil = Math.max(hotUntil, Date.now() + (ms || JP_POLL_TAIL)) }
+  const clear = () => { if (timer !== null) { clearTimeout(timer); timer = null } }
+  const wait = () => {
+    if (!hot()) return JP_POLL_IDLE
+    // A shelf that is not answering is not asked faster for it. The panel has always gone 600, 1080, 1500
+    // and stayed there; that is what this is.
+    if (!failures) return JP_POLL_FAST
+    return Math.min(1500, Math.round(JP_POLL_FAST * Math.pow(1.8, failures)))
+  }
+  const arm = () => {
+    if (stopped || timer !== null || inFlight || jpHidden()) return
+    timer = setTimeout(run, wait())
+  }
+  async function run() {
+    timer = null
+    if (stopped || jpHidden()) return
+    if (inFlight) {
+      // A read is already out: ask again as soon as it answers rather than queueing a second one.
+      again = true
+      return
+    }
+    inFlight = true
+    // Only a turn in progress pushes the tail forward; the tail itself must be able to run out.
+    if (fastNow() === true) mark()
+    try {
+      const next = await jpRead(ctx)
+      if (stopped) return
+      failures = 0
+      // A new spin on the feed is what starts the reels, so it is worth watching with them.
+      const row = next && next.feed && next.feed[0]
+      const stamp = row ? String(row.at == null ? '' : row.at) : ''
+      if (stamp && stamp !== lastStamp) {
+        lastStamp = stamp
+        mark(JP_POLL_REELS + JP_POLL_TAIL)
+      }
+      if (typeof options.apply === 'function') options.apply(next)
+    } catch (err) {
+      if (stopped) return
+      failures += 1
+      if (typeof options.fail === 'function') options.fail(err)
+    } finally {
+      // The view can be closed while a read is in the air; nothing may be armed for it afterwards.
+      inFlight = false
+      if (!stopped) {
+        if (again) {
+          again = false
+          run()
+        } else {
+          arm()
+        }
+      }
+    }
+  }
+  // Back on screen: read at once rather than waiting out the cadence the window was on its way to.
+  const read = () => {
+    if (stopped) return
+    if (jpHidden()) {
+      clear()
+      return
+    }
+    clear()
+    run()
+  }
+  try {
+    if (typeof document !== 'undefined' && document && typeof document.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', read)
+    }
+  } catch {
+    // No document to ask: the poll simply keeps its cadence.
+  }
+  const stop = () => {
+    if (stopped) return
+    stopped = true
+    clear()
+    try {
+      if (typeof document !== 'undefined' && document && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('visibilitychange', read)
+      }
+    } catch {
+      // Already gone; there is nothing to unwire.
+    }
+  }
+  run()
+  return { read, stop }
+}
+
 // How many views of the machine are on screen. Auto-spin runs only while this is above zero,
 // so nothing spins behind a closed machine - the whole point of "spins only while visible".
 let JP_VIEWERS = 0
@@ -124,24 +267,35 @@ function JackpotStatusItem({ ctx }) {
   const glowTimer = useRef(null)
   const holdTimer = useRef(null)
   const loadNow = useRef(null)
+  // The cadence follows the focused chat's turn flag, kept in a ref so a turn does not restart the loop
+  // (a restart would forget the three seconds that follow it). A host that cannot say = always the old
+  // 600 ms, so nothing changes on an older Desktop.
+  const busy = useJpChatBusy()
+  const fastRef = useRef(busy === null ? true : busy === true)
+  const wasBusy = useRef(false)
   useEffect(() => {
     let alive = true
-    const load = async () => {
-      try {
-        const next = await jpRead(ctx)
+    const poll = jpPoll(ctx, {
+      fast: () => fastRef.current,
+      apply: next => {
         JP_LAST = next
         dataRef.current = next
         if (alive) { setData(next); setTrouble('') }
-      } catch (err) {
+      },
+      fail: err => {
         // A failed read keeps the last known numbers and says why on hover.
         if (alive) setTrouble(jpReason(err))
       }
-    }
-    loadNow.current = load
-    load()
-    const timer = setInterval(load, 600)
-    return () => { alive = false; clearInterval(timer) }
+    })
+    loadNow.current = poll.read
+    return () => { alive = false; loadNow.current = null; poll.stop() }
   }, [ctx])
+  useEffect(() => {
+    fastRef.current = busy === null ? true : busy === true
+    // A turn starting is when the spin is recorded: read then, rather than at the next resting beat.
+    if (busy === true && !wasBusy.current && loadNow.current) loadNow.current()
+    wasBusy.current = busy === true
+  }, [busy])
   // The spin is recorded when the turn starts, which is the moment the message is sent.
   // Ask the shelf then, instead of making the person wait out a poll: the reels should run
   // as the message goes, which is what "auto-spin every reply" is supposed to look like.
@@ -332,31 +486,38 @@ function JackpotOverlay({ ctx, onClose, data }) {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const [trouble, setTrouble] = useState('')
+  // The panel rests at 5 s too while the chat is idle; the same turn flag the chip follows says when it
+  // is worth watching closely.
+  const chatBusy = useJpChatBusy()
+  const fastRef = useRef(chatBusy === null ? true : chatBusy === true)
+  const wasBusy = useRef(false)
+  const panelRead = useRef(null)
+  useEffect(() => {
+    fastRef.current = chatBusy === null ? true : chatBusy === true
+    if (chatBusy === true && !wasBusy.current && panelRead.current) panelRead.current()
+    wasBusy.current = chatBusy === true
+  }, [chatBusy])
   useEffect(() => {
     if (data) {
       setSnapshot(data)
       return undefined
     }
     let alive = true
-    let wait = 600
-    let timer = null
-    const load = async () => {
-      try {
-        const next = await jpRead(ctx)
+    const poll = jpPoll(ctx, {
+      fast: () => fastRef.current,
+      apply: next => {
         if (!alive) return
         setSnapshot(next)
         setTrouble('')
-        wait = 600
-      } catch (err) {
-        if (!alive) return
+      },
+      fail: err => {
         // Say why, and look less often the longer it stays down, instead of spinning forever.
+        if (!alive) return
         setTrouble(jpReason(err))
-        wait = Math.min(1500, Math.round(wait * 1.8))
       }
-      if (alive) timer = setTimeout(load, wait)
-    }
-    load()
-    return () => { alive = false; clearTimeout(timer) }
+    })
+    panelRead.current = poll.read
+    return () => { alive = false; panelRead.current = null; poll.stop() }
   }, [ctx, data])
   const door = (path, body) => ctx.rest(path, { method: 'POST', body })
   // Auto-spin is a switch, not a move: it answers even while a spin is running, and it shows
@@ -554,26 +715,31 @@ function SlotsOverChatCopy({ ctx, width, height }) {
   const [overchatScale] = useSmScale()
 
   // The picture. The status chip polls as well and is what adopts the shelf's stored switch on load;
-  // this copy only needs the numbers while it is on screen, which is when it is mounted at all.
+  // this copy only needs the numbers while it is on screen, which is when it is mounted at all. It rests
+  // with the chip: 5 s while the chat is idle, 600 ms while a turn runs and for three seconds after one.
+  const chatBusy = useJpChatBusy()
+  const fastRef = useRef(chatBusy === null ? true : chatBusy === true)
+  const wasBusy = useRef(false)
+  const copyRead = useRef(null)
+  useEffect(() => {
+    fastRef.current = chatBusy === null ? true : chatBusy === true
+    if (chatBusy === true && !wasBusy.current && copyRead.current) copyRead.current()
+    wasBusy.current = chatBusy === true
+  }, [chatBusy])
   useEffect(() => {
     let alive = true
-    let timer = null
-    let wait = 600
-    const load = async () => {
-      try {
-        const next = await jpRead(ctx)
+    // A failed poll leaves the last good picture; the loop tries again a little later, so there is
+    // nothing to say about it here.
+    const poll = jpPoll(ctx, {
+      fast: () => fastRef.current,
+      apply: next => {
         if (!alive) return
         JP_LAST = next
         setSnapshot(next)
-        wait = 600
-      } catch {
-        // A failed poll leaves the last good picture; try again a little later.
-        wait = Math.min(1500, Math.round(wait * 1.8))
       }
-      if (alive) timer = setTimeout(load, wait)
-    }
-    load()
-    return () => { alive = false; clearTimeout(timer) }
+    })
+    copyRead.current = poll.read
+    return () => { alive = false; copyRead.current = null; poll.stop() }
   }, [ctx])
 
   // While the machine is drawn it counts as visible for auto-spin, so a turn in this chat spins it even

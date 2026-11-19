@@ -6105,8 +6105,11 @@ async function refereeBadgeContract() {
 
 {
   // A watched surface must not sit a beat behind the person: a poll of three or five seconds reads as
-  // lag even when the server answered at once.
-  assert.ok(source.includes('setInterval(load, 600)'), 'the over-chat overlay reads every 600 ms')
+  // lag even when the server answered at once. The over-chat machine is the exception, and only because
+  // what it draws moves while a turn runs: it reads every 600 ms while the chat is working and sleeps at
+  // 5 s when nothing is happening, instead of asking 100 times a minute forever (T11).
+  assert.ok(source.includes('const JP_POLL_IDLE = 5000'), 'the over-chat machine rests when nothing happens')
+  assert.ok(!source.includes('setInterval(load, 600)'), 'and no longer reads every 600 ms forever')
   assert.ok(source.includes('setInterval(() => load(), 1000)'), 'the waiting pane reads every second')
   assert.ok(source.includes("SDK_HOST.onEvent('message.start', () => load())"),
     'a sent message refreshes the waiting pane at once instead of waiting for a tick')
