@@ -317,7 +317,7 @@ async function inviteBellAnswer(ctx, request, accept) {
     if (answer && answer.ok === false) return { ok: false, text: String(answer.text || 'The lobby did not take that answer.') }
     inviteBellDrop(request.id)
     if (accept) {
-      const seat = await inviteBellSeat(ctx)
+      const seat = await inviteBellSeat(ctx, request)
       if (seat) await openOnlineTable(ctx, seat.room_id, seat.game)
       inviteBellOpen()
     }
@@ -329,13 +329,18 @@ async function inviteBellAnswer(ctx, request, accept) {
 
 // The seat the lobby just made, read once. A read that lands before the lobby's own "seated"
 // frame simply finds nothing; the Games screen opens the table on its next look.
-async function inviteBellSeat(ctx) {
+async function inviteBellSeat(ctx, request) {
   try {
     const snap = await ctx.rest('/online/hall')
     if (!snap || typeof snap !== 'object') return null
     inviteBellFeed(snap)
     const seated = snap.seated || null
-    return seated && seated.room_id ? seated : null
+    if (!seated || !seated.room_id) return null
+    if (HALL_LEFT.has(String(seated.room_id))) return null
+    const wanted = request && request.id ? String(request.id) : ''
+    const got = seated.request_id ? String(seated.request_id) : ''
+    if (wanted && got && wanted !== got) return null
+    return seated
   } catch {
     return null
   }

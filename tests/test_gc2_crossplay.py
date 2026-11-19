@@ -127,7 +127,8 @@ def test_web_and_hermes_play_connect4_to_a_win(tmp_path, caplog):
 
             web_ws = await connect(client, room_id, web_token)
             sockets.append(web_ws)
-            table = open_hermes_table(
+            table = await asyncio.to_thread(
+                open_hermes_table,
                 tmp_path, str(client.make_url("/")).rstrip("/"), herm_token, room_id)
 
             seen_snapshots = []
@@ -237,7 +238,8 @@ def test_hermes_table_reconnects_without_resigning(tmp_path):
                 client, web, web_token, herm, herm_token, web_lobby, herm_lobby)
             web_ws = await connect(client, room_id, web_token)
             sockets.append(web_ws)
-            table = open_hermes_table(
+            table = await asyncio.to_thread(
+                open_hermes_table,
                 tmp_path, str(client.make_url("/")).rstrip("/"), herm_token, room_id)
 
             def snapshot():

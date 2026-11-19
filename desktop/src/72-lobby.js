@@ -410,7 +410,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       try { answer = await openOnlineTable(ctx, room, seated.game) } catch (error) { answer = { ok: false } }
       if (!answer || answer.ok === false) {
         handled.current.delete(room)
-        if (alive.current) setSeatProblem({ room, text: String((answer && answer.text) || '') || 'That table would not open. Try again.' })
+        const text = String((answer && answer.text) || '') || 'That table would not open. Try again.'
+        // A room the server has already closed is not retried on the next poll.
+        // Try again is the one way back to it.
+        if (/closed|does not exist|invalid room/i.test(text)) markHallLeft(room)
+        if (alive.current) setSeatProblem({ room, text })
         return
       }
       if (alive.current) setSeatProblem(null)
@@ -419,7 +423,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   }, [seated && seated.room_id, seatAttempt])
 
   // The retry the refusal offers: the same room, asked for again.
-  const retrySeat = () => setSeatAttempt(count => count + 1)
+  const retrySeat = () => {
+    const room = seatProblem && seatProblem.room
+    if (room) HALL_LEFT.delete(String(room))
+    setSeatAttempt(count => count + 1)
+  }
 
   // One door for every control: it is locked while its own POST is out, and a
   // refusal is shown in the server's own words rather than swallowed.

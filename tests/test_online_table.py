@@ -32,7 +32,7 @@ def test_person_plays_and_close_does_not_resign(tmp_path):
             table = OnlineTable(source)
             assert not table.open(room["id"])["ok"]
             source.turn_on()
-            assert table.open(room["id"])["ok"]
+            assert (await asyncio.to_thread(table.open, room["id"]))["ok"]
             view = await wait_for(lambda: table.snapshot() if (table.snapshot().get("picture") or {}).get("permissions", {}).get("can_move") else None)
             assert view["side"] == "white" and view["opponent"]["name"] == "Bea"
             serialized = json.dumps(view)
@@ -53,6 +53,41 @@ def test_person_plays_and_close_does_not_resign(tmp_path):
                 await asyncio.to_thread(table.close)
             await client.close()
     run(scenario())
+
+
+def test_opening_a_missing_room_fails(tmp_path, monkeypatch):
+    """A closed or missing room is a failure, not a table that opens and then dies."""
+    import queue
+    from shelf import online_table
+
+    class ClosedSocket:
+        def __init__(self, address, timeout):
+            self.inbox = queue.Queue()
+
+        def send_json(self, message):
+            if message.get("t") == "auth":
+                self.inbox.put({"t": "closed", "text": "This table is closed or does not exist."})
+
+        def receive(self, timeout):
+            try:
+                return self.inbox.get(timeout=timeout)
+            except queue.Empty:
+                return None
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(online_table.wsmod, "Socket", ClosedSocket)
+    source = Online(tmp_path, url="http://example.test", secret=lambda _: "person-secret")
+    source.turn_on()
+    table = OnlineTable(source)
+    try:
+        answer = table.open("missing-room")
+        assert answer["ok"] is False, answer
+        assert "closed" in answer["text"].lower() or "does not exist" in answer["text"].lower()
+        assert table.snapshot().get("state") in {None, "", "closed", "error"}
+    finally:
+        table.close()
 
 
 def test_off_refuses_without_socket(tmp_path, monkeypatch):
@@ -173,7 +208,7 @@ def test_two_people_chat_through_a_real_server(tmp_path):
             source = Online(tmp_path / "plugin", url=str(client.make_url('/')).rstrip('/'), secret=lambda _: token)
             source.turn_on()
             table = OnlineTable(source)
-            assert table.open(room["id"])["ok"]
+            assert (await asyncio.to_thread(table.open, room["id"]))["ok"]
             hello = await wait_for(lambda: table.snapshot() if table.snapshot().get("state") == "live" else None)
             assert [m["text"] for m in hello["chat"]] == ["before you joined"]
             # Their messages arrive on the table's feed, named and with their role.

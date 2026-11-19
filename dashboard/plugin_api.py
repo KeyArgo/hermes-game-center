@@ -1579,6 +1579,15 @@ def _online_table(source):
         return table
 
 
+def _table_is_live(source, room_id: str) -> bool:
+    """True when this computer's table socket is open on that room."""
+    try:
+        snap = _online_table(source).snapshot() or {}
+    except Exception:
+        return False
+    return str(snap.get("state") or "") == "live" and str(snap.get("room_id") or "") == str(room_id or "")
+
+
 def _online_hall(source):
     root = str(_data_root())
     with _LADDER_LOCK:
@@ -1588,6 +1597,7 @@ def _online_hall(source):
                 hall.stop()
             hall = online_hall.Hall(source)
             _HALLS[root] = hall
+        hall.table_live = lambda room_id, source=source: _table_is_live(source, room_id)
         return hall
 
 

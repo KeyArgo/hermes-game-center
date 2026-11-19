@@ -24473,7 +24473,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       try { answer = await openOnlineTable(ctx, room, seated.game) } catch (error) { answer = { ok: false } }
       if (!answer || answer.ok === false) {
         handled.current.delete(room)
-        if (alive.current) setSeatProblem({ room, text: String((answer && answer.text) || '') || 'That table would not open. Try again.' })
+        const text = String((answer && answer.text) || '') || 'That table would not open. Try again.'
+        // A room the server has already closed is not retried on the next poll.
+        // Try again is the one way back to it.
+        if (/closed|does not exist|invalid room/i.test(text)) markHallLeft(room)
+        if (alive.current) setSeatProblem({ room, text })
         return
       }
       if (alive.current) setSeatProblem(null)
@@ -24482,7 +24486,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   }, [seated && seated.room_id, seatAttempt])
 
   // The retry the refusal offers: the same room, asked for again.
-  const retrySeat = () => setSeatAttempt(count => count + 1)
+  const retrySeat = () => {
+    const room = seatProblem && seatProblem.room
+    if (room) HALL_LEFT.delete(String(room))
+    setSeatAttempt(count => count + 1)
+  }
 
   // One door for every control: it is locked while its own POST is out, and a
   // refusal is shown in the server's own words rather than swallowed.
@@ -25889,7 +25897,7 @@ async function inviteBellAnswer(ctx, request, accept) {
     if (answer && answer.ok === false) return { ok: false, text: String(answer.text || 'The lobby did not take that answer.') }
     inviteBellDrop(request.id)
     if (accept) {
-      const seat = await inviteBellSeat(ctx)
+      const seat = await inviteBellSeat(ctx, request)
       if (seat) await openOnlineTable(ctx, seat.room_id, seat.game)
       inviteBellOpen()
     }
@@ -25901,13 +25909,18 @@ async function inviteBellAnswer(ctx, request, accept) {
 
 // The seat the lobby just made, read once. A read that lands before the lobby's own "seated"
 // frame simply finds nothing; the Games screen opens the table on its next look.
-async function inviteBellSeat(ctx) {
+async function inviteBellSeat(ctx, request) {
   try {
     const snap = await ctx.rest('/online/hall')
     if (!snap || typeof snap !== 'object') return null
     inviteBellFeed(snap)
     const seated = snap.seated || null
-    return seated && seated.room_id ? seated : null
+    if (!seated || !seated.room_id) return null
+    if (HALL_LEFT.has(String(seated.room_id))) return null
+    const wanted = request && request.id ? String(request.id) : ''
+    const got = seated.request_id ? String(seated.request_id) : ''
+    if (wanted && got && wanted !== got) return null
+    return seated
   } catch {
     return null
   }

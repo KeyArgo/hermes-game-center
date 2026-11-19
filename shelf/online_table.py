@@ -18,6 +18,8 @@ _ACTIONS = {"new", "join", "sit", "move", "draw", "leave", "resign", "rematch", 
 # for the panel: a message the table would not take is never swallowed silently.
 _CHAT_KEEP = 50
 _CHAT_MAX = 300
+# How long open() listens for the server to accept the room or refuse it.
+_OPEN_WAIT = 2.0
 
 
 class OnlineTable:
@@ -36,6 +38,7 @@ class OnlineTable:
         self.result = None
         self._me = ""
         self._saying = ""
+        self._opened = threading.Event()
         # The frames that only add to what the panel keeps — who is here, and what was said — one
         # entry each, so the next such feed is a line here rather than another branch in the loop.
         self._feeds = {"presence": self._keep_presence, "chat": self._keep_chat}
@@ -51,16 +54,26 @@ class OnlineTable:
             if not key:
                 return {"ok": False, "text": "Sign in to online play first."}
             self.close()
+            self._opened = threading.Event()
             with self._lock:
                 self._data = {"room_id": room_id, "state": "connecting", "picture": None,
                               "room": None, "side": "", "opponent": None, "error": "", "finished": None,
-                              "chat": [], "chat_error": None}
+                              "chat": [], "chat_error": None, "closed_text": ""}
                 self.presence, self.result, self._me, self._saying = [], None, "", ""
                 self._out = queue.Queue()
                 self._stop = threading.Event()
                 self._thread = threading.Thread(target=self._run, args=(room_id, key), daemon=True)
                 self._thread.start()
-            return {"ok": True, "table": self.snapshot()}
+        # Outside the lifecycle lock: close() needs it, and the worker is the one
+        # that hears whether this room is still there.
+        self._opened.wait(_OPEN_WAIT)
+        snap = self.snapshot()
+        state = str(snap.get("state") or "")
+        if state in {"closed", "error"}:
+            text = str(snap.get("closed_text") or snap.get("error") or "This table is closed or does not exist.")
+            self.close()
+            return {"ok": False, "text": text, "table": self.snapshot()}
+        return {"ok": True, "table": snap}
 
     def snapshot(self):
         with self._lock:
@@ -112,6 +125,7 @@ class OnlineTable:
                 sock, thread = self._socket, self._thread
                 if self._data:
                     self._data["state"] = "closed"
+                self._opened.set()
                 self._fail_pending("The table was closed.")
             if sock:
                 sock.close()
@@ -167,6 +181,7 @@ class OnlineTable:
                         if kind == "hello":
                             self._me = (message.get("me") or {}).get("id", "")
                             self._data.update(state="live", room=message.get("room"), error="")
+                            self._opened.set()
                             # The table opens with the last messages it kept for this seat.
                             self._data["chat"] = [m for m in (message.get("chat") or []) if isinstance(m, dict)][-_CHAT_KEEP:]
                             delay = 1
@@ -201,8 +216,10 @@ class OnlineTable:
                                     "text": str(message.get("text") or "The table did not take that message."),
                                     "sent": self._saying, "at": time.time()}
                         elif kind in {"error", "closed"}:
+                            text = str(message.get("text") or "The table closed.")
                             self._data.update(state="error" if kind == "error" else "closed",
-                                              error=str(message.get("text") or "The table closed."))
+                                              error=text, closed_text=text)
+                            self._opened.set()
                             return
             except (OSError, wsmod.SocketError):
                 with self._lock:

@@ -1230,3 +1230,34 @@ def test_a_closed_or_refused_table_drops_the_hall_seat(monkeypatch):
     answer = plugin_api.online_table_cmd({"action": "decline", "args": []})
     assert answer["ok"] is False
     assert hall.snapshot()["seated"] is None, "a refused decline still drops the seat"
+
+
+def test_a_seat_expires_and_a_reconnect_drops_it_unless_the_table_is_live(tmp_path):
+    """The remembered seat is a one-shot handoff, not a room that stays open."""
+    source = Online(tmp_path, url="http://127.0.0.1:9", secret=lambda _name: "")
+    hall = Hall(source)
+    seat = {"room_id": "r1", "game": "connect4", "side": "white", "opponent": "Bea", "request_id": "req-1"}
+    hall._seated = dict(seat)
+    hall._seated_at = time.monotonic()
+    assert hall.snapshot()["seated"]["room_id"] == "r1"
+
+    hall._seated_at = time.monotonic() - (hall.SEAT_TTL_SECONDS + 1)
+    assert hall.snapshot()["seated"] is None, "two minutes later the seat is gone"
+
+    hall._seated = dict(seat)
+    hall._seated_at = time.monotonic()
+    hall._apply({
+        "t": "hello", "you": {"id": "a", "name": "Ada"},
+        "prefs": {"open": False, "games": {}}, "roster": [], "requests": [],
+    })
+    assert hall.snapshot()["seated"] is None, "a Hall reconnect does not keep a seat the server did not send"
+
+    hall._seated = dict(seat)
+    hall._seated_at = time.monotonic() - (hall.SEAT_TTL_SECONDS + 5)
+    hall.table_live = lambda room_id: room_id == "r1"
+    assert hall.snapshot()["seated"]["room_id"] == "r1", "a live table socket keeps the seat"
+    hall._apply({
+        "t": "hello", "you": {"id": "a", "name": "Ada"},
+        "prefs": {"open": False, "games": {}}, "roster": [], "requests": [],
+    })
+    assert hall.snapshot()["seated"]["room_id"] == "r1", "and a reconnect keeps it while that socket is live"

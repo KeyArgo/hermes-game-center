@@ -38,6 +38,9 @@ REQUESTABLE = (
     "go", "hex", "breakthrough", "seabattle", "blackjack",
 )
 
+# A `seated` frame is a one-shot handoff. It is not a room that stays open.
+SEAT_TTL_SECONDS = 120.0
+
 
 def _blank_prefs() -> dict:
     return {"open": False, "games": {game: False for game in REQUESTABLE}, "until": {}}
@@ -58,6 +61,8 @@ def _is_rejected_upgrade(exc: Exception) -> bool:
 
 class Hall:
     """One account's lobby presence, as the plugin page sees it."""
+
+    SEAT_TTL_SECONDS = SEAT_TTL_SECONDS
 
     # Redial backoff, in seconds: the first wait, then doubling up to the most.
     retry_first = 1
@@ -100,6 +105,11 @@ class Hall:
         self._roster: dict = {}
         self._requests: dict = {}
         self._seated = None
+        self._seated_at = 0.0
+        # True only while this computer's table socket is live for that room.
+        # A Hall reconnect does not invent a seat, and it does not keep one
+        # unless that socket is still at the table. The plugin sets this.
+        self.table_live = lambda _room_id: False
         # Lobby HTTP (refresh, queue, the league's reads, one alert) runs here, not inside
         # /view. The worker is started from a request, in that request's context.
         self._refresh_stop = threading.Event()
@@ -217,6 +227,7 @@ class Hall:
                 self._roster = {}
                 self._requests = {}
                 self._seated = None
+                self._seated_at = 0.0
             if not still_holding:
                 self._thread = None
 
@@ -266,7 +277,7 @@ class Hall:
                 "prefs": self._drop_run_out(copy.deepcopy(self._prefs), time.time()),
                 "roster": [copy.deepcopy(row) for row in roster],
                 "requests": [copy.deepcopy(req) for req in self._requests.values()],
-                "seated": copy.deepcopy(self._seated),
+                "seated": copy.deepcopy(self._seat_for_read()),
             }
             if self._error:
                 data["error"] = self._error
@@ -285,6 +296,37 @@ class Hall:
             if room_id and str(self._seated.get("room_id") or "") != str(room_id):
                 return
             self._seated = None
+            self._seated_at = 0.0
+
+    def _table_is_live(self, room_id: str) -> bool:
+        checker = self.table_live
+        if not room_id or not callable(checker):
+            return False
+        try:
+            return bool(checker(room_id))
+        except Exception:
+            return False
+
+    def _seat_for_read(self) -> dict | None:
+        """The handoff, while it is still the one the Hall should open.
+
+        Caller holds ``_lock``. A live table socket keeps the seat past the
+        two-minute handoff and across a Hall reconnect. Anything else expires.
+        """
+        if not self._seated:
+            return None
+        room_id = str(self._seated.get("room_id") or "")
+        if self._table_is_live(room_id):
+            return self._seated
+        started = float(self._seated_at or 0)
+        if not started:
+            self._seated_at = time.monotonic()
+            return self._seated
+        if time.monotonic() - started > SEAT_TTL_SECONDS:
+            self._seated = None
+            self._seated_at = 0.0
+            return None
+        return self._seated
 
     def ensure_refresh(self) -> None:
         """Keep the lobby snapshot warm on a worker, off the request that paints /view.
@@ -671,8 +713,9 @@ class Hall:
                     self._you = _blank_you()
                     self._prefs = _blank_prefs()
                     self._roster = {}
-                    self._requests = {}
-                    self._seated = None
+                self._requests = {}
+                self._seated = None
+                self._seated_at = 0.0
                 return "auth"
             self._apply(message)
         return "stop"
@@ -705,6 +748,12 @@ class Hall:
                 self._misses = 0
                 self._delay = self.retry_first
                 self._unsaid()
+                # hello carries no seat. A reconnect drops the old handoff unless
+                # this computer is already at that table.
+                room_id = str((self._seated or {}).get("room_id") or "")
+                if not self._table_is_live(room_id):
+                    self._seated = None
+                    self._seated_at = 0.0
                 log.info("lobby socket live as %s", self._you.get("name") or "this account")
                 learn = getattr(self.online, "learn_name", None)
                 if learn and self._you.get("name"):
@@ -732,6 +781,7 @@ class Hall:
                     "opponent": message.get("opponent"),
                     "request_id": message.get("request_id"),
                 }
+                self._seated_at = time.monotonic()
             elif kind == "ack":
                 pending = self._pending.get(message.get("op"))
                 if pending:

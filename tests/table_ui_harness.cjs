@@ -4819,6 +4819,41 @@ async function onlineTableContract() {
 
   evaluate("rememberOnlineRoom('')")
   reset()
+
+  // A room the server refuses is not opened, and the next Hall read does not ask again.
+  const missed = []
+  const missedCtx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path) => {
+      missed.push(path)
+      if (path === '/online/hall') {
+        return { state: 'live', you: { id: 'me', name: 'Ada' }, prefs: { open: true, games: {} },
+          roster: [], requests: [], seated: { room_id: 'gone-room', game: 'blackjack' } }
+      }
+      if (path === '/online/table/open') return { ok: false, text: 'This table is closed or does not exist.' }
+      return { ok: true }
+    }
+  }
+  sandbox.hallProps = {
+    ctx: missedCtx, current: 'blackjack', view: { online: { on: true } },
+    onPlayHere: match => missed.push('play:' + match.room_id)
+  }
+  const paintHall = async () => {
+    cursor = 0
+    evaluate('LobbyHall(hallProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    await tick()
+  }
+  await paintHall()
+  await paintHall()
+  assert.equal(missed.filter(item => item === 'play:gone-room').length, 0, 'a missing room never calls onPlayHere')
+  assert.equal(missed.filter(item => item === '/online/table/open').length, 1, 'and the Hall does not keep opening it')
+
+  evaluate("rememberOnlineRoom('')")
+  reset()
   console.log('online table in the plugin: the server board, one command route, the table chat on one route, no local move: passed')
 }
 
@@ -7731,6 +7766,18 @@ async function inviteBellContract() {
   bellClear()
   evaluate("INVITE_BELL.notified = ''")
   sandbox.document.hidden = undefined
+
+  // A seat for a different request, or a room already left, is not this invite.
+  sandbox.seatCtx = {
+    rest: async () => ({ state: 'live', seated: { room_id: 'r9', game: 'connect4', request_id: 'old-req' } })
+  }
+  const other = await evaluate('inviteBellSeat(seatCtx, { id: "new-req" })')
+  assert.equal(other, null, 'a seat for another request is not opened')
+  evaluate('HALL_LEFT.add("r9")')
+  const leftSeat = await evaluate('inviteBellSeat(seatCtx, { id: "old-req" })')
+  assert.equal(leftSeat, null, 'a room already left is not opened from the bell')
+  evaluate('HALL_LEFT.delete("r9")')
+
   console.log('invite bell: an invite is on screen wherever the person is, and both answers work: passed')
 }
 
