@@ -1,6 +1,6 @@
 # Configuration
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (bfcbdca0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (3e1a0d4e)_
 
 Every setting, environment variable and stored preference the code reads, with the default it uses.
 
@@ -38,7 +38,7 @@ All three credential fields are `type: secret`: Hermes shows them in Settings as
 | `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or the Olympus machine. |
 | `online.json` | `on` | `false` | Whether online play is on. |
 
-The rest of `wallet.json` is bookkeeping: chips, points under `bonus`, token counters, spins, streaks, the recent spin feed and which surfaces currently show a machine.
+The rest of `wallet.json` is bookkeeping: chips, points under `bonus`, token counters, spins, streaks, the recent spin feed, which surfaces currently show a machine, and which chat the desktop last reported as the one on screen (`focus_session` with the `focus_at` stamp; older than 60 seconds, the automatic spin stops).
 
 ## Environment variables
 

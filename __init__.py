@@ -62,10 +62,37 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
     _register_model_slot(ctx)
 
     # Slots: with auto-spin on, a spin happens at the moment the person's turn starts, and only
-    # while the machine is on screen (the desktop reports that). Nothing is banked: a turn with
-    # the machine closed costs nothing and earns nothing. The hook returns no text, so the prompt
-    # is untouched, and any failure is swallowed rather than breaking the turn.
+    # while the machine is on screen AND only for the chat on screen. Nothing is banked: a turn with
+    # the machine closed costs nothing and earns nothing, and neither does a turn in a chat nobody is
+    # looking at. The hook returns no text, so the prompt is untouched, and any failure is swallowed
+    # rather than breaking the turn.
     seen_turns: list[str] = []
+    # What the last turn spent, per chat, so the person's own message bets in proportion to the turn
+    # before it: a message is sent before the model is asked anything, so the turn's own cost is not
+    # known yet - the previous one's is the only honest number there is. Cleared as it is read.
+    spent_by_session: dict[str, int] = {}
+
+    def on_screen(wallet, kwargs: dict[str, Any], wallets) -> bool:
+        """Whether this hook belongs to the chat the person is looking at.
+
+        Every hook fires for every chat on this Hermes - a workturn, a delegated subagent, a review
+        pane - which is how the machine used to turn over while the owner was reading something else.
+        The desktop says which chat is on screen (``/jackpot/visible`` carries the runtime id and a
+        stamp); a subagent, a missing report and a report older than ``wallet.FOCUS_TTL`` are all a
+        no. One debug line when it says no, so a live run can prove the match instead of trusting it.
+        """
+        session = str(kwargs.get("session_id") or "")
+        parent = str(kwargs.get("parent_session_id") or "")
+        if parent:
+            # A delegated child is not the person: whatever it costs, it never turns their machine.
+            log.debug("the automatic spin skipped: chat %r is a subagent of %r", session or "none", parent)
+            return False
+        held = wallet.read()
+        if not wallets.focused(held, session):
+            log.debug("the automatic spin skipped: chat %r is not the focused chat (%r), or the report is stale",
+                      session or "none", held.get("focus_session") or "none")
+            return False
+        return True
 
     def earn_pull(**kwargs: Any) -> None:
         turn = str(kwargs.get("turn_id") or "")
@@ -75,19 +102,28 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
                 return None
             seen_turns.append(turn)
             del seen_turns[:-50]
+        session = str(kwargs.get("session_id") or "")
         try:
             here = Path(__file__).resolve().parent / "shelf"
             wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
             slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
-            slots.autospin(wallet, kind="turn")
+            if not on_screen(wallet, kwargs, wallets):
+                spent_by_session.pop(session, None)
+                return None
+            # The person's own message: one spin, at least double the smallest bet, sized by what the
+            # turn before it cost.
+            tokens = spent_by_session.pop(session, 0)
+            slots.autospin(wallet, kind="message", tokens=tokens, session_id=session)
         except Exception:
             log.debug("the automatic spin after a turn did not run", exc_info=True)
 
     # Tokens: every API reply the person spends pays points - 10 per 1M tokens in or out, one
     # whole point per 100k - because points are the account currency that shows how much Hermes is
     # being used. A reply is counted once, judged by its own api_request_id; failures are
-    # swallowed, and only the local person's wallet (the auto-spin one) ever moves.
+    # swallowed, and only the local person's wallet (the auto-spin one) ever moves. A reply does NOT
+    # spin: the spin for the turn already happened when the person sent their message, and one spin
+    # per intermediate model reply turned the machine into a machine gun.
     seen_requests: list[str] = []
 
     def earn_tokens(**kwargs: Any) -> None:
@@ -98,18 +134,19 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
                 return None
             seen_requests.append(request_id)
             del seen_requests[:-50]
+        session = str(kwargs.get("session_id") or "")
         try:
             here = Path(__file__).resolve().parent / "shelf"
             wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
             spent = wallets.usage_tokens(kwargs.get("usage") or {})
-            if spent > 0:
+            # Points belong to the chat on screen too: a background chat's tokens are not something
+            # the person is spending in front of this machine.
+            if spent > 0 and on_screen(wallet, kwargs, wallets):
                 wallet.add_tokens(spent)
-                # The reply was expensive, so it is worth a bigger automatic bet than a turn
-                # starting or a tool running. Same gate as any other
-                # automatic spin: auto-play on and the machine on screen.
-                slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
-                slots.autospin(wallet, kind="reply", tokens=spent)
+                if len(spent_by_session) > 64:
+                    spent_by_session.clear()
+                spent_by_session[session] = spent_by_session.get(session, 0) + spent
         except Exception:
             log.debug("the automatic spin after a reply did not run", exc_info=True)
 
@@ -129,7 +166,9 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
             wallets = load_fresh("hermes_gameshelf_wallet", here / "wallet.py")
             slots = load_fresh("hermes_gameshelf_slotplay", here / "slotplay.py")
             wallet = wallets.Wallet(wallets.wallet_path(root()))
-            slots.autospin(wallet, kind="tool")
+            if not on_screen(wallet, kwargs, wallets):
+                return None
+            slots.autospin(wallet, kind="tool", session_id=str(kwargs.get("session_id") or ""))
         except Exception:
             log.debug("the automatic spin after a tool call did not run", exc_info=True)
 

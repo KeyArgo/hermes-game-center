@@ -120,11 +120,39 @@ let JP2_LAST = null
 // surface reports under, so it cannot clear the original machine's own flag (or be cleared by it).
 let JP2_VIEWERS = 0
 
+// Which chat the person is looking at, as the shelf's hooks name it. The hooks carry the RUNTIME
+// session id (focusedStoredSessionId is the durable one and would never match), so that is what is
+// read here. A draft has none - '' - and the shelf reads that as "no chat on screen": no spin.
+function gcFocusedChat() {
+  try {
+    const atom = host && host.state && host.state.focusedSessionId
+    const value = atom && typeof atom.get === 'function' ? atom.get() : atom
+    return typeof value === 'string' ? value : ''
+  } catch {
+    return ''
+  }
+}
+
+// Keep saying which chat is on screen while a machine is drawn: on every focus move, and every 20 s
+// because the shelf's stamp is only good for 60. Returns the one call that stops both.
+function gcRepeatFocus(again) {
+  const stops = []
+  try {
+    const atom = host && host.state && host.state.focusedSessionId
+    if (atom && typeof atom.subscribe === 'function') stops.push(atom.subscribe(() => { again() }))
+  } catch {
+    // An app without the atom: the beat below still refreshes the stamp.
+  }
+  const beat = setInterval(() => { again() }, 20000)
+  stops.push(() => clearInterval(beat))
+  return () => stops.forEach(stop => { try { stop() } catch { /* already gone */ } })
+}
+
 async function jp2Visible(delta, ctx) {
   JP2_VIEWERS = Math.max(0, JP2_VIEWERS + Number(delta || 0))
   try {
     if (ctx && typeof ctx.rest === 'function') {
-      await ctx.rest('/jackpot/visible', { method: 'POST', body: { on: JP2_VIEWERS > 0, source: 'jackpot2' } })
+      await ctx.rest('/jackpot/visible', { method: 'POST', body: { on: JP2_VIEWERS > 0, source: 'jackpot2', session_id: gcFocusedChat() } })
     }
   } catch (err) {
     // A report that did not arrive only means no automatic spin; nothing else waits on it.
@@ -528,11 +556,13 @@ function JackpotMachine(props) {
   }, [mode])
 
   // This cabinet is on screen for as long as it is mounted, and the shelf spins on the hook path
-  // while any surface says so. Without this report the automatic spin was refused on every reply and
-  // every tool call while the cabinet was the only machine drawn.
+  // while any surface says so - for the chat the person is looking at and no other. Without this
+  // report the automatic spin was refused on every reply and every tool call while the cabinet was
+  // the only machine drawn; without the repeat it went stale a minute after the page opened.
   useEffect(() => {
     jp2Visible(1, ctx)
-    return () => { jp2Visible(-1, ctx) }
+    const stillFocused = gcRepeatFocus(() => jp2Visible(0, ctx))
+    return () => { stillFocused(); jp2Visible(-1, ctx) }
   }, [ctx])
 
   // The full view measures the ELEMENT IT IS MOUNTED IN, not the window: the same cabinet is mounted

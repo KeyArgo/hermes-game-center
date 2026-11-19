@@ -872,15 +872,21 @@ def jackpot_prefs(body: dict | None = None) -> dict:
 
 @router.post("/jackpot/visible")
 def jackpot_visible(body: dict | None = None) -> dict:
-    """Whether a surface is showing a machine. Auto-spin only runs while one of them is.
+    """Whether a surface is showing a machine, and which chat the person is looking at.
 
     ``source`` names the surface: the original copy over the chat (the default, which is what the
     older desktop posts) or the Jackpot cabinet. Each keeps its own flag, so closing one cannot
     switch the automatic spin off while another is still drawing: two machines may float at once.
+
+    ``session_id`` is the chat on screen, as the RUNTIME id the hooks carry (not the stored one),
+    stamped with the moment it arrived. A spin belongs to that chat and to no other, so it is sent
+    on every focus move and every 20 s; a report older than the shelf's window spins nothing. A post
+    without it (an older desktop) leaves the last report standing.
     """
     body = body or {}
     wallet = _jackpot_wallet()
-    wallet.set_visible(bool(body.get("on")), str(body.get("source") or "slots"))
+    wallet.set_visible(bool(body.get("on")), str(body.get("source") or "slots"),
+                       session_id=body.get("session_id"))
     return _jackpot_payload(wallet)
 
 

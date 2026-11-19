@@ -6,6 +6,17 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The slot spins and pays points only for the chat you are looking at.** Every hook fires for every
+  chat on the machine, so a workturn in a side chat, a delegated subagent or a review pane turned the
+  owner's machine over while he was reading something else (owner, 2026-11-18: "slot spins and points
+  ONLY for the chat the person is looking at"). The desktop now posts the chat on screen - the RUNTIME
+  `host.state.focusedSessionId` the hooks carry, never the stored id - with its `/jackpot/visible`
+  report, re-sent on every focus move and every 20 s; the wallet keeps it with a stamp, and a missing,
+  different or older-than-a-minute report spins nothing and pays no points. A subagent (`parent_session_id`
+  set) never spins. Bets: a tool call stays the smallest bet, your own message is one spin at least
+  double the smallest and sized by what the turn before it cost, and an intermediate model reply pays
+  points instead of spinning. A skip is logged once at debug so the match can be proved live. Guards:
+  `tests/test_focused_chat_spins.py`.
 - **The Games page no longer carries backdrop Size and Visibility, and the side pane opens at 368 px.**
   The owner (2026-11-18): the slot machine settings on the Game Center main page "don't seem to work,
   maybe we should remove those", and "the right pane for the game center should default where it is

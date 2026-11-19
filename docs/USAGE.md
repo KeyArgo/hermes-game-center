@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (bfcbdca0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (3e1a0d4e)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -103,8 +103,8 @@ Open **Blackjack** on the Play shelf and bet chips from the wallet. The dealer s
 Open **Slots** on the Play shelf. Pick a bet (25 chips up) and press **Spin**.
 
 - **Classic** is a nine-window, five-payline machine; **Hermes Olympus** is one line on three Greek reels. You can switch mid-session.
-- **Inference Slot Machine** spins while Hermes is working, and only while a machine is on screen. Both cabinets' switches and the Games-page button carry the same one-line help: *One spin each time Hermes starts thinking, and only while this machine is on screen.* In full: one spin each time Hermes starts thinking, one per burst of tool calls, and one after a reply.
-- **Auto-bet** sizes each stake by what the reply cost.
+- **Inference Slot Machine** spins while Hermes is working, and only while a machine is on screen and only for the chat you are looking at. Both cabinets' switches and the Games-page button carry the same one-line help: *One spin each time Hermes starts thinking, and only while this machine is on screen.* In full: one spin for your own message (at least double the smallest bet, sized by what the turn before it cost), one per burst of tool calls at the smallest bet, and none for the model's intermediate replies - those pay points instead. A chat that is not on screen, a delegated subagent, and a report older than a minute all spin nothing.
+- **Auto-bet** sizes each stake by what the message or the reply cost.
 - **Show as backdrop** draws a see-through copy at the top centre of the conversation, centred over the message box (the composer's own slot), so it is on screen exactly while the conversation is, and never floats over another screen. It stays at the top with the status bar hidden (Simple mode) too. Its size and how see-through it is (5% to 100%, 50% by default) are set in the cabinet itself. **Backdrop size** and **Backdrop opacity** are shared by the cabinet, the status bar and Settings. 100% is 640 px tall, twice the old copy, and at 100% never more than 60% of the window's height; a bigger size grows it up to 95% of the window. **Normal** / **Bigger** / **Biggest** in the cabinet set 100% / 150% / 200% in one press. The backdrop is a picture: nothing in it takes a click.
 
 The screen prints no odds. The mechanics and payouts are in `shelf/jackpot.py` and `shelf/slotplay.py`; the audit script is `scripts/slot-audit.py`.

@@ -7,6 +7,7 @@ lever.
 Rules, in one place so the table, the hooks and the tests cannot drift:
 
 - A cheap, frequent hook (a turn starting, a tool call) is worth the smallest bet on the table.
+- The person's own message is worth at least double the smallest bet: it is the one hook they fired.
 - A reply is worth more the more tokens it cost, one step per doubling past 20k, up to the cap.
 - Nothing here decides whether a spin happens, only how much it costs. Odds are untouched: the
   return is the same at every bet, so a bigger bet is a bigger swing, never a better chance.
@@ -16,8 +17,11 @@ from __future__ import annotations
 
 import math
 
-# Kinds that fire often and cost little: the turn starting, a tool running.
+# Kinds that fire often and cost little: a turn starting, a tool running.
 CHEAP_KINDS = ("turn", "tool", "hook", "start")
+# The person's own message: the one hook they chose to fire. It is never the smallest bet - a tool
+# call is - so its floor is the second rung of the ladder, whatever the turn cost.
+MESSAGE_KINDS = ("message", "prompt")
 
 # A multiple of the table's minimum bet. 1 is the smallest bet the machine offers.
 MULTIPLES = (1, 2, 3, 4, 6, 8)
@@ -27,15 +31,19 @@ STEPS_AT_TOKENS = 20_000  # below this a reply is barely a reply
 
 def multiple_for(kind: str, tokens: int = 0) -> int:
     """The bet multiple for one hook. Cheap hooks are always the smallest bet."""
-    if str(kind).lower() in CHEAP_KINDS:
+    name = str(kind).lower()
+    if name in CHEAP_KINDS:
         return MULTIPLES[0]
     tokens = int(tokens or 0)
     if tokens <= 0:
-        return MULTIPLES[0]
-    if tokens <= STEPS_AT_TOKENS:
-        return MULTIPLES[1]
-    # 20k -> 2x, 40k -> 3x, 80k -> 4x, 160k -> 6x, 320k+ -> 8x
-    step = 1 + int(math.log2(tokens / STEPS_AT_TOKENS))
+        step = 0
+    elif tokens <= STEPS_AT_TOKENS:
+        step = 1
+    else:
+        # 20k -> 2x, 40k -> 3x, 80k -> 4x, 160k -> 6x, 320k+ -> 8x
+        step = 1 + int(math.log2(tokens / STEPS_AT_TOKENS))
+    if name in MESSAGE_KINDS:
+        step = max(step, 1)
     return MULTIPLES[min(step, len(MULTIPLES) - 1)]
 
 

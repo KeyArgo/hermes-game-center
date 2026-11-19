@@ -203,26 +203,28 @@ import importlib
 
 
 def test_auto_spin_can_be_turned_on_and_off(tmp_path: Path) -> None:
-    """The reply hook follows the switch, and the switch is remembered.
+    """The turn hook follows the switch, and the switch is remembered.
 
-    The hook only spins while the machine is on screen; that visibility gate is what
-    "no spinning while the slot is closed" means, and it is posted by the desktop.
+    The hook only spins while the machine is on screen and only for the chat on screen; that is what
+    "no spinning while the slot is closed" means, and both are posted by the desktop.
     """
     slotplay = importlib.import_module("shelf.slotplay")
     from shelf.wallet import Wallet
 
     wallet = Wallet(tmp_path / "wallet.json")
-    wallet.set_visible(True)
+    wallet.set_visible(True, session_id="chat-1")
     wallet.set_bet(25)
-    assert slotplay.autospin(wallet) is None, "auto-spin is off until someone turns it on"
+    assert slotplay.autospin(wallet, session_id="chat-1") is None, \
+        "auto-spin is off until someone turns it on"
 
     wallet.set_autoplay(True)
-    spun = slotplay.autospin(wallet)
+    spun = slotplay.autospin(wallet, session_id="chat-1")
     assert spun is not None and spun["auto"] is True
     assert wallet.read()["chips"] <= 10_000 - 25 + int(spun["payout"])
 
     wallet.set_autoplay(False)
-    assert slotplay.autospin(wallet) is None, "turning it off stops the next reply spinning"
+    assert slotplay.autospin(wallet, session_id="chat-1") is None, \
+        "turning it off stops the next turn spinning"
     assert wallet.read()["autoplay"] is False
 
 
@@ -232,10 +234,10 @@ def test_auto_spin_never_fires_while_the_machine_is_closed(tmp_path: Path) -> No
 
     wallet = Wallet(tmp_path / "wallet.json")
     wallet.set_autoplay(True)
-    wallet.set_visible(False)
-    assert slotplay.autospin(wallet) is None
-    wallet.set_visible(True)
-    assert slotplay.autospin(wallet) is not None
+    wallet.set_visible(False, session_id="chat-1")
+    assert slotplay.autospin(wallet, session_id="chat-1") is None
+    wallet.set_visible(True, session_id="chat-1")
+    assert slotplay.autospin(wallet, session_id="chat-1") is not None
 
 
 def test_robot3_is_its_own_machine_not_a_reskin() -> None:
@@ -364,9 +366,9 @@ def test_the_overchat_look_is_remembered_and_out_of_range_values_refused(tmp_pat
     assert again["overchat_alpha"] == 0.35 and again["overchat_scale"] == 0.6, "the file holds them"
 
 
-def test_the_overchat_copy_alone_earns_a_spin_per_reply(tmp_path: Path) -> None:
+def test_the_overchat_copy_alone_earns_a_spin_per_turn(tmp_path: Path) -> None:
     """With the machine over the chat it is heard spinning while a person plays Sea Battle - the
-    Slots table does not have to be open. Visibility is all auto-spin needs."""
+    Slots table does not have to be open. Visibility, and the chat on screen, is all auto-spin needs."""
     import importlib
 
     play = importlib.import_module("shelf.slotplay")
@@ -374,12 +376,13 @@ def test_the_overchat_copy_alone_earns_a_spin_per_reply(tmp_path: Path) -> None:
 
     wallet = Wallet(wallet_path(tmp_path))
     wallet.set_autoplay(True)
-    wallet.set_visible(True)  # what the over-chat copy reports while it is drawn
-    first = play.autospin(wallet)
-    assert first is not None, "a reply spins the machine when the copy is on screen"
+    wallet.set_visible(True, session_id="chat-1")  # what the over-chat copy reports while it is drawn
+    first = play.autospin(wallet, kind="message", session_id="chat-1")
+    assert first is not None, "a turn spins the machine when the copy is on screen"
     assert first["auto"] is True
-    wallet.set_visible(False)
-    assert play.autospin(wallet) is None, "nothing spins once the copy is off screen"
+    wallet.set_visible(False, session_id="chat-1")
+    assert play.autospin(wallet, kind="message", session_id="chat-1") is None, \
+        "nothing spins once the copy is off screen"
 
 
 def test_the_backdrop_visibility_reaches_solid_and_starts_at_half(tmp_path: Path) -> None:
