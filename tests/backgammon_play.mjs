@@ -374,6 +374,84 @@ if (dragToken) {
   console.log('info drag skipped: no plain point-to-point move is on offer this turn')
 }
 
+// ---------------------------------------------------------------- the bar and the off tray
+// A person only reaches the bar and their own home board after twenty moves, so the position is
+// seeded the way tests/test_difficulty.py edits a saved game: write the engine's own state.json,
+// wait for the board on screen to show it, then click. Between them these two prove by clicking
+// the two controls the owner named - entering from the bar, and bearing a checker off the board.
+const STATE_FILE = path.join(scratch, 'root', 'data', 'backgammon', 'state.json')
+const BLACK_AS_USUAL = { 1: -2, 12: -5, 17: -3, 19: -5 }
+const pointsOf = map => {
+  const array = Array(24).fill(0)
+  Object.entries(map).forEach(([point, count]) => { array[Number(point) - 1] = count })
+  return array
+}
+const seed = (white, dice, extra = {}) => {
+  const saved = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))
+  fs.writeFileSync(STATE_FILE, JSON.stringify({
+    ...saved,
+    points: pointsOf({ ...(extra.black || BLACK_AS_USUAL), ...white }),
+    bar: { white: 0, black: 0, ...(extra.bar || {}) },
+    off: { white: 0, black: 0, ...(extra.off || {}) },
+    dice: [...dice], turn: 'white', status: 'active', winner: '', last: '',
+    plies: Number(saved.plies || 0) + 1
+  }, null, 2))
+}
+// The tray labels are the seeded position's fingerprint on screen, so waiting for them waits for
+// the poll to have really painted this position rather than a stale board one poll behind.
+const trays = () => evaluate(`(() => {
+  const svg = document.querySelector('svg[aria-label="Backgammon board"]')
+  if (!svg) return null
+  const labels = [...svg.querySelectorAll('text')].map(n => n.textContent)
+  return { bar: labels.find(text => /^Bar /.test(text)) || '', off: labels.find(text => /^Off /.test(text)) || '' }
+})()`)
+const boardShows = async (bar, off) => waitFor(async () => {
+  const shown = await trays()
+  return Boolean(shown && shown.bar === bar && shown.off === off)
+}, 30000)
+
+// Black is seeded inside its own home board, out of reach of point 22, so the computer's answer
+// cannot hit the entered checker straight back onto the bar and blur what is being measured.
+seed({ 24: 1 }, [3], { bar: { white: 1 }, off: { white: 13 }, black: { 1: 2, 2: 13 } })
+check('the board shows a seeded position with a checker on the bar', (await boardShows('Bar 1/0', 'Off 13/0')) === true,
+  JSON.stringify(await trays()))
+const barState = await boardFacts()
+check('the board says a checker is waiting on the bar', /bar/i.test(barState.hint || ''), JSON.stringify(barState.hint))
+const barBefore = await apiPicture()
+const barToken = String((barBefore.legal || [])[0] || '')
+check('the engine offers only the entry from the bar', /^bar-\d+-\d$/.test(barToken), JSON.stringify(barBefore.legal))
+await mouseClick('[data-bg-point="bar"]')
+const barPicked = await boardFacts()
+check('picking the bar lights the point it enters on', barPicked.lit.includes(barToken.split('-')[1]),
+  JSON.stringify({ lit: barPicked.lit, hint: barPicked.hint, token: barToken }))
+await mouseClick(`[data-bg-point="${barToken.split('-')[1]}"]`)
+await sleep(1600)
+const barAfter = await boardFacts()
+check('clicking the entry point really brings the checker in off the bar',
+  barAfter.calls.includes(`backgammon move ${barToken}`), JSON.stringify(barAfter.calls.slice(-3)))
+check('the bar is empty afterwards', (await apiPicture()).bar.white === 0, JSON.stringify((await apiPicture()).bar))
+await shot('bg-seeded-bar')
+
+seed({ 6: 1, 5: 1, 4: 1 }, [6, 5], { off: { white: 12 } })
+check('the board shows a seeded home-board position', (await boardShows('Bar 0/0', 'Off 12/0')) === true,
+  JSON.stringify(await trays()))
+let offState = await boardFacts()
+if (offState.roll) { await click('[data-bg-roll]'); await sleep(1400) }
+const offBefore = await apiPicture()
+const offToken = String((offBefore.legal || [])[0] || '')
+check('the engine offers a bear-off from the home board', /^\d+-off-\d$/.test(offToken), JSON.stringify(offBefore.legal))
+await mouseClick(`[data-bg-checker="${offToken.split('-')[0]}"]`)
+const offArmed = await evaluate(`(() => { const n = document.querySelector('[data-bg-off]'); return !!n && !n.disabled })()`)
+check('picking a home-board checker arms Bear off', offArmed === true, JSON.stringify((await boardFacts()).hint))
+await mouseClick('[data-bg-off]')
+await sleep(1600)
+const offAfter = await boardFacts()
+check('clicking Bear off really takes a checker off the board',
+  offAfter.calls.includes(`backgammon move ${offToken}`), JSON.stringify({ wanted: offToken, calls: offAfter.calls.slice(-3) }))
+check('the off tray went up by one',
+  (await apiPicture()).off.white === 13, JSON.stringify((await apiPicture()).off))
+await shot('bg-seeded-off')
+
 // ---------------------------------------------------------------- verdict
 stopChrome()
 stopServer()

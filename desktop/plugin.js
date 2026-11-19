@@ -2580,7 +2580,10 @@ function BackgammonSvg({ picture, height, interactive, onMove, onPhase }) {
 
   const movable = name => moves.some(move => move.from === name)
   const target = name => Boolean(picked) && moves.some(move => move.from === picked && move.to === name)
-  const litPoints = () => [...new Set(moves.map(move => move.to).filter(name => name !== 'off'))].join(', ')
+  // Where ONE picked checker can go, so the sentence under the board never lists a point the
+  // person's own checker cannot reach.
+  const waysFrom = name => [...new Set(moves.filter(move => move.from === name).map(move => move.to))]
+    .map(to => (to === 'off' ? 'Bear off' : to)).join(', ')
 
   const moveNow = move => {
     setPicked('')
@@ -2597,7 +2600,7 @@ function BackgammonSvg({ picture, height, interactive, onMove, onPhase }) {
     const choice = picked ? moves.find(move => move.from === picked && move.to === name) : null
     if (choice) { moveNow(choice); return }
     if (name === picked) { setPicked(''); setHint(''); return }
-    if (movable(name)) { setPicked(name); setHint(`Now tap a lit point${litPoints() ? ` (${litPoints()})` : ''}.`); return }
+    if (movable(name)) { setPicked(name); setHint(`Now tap a lit point: ${waysFrom(name)}.`); return }
     setPicked('')
     setHint(picked ? 'That checker cannot reach there. Lit points show where it can go.'
       : 'No checker can move from there with these dice. A lit checker can.')
@@ -2621,7 +2624,7 @@ function BackgammonSvg({ picture, height, interactive, onMove, onPhase }) {
     if (!grip.current) return
     if (dragged.current) return
     dragged.current = true
-    if (movable(grip.current)) { setPicked(grip.current); setHint(`Drop it on a lit point${litPoints() ? ` (${litPoints()})` : ''}.`) }
+    if (movable(grip.current)) { setPicked(grip.current); setHint(`Drop it on a lit point: ${waysFrom(grip.current)}.`) }
   }
   const boardUp = event => {
     const from = grip.current
@@ -2758,7 +2761,7 @@ function BackgammonSvg({ picture, height, interactive, onMove, onPhase }) {
   })
 
   const words = hint || (picked
-    ? `Now tap a lit point${litPoints() ? ` (${litPoints()})` : ''}.`
+    ? `Now tap a lit point: ${waysFrom(picked)}.`
     : movable('bar') && !picked ? 'A checker is on the bar: tap Bar, then a lit point.'
       : moves.length && moves[0].token !== 'pass'
         ? 'Tap a lit checker, then a lit point. Drag works too.'
