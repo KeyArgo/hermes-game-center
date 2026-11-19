@@ -10189,8 +10189,8 @@ const GAMES_REPO = 'https://github.com/KeyArgo/hermes-game-center'
 const GAMES_LINKS = [
   { id: 'report', label: 'Report a problem', href: GAMES_REPO + '/issues/new',
     title: 'Open a new issue on the Game Center repository in your browser' },
-  { id: 'contribute', label: 'Contribute', href: GAMES_REPO,
-    title: 'The Game Center repository on GitHub, in your browser' },
+  { id: 'contribute', label: 'How to help', href: GAMES_REPO + '/blob/main/CONTRIBUTING.md',
+    title: 'How to help: report a problem, add a game, or work on the code' },
   { id: 'add', label: 'Add your own game', href: '',
     title: 'Add your own game: a community game or a Game Center game, in a form here' }
 ]
@@ -19086,6 +19086,11 @@ const WELCOME_LINE = 'Game Center is where you play the board games that come wi
 const HERE_LINE = 'People in this Hermes and the chats it shares.'
 const MATCH_LINE = 'Tell me when someone wants a match'
 
+// A match needs a second person, so a game only gets a match toggle when the lobby server can seat
+// it: LOBBY_GAME_IDS in 72-lobby.js, which mirrors the server's REQUESTABLE list. Slots and the
+// other one-player games are still played, they just never wait for anyone (owner, 2026-11-18).
+const matchable = list => (Array.isArray(list) ? list : []).filter(game => game && LOBBY_GAME_IDS.includes(game.id))
+
 // No default name (owner, 2026-11-18: "There should not be a default user, but we can add a user name
 // generator"). Every box - the welcome, Settings and the online sign-in - opens empty, and this is the
 // button beside it: the shelf hands back a fresh name on every press (/name/suggest, drawn from the
@@ -19131,7 +19136,8 @@ function WelcomePanel({ view, ctx, onDone }) {
   const [games, setGames] = useState(() => Object.keys(setup.watched || {}))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const list = view.play || []
+  // Only the games two people can play: the welcome writes the match list too (E2).
+  const list = matchable(view.play)
 
   const pick = id => setGames(current => (current.includes(id) ? current.filter(item => item !== id) : current.concat([id])))
 
@@ -19210,7 +19216,7 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
   const [name, setName] = useState(setup.name || '')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const list = view.play || []
+  const list = matchable(view.play)
   const watched = setup.watched || {}
   const player = view.player || {}
 
@@ -22735,6 +22741,189 @@ function OnlineGetOnlineCard({ ctx, view }) {
   })
 }
 
+// ---- Play with people: the card right under Get online -------------------------------
+//
+// The accept list and Find match used to live only inside The Hall, a panel down the page,
+// which is why the owner could not find them. Both rows are here now, on the page a person
+// already is, and they write exactly what The Hall writes (lobbyAcceptBody / lobbyLookingBody,
+// 72-lobby.js): the lobby server is the one copy of that state, so the two surfaces cannot
+// disagree. The card is drawn only when this window is signed in to online play.
+function PlayWithPeople({ ctx, view }) {
+  const online = onlineView(view)
+  const signedIn = Boolean(online.on && online.linked && !online.offline)
+  // The Hall's own snapshot, read here every few seconds. It is the same door The Hall reads,
+  // so an accept made in either place is what this card shows on its next turn.
+  const [snap, setSnap] = useState(null)
+  const [pending, setPending] = useState('')
+  const [note, setNote] = useState('')
+  // The game the once-only "always?" question is about, while it is on screen.
+  const [askGame, setAskGame] = useState('')
+  // Games already asked about in this visit. The server sends ask_always once per change,
+  // and this keeps a second press from drawing the same question again.
+  const asked = useRef({})
+
+  useEffect(() => {
+    if (!signedIn || !ctx || typeof ctx.rest !== 'function') return undefined
+    let alive = true
+    let timer = null
+    const read = async () => {
+      try {
+        const answer = await ctx.rest('/online/hall')
+        if (alive && answer && typeof answer === 'object') setSnap(answer)
+      } catch { /* the last snapshot stands; the next tick tries again */ }
+    }
+    read()
+    timer = setInterval(read, HALL_POLL_MS)
+    return () => { alive = false; if (timer) clearInterval(timer) }
+  }, [ctx, signedIn])
+
+  if (!signedIn) return null
+
+  // One door for both rows, held while its own POST is out, and a refusal is said in the
+  // lobby's own words rather than swallowed.
+  const post = async (key, path, body) => {
+    if (pending) return { ok: false }
+    setPending(key)
+    setNote('')
+    try {
+      const answer = ctx && typeof ctx.rest === 'function'
+        ? await ctx.rest(path, { method: 'POST', body })
+        : { ok: false, text: 'Game Center cannot be reached.' }
+      if (answer && answer.ok === false) setNote(String(answer.text || ''))
+      // A Play that had to accept the game for twenty minutes comes back with ask_always:
+      // the press that opened that window is the one moment to ask whether it should stay.
+      const played = body && Array.isArray(body.games) ? body.games[0] : ''
+      if (answer && answer.ask_always && played && !asked.current[played]) {
+        asked.current[played] = true
+        setAskGame(played)
+      }
+      return answer || { ok: true }
+    } catch {
+      setNote('That did not reach Game Center. Try again.')
+      return { ok: false }
+    } finally {
+      setPending('')
+    }
+  }
+
+  const you = (snap && snap.you) || {}
+  const prefs = (snap && snap.prefs) || { open: false, games: {}, until: {} }
+  const requests = (snap && snap.requests) || []
+  const mine = Array.isArray(you.looking) ? you.looking : []
+  const nowSeconds = Date.now() / 1000
+  // A pending offer that has run out is not one that is out any more.
+  const sent = requests.filter(req => req && req.state === 'pending' && req.offer
+    && req.from && String(req.from.id) === String(you.id)
+    && Number(req.expires || 0) > nowSeconds)
+  const came = requests.filter(req => req && req.state === 'pending' && req.offer
+    && req.to && String(req.to.id) === String(you.id))
+  const asking = sent[0] || null
+  // How long the offer has left, in whole seconds: "Asking Bea — 42 s". The server's expires is
+  // the moment it lapses, not a length, so the count is that moment minus now.
+  const left = asking ? Math.max(0, Math.round(Number(asking.expires || 0) - nowSeconds)) : 0
+  const comingOffer = came[0] || null
+  const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
+  const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.5, minWidth: 0 }
+
+  // One label row: the row's name, then the sentence that says what pressing it does.
+  const rowHead = (key, label, say) => jsxs('div', {
+    'data-people-row': key,
+    style: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, minWidth: 0 },
+    children: [
+      jsx('span', { style: { fontSize: 13, fontWeight: 650 }, children: label }),
+      jsx('span', { style: { ...muted, whiteSpace: 'normal' }, children: say })
+    ]
+  })
+
+  return jsxs('section', {
+    'data-people-card': 'open',
+    'aria-label': 'Play with people',
+    style: {
+      display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flexWrap: 'wrap',
+      border: `1px solid ${stroke}`, borderRadius: 10, background: card, padding: '10px 12px'
+    },
+    children: [
+      jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Play with people' }),
+      rowHead('accept', 'Games I accept', 'People who press Play can invite you to these.'),
+      // Called as the block it is, the way onlineAccountBlock is: no state of its own, so the
+      // chip row is drawn in place and its presses go through this card's one door.
+      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE }),
+      // The master switch is The Hall's; saying so here is kinder than chips that look pressed
+      // while the server is sending nobody.
+      prefs.open ? null : jsx('div', {
+        'data-people-open-off': '1', style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
+        children: 'Game requests are off. Turn on "Take game requests" in The Hall for people to reach these.'
+      }),
+      rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
+      jsx('div', {
+        role: 'group', 'aria-label': 'Play now',
+        style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
+        children: LOBBY_GAMES.map(([id, label]) => jsx('button', {
+          'data-play-now': id,
+          ...held(`Ask people who accept ${label} for a game now.`),
+          onClick: () => post(`play:${id}`, '/online/hall/looking', lobbyLookingBody([id])),
+          style: {
+            fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'normal',
+            border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary
+          },
+          children: `Play ${label}`
+        }, id))
+      }),
+      // The search itself: who is being asked, or that nobody is free yet. Stop looking is
+      // here, beside the sentence it ends, so the way out is where the person is looking.
+      asking || mine.length
+        ? jsxs('div', {
+            'data-people-status': '1', role: 'status', 'aria-live': 'polite',
+            style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 },
+            children: [
+              jsx('span', { style: { ...muted, color: text.secondary, flex: 1 }, children: asking
+                ? `Asking ${(asking.to && asking.to.name) || 'someone'} — ${left} s`
+                : `Nobody is free for ${mine.map(lobbyTitle).join(', ')} right now — still looking` }),
+              jsx('button', {
+                'data-people-stop': '1',
+                ...held('Stop looking for a match.'),
+                onClick: () => post('stop', '/online/hall/looking', lobbyLookingBody([])),
+                style: { fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${stroke}`, background: 'transparent', color: text.tertiary, cursor: 'pointer' },
+                children: 'Stop looking'
+              })
+            ]
+          })
+        : jsx('div', { style: muted, children: 'Press Play beside a game to ask the people who accept it.' }),
+      // An offer that came in: the same sentence the Hall uses, and the same dialog it opens.
+      comingOffer
+        ? jsx('div', {
+            'data-people-offer': String(comingOffer.id), role: 'status', 'aria-live': 'polite',
+            style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
+            children: `${lobbyOfferLine((comingOffer.from && comingOffer.from.name) || '', comingOffer.game)} — Join or Not now on the dialog.`
+          })
+        : null,
+      // The once-only question: the twenty-minute accept is already in place, so both answers
+      // work; "Yes, always" is the one that keeps it without a window.
+      askGame
+        ? jsxs('div', {
+            'data-ask-always': askGame, role: 'status', 'aria-live': 'polite',
+            style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, borderTop: `1px solid ${stroke}`, paddingTop: 8 },
+            children: [
+              jsx('span', { style: { ...muted, color: text.secondary, flex: 1, whiteSpace: 'normal' }, children: `Always let people invite you to ${lobbyTitle(askGame)}?` }),
+              button('Yes, always', async () => {
+                await post('always', '/online/hall/prefs', { always: { [askGame]: true } })
+                setAskGame('')
+              }, { primary: true, title: `Keep ${lobbyTitle(askGame)} on your accept list from now on.` }),
+              jsx('button', {
+                'data-ask-just': '1',
+                ...held(`Leave ${lobbyTitle(askGame)} accepted for the next twenty minutes only.`),
+                onClick: () => setAskGame(''),
+                style: { fontSize: 12, padding: '4px 10px', borderRadius: 8, border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary, cursor: 'pointer' },
+                children: 'Just 20 minutes'
+              })
+            ]
+          })
+        : null,
+      note ? jsx('div', { role: 'alert', style: { ...muted, color: text.primary }, children: note }) : null
+    ]
+  })
+}
+
 function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
@@ -23232,6 +23421,9 @@ function GameCenterPage({ ctx, onArea }) {
       // Get online: the first thing on the page, because playing with another person starts
       // here - which Game Center this window is on, and the four steps that sign you in.
       jsx(OnlineGetOnlineCard, { ctx, view }),
+      // Right under it: who may invite you, and Play now. Signed in only, and drawn from the
+      // lobby's own answer, so this card and The Hall always agree.
+      jsx(PlayWithPeople, { ctx, view }),
       jsxs('div', {
         style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'end', flexWrap: 'wrap' },
         children: [
@@ -23475,6 +23667,21 @@ const LOBBY_GAME_IDS = LOBBY_GAMES.map(item => item[0])
 const LOBBY_TITLES = Object.fromEntries(LOBBY_GAMES)
 const lobbyTitle = id => LOBBY_TITLES[id] || id
 
+// The two calls the accept list and the Play buttons make. The Hall's Find match chips press
+// the second one too, so the Games page's card and the Hall cannot drift apart.
+function lobbyAcceptBody(id, on) { return { games: { [id]: on } } }
+function lobbyLookingBody(ids) {
+  const games = (Array.isArray(ids) ? ids : []).filter(Boolean)
+  return games.length ? { games } : { on: false }
+}
+
+// "Connect 4 for 20 min": a temporary accept says how long it has, in the same words in both
+// places it is drawn. The server drops it by itself, so the label never promises more.
+function lobbyAcceptLabel(id, temp) { return temp ? `${lobbyTitle(id)} for 20 min` : lobbyTitle(id) }
+
+// "Bea wants to play Chess": the one sentence for an offer or a request, wherever it is drawn.
+function lobbyOfferLine(name, game) { return `${name || 'Someone'} wants to play ${lobbyTitle(game)}` }
+
 // A lobby post stays readable for 30 days: that is how long the server keeps the #games chat
 // (online/server.py CHAT_KEEP_DAYS), so this screen never hides a line the server still has.
 const LOBBY_POST_MS = 30 * 24 * 3600 * 1000
@@ -23574,8 +23781,7 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
     ...held(on ? `Stop looking for ${label}.` : `Look for a game of ${label} right now.`),
     onClick: () => {
       const next = on ? mine.filter(item => item !== id) : mine.concat([id])
-      post(`looking:${id}`, '/online/hall/looking',
-        next.length ? { games: next } : { on: false })
+      post(`looking:${id}`, '/online/hall/looking', lobbyLookingBody(next))
     },
     style: chipStyle(on),
     children: label
@@ -23617,11 +23823,45 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
   ] })
 }
 
+// The accept list as chips, on the page a person is already looking at (the Games page's
+// Play with people card). Every chip is one server write, the same one the Hall's per-game
+// switches make: the lobby keeps the list, so no screen keeps its own copy of it.
+function LobbyAcceptChips({ until, games, post, pending, busyNote }) {
+  const now = Date.now() / 1000
+  const untilAt = id => Number((until || {})[id] || 0)
+  // A temporary accept is on while its window lasts, and the server sends it as on too; a
+  // clock that has run past it is off, exactly as the server will count it.
+  const isOn = id => Boolean(games && games[id]) && (!untilAt(id) || untilAt(id) > now)
+  const held = say => ({ disabled: Boolean(pending), title: pending ? busyNote : say })
+  return jsx('div', {
+    'data-accept-row': '1', role: 'group', 'aria-label': 'Games you accept',
+    style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
+    children: LOBBY_GAMES.map(([id, label]) => {
+      const on = isOn(id)
+      const temp = on && untilAt(id) > 0
+      return jsx('button', {
+        'data-accept-chip': id,
+        'aria-pressed': on ? 'true' : 'false',
+        ...held(on ? `Stop accepting requests for ${label}.` : `Accept requests for ${label}.`),
+        onClick: () => post(`accept:${id}`, '/online/hall/prefs', lobbyAcceptBody(id, !on)),
+        style: {
+          fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
+          border: `1px solid ${on ? accent : stroke}`,
+          background: on ? fill : 'transparent', color: text.secondary,
+          // A narrow pane wraps the words inside a chip rather than pushing the row sideways.
+          whiteSpace: 'normal', textAlign: 'left', maxWidth: '100%'
+        },
+        children: lobbyAcceptLabel(id, temp)
+      }, id)
+    })
+  })
+}
+
 // A match offer. Find match made it, so neither person sent it: whichever of you
 // presses Join sits both down at the same private table. The dialog is the ask; the
 // dim line under the roster is the same news kept on the panel.
 function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote }) {
-  const title = `${otherName} wants to play ${lobbyTitle(card.game)}`
+  const title = lobbyOfferLine(otherName, card.game)
   return jsx('div', {
     'data-lobby-offer': String(card.id),
     role: 'dialog', 'aria-modal': 'true', 'aria-label': title,
@@ -23665,6 +23905,10 @@ const HALL_POLL_MS = 3000
 // while that one is out — and says so on hover, rather than looking pressable and being ignored.
 const HALL_BUSY_NOTE = 'Another Hall action is still going through. Wait for it, then try again.'
 
+// The last game you asked anyone for. A row defaults to it when that person takes it too, so
+// asking three people in a row does not mean choosing the same game three times.
+let lastHallAsked = ''
+
 // online is ready to play, away is here but idle, playing is already at a table.
 const HALL_STATUS_DOT = { online: '#3ee0c5', away: '#ffb020', playing: 'var(--ui-fill-tertiary, rgba(127,127,127,0.45))' }
 
@@ -23687,6 +23931,9 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // Rooms already opened, so a seat the server keeps reporting opens the table once.
   const handled = useRef(new Set())
   const alive = useRef(true)
+  // The game each person's Ask will send, remembered by person. It lives in a ref because
+  // choosing from the list must not redraw the panel (and so must not move every other row).
+  const asks = useRef({})
 
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
 
@@ -23835,26 +24082,54 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     : null
 
   // The roster, you left out. A dot says whether each person can play now, and Ask is
-  // offered only to someone online who accepts a game you are also taking.
+  // offered only to someone online who accepts a game you are also taking — for the game
+  // you choose from the ones you both take, not quietly for the first of them.
   const others = roster.filter(row => String(row.id) !== String(you.id))
   const anyMine = LOBBY_GAME_IDS.some(id => prefs.games && prefs.games[id])
   const myAccepted = (prefs.open || anyMine) ? LOBBY_GAME_IDS.filter(id => prefs.games && prefs.games[id]) : LOBBY_GAME_IDS
   const rosterRows = others.length ? others.map(row => {
     const status = String(row.status || '')
-    const shared = (Array.isArray(row.games) ? row.games : []).filter(id => myAccepted.includes(id))
-    const askGame = shared[0] || ''
-    const canAsk = status === 'online' && Boolean(askGame)
+    const theirs = LOBBY_GAME_IDS.filter(id => Array.isArray(row.games) && row.games.includes(id))
+    const shared = theirs.filter(id => myAccepted.includes(id))
+    // The game this row asks for: one chosen in it, else the last game you asked anyone for
+    // when they take it too, else the first game you both take. A choice that stops being
+    // shared (they turned it off, you did) falls back to one that still is.
+    const picked = asks.current[row.id]
+    const chosen = shared.includes(picked) ? picked
+      : (shared.includes(lastHallAsked) ? lastHallAsked : shared[0]) || ''
+    const canAsk = status === 'online' && Boolean(chosen)
     const askKey = `ask:${row.id}`
+    // Ask reads the ref rather than this draw: choosing in the list does not redraw the panel.
+    const ask = () => {
+      const game = shared.includes(asks.current[row.id]) ? asks.current[row.id] : chosen
+      lastHallAsked = game
+      return post(askKey, '/online/hall/request', { to: row.id, game })
+    }
     return jsxs('div', {
       'data-hall-row': String(row.id),
       style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: text.secondary },
       children: [
         jsx('span', { 'aria-hidden': true, style: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: HALL_STATUS_DOT[status] || text.tertiary } }),
         jsx('span', { style: { flex: 1, minWidth: 0 }, children: row.name }),
-        shared.length ? jsx('span', { style: { ...muted, flexShrink: 0 }, children: shared.map(lobbyTitle).join(', ') }) : null,
+        // A row you can ask carries the choice in its own control: a list when you both take
+        // more than one game, the game's name in the button when you take just one. A row you
+        // cannot ask keeps saying why in words.
+        canAsk && shared.length > 1 ? jsx('select', {
+          'data-hall-pick': String(row.id),
+          'aria-label': `Game to ask ${row.name} for`,
+          title: `The games you and ${row.name} both take. Ask sends the one chosen here.`,
+          defaultValue: chosen,
+          disabled: Boolean(pending),
+          style: { fontSize: 12, flexShrink: 0, maxWidth: 140, color: text.primary, background: 'transparent', border: `1px solid ${stroke}`, borderRadius: 6, padding: '1px 4px' },
+          onChange: event => { asks.current[row.id] = String((event.target && event.target.value) || '') },
+          children: shared.map(id => jsx('option', { value: id, children: lobbyTitle(id) }, id))
+        }, String(row.id)) : null,
+        canAsk ? null : jsx('span', { style: { ...muted, flexShrink: 0 }, children: shared.length
+          ? shared.map(lobbyTitle).join(', ')
+          : theirs.length ? `Takes ${theirs.map(lobbyTitle).join(', ')}` : 'Not taking requests' }),
         jsx('span', { 'data-hall-status': status, style: muted, children: status }),
-        canAsk ? button('Ask', () => post(askKey, '/online/hall/request', { to: row.id, game: askGame }),
-          held(`Ask ${row.name} to a game of ${lobbyTitle(askGame)}.`)) : null
+        canAsk ? button(shared.length === 1 ? `Ask to ${lobbyTitle(chosen)}` : 'Ask', ask,
+          held(`Ask ${row.name} to a game of ${lobbyTitle(chosen)}.`)) : null
       ]
     }, String(row.id))
   }) : jsx('div', { style: muted, children: 'Nobody else is here right now.' })
@@ -23866,14 +24141,14 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const outbound = requests.filter(req => req.state === 'pending' && !req.offer && req.from && String(req.from.id) === String(you.id))
   const requestCards = [
     ...inbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
-      jsx('span', { style: { flex: 1, minWidth: 120 }, children: `${req.from.name} wants to play ${req.game}` }),
+      jsx('span', { style: { flex: 1, minWidth: 120 }, children: lobbyOfferLine(req.from.name, req.game) }),
       button('Accept', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: true }),
         { primary: true, ...held(`Accept and sit down with ${req.from.name}.`) }),
       button('Decline', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: false }),
         held('Say no to this request.'))
     ] }, String(req.id))),
     ...outbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
-      jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asked ${req.to.name}… ` }),
+      jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asked ${req.to.name} to play ${lobbyTitle(req.game)}… ` }),
       button('Cancel', () => post(`cancel:${req.id}`, '/online/hall/cancel', { id: req.id }),
         held(`Take back your request to ${req.to.name}.`))
     ] }, String(req.id)))
@@ -23891,7 +24166,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       'data-lobby-offer-line': '1', role: 'status', 'aria-live': 'polite',
       style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 },
       children: [
-        jsx('span', { children: `${offerOther.name || 'Someone'} wants to play ${lobbyTitle(offer.game)} — Join or Not now on the dialog.` }),
+        jsx('span', { children: `${lobbyOfferLine(offerOther.name, offer.game)} — Join or Not now on the dialog.` }),
         jsx('span', { children: ' (Not sent to the model: Game Center shows this itself.)' })
       ]
     }) : null,
