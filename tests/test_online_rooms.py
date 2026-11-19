@@ -170,8 +170,60 @@ def test_rematch_needs_both_and_second_result_is_recorded(setup):
     # Both said yes, so the colours swap: Ada sat white, then black, then white again.
     assert rooms.state(room)["white_id"] == p["Ada"]["id"]
     assert [m["match_no"] for m in store.recent_matches(room["id"])] == [2, 1]
-    # White resigned both games, so black took both.
-    assert rooms.state(room)["score"]["black"] == 2
+    # Each white resignation follows that person when the colours swap, so the pair is one each.
+    assert rooms.state(room)["score"]["white"] == 1
+    assert rooms.state(room)["score"]["black"] == 1
+
+
+def test_only_a_seated_player_can_decline(setup):
+    store, rooms, p, _ = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.run(room, p["Ada"], "resign")
+    answer = rooms.run(room, p["Eve"], "decline")
+    assert not answer["ok"]
+    assert "seated" in answer["text"]
+    assert not store.room(room["id"])["closed"]
+
+
+def test_leaving_a_finished_match_closes_the_room(setup):
+    store, rooms, p, _ = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.run(room, p["Ada"], "resign")
+    answer = rooms.run(room, p["Bea"], "leave")
+    assert answer["ok"] and answer.get("closed")
+    assert answer["text"] == "Bea left the table."
+    assert store.room(room["id"])["closed"]
+    assert rooms.picture(room, p["Ada"]["id"])["rematch_note"] == "Bea left the table."
+
+
+def test_a_rematch_keeps_the_score_with_the_person(setup):
+    _store, rooms, p, _ = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.run(room, p["Ada"], "resign")
+    assert rooms.run(room, p["Ada"], "rematch")["ok"]
+    assert rooms.run(room, p["Bea"], "rematch")["ok"]
+    state = rooms.state(room)
+    assert state["white_id"] == p["Bea"]["id"]
+    assert state["score"]["white"] == 1
+    assert state["score"]["black"] == 0
+
+
+def test_an_old_rematch_request_still_times_out(setup):
+    store, rooms, p, clock = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.run(room, p["Ada"], "resign")
+    rooms.run(room, p["Ada"], "rematch")
+    state = rooms.state(room)
+    state["finished_at"] = clock.now - 90
+    state["rematch_asked_at"] = 0
+    kit.write(rooms.folder(room["id"]), state)
+    closed = rooms.sweep_finished(clock.now)
+    assert room["id"] in closed
+    assert store.room(room["id"])["closed"]
 
 
 def test_a_declined_rematch_closes_the_room(setup):
@@ -192,9 +244,8 @@ def test_a_finished_room_closes_when_both_have_left(setup):
     room, _ = rooms.create("connect4", p["Ada"], public=True)
     rooms.run(room, p["Bea"], "join")
     rooms.run(room, p["Ada"], "resign")
-    rooms.run(room, p["Ada"], "leave")
-    assert not store.room(room["id"])["closed"], "one person is still at the table"
-    rooms.run(room, p["Bea"], "leave")
+    left = rooms.run(room, p["Ada"], "leave")
+    assert left.get("closed") and left["text"] == "Ada left the table."
     assert store.room(room["id"])["closed"]
 
 

@@ -169,6 +169,8 @@ class Rooms:
         # Presence is not saved. After a restart, everyone seated counts as away from now,
         # so a player who never comes back can still be claimed against.
         self.started = clock()
+        # The sentence a sweep closed a room with, so the server can say it on the socket.
+        self.swept_notes: dict[str, str] = {}
 
     # Tables ------------------------------------------------------------------
 
@@ -385,6 +387,13 @@ class Rooms:
             line = "move " + " ".join(args)
         elif action == "draw":
             line = "draw accept" if args[:1] == ["accept"] else "draw"
+        elif action == "leave" and self._seated(state, player["id"]) and state and state.get("status") in FINISHED \
+                and str(room.get("game") or "") not in NO_COLOUR_SWAP:
+            name = str(player.get("name") or "The other player")
+            note = f"{name} left the table."
+            self._write_state(room, lambda saved, text=note: saved.__setitem__("rematch_note", text))
+            self._close_finished(room, note)
+            return {"ok": True, "text": note, "finished": None, "closed": True}
         elif action == "leave" and self._seated(state, player["id"]) and state and state.get("status") == "active" \
                 and int(state.get("plies") or 0) and str(room.get("game") or "") not in NO_COLOUR_SWAP:
             # The kit resigns and then clears the seat in one write, which would record the
@@ -539,6 +548,8 @@ class Rooms:
     def _decline_rematch(self, room: dict, player: dict, state: dict | None) -> dict:
         if not state or state.get("status") not in FINISHED:
             return {"ok": False, "text": "There is no rematch to decline.", "finished": None}
+        if not self._seated(state, player["id"]):
+            return {"ok": False, "text": "Only a seated player can decline a rematch.", "finished": None}
         name = str(player.get("name") or "The other player")
         note = f"{name} declined a rematch."
         self._write_state(room, lambda saved, text=note: saved.__setitem__("rematch_note", text))
@@ -568,6 +579,9 @@ class Rooms:
             for suffix in ("", "_id", "_name"):
                 white, black = f"white{suffix}", f"black{suffix}"
                 saved[white], saved[black] = saved[black], saved[white]
+            score = saved.get("score")
+            if isinstance(score, dict):
+                score["white"], score["black"] = score.get("black", 0), score.get("white", 0)
 
         self._write_state(room, fresh)
 
@@ -605,6 +619,13 @@ class Rooms:
                     room, lambda saved, at=stamp: saved.__setitem__("finished_at", saved.get("finished_at") or at))
                 continue
             note = ""
+            # An older room asked for a rematch and never stamped when. The finish is that time.
+            if requested and not asked:
+                asked = finished_at or now
+                stamp = asked
+                self._write_state(
+                    room, lambda saved, at=stamp: saved.__setitem__(
+                        "rematch_asked_at", saved.get("rematch_asked_at") or at))
             if requested and asked and now - asked >= REMATCH_ANSWER_SECONDS:
                 names = {pid: name for _side, pid, name in self._human_seats(state)}
                 missing = [names[pid] for pid in names if pid not in set(requested)]
@@ -618,6 +639,7 @@ class Rooms:
                 text = note
                 self._write_state(room, lambda saved, line=text: saved.__setitem__("rematch_note", line))
             self._close_finished(room, note)
+            self.swept_notes[room["id"]] = "This table is closed." if note == "no rematch" else note
             closed.append(room["id"])
         return closed
 

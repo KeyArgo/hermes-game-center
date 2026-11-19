@@ -285,3 +285,43 @@ def test_pending_socket_cap_and_removed_address_blocked(tmp_path):
         finally:
             await client.close()
     run(scenario())
+
+
+def test_a_decline_and_a_sweep_close_the_sockets(tmp_path):
+    async def scenario():
+        server, client = await started(tmp_path)
+        try:
+            _ada, ada_token = await sign_in(client, "Ada")
+            _bea, bea_token = await sign_in(client, "Bea")
+            room = (await open_room(client, ada_token))["room"]
+            a = await connect(client, room["id"], ada_token)
+            b = await connect(client, room["id"], bea_token)
+            assert (await b.result(1, t="cmd", action="join"))["ok"]
+            assert (await a.result(2, t="cmd", action="resign"))["ok"]
+            assert (await a.result(3, t="cmd", action="rematch"))["ok"]
+            waiting = asyncio.create_task(a.until(lambda m: m.get("t") == "closed"))
+            answer = await b.result(4, t="cmd", action="decline")
+            assert answer["ok"]
+            closed = await waiting
+            assert closed["text"] == "Bea declined a rematch."
+            raw = await a.ws.receive(timeout=2)
+            assert raw.type.name != "TEXT", raw.data
+
+            room2 = (await open_room(client, ada_token))["room"]
+            a2 = await connect(client, room2["id"], ada_token)
+            b2 = await connect(client, room2["id"], bea_token)
+            assert (await b2.result(1, t="cmd", action="join"))["ok"]
+            assert (await a2.result(2, t="cmd", action="resign"))["ok"]
+            state = server.rooms.state(room2)
+            state["finished_at"] = server.rooms.clock() - 400
+            from kit import write as kit_write
+            kit_write(server.rooms.folder(room2["id"]), state)
+            waiting2 = asyncio.create_task(a2.until(lambda m: m.get("t") == "closed"))
+            await server.close_finished(server.rooms.clock())
+            swept = await waiting2
+            assert "closed" in swept["text"].lower()
+            raw2 = await a2.ws.receive(timeout=2)
+            assert raw2.type.name != "TEXT", raw2.data
+        finally:
+            await client.close()
+    run(scenario())

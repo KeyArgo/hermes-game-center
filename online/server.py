@@ -1296,8 +1296,10 @@ class App:
             if not self.conns.get(room["id"]):
                 self.conns.pop(room["id"], None)
             else:
-                with contextlib.suppress(Exception):
-                    await self.broadcast(room["id"])
+                fresh = self.store.room(room["id"])
+                if fresh and not fresh.get("closed"):
+                    with contextlib.suppress(Exception):
+                        await self.broadcast(room["id"])
         return ws
 
     async def handle(self, conn: Conn, message: dict) -> None:
@@ -1365,10 +1367,7 @@ class App:
             await _send(conn.ws, {"t": "result", "ref": ref, "ok": answer["ok"], "text": answer["text"],
                                   "finished": answer.get("finished")})
             if answer.get("closed"):
-                await self.broadcast(conn.room_id)
-                text = str(answer.get("text") or "This table is closed.")
-                for other in list(self.conns.get(room["id"], ())):
-                    await _send(other.ws, {"t": "closed", "text": text})
+                await self.shut_room(room["id"], str(answer.get("text") or "This table is closed."))
                 return
             if kind == "close" and answer["ok"]:
                 for other in list(self.conns.get(room["id"], ())):
@@ -1420,6 +1419,27 @@ class App:
         if ok:
             await self.broadcast(room["id"])
 
+    async def shut_room(self, room_id: str, text: str) -> None:
+        """Tell everyone the table is gone, then drop the sockets.
+
+        One person who has already stopped reading must not hold up the others,
+        and the sentence goes out before any socket is hung up.
+        """
+        note = text or "This table is closed."
+        conns = list(self.conns.get(room_id, ()))
+        for other in conns:
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(_send(other.ws, {"t": "closed", "text": note}), 1)
+        for other in conns:
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(other.ws.close(), 1)
+
+    async def close_finished(self, now: float) -> None:
+        """A finished room the sweep closed: say so, then hang up."""
+        for room_id in self.rooms.sweep_finished(now):
+            note = self.rooms.swept_notes.pop(room_id, "") or "This table is closed."
+            await self.shut_room(room_id, note)
+
     async def broadcast(self, room_id: str) -> None:
         room = self.store.room(room_id)
         if not room:
@@ -1465,8 +1485,7 @@ class App:
                 await self.requests.pair_looking(now)
                 for room_id in self.rooms.check_clocks(now):
                     await self.broadcast(room_id)
-                for room_id in self.rooms.sweep_finished(now):
-                    await self.broadcast(room_id)
+                await self.close_finished(now)
                 if time.monotonic() - last_housekeeping >= 15:
                     last_housekeeping = time.monotonic()
                     self.rooms.expire()
