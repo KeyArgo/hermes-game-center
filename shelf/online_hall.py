@@ -69,6 +69,13 @@ class Hall:
         self._lock = threading.RLock()
         self._lifecycle = threading.RLock()
         self._stop = threading.Event()
+        # Set by start() when someone asks for a dial now - a sign-in, the Games page opening,
+        # or Retry - so a worker that is waiting out a backoff (or a refused sign-in's long
+        # pause) dials at once instead of leaving the person on "Not connected".
+        self._dial = threading.Event()
+        # True only while a connect attempt is in flight, so a request that arrives mid-dial
+        # does not queue a second one: the worker dials as fast as it can as it is.
+        self._dialling = False
         self._thread = None
         self._socket = None
         self._out: queue.Queue = queue.Queue()
@@ -108,10 +115,16 @@ class Hall:
     # Lifecycle ---------------------------------------------------------------
 
     def start(self) -> None:
-        """Open the lobby socket if it is not already open. Idempotent.
+        """Make sure the lobby socket is being dialled - and dial now if it is waiting.
 
-        Does nothing unless online play is on and there is a key to sign in with,
-        so a GET that calls this before sign-in is a harmless no-op.
+        Idempotent, and a no-op before online play is on and there is a key to sign in with,
+        so a GET that calls this before sign-in is harmless.
+
+        A worker that is already running used to make this return while doing nothing: a
+        socket that had been refused (its state ``off``), a server with no lobby socket, or a
+        dropped line left the person on "Not connected to the lobby" for the whole of a wait
+        they never asked for - and the sign-in, the page opening and Retry that were supposed
+        to fix it dialled nothing. Now it wakes that worker, which dials at once.
         """
         with self._lifecycle:
             if not self.online.on:
@@ -121,9 +134,14 @@ class Hall:
                 self._say("not opened: this computer has no sign-in key")
                 return
             if self._thread is not None and self._thread.is_alive():
+                with self._lock:
+                    if self._state != "live" and not self._dialling:
+                        self._dial.set()
                 return
             with self._lock:
                 self._stop = threading.Event()
+                self._dial = threading.Event()
+                self._dialling = False
                 self._out = queue.Queue()
                 self._pending = {}
                 self._ref = 0
@@ -161,20 +179,32 @@ class Hall:
 
     # The view ----------------------------------------------------------------
 
-    def retry(self) -> dict:
-        """Dial the lobby again now, and hand back the view as it stands.
+    def retry(self, *, settle: float = 2.0) -> dict:
+        """Dial the lobby again now, and hand back the view once the dial has had its chance.
 
-        The screen's one Retry. A live socket is left alone; anything else is closed and
-        opened again with a fresh backoff, so a person is never told to wait out a delay
-        they did not ask for. Never raises: a dial that fails is a state, not an error.
+        The screen's one Retry. A live socket is left alone; a session that is open but not
+        answering is let go; anything else is woken (or opened) at once with a fresh backoff,
+        so a person is never told to wait out a delay they did not ask for. ``settle`` is how
+        long the answer waits for the dial: the sentence beside Retry is read from the state
+        that comes back, and a dial that has not had its moment yet would always read as a
+        failure. Never raises: a dial that fails is a state, not an error.
         """
-        if self._thread is not None and self._thread.is_alive():
+        with self._lock:
+            live = self._state == "live"
+            talking = self._socket is not None
+        if live:
+            return self.snapshot()
+        self._unsaid()
+        if talking:
+            # A session that is not answering must be let go, not merely woken.
+            self.stop()
+        self.start()
+        end = time.monotonic() + max(0.0, settle)
+        while time.monotonic() < end:
             with self._lock:
                 if self._state == "live":
-                    return self.snapshot()
-        self.stop()
-        self._unsaid()
-        self.start()
+                    break
+            time.sleep(0.02)
         log.info("the person asked to reconnect to the lobby (state %s)", self._state)
         return self.snapshot()
 
@@ -348,6 +378,24 @@ class Hall:
             pending["answer"] = {"ok": False, "text": text}
             pending["event"].set()
 
+    def _wait(self, seconds: float) -> str:
+        """Wait up to ``seconds``: 'stop', 'dial' (someone asked to dial now) or 'timeout'.
+
+        Every wait in the worker goes through here, so a sign-in, the Games page opening or
+        Retry reaches the worker that is sitting that wait out instead of leaving the person
+        to sit it out too.
+        """
+        with self._lock:
+            self._dialling = False
+        end = time.monotonic() + seconds
+        while not self._stop.is_set():
+            left = end - time.monotonic()
+            if left <= 0:
+                return "timeout"
+            if self._dial.wait(min(left, 0.2)):
+                return "dial"
+        return "stop"
+
     def _run(self) -> None:
         while not self._stop.is_set():
             key = self.online.key()
@@ -360,6 +408,7 @@ class Hall:
                 # stale "live" left over from a dropped socket lets a page queue a request that
                 # then replays seconds later, and seats two people nobody asked to seat.
                 self._state = "connecting"
+                self._dialling = True
             sock = None
             try:
                 sock = wsmod.Socket(wsmod.socket_url(self.online.url, "/api/lobby/socket"), timeout=5)
@@ -374,8 +423,13 @@ class Hall:
                     self._say(f"this server has no lobby socket ({self.online.url})")
                 else:
                     self._say(f"could not open the socket at {self.online.url}: {exc}")
-                if self._stop.wait(60 if slow else self._delay):
+                verdict = self._wait(60 if slow else self._delay)
+                if verdict == "stop":
                     break
+                if verdict == "dial":
+                    self._dial.clear()
+                    self._delay = self.retry_first
+                    continue
                 if not slow:
                     self._delay = min(self._delay * 2, self.retry_most)
                 continue
@@ -385,8 +439,13 @@ class Hall:
                     self._state = "connecting"
                     self._missed()
                 self._say(f"could not reach {self.online.url}: {exc}")
-                if self._stop.wait(self._delay):
+                verdict = self._wait(self._delay)
+                if verdict == "stop":
                     break
+                if verdict == "dial":
+                    self._dial.clear()
+                    self._delay = self.retry_first
+                    continue
                 self._delay = min(self._delay * 2, self.retry_most)
                 continue
             outcome = self._session(sock, key)
@@ -407,14 +466,25 @@ class Hall:
             if outcome == "stop":
                 break
             if outcome == "auth":
-                # A refused sign-in will not change by trying again fast; wait.
+                # A refused sign-in will not change by trying again fast; wait - but a sign-in
+                # with another key (or Retry) wakes it, because that is the one thing that
+                # makes another dial worth trying.
                 self._say("the lobby refused this computer's sign-in key")
-                if self._stop.wait(60):
+                verdict = self._wait(60)
+                if verdict == "stop":
                     break
+                if verdict == "dial":
+                    self._dial.clear()
+                    self._delay = self.retry_first
                 continue
             # A plain drop: reconnect with backoff.
-            if self._stop.wait(self._delay):
+            verdict = self._wait(self._delay)
+            if verdict == "stop":
                 break
+            if verdict == "dial":
+                self._dial.clear()
+                self._delay = self.retry_first
+                continue
             self._delay = min(self._delay * 2, self.retry_most)
 
     def _missed(self) -> None:

@@ -178,6 +178,76 @@ def test_every_door_says_not_connected_and_retry_dials_again(tmp_path):
         hall.stop()
 
 
+def test_signing_in_again_dials_a_refused_socket_at_once(tmp_path):
+    """A key the lobby refused is a pause, not a dead end: the next start() must dial at once.
+
+    This is the owner's report ("it won't let me check Let people invite me", 2026-11-18) at its
+    source: the card was drawn from a snapshot whose state was not ``live``, and every door that
+    was supposed to fix it - the sign-in, the Games page opening, Retry - called ``start()``,
+    which returned the moment it saw a worker thread. The worker was sitting out a 60-second
+    pause after the refused key (or its reconnect delay), so the socket the person had just
+    signed in for was never dialled, and the switch stayed dead for as long as they were
+    willing to look at it.
+    """
+    async def scenario():
+        server, client = await started(tmp_path / "server")
+        hall = None
+        try:
+            ada, ada_token = await sign_in(client, "Ada")
+            base = str(client.make_url("/")).rstrip("/")
+            key = {"now": "not-a-real-token"}
+            source = Online(tmp_path / "plugin", url=base, secret=lambda _name: key["now"])
+            source.turn_on()
+            hall = Hall(source)
+            hall.start()
+            # The lobby refuses that key: the state is a quiet "off" with the reason, and the
+            # worker is now waiting before it tries the same refused key again.
+            refused = await wait_snapshot(hall, lambda s: s["state"] == "off" and s.get("error"))
+            assert "did not accept" in refused["error"], refused
+
+            # The person signs in with the key that works. The route's one action is start().
+            key["now"] = ada_token
+            hall.start()
+            live = await wait_snapshot(hall, lambda s: s["state"] == "live", timeout=2)
+            assert live["you"]["name"] == "Ada"
+        finally:
+            if hall:
+                await asyncio.to_thread(hall.stop)
+            await client.close()
+    run(scenario())
+
+
+def test_retry_answers_with_the_state_the_dial_reached(tmp_path):
+    """Retry's answer is read by the card, so it must be the state after the dial, not before it.
+
+    /online/hall/retry used to hand back the snapshot taken the instant start() returned - always
+    "connecting" - so the one control offered beside "Lobby not connected" answered "not
+    connected" every time, on a lobby that was up.
+    """
+    async def scenario():
+        server, client = await started(tmp_path / "server")
+        hall = None
+        try:
+            ada, ada_token = await sign_in(client, "Ada")
+            base = str(client.make_url("/")).rstrip("/")
+            key = {"now": "not-a-real-token"}
+            source = Online(tmp_path / "plugin", url=base, secret=lambda _name: key["now"])
+            source.turn_on()
+            hall = Hall(source)
+            hall.start()
+            await wait_snapshot(hall, lambda s: s["state"] == "off" and s.get("error"))
+
+            key["now"] = ada_token
+            answer = await asyncio.to_thread(hall.retry)
+            assert answer["state"] == "live", answer
+            assert answer["you"]["name"] == "Ada"
+        finally:
+            if hall:
+                await asyncio.to_thread(hall.stop)
+            await client.close()
+    run(scenario())
+
+
 def test_the_reason_a_socket_could_not_be_opened_reaches_the_log(tmp_path, caplog):
     """A Hall that cannot connect says why, once, in the logger the other shelf parts use."""
     source = Online(tmp_path, url="http://127.0.0.1:1", secret=lambda _name: "")
