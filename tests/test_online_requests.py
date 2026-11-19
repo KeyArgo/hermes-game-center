@@ -102,7 +102,8 @@ def test_open_false_keeps_choices(world):
         ack = await service.handle(ada, {"t": "prefs", "games": {"connect4": True, "go": False}})
         assert ack["ok"], ack
         chosen = service.prefs(ada["id"])
-        assert chosen["open"] is False
+        # Turning a chip on turns the master switch on with it, so a chip shown on accepts.
+        assert chosen["open"] is True
         assert chosen["games"]["connect4"] is True
         assert chosen["games"]["go"] is False
         assert chosen["games"]["reversi"] is False
@@ -113,6 +114,35 @@ def test_open_false_keeps_choices(world):
         assert (await service.handle(ada, {"t": "prefs", "open": False}))["ok"]
         closed = service.prefs(ada["id"])
         assert closed["open"] is False and closed["games"] == chosen["games"]
+
+    run(scenario())
+
+
+def test_turning_a_game_on_turns_the_master_switch_on(world):
+    """A chip shown on has to accept: the switch follows the chip, not the other way.
+
+    With the master switch off, turning one game on left the page showing a chip that
+    accepted nothing, so a Play for that game was refused. Turning a chip on is a yes.
+    """
+    _store, _rooms, people, _clock, _hub, service = world
+
+    async def scenario():
+        ada = people["Ada"]
+        assert service.prefs(ada["id"])["open"] is False
+        ack = await service.handle(ada, {"t": "prefs", "games": {"connect4": True}})
+        assert ack["ok"], ack
+        prefs = service.prefs(ada["id"])
+        assert prefs["open"] is True, "the master switch came on with the chip"
+        assert prefs["games"]["connect4"] is True
+        assert prefs["games"]["reversi"] is False, "no other game was turned on"
+        assert service.accepts(ada["id"], "connect4") is True
+        # A chip turned off leaves the switch alone.
+        assert (await service.handle(ada, {"t": "prefs", "games": {"connect4": False}}))["ok"]
+        assert service.prefs(ada["id"])["open"] is True
+        # A frame that sets the switch itself wins: that is the master switch being turned off.
+        assert (await service.handle(ada, {"t": "prefs", "open": False, "games": {"go": True}}))["ok"]
+        assert service.prefs(ada["id"])["open"] is False
+        assert service.accepts(ada["id"], "go") is False
 
     run(scenario())
 

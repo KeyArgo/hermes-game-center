@@ -562,3 +562,36 @@ def test_a_looking_ack_sets_the_switches_it_came_with():
     wire.send = lambda frame: {"ok": True, "text": "Looking for Connect4."}
     Hall.looking(wire, ["connect4"])
     assert wire._you["looking"] == ["connect4"]
+
+
+def test_turning_a_chip_on_puts_the_master_switch_on():
+    """A chip shown on really accepts, so the page turns the switch on with it.
+
+    The chip and the switch are one answer as far as a person can see them, and the
+    server does the same; a page that left the switch off showed a chip that refused.
+    """
+    class Wire:
+        def __init__(self):
+            self._lock = threading.Lock()
+            self._prefs = {"open": False, "games": {}, "until": {}}
+            self._you = {"id": "me", "name": "Ada", "invisible": False, "looking": []}
+            self.frames = []
+
+        def send(self, frame):
+            self.frames.append(frame)
+            return {"ok": True, "text": "Saved."}
+
+    wire = Wire()
+    assert Hall.prefs(wire, games={"connect4": True})["ok"] is True
+    assert wire._prefs["open"] is True, "a chip shown on really accepts"
+    assert wire._prefs["games"]["connect4"] is True
+
+    # A chip turned off leaves the switch as it was.
+    wire = Wire()
+    Hall.prefs(wire, games={"connect4": False})
+    assert wire._prefs["open"] is False
+    # And a frame that sets the switch itself wins over the chip.
+    wire = Wire()
+    wire._prefs["open"] = True
+    Hall.prefs(wire, open=False, games={"connect4": True})
+    assert wire._prefs["open"] is False

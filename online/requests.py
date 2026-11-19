@@ -234,6 +234,10 @@ class Service:
         # Open off, and open on when a choice is already stored, leave the choices.
         if open_flag and not games_in and not any(merged.values()):
             merged = {game: True for game in REQUESTABLE}
+        # Turning a chip on is a yes: with the master switch off it came on beside the chip,
+        # so a chip shown on really accepts. A frame that sets the switch itself wins.
+        if "open" not in frame and games_in and any(games_in.values()):
+            open_flag = True
         # "Always let people invite you to this game?": Yes makes the twenty minutes a
         # standing choice, and turns the master switch on with it.
         for game, flag in (always_in or {}).items():

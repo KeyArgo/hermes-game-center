@@ -213,6 +213,10 @@ class Hall:
                     self._prefs["open"] = frame["open"]
                 for game, enabled in frame.get("games", {}).items():
                     self._prefs.setdefault("games", {})[game] = enabled
+                if "open" not in frame and any(frame.get("games", {}).values()):
+                    # A chip turned on turns the master switch on with it, as the server does:
+                    # a chip shown on really accepts.
+                    self._prefs["open"] = True
                 for game, enabled in frame.get("always", {}).items():
                     # Keeping a game for good turns the master switch on, clears any window it
                     # was on for, and leaves the game itself on.
