@@ -1313,7 +1313,9 @@ async function firstRunContract() {
   const asked = []
   const view = {
     player: { name: '', named: false },
-    play: [{ id: 'connect4', title: 'Connect Four' }, { id: 'reversi', title: 'Reversi' }],
+    // Slots is one player, so it is a game here but never one that can ask for a match (E2).
+    play: [{ id: 'connect4', title: 'Connect Four' }, { id: 'reversi', title: 'Reversi' },
+      { id: 'blackjack', title: 'Blackjack' }, { id: 'slots', title: 'Slots' }],
     setup: { welcome_needed: true, name: '', suggested_name: 'AmberOtter', watched: {}, paused: false, allow_ai: true, ai_choice: null },
     alerts: { ok: true, count: 0, rows: [] }
   }
@@ -1345,6 +1347,9 @@ async function firstRunContract() {
   const nameBox = () => nodes(draw('WelcomePanel')).find(node => node.type === 'input')
   assert.equal(nameBox().props.value, '', 'the box opens empty: there is no default name')
   assert.equal(nameBox().props['aria-label'], 'Your name')
+  // Only games two people can play are offered here: Slots is not one of them (E2).
+  assert.ok(findButton(tree, 'Blackjack'), 'a game two people can play is offered')
+  assert.equal(findButton(tree, 'Slots'), undefined, 'a one-player game is never a match to wait for')
 
   // Suggest a name asks the shelf and puts its answer in the box. No default is pre-filled, so the
   // person either types or presses this once (owner, 2026-11-18).
@@ -1405,6 +1410,11 @@ async function firstRunContract() {
   assert.ok(connect4, 'each game has its own switch')
   assert.equal(words(connect4), 'Off', 'every switch starts off')
   assert.ok(words(tree).includes('Tell me when someone wants a match'), 'the switch says what it does')
+  // A match needs a second person: Slots must not be offered as something to wait for (E2).
+  assert.equal(switchFor('Tell me when someone wants a match: Slots'), undefined,
+    'Slots is one player: it has no match alert to switch on')
+  assert.ok(switchFor('Tell me when someone wants a match: Blackjack'),
+    'Blackjack is two people, so it keeps its switch')
   assert.ok(words(tree).includes('People in this Hermes and the chats it shares.'), 'the source is named, not the internet')
   await connect4.props.onClick()
   const toggled = asked.find(item => item[0] === '/settings')

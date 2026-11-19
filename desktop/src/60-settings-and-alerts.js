@@ -15,6 +15,11 @@ const WELCOME_LINE = 'Game Center is where you play the board games that come wi
 const HERE_LINE = 'People in this Hermes and the chats it shares.'
 const MATCH_LINE = 'Tell me when someone wants a match'
 
+// A match needs a second person, so a game only gets a match toggle when the lobby server can seat
+// it: LOBBY_GAME_IDS in 72-lobby.js, which mirrors the server's REQUESTABLE list. Slots and the
+// other one-player games are still played, they just never wait for anyone (owner, 2026-11-18).
+const matchable = list => (Array.isArray(list) ? list : []).filter(game => game && LOBBY_GAME_IDS.includes(game.id))
+
 // No default name (owner, 2026-11-18: "There should not be a default user, but we can add a user name
 // generator"). Every box - the welcome, Settings and the online sign-in - opens empty, and this is the
 // button beside it: the shelf hands back a fresh name on every press (/name/suggest, drawn from the
@@ -60,7 +65,8 @@ function WelcomePanel({ view, ctx, onDone }) {
   const [games, setGames] = useState(() => Object.keys(setup.watched || {}))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const list = view.play || []
+  // Only the games two people can play: the welcome writes the match list too (E2).
+  const list = matchable(view.play)
 
   const pick = id => setGames(current => (current.includes(id) ? current.filter(item => item !== id) : current.concat([id])))
 
@@ -139,7 +145,7 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
   const [name, setName] = useState(setup.name || '')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const list = view.play || []
+  const list = matchable(view.play)
   const watched = setup.watched || {}
   const player = view.player || {}
 
