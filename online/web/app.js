@@ -1024,8 +1024,12 @@ function HallTab({ token, me, hall }) {
   const myName = (hall.you && hall.you.name) || (me && me.name) || ''
   const prefs = hall.prefs || defaultPrefs()
   const pendingRequests = (hall.requests || []).filter(item => item && item.state === 'pending')
-  // A match offer is not an ask: neither person sent it, so either may join it.
+  // A match offer is one person's ask, so only the person asked can answer it (the server
+  // refuses anyone else): they get Join and Not now, and the asker waits with the seconds
+  // left and a way to take the ask back.
   const offers = pendingRequests.filter(item => item.offer)
+  const offersToMe = offers.filter(item => item.to && item.to.id === myId)
+  const offersFromMe = offers.filter(item => item.from && item.from.id === myId)
   const incoming = pendingRequests.filter(item => !item.offer && item.to && item.to.id === myId)
   const outgoing = pendingRequests.filter(item => !item.offer && item.from && item.from.id === myId)
 
@@ -1088,15 +1092,14 @@ function HallTab({ token, me, hall }) {
       hall.error ? h('div', { className: 'alert', role: 'alert' }, hall.error) : null,
       hall.notice ? h('div', { className: 'note', role: 'status' }, hall.notice) : null,
 
-      offers.length ? h('section', { className: 'hall-requests', 'aria-label': 'Match offers' },
-        offers.map(req => {
+      offersToMe.length ? h('section', { className: 'hall-requests', 'aria-label': 'Match offers' },
+        offersToMe.map(req => {
           const left = countdownSeconds(req, nowSec)
-          const other = (req.from && req.from.id === myId ? req.to : req.from) || {}
+          const other = (req.from || {})
           const otherName = other.name || 'Someone'
           return h('article', { key: req.id, className: 'hall-request incoming offer', role: 'status' },
             h('div', { className: 'hall-request-body' },
-              h('div', null, h('b', null, otherName), ' wants to play ', h('b', null, titleOf(req.game)),
-                ' — you are both looking for it'),
+              h('div', null, h('b', null, otherName), ' wants to play ', h('b', null, titleOf(req.game))),
               h('div', { className: 'hall-request-meta' },
                 h('span', null, 'Find match · private unrated table · right away'),
                 h('span', { className: 'hall-countdown', 'aria-label': `${left} seconds left` }, `${left}s`))),
@@ -1105,7 +1108,23 @@ function HallTab({ token, me, hall }) {
               h(Button, { disabled: Boolean(busyId), onClick: () => onRespond(req.id, false) }, 'Not now')))
         }),
         h('p', { className: 'muted small', style: { margin: 0 } },
-          'Find match is on for you too — press Join to sit down together. Nothing here is sent to your Hermes model.')) : null,
+          'Join and you sit down together at a private table. Nothing here is sent to your Hermes model.')) : null,
+
+      offersFromMe.length ? h('section', { className: 'hall-requests', 'aria-label': 'Your match ask' },
+        offersFromMe.map(req => {
+          const left = countdownSeconds(req, nowSec)
+          const toName = (req.to && req.to.name) || 'someone'
+          return h('article', { key: req.id, className: 'hall-request outgoing offer', role: 'status' },
+            h('div', { className: 'hall-request-body' },
+              h('div', null, 'Asking ', h('b', null, toName), ` — ${left} s`),
+              h('div', { className: 'hall-request-meta' },
+                h('span', null, `Find match for ${titleOf(req.game)} · waiting for an answer`),
+                h('span', { className: 'hall-countdown', 'aria-label': `${left} seconds left` }, `${left}s`))),
+            h('div', { className: 'row' },
+              h(Button, { disabled: Boolean(busyId), onClick: () => onCancel(req.id) }, 'Cancel')))
+        }),
+        h('p', { className: 'muted small', style: { margin: 0 } },
+          `Nobody else is asked until ${offersFromMe.length > 1 ? 'these offers end' : 'this offer ends'} or you cancel.`)) : null,
 
       (incoming.length || outgoing.length) ? h('section', { className: 'hall-requests', 'aria-label': 'Game requests' },
         incoming.map(req => {
