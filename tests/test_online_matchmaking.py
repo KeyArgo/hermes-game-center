@@ -318,6 +318,37 @@ def test_stop_looking_withdraws_the_offer(world):
     run(scenario())
 
 
+def test_changing_the_search_withdraws_the_offer_it_stops_covering(world):
+    """A search that moved on leaves no offer behind for the game it left.
+
+    The seeker is mid-offer, so no later pass asks anyone for the new game until that
+    offer is answered or lapses: changing the search has to take it back first.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea, eve = people["Ada"], people["Bea"], people["Eve"]
+        played_at(store, bea, clock.now - 500)
+        here(hub, ada, bea, eve)
+        await accepts(service, bea, "connect4")
+        await accepts(service, eve, "gomoku")
+        hub.sent.clear()
+        assert (await look(service, ada, ["connect4"]))["ok"]
+        card = asked_card(hub)
+        assert card["to"]["id"] == bea["id"]
+        hub.sent.clear()
+        changed = await look(service, ada, ["gomoku"])
+        assert changed["ok"], changed
+        assert store.play_request(card["id"])["state"] == "cancelled", \
+            "an offer for a game no longer searched does not stay live"
+        told = {pid: frame for pid, frame in hub.sent if frame.get("t") == "request_update"}
+        assert told[bea["id"]]["request"]["state"] == "cancelled", "the person who was asked is told"
+        assert asked_card(hub)["to"]["id"] == eve["id"], "the new search is asked at once"
+        assert [row["to_id"] for row in store.pending_offers_from(ada["id"])] == [eve["id"]]
+
+    run(scenario())
+
+
 # --- a game played but not accepted: twenty minutes, or for ever -------------------
 
 def test_playing_a_game_you_do_not_accept_accepts_it_for_twenty_minutes(world):

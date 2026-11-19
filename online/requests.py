@@ -303,7 +303,7 @@ class Service:
         granted = [game for game in games if self._open_window(player_id, game, now)]
         self.store.set_looking(player_id, games, now)
         self._forget(player_id)
-        return "", [], granted
+        return "", self._withdraw_offers(player_id, games), granted
 
     def _open_window(self, player_id: str, game: str, now: float) -> bool:
         if self.standing(player_id, game):
@@ -313,10 +313,17 @@ class Service:
         self.store.set_game_window(player_id, game, now + TEMP_SECONDS, now)
         return True
 
-    def _withdraw_offers(self, player_id: str) -> list[dict]:
-        """Stopping takes the offer that is out back, so nobody is seated by mistake."""
+    def _withdraw_offers(self, player_id: str, games=None) -> list[dict]:
+        """Stopping takes the offer that is out back, so nobody is seated by mistake.
+
+        A search that changed takes back the offer for a game it no longer covers: an
+        offer must name a game the person is still looking for.
+        """
+        keep = None if games is None else set(games)
         out = []
         for row in self.store.pending_offers_from(player_id):
+            if keep is not None and row["game"] in keep:
+                continue
             saved = self.store.set_play_state(row["id"], "cancelled")
             out.append(saved or row)
         return out
