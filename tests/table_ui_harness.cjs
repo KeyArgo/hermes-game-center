@@ -7128,7 +7128,7 @@ async function gcextrasContract() {
   const repo = 'https://github.com/KeyArgo/hermes-game-center'
   const wanted = [
     ['Report a problem', repo + '/issues/new'],
-    ['Contribute', repo]
+    ['How to help', repo + '/blob/main/CONTRIBUTING.md']
   ]
   const launched = []
   const added = []
@@ -7142,6 +7142,10 @@ async function gcextrasContract() {
   for (const [label, href] of wanted) {
     const link = findButton(row, label)
     assert.ok(link, `the row carries ${label}`)
+    if (label === 'How to help') {
+      assert.ok(String(link.props['aria-label']).startsWith('How to help:'),
+        'How to help says what it is for on hover: ' + link.props['aria-label'])
+    }
     link.props.onClick()
     await tick()
     assert.equal(launched.at(-1), href, `${label} opens ${href}`)
