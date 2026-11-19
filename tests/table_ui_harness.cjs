@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8389,4 +8389,70 @@ async function prefsFromAckContract() {
     'the accept list the lobby returned is what the switch shows')
   reset()
   console.log('prefs: an answer carries the accept list, so the chips show it at once: passed')
+}
+
+// ---- "Yes, always" that the lobby will not save ----------------------------------------
+// Both answers to the once-only question work from the moment it is asked (the twenty
+// minutes are already in place). Keeping it for good is one more write, and if the lobby
+// refuses that write the question stays where it is with the refusal in words, so the
+// person can press again rather than losing the choice to a silent failure.
+async function alwaysRetryContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const snap = {
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: ['chessboard'] },
+    prefs: { open: true, games: { chessboard: true }, until: {} },
+    roster: [], requests: [], seated: null
+  }
+  const refusal = { ok: false, text: 'The lobby could not save your accept list. Try again.' }
+  let prefsAnswer = refusal
+  const posts = []
+  const ctx = { rest: async (path, options) => {
+    posts.push([path, (options && options.body) || null])
+    if (path === '/online/hall') return snap
+    if (path === '/online/hall/looking') return { ok: true, text: 'Looking for Chess.', ask_always: true, ask_always_games: ['chessboard'] }
+    if (path === '/online/hall/prefs') return prefsAnswer
+    return { ok: true, text: '' }
+  } }
+  const paint = async () => {
+    sandbox.alwaysRetryProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(alwaysRetryProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const prompts = tree => nodes(tree).filter(node => node.props && node.props['data-ask-always'])
+
+  reset()
+  let tree = await paint()
+  await nodes(tree).find(node => node.props && node.props['data-play-now'] === 'chessboard').props.onClick()
+  await tick()
+  tree = await paint()
+  assert.equal(prompts(tree).length, 1, 'the question is asked')
+  await findButton(tree, 'Yes, always').props.onClick()
+  await tick()
+  tree = await paint()
+  assert.equal(prompts(tree).length, 1, 'a refused save leaves the question open to try again: ' + words(tree).slice(-300))
+  assert.equal(prompts(tree)[0].props['data-ask-always'], 'chessboard', 'still about the game it was about')
+  assert.ok(words(tree).includes(refusal.text), 'and says what the lobby said: ' + words(tree).slice(-300))
+  assert.ok(findButton(tree, 'Yes, always'), 'with the button still there to press again')
+
+  // The retry works: the same press, this time saved, closes the question.
+  prefsAnswer = { ok: true, text: 'Kept.' }
+  await findButton(tree, 'Yes, always').props.onClick()
+  await tick()
+  tree = await paint()
+  assert.equal(prompts(tree).length, 0, 'a save that works closes the question')
+  const kept = posts.filter(item => item[0] === '/online/hall/prefs').pop()
+  assert.equal(JSON.stringify(kept[1]), JSON.stringify({ always: { chessboard: true } }), 'and it was the same write')
+  reset()
+  console.log('always invite: a refused save keeps the question open, and the retry works: passed')
 }
