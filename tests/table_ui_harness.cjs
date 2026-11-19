@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8301,4 +8301,92 @@ async function hallAlwaysContract() {
   assert.equal(prompts(tree).length, 0, 'an ack without ask_always asks nothing')
   reset()
   console.log('hall: find match asks about a newly accepted game, once each: passed')
+}
+
+// ---- A Play, a Find match or a prefs write answers with the accept list -----------------
+// The lobby returns the accept list as it now stands, so the chip the press just made
+// temporary reads "for 20 min" on the very next draw instead of waiting for the poll. Both
+// surfaces take that answer: the Games page's card and the Hall's switches.
+async function prefsFromAckContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const now = Math.floor(Date.now() / 1000)
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const snap = {
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: true, games: { connect4: true, chessboard: false }, until: {} },
+    roster: [{ id: 'me', name: 'Ada', status: 'online', games: ['connect4'] }],
+    requests: [], seated: null
+  }
+  const returned = { open: true, games: { connect4: true, chessboard: true }, until: { chessboard: now + 1200 } }
+  const makeCtx = ack => {
+    const posts = []
+    const ctx = { rest: async (path, options) => {
+      posts.push([path, (options && options.body) || null])
+      if (path === '/online/hall') return snap
+      return ack
+    } }
+    return { ctx, posts }
+  }
+  const paintCard = async ctx => {
+    sandbox.prefsAckProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(prefsAckProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const chip = (tree, id) => nodes(tree).find(node => node.props && node.props['data-accept-chip'] === id)
+
+  // 1. Play Chess while Chess is not accepted: the ack's own prefs put the temporary
+  //    accept on the chip at once, with its twenty minutes said out loud.
+  reset()
+  let run = makeCtx({ ok: true, text: 'Looking for Chess.', ask_always: true, ask_always_games: ['chessboard'], prefs: returned })
+  let tree = await paintCard(run.ctx)
+  assert.equal(chip(tree, 'chessboard').props['aria-pressed'], 'false', 'Chess starts off the accept list')
+  await nodes(tree).find(node => node.props && node.props['data-play-now'] === 'chessboard').props.onClick()
+  await tick()
+  tree = await paintCard(run.ctx)
+  assert.equal(chip(tree, 'chessboard').props['aria-pressed'], 'true', 'the accept the lobby granted shows at once')
+  assert.ok(words(chip(tree, 'chessboard')).includes('for 20 min'), 'and says how long it has: ' + words(chip(tree, 'chessboard')))
+
+  // 2. The Hall's own switches read the same answer: a prefs write that comes back with the
+  //    list leaves the switch on without waiting for the next poll.
+  reset()
+  const hallSnap = {
+    ...snap,
+    roster: [], requests: [], seated: null,
+    prefs: { open: true, games: { chessboard: false }, until: {} }
+  }
+  const hallCtx = { rest: async (path, options) => {
+    if (path === '/online/hall') return hallSnap
+    return { ok: true, text: 'Saved.', prefs: { open: true, games: { chessboard: true }, until: {} } }
+  } }
+  const drawHall = value => {
+    sandbox.prefsAckHall = value
+    cursor = 0
+    const tree = evaluate('LobbyHall(prefsAckHall)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return tree
+  }
+  const settleHall = async value => { drawHall(value); await tick(); return drawHall(value) }
+  const gameSwitch = (tree, id) => nodes(tree).find(node => node.props && node.props['data-hall-game'] === id)
+  tree = await settleHall({ ctx: hallCtx, current: 'connect4', view: {}, onPlayHere: () => {} })
+  const box = nodes(gameSwitch(tree, 'chessboard')).find(node => node.type === 'input')
+  assert.equal(box.props.checked, false, 'Chess reads off in the Hall before the press')
+  box.props.onChange({ target: { checked: true } })
+  await tick()
+  tree = await settleHall({ ctx: hallCtx, current: 'connect4', view: {}, onPlayHere: () => {} })
+  assert.equal(nodes(gameSwitch(tree, 'chessboard')).find(node => node.type === 'input').props.checked, true,
+    'the accept list the lobby returned is what the switch shows')
+  reset()
+  console.log('prefs: an answer carries the accept list, so the chips show it at once: passed')
 }

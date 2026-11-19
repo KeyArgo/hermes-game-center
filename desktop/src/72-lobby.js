@@ -408,6 +408,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
       if (alive.current && answer && answer.ok === false) setAck(String(answer.text || ''))
+      // The accept list as the lobby has it now, so a switch this press changed shows it
+      // without waiting for the next poll (the Games page's chips take the same answer).
+      if (alive.current && answer && answer.prefs && typeof answer.prefs === 'object') {
+        setSnap(previous => (previous ? { ...previous, prefs: answer.prefs } : previous))
+      }
       // A Find match press that accepted a game for twenty minutes asks whether it should
       // stay, exactly as the Games page's Play button does: one question per granted game.
       const granted = lobbyAlwaysAsk(answer, body, askedAlways)

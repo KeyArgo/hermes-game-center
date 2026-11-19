@@ -298,6 +298,12 @@ function PlayWithPeople({ ctx, view }) {
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
       if (answer && answer.ok === false) setNote(String(answer.text || ''))
+      // The lobby answers a Play, a Find match or a prefs write with the accept list as it now
+      // stands, so the chip the press just made temporary reads "for 20 min" on the next draw
+      // instead of waiting for the next poll.
+      if (answer && answer.prefs && typeof answer.prefs === 'object') {
+        setSnap(previous => (previous ? { ...previous, prefs: answer.prefs } : previous))
+      }
       // A Play that had to accept the game for twenty minutes comes back with ask_always:
       // the press that opened that window is the one moment to ask whether it should stay.
       const granted = lobbyAlwaysAsk(answer, body, asked)
