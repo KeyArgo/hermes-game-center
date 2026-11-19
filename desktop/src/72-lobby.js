@@ -34,6 +34,52 @@ function lobbyAcceptLabel(id, temp) { return temp ? `${lobbyTitle(id)} for 20 mi
 // "Bea wants to play Chess": the one sentence for an offer or a request, wherever it is drawn.
 function lobbyOfferLine(name, game) { return `${name || 'Someone'} wants to play ${lobbyTitle(game)}` }
 
+// A looking press that accepted a game for twenty minutes comes back with ask_always: that
+// press is the one moment to ask whether the accept should stay. The ack names the games it
+// granted (ask_always_games), or the game the press itself named; a game already asked about
+// in this visit is never asked again. Both the Games page's Play row and the Hall's Find
+// match chips ask through here, so they ask about the same games, once.
+function lobbyAlwaysAsk(answer, body, asked) {
+  if (!answer || !answer.ask_always) return []
+  const named = Array.isArray(answer.ask_always_games) ? answer.ask_always_games : []
+  const played = body && Array.isArray(body.games) ? body.games : []
+  const seen = asked.current || (asked.current = {})
+  const fresh = []
+  for (const game of (named.length ? named : played)) {
+    if (!game || seen[game]) continue
+    seen[game] = true
+    fresh.push(game)
+  }
+  return fresh
+}
+
+// The once-only question, drawn where the person pressed. The twenty-minute accept is
+// already in place, so both answers work; "Yes, always" is the one that keeps it without a
+// window. A save the lobby refuses leaves the question where it is, so the person can press
+// again - the surface's own note line says why, in the lobby's words.
+function lobbyAlwaysBlock(game, { post, pending, busyNote, onDone }) {
+  if (!game) return null
+  const keep = async () => {
+    const answer = await post(`always:${game}`, '/online/hall/prefs', { always: { [game]: true } })
+    if (answer && answer.ok !== false && onDone) onDone()
+  }
+  return jsxs('div', {
+    'data-ask-always': game, role: 'status', 'aria-live': 'polite',
+    style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, borderTop: `1px solid ${stroke}`, paddingTop: 8 },
+    children: [
+      jsx('span', { style: { fontSize: 11, color: text.secondary, lineHeight: 1.5, flex: 1, minWidth: 0, whiteSpace: 'normal' }, children: `Always let people invite you to ${lobbyTitle(game)}?` }),
+      button('Yes, always', keep, { primary: true, disabled: Boolean(pending), title: pending ? busyNote : `Keep ${lobbyTitle(game)} on your accept list from now on.` }),
+      jsx('button', {
+        'data-ask-just': '1',
+        disabled: Boolean(pending), title: pending ? busyNote : `Leave ${lobbyTitle(game)} accepted for the next twenty minutes only.`,
+        onClick: onDone,
+        style: { fontSize: 12, padding: '4px 10px', borderRadius: 8, border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary, cursor: 'pointer' },
+        children: 'Just 20 minutes'
+      })
+    ]
+  })
+}
+
 // A lobby post stays readable for 30 days: that is how long the server keeps the #games chat
 // (online/server.py CHAT_KEEP_DAYS), so this screen never hides a line the server still has.
 const LOBBY_POST_MS = 30 * 24 * 3600 * 1000
@@ -272,6 +318,10 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // The one control whose POST is in flight; that control, and only it, is locked.
   const [pending, setPending] = useState('')
   const [ack, setAck] = useState('')
+  // The once-only "always?" question for a looking press that accepted a game for twenty
+  // minutes: one game at a time, in the order the server granted them.
+  const [askAlways, setAskAlways] = useState([])
+  const askedAlways = useRef({})
   // A seat the server offered that would not open, in the server's own words, and how many
   // times the person has asked for it again.
   const [seatProblem, setSeatProblem] = useState(null)
@@ -358,6 +408,10 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
       if (alive.current && answer && answer.ok === false) setAck(String(answer.text || ''))
+      // A Find match press that accepted a game for twenty minutes asks whether it should
+      // stay, exactly as the Games page's Play button does: one question per granted game.
+      const granted = lobbyAlwaysAsk(answer, body, askedAlways)
+      if (alive.current && granted.length) setAskAlways(queue => queue.concat(granted))
       return answer || { ok: true }
     } catch (error) {
       if (alive.current) setAck('That did not reach Game Center. Try again.')
@@ -518,6 +572,10 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       children: 'Reconnecting… the list below is the last one this computer saw.'
     }) : null,
     jsx(LobbyFindMatch, { looking, post, pending, busyNote: HALL_BUSY_NOTE }),
+    lobbyAlwaysBlock(askAlways[0], {
+      post, pending, busyNote: HALL_BUSY_NOTE,
+      onDone: () => setAskAlways(queue => queue.slice(1))
+    }),
     offer ? jsxs('div', {
       'data-lobby-offer-line': '1', role: 'status', 'aria-live': 'polite',
       style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 },

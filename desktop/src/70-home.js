@@ -263,8 +263,9 @@ function PlayWithPeople({ ctx, view }) {
   const [snap, setSnap] = useState(null)
   const [pending, setPending] = useState('')
   const [note, setNote] = useState('')
-  // The game the once-only "always?" question is about, while it is on screen.
-  const [askGame, setAskGame] = useState('')
+  // The games the once-only "always?" question is still to ask about, in the order the
+  // server granted them - the question in front is the one on screen.
+  const [askAlways, setAskAlways] = useState([])
   // Games already asked about in this visit. The server sends ask_always once per change,
   // and this keeps a second press from drawing the same question again.
   const asked = useRef({})
@@ -299,11 +300,8 @@ function PlayWithPeople({ ctx, view }) {
       if (answer && answer.ok === false) setNote(String(answer.text || ''))
       // A Play that had to accept the game for twenty minutes comes back with ask_always:
       // the press that opened that window is the one moment to ask whether it should stay.
-      const played = body && Array.isArray(body.games) ? body.games[0] : ''
-      if (answer && answer.ask_always && played && !asked.current[played]) {
-        asked.current[played] = true
-        setAskGame(played)
-      }
+      const granted = lobbyAlwaysAsk(answer, body, asked)
+      if (granted.length) setAskAlways(queue => queue.concat(granted))
       return answer || { ok: true }
     } catch {
       setNote('That did not reach Game Center. Try again.')
@@ -404,28 +402,11 @@ function PlayWithPeople({ ctx, view }) {
             children: `${lobbyOfferLine((comingOffer.from && comingOffer.from.name) || '', comingOffer.game)} — Join or Not now on the dialog.`
           })
         : null,
-      // The once-only question: the twenty-minute accept is already in place, so both answers
-      // work; "Yes, always" is the one that keeps it without a window.
-      askGame
-        ? jsxs('div', {
-            'data-ask-always': askGame, role: 'status', 'aria-live': 'polite',
-            style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, borderTop: `1px solid ${stroke}`, paddingTop: 8 },
-            children: [
-              jsx('span', { style: { ...muted, color: text.secondary, flex: 1, whiteSpace: 'normal' }, children: `Always let people invite you to ${lobbyTitle(askGame)}?` }),
-              button('Yes, always', async () => {
-                await post('always', '/online/hall/prefs', { always: { [askGame]: true } })
-                setAskGame('')
-              }, { primary: true, title: `Keep ${lobbyTitle(askGame)} on your accept list from now on.` }),
-              jsx('button', {
-                'data-ask-just': '1',
-                ...held(`Leave ${lobbyTitle(askGame)} accepted for the next twenty minutes only.`),
-                onClick: () => setAskGame(''),
-                style: { fontSize: 12, padding: '4px 10px', borderRadius: 8, border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary, cursor: 'pointer' },
-                children: 'Just 20 minutes'
-              })
-            ]
-          })
-        : null,
+      // The once-only question, in the one shape both this card and the Hall draw.
+      lobbyAlwaysBlock(askAlways[0], {
+        post, pending, busyNote: HALL_BUSY_NOTE,
+        onDone: () => setAskAlways(queue => queue.slice(1))
+      }),
       note ? jsx('div', { role: 'alert', style: { ...muted, color: text.primary }, children: note }) : null
     ]
   })

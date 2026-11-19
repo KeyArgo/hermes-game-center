@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8209,4 +8209,96 @@ async function offerSidesContract() {
     'nor is it their ask to wait on')
   reset()
   console.log('offers: the person asked answers, the asker waits with a cancel: passed')
+}
+
+// ---- The Hall's Find match asks about a new accept too -----------------------------------
+// The Hall's chips press the same looking door the Games page's Play buttons do, so a press
+// that accepts a game for twenty minutes has to ask the same once-only question there. An
+// All games search can grant several, so each newly granted game is asked about once.
+async function hallAlwaysContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const draw = value => {
+    sandbox.hallProps = value
+    cursor = 0
+    const tree = evaluate('LobbyHall(hallProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return tree
+  }
+  const settle = async value => { draw(value); await tick(); return draw(value) }
+  const snapshot = (extra = {}) => ({
+    state: 'live', you: { id: 'me', name: 'Ada', looking: [] }, prefs: { open: false, games: {} },
+    roster: [], requests: [], seated: null, ...extra
+  })
+  let answer = { ok: true, text: 'Looking.', ask_always: true, ask_always_games: ['connect4', 'chessboard'] }
+  const asked = []
+  const makeCtx = snap => {
+    const ctx = { rest: async (path, options) => {
+      asked.push([path, (options && options.body) || null])
+      if (path === '/online/hall') return snap
+      if (path === '/online/hall/looking') return answer
+      return { ok: true, text: 'Saved.' }
+    } }
+    return { ctx }
+  }
+  const props = extra => ({ ctx: null, current: 'connect4', view: {}, onPlayHere: () => {}, ...extra })
+  // The chips live inside LobbyFindMatch, which the harness draws as an element, so the
+  // press is made through the very post that element was handed.
+  const lookingBefore = tree => {
+    const spot = nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'LobbyFindMatch')
+    return spot.props.post
+  }
+  const prompts = tree => nodes(tree).filter(node => node.props && node.props['data-ask-always'])
+
+  // 1. A chip that accepts the game for twenty minutes asks whether it should stay - once
+  //    per granted game, so an All games search asks about each one in turn.
+  reset()
+  let run = makeCtx(snapshot())
+  let tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(prompts(tree).length, 0, 'nothing is asked before a search grants an accept')
+  await lookingBefore(tree)('looking:all', '/online/hall/looking', { all: true })
+  await tick()
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(prompts(tree).length, 1, 'the Hall asks the question the Games page asks: ' + words(tree).slice(-300))
+  assert.equal(prompts(tree)[0].props['data-ask-always'], 'connect4', 'about the first game it granted')
+  assert.ok(words(prompts(tree)[0]).includes('Always let people invite you to Connect 4?'), 'in words that name it')
+  assert.ok(findButton(tree, 'Just 20 minutes'), 'with the same two answers the card offers')
+
+  // 2. Leaving the twenty minutes alone moves on to the next granted game, not away from it.
+  await findButton(tree, 'Just 20 minutes').props.onClick()
+  await tick()
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(prompts(tree).length, 1, 'the second granted game is asked about too: ' + words(tree).slice(-300))
+  assert.equal(prompts(tree)[0].props['data-ask-always'], 'chessboard', 'and it is the next one')
+
+  // 3. Yes, always writes the accept list through the prefs door, and closes the question.
+  await findButton(tree, 'Yes, always').props.onClick()
+  await tick()
+  const kept = asked.filter(item => item[0] === '/online/hall/prefs').pop()
+  assert.ok(kept, 'Yes, always is a prefs write, from the Hall too')
+  assert.equal(JSON.stringify(kept[1]), JSON.stringify({ always: { chessboard: true } }), 'naming that game')
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(prompts(tree).length, 0, 'and the last question is answered and gone')
+
+  // 4. The same game is never asked about twice in this visit, even if the server says it
+  //    granted it again.
+  await lookingBefore(tree)('looking:all', '/online/hall/looking', { all: true })
+  await tick()
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(prompts(tree).length, 0, 'a game already asked about is not asked again: ' + words(tree).slice(-200))
+
+  // 5. A search that granted nothing new asks nothing.
+  reset()
+  answer = { ok: true, text: 'Looking.' }
+  run = makeCtx(snapshot())
+  tree = await settle(props({ ctx: run.ctx }))
+  await lookingBefore(tree)('looking:all', '/online/hall/looking', { all: true })
+  await tick()
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(prompts(tree).length, 0, 'an ack without ask_always asks nothing')
+  reset()
+  console.log('hall: find match asks about a newly accepted game, once each: passed')
 }
