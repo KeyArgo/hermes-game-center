@@ -4000,7 +4000,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -7748,6 +7748,89 @@ async function inviteBellContract() {
 // so the "opponent chip" named nobody at all: the felt now always says who is dealing. The
 // start screen offers the three ways in by name, and leaving between hands (nothing on the
 // felt) never threatens a forfeit.
+async function blackjackRoundContract() {
+  const tick = () => new Promise(resolve => setImmediate(resolve))
+  reset()
+  const moves = []
+  const picture = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white',
+    plies: 4, hands: 1, bet: 25, next_bet: 25, mid_round: false, outcome: 'win', won: 25,
+    legal: ['bet10', 'bet25', 'bet50'], bets: [10, 25, 50], chips: 10000,
+    permissions: { can_move: true, can_manage: true },
+    seats: [
+      { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
+      { side: 'black', kind: 'local', name: 'Computer', open: false }
+    ],
+    side_words: { white: 'You', black: 'Dealer' },
+    level: 'intermediate', levels: [{ id: 'intermediate', label: 'Intermediate' }],
+    score: { white: 0, black: 0, draws: 0 }, schema_version: 2, table_id: 'bj-1'
+  }
+  const delays = []
+  const previousTimeout = sandbox.setTimeout
+  sandbox.setTimeout = (fn, ms) => { delays.push(ms); fn(); return delays.length }
+  sandbox.bjRoundProps = {
+    game: { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true, draws: true, solo: true },
+    view: { player: { id: 'me' }, viewer_id: 'me', allow_ai: true },
+    board: { picture },
+    send: async line => { moves.push(line); return { text: 'OK' } },
+    playMove: async (id, token) => { moves.push(`${id} ${token}`); return { ok: true, text: 'OK' } },
+    onBack: () => moves.push('back'),
+    ctx: { storage: { get: (_key, fallback) => fallback, set() {}, remove() {} }, rest: async () => ({ ok: true }), os: { notify() {} } }
+  }
+  cursor = 0
+  let tree = evaluate('PlayTable(bjRoundProps)')
+  const queued = effects
+  effects = []
+  queued.forEach(run => run())
+  sandbox.setTimeout = previousTimeout
+  assert.ok(delays.includes(evaluate('BLACKJACK_NEXT_HAND_MS')), 'the next hand waits a short pause: ' + delays.join(','))
+  assert.ok(moves.includes('blackjack bet25'), 'and deals the same bet again: ' + moves.join(' | '))
+  assert.ok(findButton(tree, 'Leave table'), 'Leave table stays up between hands')
+  assert.equal(findButton(tree, 'Continue'), undefined, 'there is no continue question')
+  assert.equal(words(tree).toLowerCase().includes('continue?'), false, 'and no continue question in the words')
+  findButton(tree, 'Leave table').props.onClick()
+  await tick()
+  tree = evaluate('PlayTable(bjRoundProps)')
+  effects.forEach(run => run())
+  effects = []
+  assert.ok(moves.includes('blackjack abandon'), 'Leave table gets up: ' + moves.join(' | '))
+
+  reset()
+  evaluate("rememberOnlineRoom('')")
+  const again = []
+  sandbox.againProps = {
+    game: { id: 'connect4', title: 'Connect Four', installed: true, bots: true, draws: true },
+    view: { player: { id: 'me' }, viewer_id: 'me', allow_ai: true },
+    board: { picture: {
+      status: 'win', winner: 'black', game: 'connect4', view: 'connect4', schema_version: 2, table_id: 'c4-1',
+      seats: [
+        { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
+        { side: 'black', kind: 'local', name: 'Computer', open: false }
+      ],
+      level: 'intermediate', remembered_level: 'intermediate',
+      permissions: { can_manage: true, can_rematch: true, can_review: false },
+      score: { white: 0, black: 1, draws: 0 }, rematch: { requested_by: [] }, plies: 8
+    } },
+    send: async line => { again.push(line); return { text: 'OK' } },
+    playMove: async () => ({ ok: true, text: 'OK' }),
+    onBack: () => {},
+    ctx: { storage: { get: (_key, fallback) => fallback, set() {}, remove() {} }, os: { notify() {} } }
+  }
+  cursor = 0
+  tree = evaluate('PlayTable(againProps)')
+  effects.forEach(run => run())
+  effects = []
+  const play = findButton(tree, 'Play again')
+  assert.ok(play, 'a finished game against the computer offers Play again')
+  assert.ok(findButton(tree, 'Back to games'), 'and Back to games')
+  play.props.onClick()
+  await tick()
+  assert.equal(again.at(-1), 'allow-ai connect4 white=local level=intermediate',
+    'Play again keeps the game and swaps the colour: ' + again.join(' | '))
+  reset()
+  console.log('blackjack round loop, Leave table, and Play again: passed')
+}
+
 async function blackjackDealerContract() {
   const tick = () => new Promise(resolve => setImmediate(resolve))
   const seat = (side, kind, name, open) => ({ side, kind, name, open })

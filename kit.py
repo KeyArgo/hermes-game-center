@@ -1008,7 +1008,10 @@ class Table:
         mine = self._mine(state, player)
         if not mine:
             return "Only a seated player can leave."
-        if state.get("status") == "active" and state.get("plies", 0):
+        # Blackjack has no match to resign. Getting up clears the seat and leaves the
+        # chips where the last hand settled them.
+        session = getattr(self.rules, "ID", "") == "blackjack"
+        if state.get("status") == "active" and state.get("plies", 0) and not session:
             self._resign(state, [mine[0]], player)
         for side in mine:
             sit(state, side, None)

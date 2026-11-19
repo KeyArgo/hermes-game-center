@@ -3963,6 +3963,24 @@ function seaBattleCover(width, height) {
   }, 'sea-cover')
 }
 
+// How long a settled hand stays on the felt before the same bet is dealt again.
+const BLACKJACK_NEXT_HAND_MS = 1600
+
+// The chip the last hand used, when this seat may bet it again. Empty until a hand
+// has been played, and empty while a bet is already on the felt.
+function blackjackNextBet(picture) {
+  if (!picture) return ''
+  const view = String(picture.view || picture.game || '')
+  if (view !== 'blackjack') return ''
+  if (picture.phase !== 'bet' || picture.mid_round) return ''
+  if (!Number(picture.hands || 0)) return ''
+  const amount = Number(picture.next_bet || picture.bet || picture.original_bet || 0)
+  if (!amount) return ''
+  const token = `bet${amount}`
+  if (!Array.isArray(picture.legal) || !picture.legal.includes(token)) return ''
+  return token
+}
+
 // ---- 17-blackjack.js: Blackjack against the house dealer, with Jackpot wallet chips
 // The contract the page relies on: BlackjackTable({ picture, interactive, busy, onMove,
 // against }) where picture.view === 'blackjack' and onMove(token) sends one of
@@ -11717,6 +11735,21 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   useEffect(() => { setResultHidden(false) }, [game.id, pictured && pictured.table_id, status])
   useEffect(() => { readPoints() }, [pictured && pictured.table_id, status])
   useEffect(() => { setLeftSeat(false) }, [game.id, pictured && pictured.table_id])
+  // A settled blackjack hand deals the next one on its own, for the same bet. The person
+  // stays seated until they press Leave table. There is no question between hands.
+  const dealtHand = useRef(0)
+  useEffect(() => {
+    const token = blackjackNextBet(pictured)
+    if (!token || status !== 'active' || !access.can_move) return undefined
+    const hand = Number(pictured.hands || 0)
+    if (dealtHand.current === hand) return undefined
+    const timer = setTimeout(() => {
+      if (!alive.current || dealtHand.current === hand) return
+      dealtHand.current = hand
+      playMove(game.id, token)
+    }, BLACKJACK_NEXT_HAND_MS)
+    return () => clearTimeout(timer)
+  }, [pictured && pictured.phase, pictured && pictured.hands, pictured && pictured.bet, pictured && pictured.next_bet, pictured && pictured.legal, status, access.can_move])
 
   const bothLocal = seats.length === 2 && seats.every(seat => seat.kind === 'local' || seat.kind === 'agent')
   latest.current = { send, run, ready: !botOff && access.can_step && bothLocal && status === 'active' }
@@ -11822,6 +11855,10 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
     + (drawable ? ` · Draws ${score.draws || 0}` : '')
   const levelId = String((pictured && (pictured.level || pictured.remembered_level)) || 'intermediate').toLowerCase()
   const machineLine = machineSeat ? `allow-ai ${game.id} ${machineSeat.side}=${machineSeat.kind === 'agent' ? 'agent' : 'local'} level=${levelId}` : `${game.id} new`
+  // Same game, same level, the computer on the other colour.
+  const playAgainLine = machineSeat
+    ? `allow-ai ${game.id} ${machineSeat.side === 'white' ? 'black' : 'white'}=${machineSeat.kind === 'agent' ? 'agent' : 'local'} level=${levelId}`
+    : ''
   const newGameLabel = machineSeat && machineSeat.kind === 'local'
     ? `New game (${levelLabel(levelId) || 'Intermediate'})`
     : 'New game'
@@ -12343,6 +12380,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
           ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Series: ${seriesLine}` })
           : null,
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
+          playAgainLine ? button('Play again', () => newMatch(playAgainLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : 'human-bot')), lock({ primary: true, title: 'The same game and the same settings, with the colours swapped.' })) : null,
           access.can_review ? button('Review my game', () => command(`${game.id} review`), lock({ title: 'We look at one move you could have played better. Nothing is scored, and you can play again right after.' })) : null,
           button(requestedByMe ? 'Rematch requested' : rematchRequests.length ? 'Accept rematch' : 'Rematch', () => ask('rematch', 'Start another game with the same seats and series score. Any built-in bot seats are included in your consent.', `${game.id} rematch`), lock({ primary: true, disabled: !access.can_rematch || requestedByMe || (botOff && seats.some(seat => seat.kind === 'local')) })),
           button(newGameLabel, () => newMatch(machineLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : machineSeat ? 'human-bot' : 'shared')), lock({ disabled: !access.can_manage, title: 'A fresh game with the same opponent.' })),
@@ -25039,21 +25077,43 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
+  // Blackjack deals the next hand on its own, for the same bet. Leave table is how a person gets up.
+  const dealtHand = useRef(0)
+  useEffect(() => {
+    const token = blackjackNextBet(picture)
+    if (!token || !canMove) return undefined
+    const hand = Number(picture.hands || 0)
+    if (dealtHand.current === hand) return undefined
+    const timer = setTimeout(() => {
+      if (!alive.current || dealtHand.current === hand) return
+      dealtHand.current = hand
+      command('move', [token])
+    }, BLACKJACK_NEXT_HAND_MS)
+    return () => clearTimeout(timer)
+  }, [picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
+
   // Back leaves the room. Hiding the table used to leave the seat in the Hall, and the
-  // Hall, mounted again on the way out, opened that same room.
+  // Hall, mounted again on the way out, opened that same room. A hand still being played
+  // (blackjack) is refused, and the person stays seated until it settles.
   const stepAway = async () => {
     if (busy) return
     setBusy(true)
     const room = String((table && table.room_id) || roomId || '')
-    markHallLeft(room)
+    let refused = ''
     try {
       if (ctx && typeof ctx.rest === 'function') {
-        await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
-        await ctx.rest('/online/table/close', { method: 'POST' })
+        const answer = await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
+        if (answer && answer.ok === false) refused = String(answer.text || 'The table refused that.')
+        else await ctx.rest('/online/table/close', { method: 'POST' })
       }
     } catch (error) {
       // The screen still goes back: the seat is marked left either way.
     }
+    if (refused) {
+      if (alive.current) { setFailure(refused); setBusy(false) }
+      return
+    }
+    markHallLeft(room)
     rememberOnlineRoom('')
     if (alive.current) setBusy(false)
     if (onBack) onBack()
@@ -25088,6 +25148,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
         status === 'active' && !done && !sessionTable ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
+        stageView === 'blackjack' ? button('Leave table', stepAway, { disabled: busy, title: 'Get up from the table. A hand still being played has to finish first.' }) : null,
         button('Close table', putAway, { disabled: busy, title: 'Puts this table away here. The match stays on the lobby server.' })
       ] })
     ]

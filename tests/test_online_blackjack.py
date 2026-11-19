@@ -221,6 +221,34 @@ def test_reconnecting_keeps_both_seats(setup):
     assert again.run(store.room(room["id"]), people["Bea"], "move", ["bet10"])["ok"]
 
 
+def test_between_hands_the_same_bet_is_remembered_and_leaving_gets_up(setup):
+    store, rooms, people, _root = setup
+    room = dealt(rooms, people)
+    while rooms.state(room)["phase"] == "play":
+        ada = rooms.picture(room, people["Ada"]["id"])
+        who = people["Ada"] if ada["permissions"]["can_move"] else people["Bea"]
+        answer = rooms.run(room, who, "move", ["stand"])
+        assert answer["ok"], answer["text"]
+    assert rooms.state(room)["phase"] == "bet"
+    picture = rooms.picture(room, people["Ada"]["id"])
+    assert picture["next_bet"] == 10
+    assert "bet10" in picture["legal"]
+    assert rooms.run(room, people["Ada"], "leave")["ok"]
+    assert not rooms.state(room).get("white_id"), "Ada got up"
+    assert not store.room(room["id"])["closed"], "Bea is still at the table"
+    assert rooms.run(room, people["Bea"], "leave")["ok"]
+    assert store.room(room["id"])["closed"], "both got up, so the table closes"
+
+
+def test_a_hand_being_played_is_not_left_in_the_middle(setup):
+    _store, rooms, people, _root = setup
+    room = dealt(rooms, people)
+    answer = rooms.run(room, people["Ada"], "leave")
+    assert not answer["ok"]
+    assert "Finish this hand" in answer["text"]
+    assert rooms.state(room)["white_id"] == people["Ada"]["id"]
+
+
 def test_resigning_is_refused_because_there_is_no_match(setup):
     store, rooms, people, _root = setup
     room = dealt(rooms, people)

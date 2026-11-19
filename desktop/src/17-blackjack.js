@@ -1,3 +1,21 @@
+// How long a settled hand stays on the felt before the same bet is dealt again.
+const BLACKJACK_NEXT_HAND_MS = 1600
+
+// The chip the last hand used, when this seat may bet it again. Empty until a hand
+// has been played, and empty while a bet is already on the felt.
+function blackjackNextBet(picture) {
+  if (!picture) return ''
+  const view = String(picture.view || picture.game || '')
+  if (view !== 'blackjack') return ''
+  if (picture.phase !== 'bet' || picture.mid_round) return ''
+  if (!Number(picture.hands || 0)) return ''
+  const amount = Number(picture.next_bet || picture.bet || picture.original_bet || 0)
+  if (!amount) return ''
+  const token = `bet${amount}`
+  if (!Array.isArray(picture.legal) || !picture.legal.includes(token)) return ''
+  return token
+}
+
 // ---- 17-blackjack.js: Blackjack against the house dealer, with Jackpot wallet chips
 // The contract the page relies on: BlackjackTable({ picture, interactive, busy, onMove,
 // against }) where picture.view === 'blackjack' and onMove(token) sends one of

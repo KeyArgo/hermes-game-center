@@ -307,21 +307,43 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
+  // Blackjack deals the next hand on its own, for the same bet. Leave table is how a person gets up.
+  const dealtHand = useRef(0)
+  useEffect(() => {
+    const token = blackjackNextBet(picture)
+    if (!token || !canMove) return undefined
+    const hand = Number(picture.hands || 0)
+    if (dealtHand.current === hand) return undefined
+    const timer = setTimeout(() => {
+      if (!alive.current || dealtHand.current === hand) return
+      dealtHand.current = hand
+      command('move', [token])
+    }, BLACKJACK_NEXT_HAND_MS)
+    return () => clearTimeout(timer)
+  }, [picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
+
   // Back leaves the room. Hiding the table used to leave the seat in the Hall, and the
-  // Hall, mounted again on the way out, opened that same room.
+  // Hall, mounted again on the way out, opened that same room. A hand still being played
+  // (blackjack) is refused, and the person stays seated until it settles.
   const stepAway = async () => {
     if (busy) return
     setBusy(true)
     const room = String((table && table.room_id) || roomId || '')
-    markHallLeft(room)
+    let refused = ''
     try {
       if (ctx && typeof ctx.rest === 'function') {
-        await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
-        await ctx.rest('/online/table/close', { method: 'POST' })
+        const answer = await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
+        if (answer && answer.ok === false) refused = String(answer.text || 'The table refused that.')
+        else await ctx.rest('/online/table/close', { method: 'POST' })
       }
     } catch (error) {
       // The screen still goes back: the seat is marked left either way.
     }
+    if (refused) {
+      if (alive.current) { setFailure(refused); setBusy(false) }
+      return
+    }
+    markHallLeft(room)
     rememberOnlineRoom('')
     if (alive.current) setBusy(false)
     if (onBack) onBack()
@@ -356,6 +378,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
         status === 'active' && !done && !sessionTable ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
+        stageView === 'blackjack' ? button('Leave table', stepAway, { disabled: busy, title: 'Get up from the table. A hand still being played has to finish first.' }) : null,
         button('Close table', putAway, { disabled: busy, title: 'Puts this table away here. The match stays on the lobby server.' })
       ] })
     ]

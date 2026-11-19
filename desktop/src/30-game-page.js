@@ -534,6 +534,21 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
   useEffect(() => { setResultHidden(false) }, [game.id, pictured && pictured.table_id, status])
   useEffect(() => { readPoints() }, [pictured && pictured.table_id, status])
   useEffect(() => { setLeftSeat(false) }, [game.id, pictured && pictured.table_id])
+  // A settled blackjack hand deals the next one on its own, for the same bet. The person
+  // stays seated until they press Leave table. There is no question between hands.
+  const dealtHand = useRef(0)
+  useEffect(() => {
+    const token = blackjackNextBet(pictured)
+    if (!token || status !== 'active' || !access.can_move) return undefined
+    const hand = Number(pictured.hands || 0)
+    if (dealtHand.current === hand) return undefined
+    const timer = setTimeout(() => {
+      if (!alive.current || dealtHand.current === hand) return
+      dealtHand.current = hand
+      playMove(game.id, token)
+    }, BLACKJACK_NEXT_HAND_MS)
+    return () => clearTimeout(timer)
+  }, [pictured && pictured.phase, pictured && pictured.hands, pictured && pictured.bet, pictured && pictured.next_bet, pictured && pictured.legal, status, access.can_move])
 
   const bothLocal = seats.length === 2 && seats.every(seat => seat.kind === 'local' || seat.kind === 'agent')
   latest.current = { send, run, ready: !botOff && access.can_step && bothLocal && status === 'active' }
@@ -639,6 +654,10 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
     + (drawable ? ` · Draws ${score.draws || 0}` : '')
   const levelId = String((pictured && (pictured.level || pictured.remembered_level)) || 'intermediate').toLowerCase()
   const machineLine = machineSeat ? `allow-ai ${game.id} ${machineSeat.side}=${machineSeat.kind === 'agent' ? 'agent' : 'local'} level=${levelId}` : `${game.id} new`
+  // Same game, same level, the computer on the other colour.
+  const playAgainLine = machineSeat
+    ? `allow-ai ${game.id} ${machineSeat.side === 'white' ? 'black' : 'white'}=${machineSeat.kind === 'agent' ? 'agent' : 'local'} level=${levelId}`
+    : ''
   const newGameLabel = machineSeat && machineSeat.kind === 'local'
     ? `New game (${levelLabel(levelId) || 'Intermediate'})`
     : 'New game'
@@ -1160,6 +1179,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
           ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Series: ${seriesLine}` })
           : null,
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
+          playAgainLine ? button('Play again', () => newMatch(playAgainLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : 'human-bot')), lock({ primary: true, title: 'The same game and the same settings, with the colours swapped.' })) : null,
           access.can_review ? button('Review my game', () => command(`${game.id} review`), lock({ title: 'We look at one move you could have played better. Nothing is scored, and you can play again right after.' })) : null,
           button(requestedByMe ? 'Rematch requested' : rematchRequests.length ? 'Accept rematch' : 'Rematch', () => ask('rematch', 'Start another game with the same seats and series score. Any built-in bot seats are included in your consent.', `${game.id} rematch`), lock({ primary: true, disabled: !access.can_rematch || requestedByMe || (botOff && seats.some(seat => seat.kind === 'local')) })),
           button(newGameLabel, () => newMatch(machineLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : machineSeat ? 'human-bot' : 'shared')), lock({ disabled: !access.can_manage, title: 'A fresh game with the same opponent.' })),

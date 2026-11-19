@@ -334,6 +334,12 @@ class Rooms:
             return {"ok": False, "text": "This table is closed.", "finished": None}
         host = player["id"] == room["host_id"]
         state = self.state(room)
+        if action == "leave" and room.get("game") == "blackjack":
+            phase = str((state or {}).get("phase") or "")
+            if phase != "bet" or (state or {}).get("mid_round"):
+                return {"ok": False,
+                        "text": "Finish this hand, then leave the table.",
+                        "finished": None}
         if action == "resign" and room.get("game") == "blackjack":
             # A session table has no match to resign. Leaving is how a person gets up,
             # and that is a seat, not a result.

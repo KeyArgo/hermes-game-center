@@ -880,6 +880,13 @@ def _after_hand(state: dict, said: str) -> str:
     return state["note"]
 
 
+def _repeat_bet(state: dict, seat: int) -> int:
+    """What this seat bet last time. A double grew the felt, not the next bet."""
+    if seat == 1:
+        return int((_guest(state) or {}).get("last_bet") or 0)
+    return int(state.get("bet") or 0)
+
+
 def _dealer_seat(state: dict) -> str:
     """Who is dealing: the built-in computer, the person's Hermes model, or the house.
 
@@ -1397,6 +1404,10 @@ def picture(state: dict, player=None) -> dict:
         "total_wager": sum(int(hand["wager"]) for hand in hands),
         "original_bet": int(state.get("base_bet") or (hands[0]["base"] if hands else 0) or 0),
         "bets": list(_BETS),
+        # The bet the last hand used, so the next one can start on its own.
+        "next_bet": (_repeat_bet(state, seat) if state.get("phase") == "bet"
+                     and int(state.get("hands") or 0) and not state.get("mid_round")
+                     and seat is not None else 0),
         "note": str(state.get("note") or ""),
         "legal": legal(state),
         "status": state.get("status", ""),
