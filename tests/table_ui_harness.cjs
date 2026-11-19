@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -4990,7 +4990,7 @@ async function hallContract() {
     { id: 'q1', state: 'pending', from: { id: 'bea', name: 'Bea' }, to: { id: 'me', name: 'Ada' }, game: 'connect4', created: 0, expires: 90 }
   ] }))
   tree = await settle(props({ ctx: run.ctx }))
-  assert.ok(words(tree).includes('Bea wants to play connect4'), 'an inbound request reads as a card')
+  assert.ok(words(tree).includes('Bea wants to play Connect 4'), 'an inbound request is a card, and names the game')
   findButton(tree, 'Accept').props.onClick()
   await tick()
   let respond = run.asked.filter(item => item[0] === '/online/hall/respond').pop()
@@ -7836,4 +7836,273 @@ async function getOnlineCardContract() {
   assert.deepEqual(navved, ['/settings?tab=gateway'], 'the connection list is one press away')
   sandbox.host = savedHost
   console.log('get online card: connection, switch, name, rename, key, check: passed')
+}
+
+// ---- Play with people: the card under Get online on the Games page ---------------------
+// Two rows on the page the person is already on: the games they accept, and a Play button
+// per game that asks the people who accept it. The Hall's Find match chips and this card
+// send the same calls, so the two surfaces cannot drift.
+async function playWithPeopleContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const now = Math.floor(Date.now() / 1000)
+  const liveSnap = (extra = {}) => ({
+    state: 'live',
+    you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: true, games: { connect4: true }, until: {} },
+    roster: [{ id: 'me', name: 'Ada', status: 'online', games: ['connect4'] }],
+    requests: [], seated: null, ...extra
+  })
+  const makeCtx = (snap, answer) => {
+    const posts = []
+    const ctx = { rest: async (path, options) => {
+      posts.push([path, (options && options.body) || null, (options && options.method) || 'POST'])
+      if (path === '/online/hall') return snap
+      return answer || { ok: true, text: '' }
+    } }
+    return { ctx, posts }
+  }
+  const paint = async (online, ctx) => {
+    sandbox.playWithPeopleProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    // Two passes: the first queues the card's own read of the Hall, the second paints it.
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(playWithPeopleProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const signedIn = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const chipFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-accept-chip'] === id)
+  const playFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-play-now'] === id)
+
+  // 1. Signed out, the card is not there at all: nothing to accept, nobody to ask.
+  reset()
+  let run = makeCtx(liveSnap())
+  let tree = await paint({ ...signedIn, on: false }, run.ctx)
+  assert.equal(tree, null, 'signed out, there is no Play with people card')
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint({ ...signedIn, linked: false }, run.ctx)
+  assert.equal(tree, null, 'online but signed out, there is no card either')
+
+  // 2. Signed in: both rows, their two sentences, and a chip per requestable game.
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(words(tree).includes('Play with people'), 'the card names itself')
+  assert.ok(words(tree).includes('Games I accept'), 'row one is Games I accept: ' + words(tree).slice(0, 300))
+  assert.ok(words(tree).includes('People who press Play can invite you to these.'), 'and says what it means')
+  assert.ok(words(tree).includes('Play now'), 'row two is Play now')
+  assert.ok(words(tree).includes('Asks people who accept that game, longest-waiting first, one at a time.'), 'and says who it asks')
+  const chips = nodes(tree).filter(node => node.props && node.props['data-accept-chip'])
+  assert.equal(chips.length, 10, 'one chip per game the lobby can seat')
+  assert.ok(chipFor(tree, 'blackjack'), 'Blackjack can be accepted')
+  const plays = nodes(tree).filter(node => node.props && node.props['data-play-now'])
+  assert.equal(plays.length, 10, 'and every one of them can be played now')
+  assert.ok(playFor(tree, 'blackjack'), 'including Blackjack')
+  assert.ok(!chipFor(tree, 'slots') && !playFor(tree, 'slots'), 'Slots is not a match the lobby can seat')
+  // A game on the accept list reads as on, one that is not reads as off.
+  assert.equal(chipFor(tree, 'connect4').props['aria-pressed'], 'true', 'Connect 4 is accepted')
+  assert.equal(chipFor(tree, 'chessboard').props['aria-pressed'], 'false', 'Chess is not')
+
+  // 3. A temporary accept says how long it has left.
+  reset()
+  run = makeCtx(liveSnap({ prefs: { open: true, games: { connect4: true, chessboard: true }, until: { chessboard: now + 900 } } }))
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(words(chipFor(tree, 'chessboard')).includes('for 20 min'), 'a twenty-minute accept says so: ' + words(chipFor(tree, 'chessboard')))
+  assert.ok(!words(chipFor(tree, 'connect4')).includes('for 20 min'), 'a standing accept does not')
+  // An expired one is simply off again, exactly as the server counts it.
+  reset()
+  run = makeCtx(liveSnap({ prefs: { open: true, games: { connect4: true, chessboard: true }, until: { chessboard: now - 60 } } }))
+  tree = await paint(signedIn, run.ctx)
+  assert.equal(chipFor(tree, 'chessboard').props['aria-pressed'], 'false', 'an expired accept is off')
+  assert.ok(!words(chipFor(tree, 'chessboard')).includes('for 20 min'), 'and no longer says twenty minutes')
+
+  // 4. Pressing an accept chip writes the accept list, once, on the server.
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint(signedIn, run.ctx)
+  chipFor(tree, 'chessboard').props.onClick()
+  await tick()
+  let saved = run.posts.filter(item => item[0] === '/online/hall/prefs').pop()
+  assert.ok(saved, 'an accept chip posts the accept list')
+  assert.equal(JSON.stringify(saved[1]), JSON.stringify({ games: { chessboard: true } }), 'and names just that game')
+  tree = await paint(signedIn, run.ctx)
+  chipFor(tree, 'connect4').props.onClick()
+  await tick()
+  saved = run.posts.filter(item => item[0] === '/online/hall/prefs').pop()
+  assert.equal(JSON.stringify(saved[1]), JSON.stringify({ games: { connect4: false } }), 'pressing an accepted game turns it off')
+
+  // 5. Play now asks the people who accept that game: the same call The Hall's chips make.
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint(signedIn, run.ctx)
+  playFor(tree, 'chessboard').props.onClick()
+  await tick()
+  const played = run.posts.filter(item => item[0] === '/online/hall/looking').pop()
+  assert.ok(played, 'Play Chess is a looking post')
+  assert.equal(JSON.stringify(played[1]), JSON.stringify({ games: ['chessboard'] }), 'for that game alone')
+  // The Hall's own chip, pressed with nothing picked, sends the very same body.
+  sandbox.findMatchProps = { looking: [], pending: '', busyNote: '', post: (key, path, body) => run.posts.push([path, body]) }
+  const hallChips = evaluate('LobbyFindMatch(findMatchProps)')
+  nodes(hallChips).find(node => node.props && node.props['data-lobby-chip'] === 'chessboard').props.onClick()
+  const hallPlayed = run.posts.filter(item => item[0] === '/online/hall/looking').pop()
+  assert.equal(JSON.stringify(hallPlayed[1]), JSON.stringify(played[1]),
+    'the Hall and this card post the same looking body: one source of truth')
+
+  // 6. Looking with nobody free says so, and offers the way to stop.
+  reset()
+  run = makeCtx(liveSnap({ you: { id: 'me', name: 'Ada', invisible: false, looking: ['chessboard'] } }))
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(words(tree).includes('Nobody is free for Chess right now — still looking'), 'the status line says it is still looking: ' + words(tree).slice(-300))
+  assert.ok(findButton(tree, 'Stop looking'), 'with a way to stop')
+  findButton(tree, 'Stop looking').props.onClick()
+  await tick()
+  assert.equal(JSON.stringify(run.posts.filter(item => item[0] === '/online/hall/looking').pop()[1]),
+    JSON.stringify({ on: false }), 'Stop looking ends the search')
+
+  // 7. An offer that is out names who is being asked, in seconds that are left.
+  reset()
+  run = makeCtx(liveSnap({
+    you: { id: 'me', name: 'Ada', invisible: false, looking: ['chessboard'] },
+    requests: [{ id: 'o1', state: 'pending', offer: true, game: 'chessboard', created: now - 18, expires: 60,
+      from: { id: 'me', name: 'Ada' }, to: { id: 'bea', name: 'Bea' } }]
+  }))
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(words(tree).includes('Asking Bea — 42 s'), 'the search says who is being asked and how long is left: ' + words(tree).slice(-300))
+
+  // 8. An offer that comes in names the game, not its id.
+  reset()
+  run = makeCtx(liveSnap({
+    you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    requests: [{ id: 'o2', state: 'pending', offer: true, game: 'chessboard', created: now, expires: 60,
+      from: { id: 'bea', name: 'Bea' }, to: { id: 'me', name: 'Ada' } }]
+  }))
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(words(tree).includes('Bea wants to play Chess'), 'an incoming offer names the game: ' + words(tree).slice(-300))
+
+  // 9. A narrow pane (300 px) wraps instead of scrolling sideways.
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint(signedIn, run.ctx)
+  assert.equal(tree.props.style.minWidth, 0, 'the card can shrink to the pane')
+  assert.equal(tree.props.style.flexWrap, 'wrap', 'and its rows wrap')
+  assert.ok(!tree.props.style.overflowX, 'never a sideways scroll')
+  const groups = nodes(tree).filter(node => node.props && node.props['data-people-row'])
+  assert.equal(groups.length, 2, 'both rows are their own row')
+  for (const group of groups) {
+    assert.equal(group.props.style.flexWrap, 'wrap', 'each row wraps: ' + group.props['data-people-row'])
+    assert.ok(!group.props.style.whiteSpace || group.props.style.whiteSpace !== 'nowrap', 'and holds no unbreakable line')
+  }
+  console.log('play with people: accept list, play now, status and offer lines: passed')
+}
+
+// ---- The twenty-minute accept asks if it should stay -----------------------------------
+// Playing a game that is not on the accept list accepts it for twenty minutes. The press
+// that did that is the one moment to ask whether it should stay for good, and the question
+// is asked once: the server sends ask_always only for that change.
+async function alwaysInviteContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const snap = {
+    state: 'live',
+    you: { id: 'me', name: 'Ada', invisible: false, looking: ['chessboard'] },
+    prefs: { open: true, games: { connect4: true, chessboard: true }, until: {} },
+    roster: [{ id: 'me', name: 'Ada', status: 'online', games: ['connect4'] }],
+    requests: [], seated: null
+  }
+  const makeCtx = lookingAnswer => {
+    const posts = []
+    const ctx = { rest: async (path, options) => {
+      posts.push([path, (options && options.body) || null])
+      if (path === '/online/hall') return snap
+      if (path === '/online/hall/looking') return typeof lookingAnswer === 'function' ? lookingAnswer() : lookingAnswer
+      return { ok: true, text: '' }
+    } }
+    return { ctx, posts }
+  }
+  const paint = async ctx => {
+    sandbox.alwaysProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(alwaysProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const playFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-play-now'] === id)
+
+  // 1. A Play that had to accept the game for twenty minutes asks whether it should stay.
+  reset()
+  let run = makeCtx({ ok: true, text: 'Looking for Chess.', ask_always: true })
+  let tree = await paint(run.ctx)
+  assert.equal(nodes(tree).filter(node => node.props && node.props['data-ask-always']).length, 0,
+    'nothing is asked before a game is accepted for twenty minutes')
+  await playFor(tree, 'chessboard').props.onClick()
+  await tick()
+  tree = await paint(run.ctx)
+  const prompt = nodes(tree).find(node => node.props && node.props['data-ask-always'])
+  assert.ok(prompt, 'the press that accepted the game asks whether it should stay: ' + words(tree).slice(-300))
+  assert.equal(prompt.props['data-ask-always'], 'chessboard', 'and remembers which game it was')
+  assert.ok(words(prompt).includes('Always let people invite you to Chess?'), 'in words that name the game')
+  assert.ok(findButton(tree, 'Yes, always'), 'with a way to keep it')
+  assert.ok(findButton(tree, 'Just 20 minutes'), 'and a way to leave the twenty minutes alone')
+
+  // 2. Yes, always writes the accept list through the prefs door, and the question closes.
+  await findButton(tree, 'Yes, always').props.onClick()
+  await tick()
+  const kept = run.posts.filter(item => item[0] === '/online/hall/prefs').pop()
+  assert.ok(kept, 'Yes, always is a prefs write')
+  assert.equal(JSON.stringify(kept[1]), JSON.stringify({ always: { chessboard: true } }),
+    'and names the game, as always')
+  tree = await paint(run.ctx)
+  assert.equal(nodes(tree).filter(node => node.props && node.props['data-ask-always']).length, 0,
+    'the question is answered and gone')
+
+  // 3. Just 20 minutes keeps the temporary accept, and writes nothing.
+  reset()
+  run = makeCtx({ ok: true, text: 'Looking for Chess.', ask_always: true })
+  tree = await paint(run.ctx)
+  await playFor(tree, 'chessboard').props.onClick()
+  await tick()
+  tree = await paint(run.ctx)
+  const before = run.posts.length
+  await findButton(tree, 'Just 20 minutes').props.onClick()
+  await tick()
+  assert.equal(run.posts.filter(item => item[0] === '/online/hall/prefs').length, 0,
+    'twenty minutes is already what the server did: nothing more is written')
+  assert.equal(run.posts.length, before, 'no call at all is made by leaving it')
+  tree = await paint(run.ctx)
+  assert.equal(nodes(tree).filter(node => node.props && node.props['data-ask-always']).length, 0,
+    'and the question closes too')
+
+  // 4. It is asked once per game in this visit: pressing Play again does not ask again.
+  await playFor(tree, 'chessboard').props.onClick()
+  await tick()
+  tree = await paint(run.ctx)
+  assert.equal(nodes(tree).filter(node => node.props && node.props['data-ask-always']).length, 0,
+    'the same game is never asked about twice: ' + words(tree).slice(-200))
+
+  // 5. A Play that changed nothing on the accept list asks nothing.
+  reset()
+  run = makeCtx({ ok: true, text: 'Looking for Chess.' })
+  tree = await paint(run.ctx)
+  await playFor(tree, 'chessboard').props.onClick()
+  await tick()
+  tree = await paint(run.ctx)
+  assert.equal(nodes(tree).filter(node => node.props && node.props['data-ask-always']).length, 0,
+    'an ack without ask_always asks nothing')
+  console.log('always invite: the twenty-minute accept asks once whether it should stay: passed')
 }

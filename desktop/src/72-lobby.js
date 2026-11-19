@@ -19,6 +19,21 @@ const LOBBY_GAME_IDS = LOBBY_GAMES.map(item => item[0])
 const LOBBY_TITLES = Object.fromEntries(LOBBY_GAMES)
 const lobbyTitle = id => LOBBY_TITLES[id] || id
 
+// The two calls the accept list and the Play buttons make. The Hall's Find match chips press
+// the second one too, so the Games page's card and the Hall cannot drift apart.
+function lobbyAcceptBody(id, on) { return { games: { [id]: on } } }
+function lobbyLookingBody(ids) {
+  const games = (Array.isArray(ids) ? ids : []).filter(Boolean)
+  return games.length ? { games } : { on: false }
+}
+
+// "Connect 4 for 20 min": a temporary accept says how long it has, in the same words in both
+// places it is drawn. The server drops it by itself, so the label never promises more.
+function lobbyAcceptLabel(id, temp) { return temp ? `${lobbyTitle(id)} for 20 min` : lobbyTitle(id) }
+
+// "Bea wants to play Chess": the one sentence for an offer or a request, wherever it is drawn.
+function lobbyOfferLine(name, game) { return `${name || 'Someone'} wants to play ${lobbyTitle(game)}` }
+
 // A lobby post stays readable for 30 days: that is how long the server keeps the #games chat
 // (online/server.py CHAT_KEEP_DAYS), so this screen never hides a line the server still has.
 const LOBBY_POST_MS = 30 * 24 * 3600 * 1000
@@ -118,8 +133,7 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
     ...held(on ? `Stop looking for ${label}.` : `Look for a game of ${label} right now.`),
     onClick: () => {
       const next = on ? mine.filter(item => item !== id) : mine.concat([id])
-      post(`looking:${id}`, '/online/hall/looking',
-        next.length ? { games: next } : { on: false })
+      post(`looking:${id}`, '/online/hall/looking', lobbyLookingBody(next))
     },
     style: chipStyle(on),
     children: label
@@ -161,11 +175,45 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
   ] })
 }
 
+// The accept list as chips, on the page a person is already looking at (the Games page's
+// Play with people card). Every chip is one server write, the same one the Hall's per-game
+// switches make: the lobby keeps the list, so no screen keeps its own copy of it.
+function LobbyAcceptChips({ until, games, post, pending, busyNote }) {
+  const now = Date.now() / 1000
+  const untilAt = id => Number((until || {})[id] || 0)
+  // A temporary accept is on while its window lasts, and the server sends it as on too; a
+  // clock that has run past it is off, exactly as the server will count it.
+  const isOn = id => Boolean(games && games[id]) && (!untilAt(id) || untilAt(id) > now)
+  const held = say => ({ disabled: Boolean(pending), title: pending ? busyNote : say })
+  return jsx('div', {
+    'data-accept-row': '1', role: 'group', 'aria-label': 'Games you accept',
+    style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
+    children: LOBBY_GAMES.map(([id, label]) => {
+      const on = isOn(id)
+      const temp = on && untilAt(id) > 0
+      return jsx('button', {
+        'data-accept-chip': id,
+        'aria-pressed': on ? 'true' : 'false',
+        ...held(on ? `Stop accepting requests for ${label}.` : `Accept requests for ${label}.`),
+        onClick: () => post(`accept:${id}`, '/online/hall/prefs', lobbyAcceptBody(id, !on)),
+        style: {
+          fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
+          border: `1px solid ${on ? accent : stroke}`,
+          background: on ? fill : 'transparent', color: text.secondary,
+          // A narrow pane wraps the words inside a chip rather than pushing the row sideways.
+          whiteSpace: 'normal', textAlign: 'left', maxWidth: '100%'
+        },
+        children: lobbyAcceptLabel(id, temp)
+      }, id)
+    })
+  })
+}
+
 // A match offer. Find match made it, so neither person sent it: whichever of you
 // presses Join sits both down at the same private table. The dialog is the ask; the
 // dim line under the roster is the same news kept on the panel.
 function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote }) {
-  const title = `${otherName} wants to play ${lobbyTitle(card.game)}`
+  const title = lobbyOfferLine(otherName, card.game)
   return jsx('div', {
     'data-lobby-offer': String(card.id),
     role: 'dialog', 'aria-modal': 'true', 'aria-label': title,
@@ -445,7 +493,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const outbound = requests.filter(req => req.state === 'pending' && !req.offer && req.from && String(req.from.id) === String(you.id))
   const requestCards = [
     ...inbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
-      jsx('span', { style: { flex: 1, minWidth: 120 }, children: `${req.from.name} wants to play ${req.game}` }),
+      jsx('span', { style: { flex: 1, minWidth: 120 }, children: lobbyOfferLine(req.from.name, req.game) }),
       button('Accept', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: true }),
         { primary: true, ...held(`Accept and sit down with ${req.from.name}.`) }),
       button('Decline', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: false }),
@@ -470,7 +518,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       'data-lobby-offer-line': '1', role: 'status', 'aria-live': 'polite',
       style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 },
       children: [
-        jsx('span', { children: `${offerOther.name || 'Someone'} wants to play ${lobbyTitle(offer.game)} — Join or Not now on the dialog.` }),
+        jsx('span', { children: `${lobbyOfferLine(offerOther.name, offer.game)} — Join or Not now on the dialog.` }),
         jsx('span', { children: ' (Not sent to the model: Game Center shows this itself.)' })
       ]
     }) : null,

@@ -1758,6 +1758,10 @@ def online_hall_prefs(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
     extra = {"invisible": body["invisible"]} if "invisible" in body else {}
+    # "Yes, always" after a twenty-minute accept: {always: {game: true}} clears the temporary
+    # window and keeps the game on the accept list. Older desktops never send it.
+    if "always" in body:
+        extra["always"] = body["always"]
     return _online_hall(source).prefs(open=body.get("open"), games=body.get("games"), **extra)
 
 

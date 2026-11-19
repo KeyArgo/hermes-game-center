@@ -21,12 +21,12 @@ from shelf import ws as wsmod
 # prefs the page sends are shaped the way the server expects.
 REQUESTABLE = (
     "connect4", "reversi", "checkers", "gomoku", "chessboard",
-    "go", "hex", "breakthrough", "seabattle",
+    "go", "hex", "breakthrough", "seabattle", "blackjack",
 )
 
 
 def _blank_prefs() -> dict:
-    return {"open": False, "games": {game: False for game in REQUESTABLE}}
+    return {"open": False, "games": {game: False for game in REQUESTABLE}, "until": {}}
 
 
 def _blank_you() -> dict:
@@ -151,7 +151,12 @@ class Hall:
     # Client frames -----------------------------------------------------------
 
     def send(self, frame: dict) -> dict:
-        """Send a client frame, wait <=5 s for its matching ack, return {ok,text}."""
+        """Send a client frame, wait <=5 s for its matching ack, return {ok,text}.
+
+        Whatever else the server put on the ack rides along untouched: a looking ack carries
+        ``ask_always`` when that press added a temporary accept, and the screen that pressed
+        has to be told.
+        """
         with self._lock:
             if self._state != "live":
                 return {"ok": False, "text": "The lobby is not connected."}
@@ -167,9 +172,12 @@ class Hall:
         with self._lock:
             self._pending.pop(op, None)
             answer = pending["answer"] or {"ok": False, "text": "No answer from the lobby."}
-            return {"ok": bool(answer.get("ok")), "text": str(answer.get("text") or "")}
+            out = dict(answer)
+            out["ok"] = bool(answer.get("ok"))
+            out["text"] = str(answer.get("text") or "")
+            return out
 
-    def prefs(self, open=None, games=None, invisible=None) -> dict:
+    def prefs(self, open=None, games=None, invisible=None, always=None) -> dict:
         frame: dict = {"t": "prefs"}
         if open is not None:
             if not isinstance(open, bool):
@@ -186,7 +194,15 @@ class Hall:
             ):
                 return {"ok": False, "text": "Name the games to turn on or off."}
             frame["games"] = {game: enabled for game, enabled in games.items()}
-        if "open" not in frame and "games" not in frame and "invisible" not in frame:
+        if always is not None:
+            # "Yes, always" after a twenty-minute accept: the same game, kept for good.
+            if not isinstance(always, dict) or not all(
+                isinstance(game, str) and len(game) <= 100 and isinstance(enabled, bool)
+                for game, enabled in always.items()
+            ):
+                return {"ok": False, "text": "Name the games to keep on your list."}
+            frame["always"] = {game: enabled for game, enabled in always.items()}
+        if "open" not in frame and "games" not in frame and "invisible" not in frame and "always" not in frame:
             return {"ok": False, "text": "Nothing to change."}
         answer = self.send(frame)
         if answer.get("ok"):
@@ -197,6 +213,13 @@ class Hall:
                     self._prefs["open"] = frame["open"]
                 for game, enabled in frame.get("games", {}).items():
                     self._prefs.setdefault("games", {})[game] = enabled
+                for game, enabled in frame.get("always", {}).items():
+                    # Keeping a game for good turns the master switch on, clears any window it
+                    # was on for, and leaves the game itself on.
+                    self._prefs.setdefault("games", {})[game] = enabled
+                    self._prefs.setdefault("until", {}).pop(game, None)
+                    if enabled:
+                        self._prefs["open"] = True
                 if "invisible" in frame:
                     self._you["invisible"] = frame["invisible"]
                     if frame["invisible"]:
@@ -424,8 +447,9 @@ class Hall:
             elif kind == "ack":
                 pending = self._pending.get(message.get("op"))
                 if pending:
-                    pending["answer"] = {"ok": bool(message.get("ok")),
-                                         "text": str(message.get("text") or "")}
+                    # The whole ack, so a looking ack's ask_always reaches the screen that
+                    # pressed. ok and text are normalised by send().
+                    pending["answer"] = dict(message)
                     pending["event"].set()
             # pong and anything unknown: nothing to do.
 
@@ -438,4 +462,18 @@ class Hall:
         for game, enabled in games_in.items():
             if isinstance(game, str):
                 games[game] = bool(enabled)
-        return {"open": bool(prefs.get("open")), "games": games}
+        # A temporary accept carries the moment it lapses; 0 or absent means standing. The
+        # screen says "for 20 min" from this, so it is passed through rather than dropped.
+        until_in = prefs.get("until")
+        if not isinstance(until_in, dict):
+            until_in = {}
+        until = {}
+        for game, at in until_in.items():
+            if isinstance(game, str):
+                try:
+                    stamp = float(at or 0)
+                except (TypeError, ValueError):
+                    stamp = 0.0
+                if stamp > 0:
+                    until[game] = stamp
+        return {"open": bool(prefs.get("open")), "games": games, "until": until}

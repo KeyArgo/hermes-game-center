@@ -248,6 +248,148 @@ function OnlineGetOnlineCard({ ctx, view }) {
   })
 }
 
+// ---- Play with people: the card right under Get online -------------------------------
+//
+// The accept list and Find match used to live only inside The Hall, a panel down the page,
+// which is why the owner could not find them. Both rows are here now, on the page a person
+// already is, and they write exactly what The Hall writes (lobbyAcceptBody / lobbyLookingBody,
+// 72-lobby.js): the lobby server is the one copy of that state, so the two surfaces cannot
+// disagree. The card is drawn only when this window is signed in to online play.
+function PlayWithPeople({ ctx, view }) {
+  const online = onlineView(view)
+  const signedIn = Boolean(online.on && online.linked && !online.offline)
+  // The Hall's own snapshot, read here every few seconds. It is the same door The Hall reads,
+  // so an accept made in either place is what this card shows on its next turn.
+  const [snap, setSnap] = useState(null)
+  const [pending, setPending] = useState('')
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    if (!signedIn || !ctx || typeof ctx.rest !== 'function') return undefined
+    let alive = true
+    let timer = null
+    const read = async () => {
+      try {
+        const answer = await ctx.rest('/online/hall')
+        if (alive && answer && typeof answer === 'object') setSnap(answer)
+      } catch { /* the last snapshot stands; the next tick tries again */ }
+    }
+    read()
+    timer = setInterval(read, HALL_POLL_MS)
+    return () => { alive = false; if (timer) clearInterval(timer) }
+  }, [ctx, signedIn])
+
+  if (!signedIn) return null
+
+  // One door for both rows, held while its own POST is out, and a refusal is said in the
+  // lobby's own words rather than swallowed.
+  const post = async (key, path, body) => {
+    if (pending) return { ok: false }
+    setPending(key)
+    setNote('')
+    try {
+      const answer = ctx && typeof ctx.rest === 'function'
+        ? await ctx.rest(path, { method: 'POST', body })
+        : { ok: false, text: 'Game Center cannot be reached.' }
+      if (answer && answer.ok === false) setNote(String(answer.text || ''))
+      return answer || { ok: true }
+    } catch {
+      setNote('That did not reach Game Center. Try again.')
+      return { ok: false }
+    } finally {
+      setPending('')
+    }
+  }
+
+  const you = (snap && snap.you) || {}
+  const prefs = (snap && snap.prefs) || { open: false, games: {}, until: {} }
+  const requests = (snap && snap.requests) || []
+  const mine = Array.isArray(you.looking) ? you.looking : []
+  const nowSeconds = Date.now() / 1000
+  const sent = requests.filter(req => req && req.state === 'pending' && req.offer
+    && req.from && String(req.from.id) === String(you.id))
+  const came = requests.filter(req => req && req.state === 'pending' && req.offer
+    && req.to && String(req.to.id) === String(you.id))
+  const asking = sent[0] || null
+  // How long the offer has left, in whole seconds: "Asking Bea — 42 s".
+  const left = asking
+    ? Math.max(0, Math.round(Number(asking.created || 0) + Number(asking.expires || 0) - nowSeconds))
+    : 0
+  const comingOffer = came[0] || null
+  const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
+  const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.5, minWidth: 0 }
+
+  // One label row: the row's name, then the sentence that says what pressing it does.
+  const rowHead = (key, label, say) => jsxs('div', {
+    'data-people-row': key,
+    style: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, minWidth: 0 },
+    children: [
+      jsx('span', { style: { fontSize: 13, fontWeight: 650 }, children: label }),
+      jsx('span', { style: { ...muted, whiteSpace: 'normal' }, children: say })
+    ]
+  })
+
+  return jsxs('section', {
+    'data-people-card': 'open',
+    'aria-label': 'Play with people',
+    style: {
+      display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flexWrap: 'wrap',
+      border: `1px solid ${stroke}`, borderRadius: 10, background: card, padding: '10px 12px'
+    },
+    children: [
+      jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Play with people' }),
+      rowHead('accept', 'Games I accept', 'People who press Play can invite you to these.'),
+      // Called as the block it is, the way onlineAccountBlock is: no state of its own, so the
+      // chip row is drawn in place and its presses go through this card's one door.
+      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE }),
+      rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
+      jsx('div', {
+        role: 'group', 'aria-label': 'Play now',
+        style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
+        children: LOBBY_GAMES.map(([id, label]) => jsx('button', {
+          'data-play-now': id,
+          ...held(`Ask people who accept ${label} for a game now.`),
+          onClick: () => post(`play:${id}`, '/online/hall/looking', lobbyLookingBody([id])),
+          style: {
+            fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'normal',
+            border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary
+          },
+          children: `Play ${label}`
+        }, id))
+      }),
+      // The search itself: who is being asked, or that nobody is free yet. Stop looking is
+      // here, beside the sentence it ends, so the way out is where the person is looking.
+      asking || mine.length
+        ? jsxs('div', {
+            'data-people-status': '1', role: 'status', 'aria-live': 'polite',
+            style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 },
+            children: [
+              jsx('span', { style: { ...muted, color: text.secondary, flex: 1 }, children: asking
+                ? `Asking ${(asking.to && asking.to.name) || 'someone'} — ${left} s`
+                : `Nobody is free for ${mine.map(lobbyTitle).join(', ')} right now — still looking` }),
+              jsx('button', {
+                'data-people-stop': '1',
+                ...held('Stop looking for a match.'),
+                onClick: () => post('stop', '/online/hall/looking', lobbyLookingBody([])),
+                style: { fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${stroke}`, background: 'transparent', color: text.tertiary, cursor: 'pointer' },
+                children: 'Stop looking'
+              })
+            ]
+          })
+        : jsx('div', { style: muted, children: 'Press Play beside a game to ask the people who accept it.' }),
+      // An offer that came in: the same sentence the Hall uses, and the same dialog it opens.
+      comingOffer
+        ? jsx('div', {
+            'data-people-offer': String(comingOffer.id), role: 'status', 'aria-live': 'polite',
+            style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
+            children: `${lobbyOfferLine((comingOffer.from && comingOffer.from.name) || '', comingOffer.game)} — Join or Not now on the dialog.`
+          })
+        : null,
+      note ? jsx('div', { role: 'alert', style: { ...muted, color: text.primary }, children: note }) : null
+    ]
+  })
+}
+
 function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
@@ -745,6 +887,9 @@ function GameCenterPage({ ctx, onArea }) {
       // Get online: the first thing on the page, because playing with another person starts
       // here - which Game Center this window is on, and the four steps that sign you in.
       jsx(OnlineGetOnlineCard, { ctx, view }),
+      // Right under it: who may invite you, and Play now. Signed in only, and drawn from the
+      // lobby's own answer, so this card and The Hall always agree.
+      jsx(PlayWithPeople, { ctx, view }),
       jsxs('div', {
         style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'end', flexWrap: 'wrap' },
         children: [
