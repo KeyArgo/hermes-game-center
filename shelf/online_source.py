@@ -511,7 +511,9 @@ class Online:
     # The lobby ---------------------------------------------------------------
 
     def _fail(self) -> None:
-        self._fails = min(self._fails + 1, len(BACKOFF_SECONDS) - 1)
+        # Capped at the last step, and indexed from then on: the waits are 15, 30, 60, then 120 s,
+        # which is the sequence the network section of the README promises.
+        self._fails = min(self._fails + 1, len(BACKOFF_SECONDS))
         self._next_at = self.clock() + BACKOFF_SECONDS[self._fails - 1]
         self._offline_text = ("The online lobby cannot be reached right now. Everything here that "
                               "runs on this computer still works.")

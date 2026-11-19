@@ -6,6 +6,13 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The 120-second backoff step runs.** `Online._fail` capped the failure count at
+  `len(BACKOFF_SECONDS) - 1` and then indexed `BACKOFF_SECONDS[fails - 1]`, so the fourth entry could
+  never be read: a server that stayed down was retried every 60 s forever, not the 15, 30, 60, 120
+  the network section promises. The count is capped at the length now. Guards:
+  `tests/test_online_source.py` (`test_the_backoff_reaches_the_documented_two_minute_wait` — fails
+  against the old `_fail`).
+
 - **Your pet rides on your own row in "Seen in the lobby".** The row was matched against the local
   players.json name, but those rows are lobby accounts: signed in as "Potato" with a local name of
   "BlueWren", BlueWren's row wore the pet and Potato's had none. It is matched against the name this

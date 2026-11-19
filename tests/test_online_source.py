@@ -638,3 +638,33 @@ def test_a_frame_arriving_in_two_pieces_is_not_lost():
         sock._read_message()
     sock.sock.chunks.append(frame[4:])
     assert sock._read_message() == '{"t":"state"}', "the header must not be consumed without its payload"
+
+
+def test_the_backoff_reaches_the_documented_two_minute_wait(tmp_path):
+    """The waits are 15, 30, 60, then 120 s - the last one the network section promises.
+
+    ``_fail`` capped ``_fails`` at ``len(BACKOFF_SECONDS) - 1`` and then indexed ``_fails - 1``, so
+    the fourth entry was never reached: the sequence was 15, 30, 60, 60, 60... and the documented
+    120-second wait never happened.
+    """
+    clock = [1000.0]
+    opener = Opener(status=0)
+    source = online_source.Online(tmp_path, opener=opener, clock=lambda: clock[0], secret=lambda name: "k")
+    source.turn_on()
+    # The lobby polls only: a wallet note rides along with the first one and is not a dial.
+    reads = lambda: sum(1 for call in opener.seen if str(call).endswith("/api/lobby"))
+    source.refresh()
+    tries = reads()
+    assert tries == 1, opener.seen
+    for step in (15, 30, 60):
+        clock[0] += step
+        source.refresh()
+        assert reads() == tries + 1, f"no try after the {step} s wait"
+        tries += 1
+    # The fourth wait is two minutes: nothing is tried at 60 s into it.
+    clock[0] += 60
+    source.refresh()
+    assert reads() == tries, "the fourth wait is two minutes, not another sixty seconds"
+    clock[0] += 60
+    source.refresh()
+    assert reads() == tries + 1, "and the try comes when the two minutes are up"
