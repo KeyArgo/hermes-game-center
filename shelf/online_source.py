@@ -1205,7 +1205,9 @@ class Online:
             "match": self.match(),
             "alerts": self.alerts(),
             "ladder": self._ladder or {},
-            "league": self.league(),
+            # The last league the background refresh read. This must not go and get
+            # a new one: that is six lobby calls, and /view used to wait on them.
+            "league": dict(self._league) if self._league else _blank_league(),
             "ladder_board": (self._lobby.get("ladder") or {}) if self.on else {},
             "bot": {"id": str((self._state.get("bot") or {}).get("id") or ""),
                     "name": str((self._state.get("bot") or {}).get("name") or "")},

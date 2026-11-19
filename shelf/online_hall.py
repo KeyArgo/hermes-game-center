@@ -100,6 +100,11 @@ class Hall:
         self._roster: dict = {}
         self._requests: dict = {}
         self._seated = None
+        # Lobby HTTP (refresh, queue, the league's reads, one alert) runs here, not inside
+        # /view. The worker is started from a request, in that request's context.
+        self._refresh_stop = threading.Event()
+        self._refresh_thread = None
+        self._refresh_key = None
         # The last thing said about why the socket is not live, so a dial that keeps failing
         # is one log line and not one every second.
         self._said = ""
@@ -203,6 +208,7 @@ class Hall:
             if thread and thread is not threading.current_thread():
                 thread.join(timeout=self.stop_join)
                 still_holding = thread.is_alive()
+            self._refresh_stop.set()
             with self._lock:
                 self._state = "off"
                 self._error = ""
@@ -279,6 +285,55 @@ class Hall:
             if room_id and str(self._seated.get("room_id") or "") != str(room_id):
                 return
             self._seated = None
+
+    def ensure_refresh(self) -> None:
+        """Keep the lobby snapshot warm on a worker, off the request that paints /view.
+
+        The worker runs in a copy of this request's context. A thread does not inherit
+        the profile scope, and without it the key the lobby calls need is empty.
+        """
+        try:
+            key = str(self.online.key() or "")
+        except Exception:
+            key = ""
+        with self._lifecycle:
+            alive = self._refresh_thread is not None and self._refresh_thread.is_alive()
+            if alive and key == self._refresh_key:
+                return
+            self._refresh_stop.set()
+            self._refresh_key = key
+            self._refresh_stop = threading.Event()
+            stop = self._refresh_stop
+            self._refresh_thread = threading.Thread(
+                target=contextvars.copy_context().run,
+                args=(self._refresh_loop, stop),
+                daemon=True,
+                name="lobby-refresh",
+            )
+            self._refresh_thread.start()
+
+    def _refresh_loop(self, stop: threading.Event) -> None:
+        """refresh, the queue, the league's reads and one alert. Not on the /view path."""
+        while not stop.is_set():
+            try:
+                online = self.online
+                if getattr(online, "on", False):
+                    online.refresh()
+                    check = getattr(online, "check_queue", None)
+                    if check:
+                        check()
+                    league = getattr(online, "league", None)
+                    if league:
+                        league()
+                    match = getattr(online, "match", None)
+                    if not (match() if match else None):
+                        poll = getattr(online, "poll_alert", None)
+                        if poll:
+                            poll()
+            except Exception:
+                log.warning("lobby refresh failed", exc_info=True)
+            if stop.wait(2):
+                break
 
     # Client frames -----------------------------------------------------------
 

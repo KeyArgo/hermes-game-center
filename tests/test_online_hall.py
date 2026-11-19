@@ -1092,6 +1092,54 @@ def test_the_worker_dials_with_the_key_the_request_could_read(monkeypatch):
     assert any(m.get("t") == "auth" for m in sent), "the worker never dialled with the key: %r" % sent
 
 
+def test_view_does_not_block_on_a_slow_lobby(monkeypatch, tmp_path):
+    """The lobby's HTTP stays off /view. A 3s lobby must not hold the page."""
+    import contextvars
+
+    from shelf.online_source import Online
+    from dashboard import plugin_api
+
+    scope = contextvars.ContextVar("gc_scope", default="")
+    seen = []
+    release = threading.Event()
+    started = threading.Event()
+
+    def opener(request, timeout=6):
+        seen.append((threading.current_thread().name, scope.get()))
+        started.set()
+        release.wait(4)
+        raise OSError("slow lobby")
+
+    def secret(_name):
+        return "token" if scope.get() == "desk" else ""
+
+    source = Online(tmp_path, url="http://127.0.0.1:9", opener=opener, secret=secret)
+    source.turn_on()
+    source._state["name"] = "Cached"
+    source._league = {"ladder": [{"name": "Cached"}]}
+    ladder = type("Ladder", (), {"status": staticmethod(lambda: {})})()
+    hall = plugin_api.online_hall.Hall(source)
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (source, ladder))
+    monkeypatch.setattr(plugin_api, "_online_hall", lambda src: hall)
+    token = scope.set("desk")
+    try:
+        began = time.monotonic()
+        payload = plugin_api._online_payload()
+        elapsed = time.monotonic() - began
+    finally:
+        scope.reset(token)
+    try:
+        assert elapsed < 0.5, elapsed
+        assert payload.get("error") is None, payload.get("error")
+        assert payload["name"] == "Cached", "the page is served the last snapshot"
+        assert payload["league"]["ladder"][0]["name"] == "Cached"
+        assert started.wait(2), "the worker never called the lobby"
+        assert ("lobby-refresh", "desk") in seen, seen
+    finally:
+        release.set()
+        hall.stop()
+
+
 def test_leaving_a_table_drops_the_hall_seat(monkeypatch):
     """Back posts leave, and the Hall must forget that seat or the next mount opens it."""
     import types

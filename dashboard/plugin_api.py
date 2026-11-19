@@ -1631,17 +1631,17 @@ def _online_payload_unsafe(*, refresh: bool = True) -> dict:
     # While online play is on, the lobby connection is kept up by anything that asks
     # about the online side - not only by the lobby page being open. A read: it keeps the
     # worker running and never wakes it (GET /view is polled every few seconds).
-    _online_hall(source).start(wake=False)
+    hall = _online_hall(source)
+    hall.start(wake=False)
+    # The lobby HTTP (refresh, queue, league, alert) runs on the Hall's worker,
+    # in this request's context. /view serves the snapshot that worker last wrote.
     if refresh:
-        source.refresh()
-        source.check_queue()
+        ensure = getattr(hall, "ensure_refresh", None)
+        if ensure:
+            ensure()
     payload = source.snapshot()
     payload["ladder"] = ladder.status()
     source.set_ladder(payload["ladder"])
-    # One alert at a time, never while the person has a table waiting or a game
-    # running: the moment for that is the match line, not a notification.
-    if not payload.get("match"):
-        source.poll_alert()
     # The match line is the news once a table exists; an alert would compete with it.
     payload["alert"] = None if payload.get("match") else source.live_alert()
     return payload
