@@ -4737,7 +4737,10 @@ async function lobbyColumnContract() {
   const onlineSignedIn = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada' }
   const named = { player: { id: 'me', name: 'Ada', named: true }, lobby: { lines: [], looking: [] }, online: onlineSignedIn }
   const signedOut = { ...named, online: { on: true, url: 'https://games.hermesnet.xyz', linked: false } }
-  const unnamed = { player: { id: 'me', name: '', named: false }, lobby: { lines: [], looking: [] }, online: onlineSignedIn }
+  const unnamed = { player: { id: 'me', name: '', named: false }, lobby: { lines: [], looking: [] },
+    // Signed out: the local-name box in this column is only drawn when the chat is not the
+    // lobby's (signed in, the name on a line is the lobby account's, so there is no local box).
+    online: { on: true, url: 'https://games.hermesnet.xyz', linked: false } }
   const paint = (extra = {}) => {
     sandbox.lobbyProps = {
       view: named, ctx: { os: { openExternal: () => false } }, current: 'connect4', onPlayHere: () => {},
@@ -7882,15 +7885,22 @@ async function playWithPeopleContract() {
   const chipFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-accept-chip'] === id)
   const playFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-play-now'] === id)
 
-  // 1. Signed out, the card is not there at all: nothing to accept, nobody to ask.
+  // 1. Online play off: nothing to accept and nobody to ask, so the card is not drawn at all.
   reset()
   let run = makeCtx(liveSnap())
   let tree = await paint({ ...signedIn, on: false }, run.ctx)
   assert.equal(tree, null, 'signed out, there is no Play with people card')
+  // Online on but not signed in: the card is still drawn, so it can say which of the two it is.
+  // A card that vanished blamed the person's own setting (owner, 2026-11-18).
   reset()
   run = makeCtx(liveSnap())
   tree = await paint({ ...signedIn, linked: false }, run.ctx)
-  assert.equal(tree, null, 'online but signed out, there is no card either')
+  assert.ok(tree, 'online but signed out, the card is drawn so it can say why')
+  const openState = nodes(tree).find(node => node.props && node.props['data-people-open'])
+  assert.ok(openState, 'the master switch is on the card')
+  assert.equal(openState.props['data-people-open'], 'signed-out', 'and it knows nobody is signed in')
+  assert.ok(words(tree).includes('Sign in above to let people invite you.'),
+    'it asks for the sign-in rather than blaming a switch: ' + words(tree).slice(0, 200))
 
   // 2. Signed in: both rows, their two sentences, and a chip per requestable game.
   reset()
@@ -7925,11 +7935,15 @@ async function playWithPeopleContract() {
   assert.equal(chipFor(tree, 'chessboard').props['aria-pressed'], 'false', 'an expired accept is off')
   assert.ok(!words(chipFor(tree, 'chessboard')).includes('for 20 min'), 'and no longer says twenty minutes')
 
-  // 3b. With the master switch off, the card says why the chips cannot be reached.
+  // 3b. With the master switch off, the card says so in the switch's own words: one switch, one
+  // sentence ("Online invites are off — turn on to be asked" told the person to press a switch
+  // that was already the answer).
   reset()
   run = makeCtx(liveSnap({ prefs: { open: false, games: { connect4: true }, until: {} } }))
   tree = await paint(signedIn, run.ctx)
-  assert.ok(words(tree).includes('Online invites are off — turn on to be asked'), 'a closed accept list says so: ' + words(tree).slice(0, 300))
+  assert.ok(words(tree).includes('OFF — nobody can invite you.'), 'a closed accept list says so: ' + words(tree).slice(0, 300))
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-people-open']).props['data-people-open'], 'off',
+    'and the switch itself reads off')
   assert.equal(chipFor(tree, 'connect4').props['aria-pressed'], 'false', 'and no chip looks on beside it')
   reset()
   run = makeCtx(liveSnap())
@@ -8504,7 +8518,10 @@ async function invitesOffContract() {
     return tree
   }
   const chipFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-accept-chip'] === id)
-  const reason = 'Online invites are off — turn on to be asked'
+  // One switch, one sentence: the card says which state the master switch is in, instead of the
+  // old "Online invites are off — turn on to be asked", which told the person to press the switch
+  // they were looking at.
+  const reason = 'OFF — nobody can invite you.'
 
   // 1. Switch off, one game accepted by hand: no chip reads as on, and the card says why.
   reset()
