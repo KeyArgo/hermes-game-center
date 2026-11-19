@@ -413,6 +413,13 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
       if (alive.current && answer && answer.ok === false) setAck(String(answer.text || ''))
+      // Retry answers with the snapshot the dial reached. Paint it here rather than leaving the
+      // old "not connected" panel up until the next 3 s read - a retry that worked would look
+      // like one that failed.
+      if (alive.current && answer && typeof answer.state === 'string') {
+        setSnap(previous => ({ ...(previous || {}), ...answer }))
+        if (answer.state === 'live') setAck('')
+      }
       // The accept list as the lobby has it now, so a switch this press changed shows it
       // without waiting for the next poll (the Games page's chips take the same answer).
       if (alive.current && answer && answer.prefs && typeof answer.prefs === 'object') {

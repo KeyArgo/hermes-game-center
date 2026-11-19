@@ -1005,3 +1005,35 @@ def test_a_worker_stuck_in_a_connect_is_not_left_dialling_beside_a_new_one(monke
     finally:
         held.set()
         hall.stop()
+
+
+def test_retry_says_joining_while_the_dial_is_still_running(monkeypatch):
+    """The sentence beside Retry is read from the state the dial reached - joining is not failure.
+
+    /online/hall/retry answered "Not connected to the lobby yet" for every non-live state,
+    including "connecting": a dial that had not had its two seconds was reported as a failure, and
+    the card kept that sentence even after the next read came back live.
+    """
+    from dashboard import plugin_api
+    from shelf import online_hall as hall_mod
+
+    class FakeHall:
+        def __init__(self, state):
+            self.state = state
+
+        def retry(self):
+            return {"state": self.state, "you": {}, "prefs": {}, "roster": [], "requests": [],
+                    "seated": None}
+
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (object(), None))
+    expected = {
+        "connecting": ("Joining the lobby now — one moment.", False),
+        "live": ("", True),
+        "off": (hall_mod.NOT_CONNECTED, False),
+        "old-server": (hall_mod.NOT_CONNECTED, False),
+    }
+    for state, (text, ok) in expected.items():
+        monkeypatch.setattr(plugin_api, "_online_hall", lambda src, s=state: FakeHall(s))
+        answer = plugin_api.online_hall_retry()
+        assert answer["ok"] is ok, (state, answer)
+        assert answer["text"] == text, (state, answer)

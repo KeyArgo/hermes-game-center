@@ -3990,7 +3990,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8126,6 +8126,101 @@ async function playWithPeopleContract() {
     'state', 'a connected switch says what the switch is, not that the lobby is down')
   assert.ok(!findButton(tree, 'Retry'), 'and offers no Retry')
   console.log('play with people: a held switch says why beside it, with Retry when the lobby is down: passed')
+}
+
+// ---- Retry: a dial still in flight is not a failure ------------------------------------
+// The Retry button's sentence is read from the state the dial reached. A dial that is still
+// running used to be reported as "not connected", and the Games card kept that sentence under a
+// switch that had gone live, because the note was never cleared and the Hall ignored the state
+// the retry answered with.
+async function retryStatesContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const liveSnap = () => ({
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: true, games: { connect4: true }, until: {} },
+    roster: [], requests: [], seated: null
+  })
+  const JOINING = 'Joining the lobby now — one moment.'
+
+  // 1. The Games card: "joining" while the dial runs, and no sentence at all once it is live.
+  reset()
+  const card = { snap: { ...liveSnap(), state: 'connecting' }, retry: { ok: false, state: 'connecting', text: JOINING } }
+  const paintCard = async () => {
+    // A fresh ctx each paint: the harness re-runs an effect when its dependencies change, and a
+    // fresh read of the Hall is exactly what a new poll is.
+    const ctx = { rest: async (path) => {
+      if (path === '/online/hall') return card.snap
+      if (path === '/online/hall/retry') return card.retry
+      return { ok: true, text: '' }
+    } }
+    sandbox.retryCardProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(retryCardProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  let tree = await paintCard()
+  assert.ok(words(tree).includes('Lobby not connected — Retry'), 'the card starts out not connected')
+  await findButton(tree, 'Retry').props.onClick()
+  await tick()
+  tree = await paintCard()
+  assert.ok(words(tree).includes(JOINING),
+    'a dial still in flight is said to be joining, not a failure: ' + words(tree).slice(-200))
+  assert.ok(!words(tree).includes('Not connected to the lobby yet — Retry'),
+    'and the sentence beside Retry is never "not connected" for a socket coming up')
+  // The dial lands: the next read is live, and the sentence under the switch goes with it.
+  card.snap = liveSnap()
+  tree = await paintCard()
+  assert.ok(!words(tree).includes(JOINING), 'a live read clears the joining sentence: ' + words(tree).slice(-200))
+  assert.ok(!words(tree).includes('Lobby not connected'), 'and nothing says the lobby is down')
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-people-open']).props['data-people-open'], 'on',
+    'the switch reads what the lobby says')
+  console.log('retry: joining is not a failure, and a live read clears the sentence: passed')
+
+  // 2. The Hall: the retry answers with the state the dial reached, and the panel takes it -
+  //    rather than leaving the old refusal up until the next 3-second read.
+  reset()
+  const hallLive = liveSnap()
+  const hallCtx = { rest: async (path, options) => {
+    if (path === '/online/hall') return { state: 'connecting', error: 'The online server is not answering right now.',
+      you: { id: 'me', name: 'Ada' }, prefs: { open: false, games: {} }, roster: [], requests: [], seated: null }
+    if (path === '/online/hall/retry') return { ...hallLive, ok: true, text: '' }
+    return { ok: true }
+  } }
+  const hallProps = () => ({ ctx: hallCtx, current: 'connect4', view: {}, onPlayHere: () => {} })
+  const drawHall = () => {
+    sandbox.retryHallProps = hallProps()
+    cursor = 0
+    return evaluate('LobbyHall(retryHallProps)')
+  }
+  const settleHall = async () => {
+    drawHall()
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    await tick()
+    return drawHall()
+  }
+  let hall = await settleHall()
+  assert.ok(words(hall).includes('The online server is not answering right now.'),
+    'the Hall says the server is not answering: ' + words(hall).slice(-200))
+  await findButton(hall, 'Retry').props.onClick()
+  await tick()
+  effects = []                      // no new read: what is on screen must come from the retry's answer
+  hall = drawHall()
+  assert.ok(!words(hall).includes('not answering'),
+    'the retry that reached live takes the Hall with it: ' + words(hall).slice(-200))
+  assert.ok(words(hall).includes('Take game requests'), 'and the live panel is drawn')
+  console.log('retry: the Hall paints the state the retry answered with: passed')
 }
 
 // ---- The twenty-minute accept asks if it should stay -----------------------------------

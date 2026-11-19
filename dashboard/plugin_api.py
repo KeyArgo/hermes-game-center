@@ -1799,10 +1799,15 @@ def online_hall_retry() -> dict[str, Any]:
     """Dial the lobby again now: the one control beside "Not connected to the lobby yet"."""
     source, _ = _online_pair()
     hall = _online_hall(source)
-    answer = hall.retry()
-    answer = dict(answer or {})
-    answer["ok"] = answer.get("state") == "live"
-    answer["text"] = "" if answer["ok"] else online_hall.NOT_CONNECTED
+    answer = dict(hall.retry() or {})
+    state = str(answer.get("state") or "")
+    answer["ok"] = state == "live"
+    # A dial that has not finished is not a failure: a person who pressed Retry is told it is
+    # joining, and "not connected" is kept for the states that really are one (a refused key, a
+    # server with no Hall). The card reads this sentence, so it must not call a coming-up socket
+    # down.
+    answer["text"] = "" if answer["ok"] else (
+        online_hall.JOINING if state == "connecting" else online_hall.NOT_CONNECTED)
     return answer
 
 

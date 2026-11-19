@@ -6,6 +6,19 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Retry no longer reports "not connected" for a dial that is still running, and the sentence it
+  leaves behind goes when the dial lands.** `/online/hall/retry` set
+  "Not connected to the lobby yet — Retry" for every state that was not `live`, `connecting`
+  included — a dial that had not had its two seconds was reported as a failure. The Games card then
+  kept that sentence under a switch that had gone ON (nothing cleared it, and the Retry button is
+  only drawn while the card reads not-connected, so there was no way back), and the Hall ignored the
+  state the retry answered with, leaving the old "not connected" panel up until the next 3-second
+  poll. Now `connecting` answers `Hall.JOINING` ("Joining the lobby now — one moment."), the card
+  drops that sentence on the first read that comes back live, and the Hall paints the snapshot the
+  retry answered with. Guards: `tests/test_online_hall.py`
+  (`test_retry_says_joining_while_the_dial_is_still_running`) and `tests/table_ui_harness.cjs`
+  (`retryStatesContract`), both fail against the old route and card.
+
 - **A worker stuck in a connect is no longer orphaned by `stop()`, then revived by `start()`.**
   A connect still inside `Socket()` cannot be closed from outside (a stalled DNS answer ignores the
   socket timeout), so `stop()`'s join can time out. It cleared `_thread` regardless, and the next

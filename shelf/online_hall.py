@@ -26,6 +26,10 @@ log = logging.getLogger(__name__)
 # given the one control that fixes it, rather than being told their invites are off.
 NOT_CONNECTED = "Not connected to the lobby yet — Retry"
 
+# Said beside Retry while a dial that was just asked for is still running. Joining is not a
+# failure: the card under it must not read "not connected" for a socket that is coming up.
+JOINING = "Joining the lobby now — one moment."
+
 # Games a person can be asked to play, mirrored from online/requests.py so the
 # prefs the page sends are shaped the way the server expects.
 REQUESTABLE = (

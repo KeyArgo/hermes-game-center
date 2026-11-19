@@ -22866,6 +22866,10 @@ function PlayWithPeople({ ctx, view }) {
   const [snap, setSnap] = useState(null)
   const [pending, setPending] = useState('')
   const [note, setNote] = useState('')
+  // What the lobby said when Retry could not reach it. Unlike a refusal of a press, this is about
+  // the socket, not about what the person asked: the first read that finds the lobby live makes
+  // it untrue, so it is dropped there rather than under a switch that has gone ON.
+  const [downNote, setDownNote] = useState('')
   // The games the once-only "always?" question is still to ask about, in the order the
   // server granted them - the question in front is the one on screen.
   const [askAlways, setAskAlways] = useState([])
@@ -22880,7 +22884,11 @@ function PlayWithPeople({ ctx, view }) {
     const read = async () => {
       try {
         const answer = await ctx.rest('/online/hall')
-        if (alive && answer && typeof answer === 'object') setSnap(answer)
+        if (alive && answer && typeof answer === 'object') {
+          setSnap(answer)
+          // The lobby is up: whatever Retry said about not reaching it is no longer true.
+          if (answer.state === 'live') setDownNote('')
+        }
       } catch { /* the last snapshot stands; the next tick tries again */ }
     }
     read()
@@ -22950,13 +22958,19 @@ function PlayWithPeople({ ctx, view }) {
     if (pending) return
     setPending('retry')
     setNote('')
+    setDownNote('')
     try {
       const answer = ctx && typeof ctx.rest === 'function'
         ? await ctx.rest('/online/hall/retry', { method: 'POST' })
         : { ok: false, text: 'Game Center cannot be reached.' }
-      if (answer && answer.ok === false) setNote(String(answer.text || ''))
+      // The route's sentence is read from the state the dial reached: a dial still running is
+      // "joining", which the poll drops the moment a read comes back live.
+      if (answer && answer.ok === false) setDownNote(String(answer.text || ''))
       const next = await ctx.rest('/online/hall')
-      if (next && typeof next === 'object') setSnap(next)
+      if (next && typeof next === 'object') {
+        setSnap(next)
+        if (next.state === 'live') setDownNote('')
+      }
     } catch {
       setNote('That did not reach Game Center. Try again.')
     } finally {
@@ -23079,7 +23093,9 @@ function PlayWithPeople({ ctx, view }) {
         post, pending, busyNote: HALL_BUSY_NOTE,
         onDone: () => setAskAlways(queue => queue.slice(1))
       }),
-      note ? jsx('div', { role: 'alert', style: { ...muted, color: text.primary }, children: note }) : null
+      note || downNote
+        ? jsx('div', { role: 'alert', style: { ...muted, color: text.primary }, children: note || downNote })
+        : null
     ]
   })
 }
@@ -24231,6 +24247,13 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
       if (alive.current && answer && answer.ok === false) setAck(String(answer.text || ''))
+      // Retry answers with the snapshot the dial reached. Paint it here rather than leaving the
+      // old "not connected" panel up until the next 3 s read - a retry that worked would look
+      // like one that failed.
+      if (alive.current && answer && typeof answer.state === 'string') {
+        setSnap(previous => ({ ...(previous || {}), ...answer }))
+        if (answer.state === 'live') setAck('')
+      }
       // The accept list as the lobby has it now, so a switch this press changed shows it
       // without waiting for the next poll (the Games page's chips take the same answer).
       if (alive.current && answer && answer.prefs && typeof answer.prefs === 'object') {
