@@ -62,6 +62,10 @@ class Hall:
     quiet_limit = 50
     # After this many failed dials in a row, say in words that the server is not answering.
     unreachable_after = 2
+    # How long stop() waits for a worker to leave. A connect inside Socket() cannot be closed from
+    # outside (a stalled DNS answer can outlast it), so a worker that is still there afterwards is
+    # left holding its own stop event - see stop().
+    stop_join = 12
     UNREACHABLE = ("The online server is not answering right now. Game Center keeps trying "
                    "and reconnects by itself when it is back.")
 
@@ -157,11 +161,20 @@ class Hall:
                 self._error = ""
                 if self._state in ("off", "old-server"):
                     self._state = "connecting"
-            self._thread = threading.Thread(target=self._run, daemon=True)
+                # This worker's own pair, handed to it: a worker that outlives a stop() (see below)
+                # keeps seeing its own stop event set, instead of reading the fresh one a later
+                # start() installs for its successor and dialling beside it.
+                stop, dial = self._stop, self._dial
+            self._thread = threading.Thread(target=self._run, args=(stop, dial), daemon=True)
             self._thread.start()
 
     def stop(self) -> None:
-        """Close the socket, join the thread (<=12 s), and clear the view."""
+        """Close the socket, join the thread (<=stop_join s), and clear the view.
+
+        A worker still inside its connect when the join gives up cannot be closed from outside, and
+        it is not abandoned: its own stop event is already set, so it leaves as soon as the connect
+        answers. The reference stays, so start() cannot install a second worker beside it.
+        """
         with self._lifecycle:
             with self._lock:
                 self._stop.set()
@@ -172,8 +185,10 @@ class Hall:
                     sock.close()
                 except Exception:
                     pass
+            still_holding = False
             if thread and thread is not threading.current_thread():
-                thread.join(timeout=12)
+                thread.join(timeout=self.stop_join)
+                still_holding = thread.is_alive()
             with self._lock:
                 self._state = "off"
                 self._error = ""
@@ -182,7 +197,8 @@ class Hall:
                 self._roster = {}
                 self._requests = {}
                 self._seated = None
-            self._thread = None
+            if not still_holding:
+                self._thread = None
 
     # The view ----------------------------------------------------------------
 
@@ -385,23 +401,25 @@ class Hall:
             pending["answer"] = {"ok": False, "text": text}
             pending["event"].set()
 
-    def _wait(self, seconds: float) -> str:
+    def _wait(self, seconds: float, stop: threading.Event, dial: threading.Event) -> str:
         """Wait up to ``seconds``: 'stop', 'dial' (someone asked to dial now) or 'timeout'.
 
         Every wait in the worker goes through here, so a sign-in or Retry reaches the worker that
-        is sitting that wait out instead of leaving the person to sit it out too.
+        is sitting that wait out instead of leaving the person to sit it out too. The events are
+        the worker's own, so a worker left behind by a stop() that could not join it still reads
+        its own stop event, set.
         """
         end = time.monotonic() + seconds
-        while not self._stop.is_set():
+        while not stop.is_set():
             left = end - time.monotonic()
             if left <= 0:
                 return "timeout"
-            if self._dial.wait(min(left, 0.2)):
+            if dial.wait(min(left, 0.2)):
                 return "dial"
         return "stop"
 
-    def _run(self) -> None:
-        while not self._stop.is_set():
+    def _run(self, stop: threading.Event, dial: threading.Event) -> None:
+        while not stop.is_set():
             key = self.online.key()
             if not key:
                 with self._lock:
@@ -427,11 +445,11 @@ class Hall:
                     self._say(f"this server has no lobby socket ({self.online.url})")
                 else:
                     self._say(f"could not open the socket at {self.online.url}: {exc}")
-                verdict = self._wait(60 if slow else self._delay)
+                verdict = self._wait(60 if slow else self._delay, stop, dial)
                 if verdict == "stop":
                     break
                 if verdict == "dial":
-                    self._dial.clear()
+                    dial.clear()
                     self._delay = self.retry_first
                     continue
                 if not slow:
@@ -443,11 +461,11 @@ class Hall:
                     self._state = "connecting"
                     self._missed()
                 self._say(f"could not reach {self.online.url}: {exc}")
-                verdict = self._wait(self._delay)
+                verdict = self._wait(self._delay, stop, dial)
                 if verdict == "stop":
                     break
                 if verdict == "dial":
-                    self._dial.clear()
+                    dial.clear()
                     self._delay = self.retry_first
                     continue
                 self._delay = min(self._delay * 2, self.retry_most)
@@ -462,28 +480,28 @@ class Hall:
                     self._state = "connecting"
                     self._missed()
                 self._say(f"could not open the socket at {self.online.url}: {exc}")
-                verdict = self._wait(self._delay)
+                verdict = self._wait(self._delay, stop, dial)
                 if verdict == "stop":
                     break
                 if verdict == "dial":
-                    self._dial.clear()
+                    dial.clear()
                     self._delay = self.retry_first
                     continue
                 self._delay = min(self._delay * 2, self.retry_most)
                 continue
             diagnostics.log.info("lobby connect %s", self.online.url)
             diagnostics.lobby_opened(sock)
-            outcome = self._session(sock, key)
+            outcome = self._session(sock, key, stop)
             diagnostics.lobby_closed(sock)
             with self._lock:
                 self._socket = None
-                if not self._stop.is_set() and outcome == "":
+                if not stop.is_set() and outcome == "":
                     # Never carry "live" across a drop: nothing may be queued while we are away.
                     # ("auth" keeps its own quiet "off" state; "stop" is leaving anyway.)
                     self._state = "connecting"
                 self._fail_pending("The lobby connection dropped.")
                 self._drain_out()
-            if outcome == "" and not self._stop.is_set():
+            if outcome == "" and not stop.is_set():
                 self._say("the lobby connection dropped; dialling again")
             try:
                 sock.close()
@@ -498,20 +516,20 @@ class Hall:
                 # with another key (or Retry) wakes it, because that is the one thing that
                 # makes another dial worth trying.
                 self._say("the lobby refused this computer's sign-in key")
-                verdict = self._wait(60)
+                verdict = self._wait(60, stop, dial)
                 if verdict == "stop":
                     break
                 if verdict == "dial":
-                    self._dial.clear()
+                    dial.clear()
                     self._delay = self.retry_first
                 continue
             # A plain drop: reconnect with backoff.
             diagnostics.log.info("lobby reconnect in %ss", self._delay)
-            verdict = self._wait(self._delay)
+            verdict = self._wait(self._delay, stop, dial)
             if verdict == "stop":
                 break
             if verdict == "dial":
-                self._dial.clear()
+                dial.clear()
                 self._delay = self.retry_first
                 continue
             self._delay = min(self._delay * 2, self.retry_most)
@@ -522,10 +540,14 @@ class Hall:
         if self._misses >= self.unreachable_after:
             self._error = self.UNREACHABLE
 
-    def _session(self, sock, key: str) -> str:
-        """One connected session. Returns 'stop', 'auth', or '' (dropped)."""
+    def _session(self, sock, key: str, stop: threading.Event) -> str:
+        """One connected session. Returns 'stop', 'auth', or '' (dropped).
+
+        ``stop`` is this worker's own event: a session belongs to one worker, and a worker that a
+        stop() could not join must see the stop it was given, not a later one.
+        """
         with self._lock:
-            if self._stop.is_set():
+            if stop.is_set():
                 return "stop"
             self._socket = sock
         try:
@@ -534,7 +556,7 @@ class Hall:
             return ""
         next_ping = time.monotonic() + 20
         heard = time.monotonic()
-        while not self._stop.is_set():
+        while not stop.is_set():
             try:
                 while True:
                     sock.send_json(self._out.get_nowait())

@@ -6,6 +6,17 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A worker stuck in a connect is no longer orphaned by `stop()`, then revived by `start()`.**
+  A connect still inside `Socket()` cannot be closed from outside (a stalled DNS answer ignores the
+  socket timeout), so `stop()`'s join can time out. It cleared `_thread` regardless, and the next
+  `start()` installed a fresh, unset stop event — which the worker left behind also read, so it came
+  back to life and dialled beside the new one: two sockets, one Hall. Each worker now gets its own
+  stop and dial events, handed to it at creation, and `stop()` keeps the thread reference when the
+  join times out, so `start()` cannot install a second worker until the first has left. Guards:
+  `tests/test_online_hall.py`
+  (`test_a_worker_stuck_in_a_connect_is_not_left_dialling_beside_a_new_one` — fails against the old
+  `stop()`).
+
 - **A malformed server address is a dial that failed, not a worker that dies.** With the online
   address set to something like `http://host:99999` (a port typo, or a bad IPv6 literal),
   `urlsplit(...).port` raises `ValueError` inside the connect. The worker caught only `SocketError`

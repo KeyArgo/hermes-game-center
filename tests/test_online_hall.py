@@ -931,3 +931,77 @@ def test_a_malformed_server_address_is_a_failed_dial_not_a_dead_worker(tmp_path,
             hall.stop()
     said = " ".join(record.getMessage() for record in caplog.records)
     assert "99999" in said or "Port out of range" in said, said
+
+
+def test_a_worker_stuck_in_a_connect_is_not_left_dialling_beside_a_new_one(monkeypatch):
+    """A connect that outlives stop()'s join keeps its own stop event, so it exits by itself.
+
+    A connect still inside ``Socket()`` cannot be closed from outside, and a stalled DNS answer can
+    outlast the join. ``stop()`` cleared ``_thread`` regardless, and ``start()`` then installed a
+    fresh, unset stop event for the new worker - which the old one read too, so it came back to life
+    and dialled beside it: two sockets, one Hall.
+    """
+    import types
+
+    from shelf import online_hall as mod
+
+    dials = []
+    held = threading.Event()
+
+    class StuckConnect:
+        def __init__(self, url, timeout=5):
+            dials.append(url)
+            if len(dials) == 1:
+                held.wait(5)      # the first connect outlives the join, like a stalled DNS answer
+            self.helloed = False
+
+        def send_json(self, frame):
+            pass
+
+        def receive(self, timeout=0.15):
+            if not self.helloed:
+                self.helloed = True
+                return {"t": "hello", "v": 1, "you": {"id": "web:1", "name": "Bea"},
+                        "prefs": {"open": False, "games": {}}, "roster": [], "requests": [], "rev": 1}
+            time.sleep(0.02)
+            return {"t": "pong"}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(mod.wsmod, "Socket", StuckConnect)
+    online = types.SimpleNamespace(on=True, url="http://127.0.0.1:1", key=lambda: "k",
+                                   game=lambda: "connect4")
+    hall = mod.Hall(online)
+    hall.stop_join = 0.05
+    hall.start()
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not dials:
+            time.sleep(0.01)
+        assert len(dials) == 1, dials
+
+        # stop() cannot join a worker stuck in its connect; the next start() must not orphan it.
+        hall.stop()
+        hall.start()
+        time.sleep(0.3)
+        assert len(dials) == 1, "a second worker dialled beside the one still in its connect"
+
+        # Let the stuck connect finish: it must notice its own stop event and leave.
+        held.set()
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline and hall._thread is not None and hall._thread.is_alive():
+            time.sleep(0.02)
+        assert hall._thread is None or not hall._thread.is_alive(), (
+            "the worker left behind kept running after its own stop event was set"
+        )
+
+        # And once it is gone, a start() opens exactly one worker again.
+        hall.start()
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline and len(dials) < 2:
+            time.sleep(0.02)
+        assert len(dials) == 2, dials
+    finally:
+        held.set()
+        hall.stop()
