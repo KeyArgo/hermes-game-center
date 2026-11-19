@@ -50,3 +50,7 @@ schema twice).
 - Play requests add three empty tables and nothing else. `availability` is one row per player
   (`open`, `updated`). `availability_games` stores each game's on/off choice. `play_requests`
   is one row per request. Old rows are not rewritten, and a second startup does not add them again.
+- Two columns arrive with matchmaking: `availability.last_game_end`, when the account last finished a
+  game, backfilled once from `matches.finished` so the longest-waiting person is asked first; and
+  `availability_games.until`, when a game accepted for twenty minutes stops counting (0 is a standing
+  choice, which is what every old row becomes).

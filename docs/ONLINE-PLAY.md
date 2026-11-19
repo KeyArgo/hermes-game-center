@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (fb515595)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (98c57d82)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -103,16 +103,25 @@ and the lobby starts looking for exactly those; press a chip again to stop looki
 never claim a game the lobby was not told about, and find match stays on — with Hermes closed to the lobby
 panel, across a reconnect — until you stop it or you are seated.
 
-While it is on, the server pairs you with anyone else who wants the same game *right now*: someone else
-looking for it, or someone who is simply open to requests for it. Only people who are online, visible and
-**not already at a table** are paired — nobody seated in a game is invited to another one, and they stay
-listed as *playing*. A pair is offered **one** match at a time, and a pair that declined one is left alone
-for ten minutes.
+While it is on, the server asks **one person at a time**: whoever accepts that game and has waited
+longest since their last game (never played counts first), for **sixty seconds**. Only people who are
+online, visible and **not already at a table** are asked — nobody seated in a game is invited to another
+one, and they stay listed as *playing*. If the person declines, or the sixty seconds run out, the next
+one is asked straight away, and nobody is asked twice in the same search. When there is nobody left it
+says so — *"Nobody is free for Chess right now — still looking"* — and asks whoever comes online next,
+for as long as the search lasts: twenty minutes, or until you press **Stop looking**. A person who
+declined a game is left alone for ten minutes.
 
-The offer reaches **both** people the same way, as a dialog — *"Bea wants to play Connect 4 — Join / Not
-now"* — with a dim grey line beside the roster saying the same thing (Game Center draws that line itself:
-it is **not** a chat message and is never sent to your model). Either person may press **Join**; that seats
+The offer names the person and the game — *"Ada wants to play Chess — Join / Not now"* — with a grey
+line beside the roster saying the same thing (Game Center draws that line itself: it is **not** a chat
+message and is never sent to your model). The person asked is the one who can press **Join**; that seats
 both at the same private unrated table inside Hermes, by the same path a request takes.
+
+Pressing **Play** for a game you have not chosen accepts it for **twenty minutes**, so somebody can be
+asked for a game you wanted to play right now. The first time that happens the lobby asks *"Always let
+people invite you to Chess?"*: **Yes, always** makes it a standing choice, and **Just 20 minutes** simply
+lets the window run out. A game on its twenty minutes shows **for 20 min** beside it, and stops counting
+as accepted when the time is up.
 
 ## Your name and your recovery key
 

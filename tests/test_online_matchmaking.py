@@ -105,6 +105,10 @@ async def look(service, player, games=None, **extra):
     return await service.handle(player, frame)
 
 
+async def ask(service, player, target, game):
+    return await service.handle(player, {"t": "request", "to": target["id"], "game": game})
+
+
 async def accepts(service, player, *games, open_flag=True):
     ack = await service.handle(
         player, {"t": "prefs", "open": open_flag, "games": {game: True for game in games}})
@@ -285,5 +289,188 @@ def test_stop_looking_withdraws_the_offer(world):
         told = {pid: frame for pid, frame in hub.sent if frame.get("t") == "request_update"}
         assert told[bea["id"]]["request"]["state"] == "cancelled"
         assert told[ada["id"]]["request"]["state"] == "cancelled"
+
+    run(scenario())
+
+
+# --- a game played but not accepted: twenty minutes, or for ever -------------------
+
+def test_playing_a_game_you_do_not_accept_accepts_it_for_twenty_minutes(world):
+    _store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        started = await look(service, bea, ["connect4"])
+        assert started["ok"], started
+        assert started.get("ask_always") is True, "the person is offered the permanent choice once"
+        assert started["ask_always_games"] == ["connect4"]
+        prefs = service.prefs(bea["id"])
+        assert prefs["games"]["connect4"] is True, "the game now counts as accepted"
+        assert prefs["open"] is False, "the master switch was not touched"
+        assert prefs["until"]["connect4"] == pytest.approx(clock.now + TEMP_SECONDS)
+        assert service.accepts(bea["id"], "connect4") is True, "accepted with the switch off"
+        # So a direct ask for it works, and one for a game she never played does not.
+        assert (await ask(service, ada, bea, "connect4"))["ok"]
+        assert service.looking(bea["id"]) == ["connect4"]
+
+    run(scenario())
+
+
+def test_the_window_is_still_open_at_nineteen_minutes(world):
+    _store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        started_at = clock.now
+        assert (await look(service, bea, ["chessboard"]))["ok"]
+        clock.now = started_at + TEMP_SECONDS - 1
+        assert service.prefs(bea["id"])["games"]["chessboard"] is True
+        assert service.accepts(bea["id"], "chessboard") is True
+        assert (await ask(service, ada, bea, "chessboard"))["ok"]
+
+    run(scenario())
+
+
+def test_the_window_is_over_at_twenty_one_minutes(world):
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        started_at = clock.now
+        assert (await look(service, bea, ["chessboard"]))["ok"]
+        clock.now = started_at + TEMP_SECONDS + 1
+        prefs = service.prefs(bea["id"])
+        assert prefs["games"]["chessboard"] is False, "an expired twenty minutes counts as off"
+        assert prefs["until"] == {}
+        assert service.accepts(bea["id"], "chessboard") is False
+        refused = await ask(service, ada, bea, "chessboard")
+        assert refused["ok"] is False and "requests" in refused["text"].lower(), refused
+        # Find match does not ask her either, and the search says so.
+        hub.sent.clear()
+        assert (await look(service, ada, ["chessboard"]))["ok"]
+        assert offers(hub) == []
+        assert lines(hub, ada)[-1]["asking"] is None
+        assert service.looking(ada["id"]) == ["chessboard"], "her own twenty minutes are still running"
+        # The sweep makes the stored row honest again.
+        store.clear_expired_windows(clock.now)
+        row = store.db.execute(
+            "SELECT enabled, until FROM availability_games WHERE player_id = ? AND game = 'chessboard'",
+            (bea["id"],)).fetchone()
+        assert (row["enabled"], row["until"]) == (0, 0.0)
+
+    run(scenario())
+
+
+def test_always_makes_it_permanent(world):
+    _store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        assert (await look(service, bea, ["connect4"]))["ok"]
+        ack = await service.handle(bea, {"t": "prefs", "always": {"connect4": True}})
+        assert ack["ok"], ack
+        prefs = service.prefs(bea["id"])
+        assert prefs["open"] is True, "always turns the master switch on for that game"
+        assert prefs["games"]["connect4"] is True
+        assert prefs["until"] == {}, "there is no window left to show"
+        # Playing it again is not a new choice, so there is no prompt.
+        again = await look(service, bea, ["connect4"])
+        assert again["ok"] and "ask_always" not in again
+        # And the choice survives time passing.
+        clock.now += TEMP_SECONDS * 3
+        assert service.prefs(bea["id"])["games"]["connect4"] is True
+
+    run(scenario())
+
+
+def test_playing_again_inside_the_window_does_not_ask_always_again(world):
+    _store, _rooms, people, _clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        assert (await look(service, bea, ["go"]))["ok"]
+        again = await look(service, bea, ["go"])
+        assert again["ok"] and "ask_always" not in again
+
+    run(scenario())
+
+
+def test_a_twenty_minute_game_is_in_the_roster(world):
+    store, rooms, people, clock, hub, service = world
+
+    async def scenario():
+        bea = people["Bea"]
+        assert (await look(service, bea, ["hex"]))["ok"]
+
+        app = type("App", (), {"store": store, "rooms": rooms})()
+        lobby = lobby_presence.Hub(app, clock=clock)
+        lobby.players[bea["id"]] = bea
+        prefs = {bea["id"]: service.presence_prefs(bea["id"])}
+        row = lobby.row(bea["id"], playing=set(), prefs_by_player=prefs)
+        assert row["games"] == ["hex"], "the roster shows the game she said yes to for twenty minutes"
+        clock.now += TEMP_SECONDS + 1
+        prefs = {bea["id"]: service.presence_prefs(bea["id"])}
+        assert lobby.row(bea["id"], playing=set(), prefs_by_player=prefs)["games"] == []
+
+    run(scenario())
+
+
+def test_an_old_client_post_still_saves_and_always_is_taken(tmp_path):
+    from aiohttp.test_utils import TestClient, TestServer
+    from online.server import App
+
+    async def scenario():
+        server = App(tmp_path, games=LOADED)
+        client = TestClient(TestServer(server.build()))
+        await client.start_server()
+        try:
+            response = await client.post("/api/session", json={"name": "Ada"})
+            body = await response.json()
+            ada, token = body["player"], body["token"]
+            auth = {"Authorization": f"Bearer {token}"}
+            # Yesterday's body, byte for byte: no until, no always.
+            old = await client.post("/api/availability", json={"games": {"chessboard": True}}, headers=auth)
+            assert old.status == 200, await old.text()
+            prefs = await old.json()
+            assert prefs["games"]["chessboard"] is True and prefs["until"] == {}
+            # The prompt's Yes rides on the same endpoint.
+            kept = await client.post("/api/availability", json={"always": {"chessboard": True}}, headers=auth)
+            assert kept.status == 200, await kept.text()
+            always = await kept.json()
+            assert always["open"] is True and always["games"]["chessboard"] is True
+            assert always["until"] == {}
+            assert server.store.availability_until(ada["id"]) == {}
+        finally:
+            await client.close()
+
+    run(scenario())
+
+
+def test_an_old_database_gains_the_new_columns_and_its_last_game(world, tmp_path):
+    store, _rooms, people, _clock, _hub, _service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        store.db.execute(
+            "INSERT INTO matches (room_id, match_no, game, white_id, black_id, white_name, black_name, "
+            "white_kind, black_kind, winner, reason, plies, moves, rated, finished) "
+            "VALUES ('r1', 1, 'connect4', ?, ?, 'Ada', 'Bea', 'human', 'human', '', '', 6, '[]', 0, ?)",
+            (ada["id"], bea["id"], _clock.now - 300))
+        store.close()
+        # Opening the same file again is what an upgrade does.
+        reopened = Store(store.path)
+        try:
+            ends = reopened.last_game_ends([ada["id"], bea["id"]])
+            assert ends[ada["id"]] == pytest.approx(_clock.now - 300), "the wait is backfilled from matches"
+            assert ends[bea["id"]] == pytest.approx(_clock.now - 300)
+            columns = {row[1] for row in reopened.db.execute("PRAGMA table_info(availability_games)")}
+            assert "until" in columns
+        finally:
+            reopened.close()
 
     run(scenario())

@@ -250,8 +250,9 @@ def test_find_match_can_seat_a_blackjack_table(world):
         assert {pid for pid, _card in told} == {ada["id"], bea["id"]}, "the offer reaches both"
         card = told[0][1]
         assert card["game"] == "blackjack" and card["offer"] is True
+        asked = bea if card["to"]["id"] == bea["id"] else ada
         hub.sent.clear()
-        joined = await service.handle(bea, {"t": "respond", "id": card["id"], "accept": True})
+        joined = await service.handle(asked, {"t": "respond", "id": card["id"], "accept": True})
         assert joined["ok"], joined["text"]
         seated = {frame["room_id"] for _pid, frame in hub.sent if frame.get("t") == "seated"}
         assert len(seated) == 1, "both people are told about one table"

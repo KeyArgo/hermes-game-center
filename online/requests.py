@@ -24,8 +24,10 @@ REQUESTABLE = (
 REQUEST_SECONDS = 90
 # One matchmaking offer at a time, sixty seconds each (the owner: at least sixty).
 OFFER_SECONDS = 60.0
-# A search keeps asking for as long as the twenty-minute window it opened.
-LOOKING_SECONDS = 1200.0
+# A game played but not accepted is accepted for twenty minutes, and a search keeps
+# asking for as long as that window.
+TEMP_SECONDS = 1200.0
+LOOKING_SECONDS = TEMP_SECONDS
 HOUR = 3600.0
 MAX_PER_HOUR = 8
 MAX_INBOUND = 5
@@ -101,8 +103,46 @@ class Service:
     # Reading -----------------------------------------------------------------
 
     def prefs(self, player_id: str) -> dict:
+        """The switches, plus which games are only on a twenty-minute window.
+
+        `games` stays a plain yes/no per game, true while the choice is standing or the
+        window is still running, so an old client reads it as before. `until` names the
+        games with a window, and when each ends.
+        """
+        now = float(self.clock())
         open_flag, stored = self.store.availability(player_id)
-        return {"open": open_flag, "games": {game: bool(stored.get(game, False)) for game in REQUESTABLE}}
+        windows = self.store.availability_until(player_id)
+        games: dict[str, bool] = {}
+        until: dict[str, float] = {}
+        for game in REQUESTABLE:
+            end = float(windows.get(game) or 0)
+            if end > now:
+                games[game] = True
+                until[game] = end
+            elif end:
+                # The twenty minutes are over, so the game counts as off again.
+                games[game] = False
+            else:
+                games[game] = bool(stored.get(game, False))
+        return {"open": open_flag, "games": games, "until": until}
+
+    def accepts(self, player_id: str, game: str, now: float | None = None) -> bool:
+        """Whether this account takes an invite for this game right now.
+
+        A standing choice needs the master switch on; a twenty-minute window does not.
+        """
+        moment = float(self.clock() if now is None else now)
+        prefs = self.prefs(player_id)
+        if float(prefs["until"].get(game) or 0) > moment:
+            return True
+        return bool(prefs["open"] and prefs["games"].get(game))
+
+    def standing(self, player_id: str, game: str) -> bool:
+        """A choice made by hand, with no window: always, not just for twenty minutes."""
+        open_flag, stored = self.store.availability(player_id)
+        if float(self.store.availability_until(player_id).get(game) or 0):
+            return False
+        return bool(open_flag and stored.get(game))
 
     def invisible(self, player_id: str) -> bool:
         """Appearing offline: in nobody's roster, and no requests either way."""
@@ -178,8 +218,16 @@ class Service:
             for game, enabled in games_in.items():
                 if not isinstance(game, str) or game not in REQUESTABLE or not isinstance(enabled, bool):
                     return "That game cannot be chosen."
+        always_in = frame.get("always") if "always" in frame else None
+        if always_in is not None:
+            if not isinstance(always_in, dict):
+                return "Name the games to keep."
+            for game, flag in always_in.items():
+                if not isinstance(game, str) or game not in REQUESTABLE or not isinstance(flag, bool):
+                    return "That game cannot be chosen."
         open_flag, stored = self.store.availability(player_id)
         merged = {game: bool(stored.get(game, False)) for game in REQUESTABLE}
+        windows: dict[str, float] = {}
         if games_in:
             for game, enabled in games_in.items():
                 merged[game] = enabled
@@ -189,7 +237,14 @@ class Service:
         # Open off, and open on when a choice is already stored, leave the choices.
         if open_flag and not games_in and not any(merged.values()):
             merged = {game: True for game in REQUESTABLE}
-        self.store.save_availability(player_id, open_flag, merged, float(self.clock()))
+        # "Always let people invite you to this game?": Yes makes the twenty minutes a
+        # standing choice, and turns the master switch on with it.
+        for game, flag in (always_in or {}).items():
+            if flag:
+                merged[game] = True
+                windows[game] = 0.0
+                open_flag = True
+        self.store.save_availability(player_id, open_flag, merged, float(self.clock()), windows)
         if "invisible" in frame:
             self.store.save_invisible(player_id, bool(frame["invisible"]), float(self.clock()))
             if frame["invisible"]:
@@ -202,43 +257,61 @@ class Service:
 
     async def _looking(self, player: dict, frame: dict) -> dict:
         async with self.accept_lock:
-            text, withdrawn = self._apply_looking(player["id"], frame)
+            text, withdrawn, granted = self._apply_looking(player["id"], frame)
             if text:
                 return self._ack(frame, False, text)
             frames = [item for card in withdrawn for item in self._updates(self._card(card))]
             frames.extend(self._pair_locked(float(self.clock())))
             games = self.looking(player["id"])
         await self._emit(frames)
-        return self._ack(frame, True, self._looking_text(games))
+        ack = self._ack(frame, True, self._looking_text(games))
+        ack["looking"] = games
+        if granted:
+            # "Always let people invite you to X?": asked once, when the window opens.
+            ack["ask_always"] = True
+            ack["ask_always_games"] = granted
+        return ack
 
-    def _apply_looking(self, player_id: str, frame: dict) -> tuple[str, list[dict]]:
-        """(refusal, the offers withdrawn because the search is over)."""
+    def _apply_looking(self, player_id: str, frame: dict) -> tuple[str, list[dict], list[str]]:
+        """(refusal, the offers withdrawn, the games just put on a twenty-minute window)."""
         if frame.get("on") is False or frame.get("stop") is True:
             self.store.clear_looking(player_id)
             self._forget(player_id)
-            return "", self._withdraw_offers(player_id)
+            return "", self._withdraw_offers(player_id), []
         all_games = frame.get("all")
         if all_games is not None and not isinstance(all_games, bool):
-            return "Say whether to look for every game.", []
+            return "Say whether to look for every game.", [], []
         if all_games:
             games = list(REQUESTABLE)
         else:
             wanted = frame.get("games")
             if not isinstance(wanted, list) or not wanted:
-                return "Name at least one game to look for.", []
+                return "Name at least one game to look for.", [], []
             chosen = []
             for game in wanted:
                 if not isinstance(game, str) or game not in REQUESTABLE:
-                    return "That game cannot be chosen.", []
+                    return "That game cannot be chosen.", [], []
                 if game not in chosen:
                     chosen.append(game)
             # Store in the one order the lobby lists games in.
             games = [game for game in REQUESTABLE if game in set(chosen)]
         if self.invisible(player_id):
-            return APPEAR_OFFLINE, []
-        self.store.set_looking(player_id, games, float(self.clock()))
+            return APPEAR_OFFLINE, [], []
+        now = float(self.clock())
+        # Playing a game you do not accept accepts it for twenty minutes. A second Play
+        # inside those minutes is not a new choice, so it is not asked about again.
+        granted = [game for game in games if self._open_window(player_id, game, now)]
+        self.store.set_looking(player_id, games, now)
         self._forget(player_id)
-        return "", []
+        return "", [], granted
+
+    def _open_window(self, player_id: str, game: str, now: float) -> bool:
+        if self.standing(player_id, game):
+            return False
+        if float(self.store.availability_until(player_id).get(game) or 0) > now:
+            return False
+        self.store.set_game_window(player_id, game, now + TEMP_SECONDS, now)
+        return True
 
     def _withdraw_offers(self, player_id: str) -> list[dict]:
         """Stopping takes the offer that is out back, so nobody is seated by mistake."""
@@ -348,8 +421,7 @@ class Service:
             pid = str(row["player_id"])
             if self.invisible(pid) or (connected is not None and pid not in connected):
                 continue
-            prefs = self.prefs(pid)
-            if prefs["open"] and prefs["games"].get(game):
+            if self.accepts(pid, game):
                 out.append(pid)
         return out
 
@@ -511,9 +583,9 @@ class Service:
             # was made; what is left to check is that neither has gone since.
             return NOT_AVAILABLE if self.store.blocked_pair(sender["id"], target_id) else ""
         prefs = self.prefs(target_id)
-        if not prefs["open"]:
+        if not prefs["open"] and not prefs["until"]:
             return "They are not taking requests."
-        if not prefs["games"].get(game):
+        if not self.accepts(target_id, game):
             return "They are not taking that game."
         if self.store.blocked_pair(sender["id"], target_id):
             return NOT_AVAILABLE

@@ -245,6 +245,9 @@ LATE_COLUMNS = (
     # When this account last finished a game. 0 means never, which asks for a game first:
     # find match asks the person who has waited longest.
     ("availability", "last_game_end", "REAL NOT NULL DEFAULT 0"),
+    # A game played but not accepted is accepted until this moment (owner: twenty minutes).
+    # 0 means a standing choice, which is what the old rows are.
+    ("availability_games", "until", "REAL NOT NULL DEFAULT 0"),
 )
 BOTS_PER_OWNER = 3
 PLAYER_COLUMNS = "id, name, public, created, bot, owner_id, renamed"
@@ -1258,7 +1261,14 @@ class Store:
         }
         return (bool(row["open"]) if row else False), games
 
-    def save_availability(self, player_id: str, open_flag: bool, games: dict[str, bool], now: float) -> None:
+    def save_availability(self, player_id: str, open_flag: bool, games: dict[str, bool], now: float,
+                          until: dict[str, float] | None = None) -> None:
+        """Save the switches. `until` gives absolute twenty-minute windows per game.
+
+        A game named there keeps that moment (0 = a standing choice). A game left out
+        keeps whatever window it had, and a game being turned off loses it.
+        """
+        windows = dict(until or {})
         self.db.execute("BEGIN IMMEDIATE")
         try:
             self.db.execute(
@@ -1267,15 +1277,56 @@ class Store:
                 (player_id, 1 if open_flag else 0, now),
             )
             for game, enabled in games.items():
-                self.db.execute(
-                    "INSERT INTO availability_games (player_id, game, enabled) VALUES (?, ?, ?) "
-                    "ON CONFLICT(player_id, game) DO UPDATE SET enabled = excluded.enabled",
-                    (player_id, game, 1 if enabled else 0),
-                )
+                if not enabled:
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 0, 0) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 0, until = 0",
+                        (player_id, game),
+                    )
+                elif game in windows:
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 1, ?) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
+                        (player_id, game, float(windows[game] or 0)),
+                    )
+                else:
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled) VALUES (?, ?, 1) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1",
+                        (player_id, game),
+                    )
             self.db.execute("COMMIT")
         except BaseException:
             self.db.execute("ROLLBACK")
             raise
+
+    def availability_until(self, player_id: str) -> dict[str, float]:
+        """{game: moment} for the games accepted on a twenty-minute window."""
+        return {
+            str(row["game"]): float(row["until"])
+            for row in self.db.execute(
+                "SELECT game, until FROM availability_games WHERE player_id = ? AND until > 0", (player_id,))
+        }
+
+    def set_game_window(self, player_id: str, game: str, until: float, now: float) -> None:
+        """A game played but not accepted: accepted until `until` (0 = permanent)."""
+        self.db.execute(
+            "INSERT INTO availability (player_id, open, updated) VALUES (?, 0, ?) "
+            "ON CONFLICT(player_id) DO UPDATE SET updated = excluded.updated",
+            (player_id, float(now)),
+        )
+        self.db.execute(
+            "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 1, ?) "
+            "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
+            (player_id, game, float(until)),
+        )
+
+    def clear_expired_windows(self, now: float) -> int:
+        """A twenty-minute window that has run out counts as off."""
+        return self.db.execute(
+            "UPDATE availability_games SET enabled = 0, until = 0 WHERE until > 0 AND until <= ?",
+            (float(now),),
+        ).rowcount
 
     def invisible(self, player_id: str) -> bool:
         """True when the account is appearing offline. No row means visible."""

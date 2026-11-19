@@ -77,7 +77,7 @@ def test_defaults_off(world):
     tables = {row[0] for row in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"availability", "availability_games", "play_requests"} <= tables
     prefs = service.prefs(people["Ada"]["id"])
-    assert prefs == {"open": False, "games": {game: False for game in REQUESTABLE}}
+    assert prefs == {"open": False, "games": {game: False for game in REQUESTABLE}, "until": {}}
     assert service.pending_for(people["Ada"]["id"]) == []
 
 
@@ -88,7 +88,8 @@ def test_open_with_no_games_enables_all_requestable(world):
         ada = people["Ada"]
         ack = await service.handle(ada, {"t": "prefs", "open": True, "op": "p1"})
         assert ack["t"] == "ack" and ack["op"] == "p1" and ack["ok"]
-        assert service.prefs(ada["id"]) == {"open": True, "games": {game: True for game in REQUESTABLE}}
+        assert service.prefs(ada["id"]) == {"open": True, "games": {game: True for game in REQUESTABLE},
+                                            "until": {}}
 
     run(scenario())
 
