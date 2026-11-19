@@ -468,7 +468,10 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // A server that is down says so (the Hall keeps dialling and clears this by itself), rather than
   // sitting on "Joining the Hall…" for a day (owner, 2026-11-18: sentinel was down, both PCs looked empty).
   if (state === 'connecting' && refused) return notConnected('Not connected to the lobby — Retry.', `${refused} Until then nobody here can see anyone online.`)
-  if (state !== 'live') return notConnected('Not connected to the lobby — Retry.', stale ? 'Reconnecting by itself; Retry dials now.' : '')
+  // Joining is not a failure: nothing has gone wrong yet, so the Hall says it is joining rather than
+  // offering a Retry for a dial that has not had its answer.
+  if (state === 'connecting' && !stale) return note('Joining the Hall…')
+  if (state !== 'live') return notConnected('Not connected to the lobby — Retry.', stale ? 'Reconnecting… the last read did not come back; Retry dials now.' : '')
 
   // The switches, in the order the person meets them: appear offline first (the one
   // control that takes you out of the lobby), then the master "Take game requests", then

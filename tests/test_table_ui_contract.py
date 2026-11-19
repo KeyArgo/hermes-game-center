@@ -219,7 +219,13 @@ def test_the_main_page_has_one_invite_switch_and_says_when_the_lobby_is_down():
     lobby = _src("72-lobby.js")
     assert "data-hall-not-connected" in lobby, "the Hall panel says it too"
     assert "'/online/hall/retry'" in lobby
-    assert "'Joining the Hall…'" not in lobby, "it no longer waits forever without saying so"
+    # Joining is not a failure: while the socket is still coming up the Hall says it is joining,
+    # and only a Hall that never answered offers the Retry. What is gone is the old blanket
+    # fallback that sat on "Joining the Hall…" for every state that was not live.
+    assert "if (state === 'connecting' && !stale) return note('Joining the Hall…')" in lobby, \
+        "'connecting' still says it is joining"
+    assert "if (state !== 'live') return note(" not in lobby, \
+        "no state waits on 'Joining the Hall…' forever without saying so"
 
 
 def test_one_name_at_a_time_when_signed_in():
