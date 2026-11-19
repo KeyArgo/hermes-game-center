@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -7929,11 +7929,12 @@ async function playWithPeopleContract() {
   reset()
   run = makeCtx(liveSnap({ prefs: { open: false, games: { connect4: true }, until: {} } }))
   tree = await paint(signedIn, run.ctx)
-  assert.ok(words(tree).includes('Game requests are off.'), 'a closed accept list says so: ' + words(tree).slice(0, 300))
+  assert.ok(words(tree).includes('Online invites are off — turn on to be asked'), 'a closed accept list says so: ' + words(tree).slice(0, 300))
+  assert.equal(chipFor(tree, 'connect4').props['aria-pressed'], 'false', 'and no chip looks on beside it')
   reset()
   run = makeCtx(liveSnap())
   tree = await paint(signedIn, run.ctx)
-  assert.ok(!words(tree).includes('Game requests are off'), 'an open one says nothing about it')
+  assert.ok(!words(tree).includes('Online invites are off'), 'an open one says nothing about it')
 
   // 4. Pressing an accept chip writes the accept list, once, on the server.
   reset()
@@ -8470,6 +8471,69 @@ async function staleWindowContract() {
     'a standing game is untouched by that')
   reset()
   console.log('a twenty-minute accept that has run out reads off on both screens: passed')
+}
+
+// ---- The master switch off: the chips must not look on ------------------------------
+// A chip drawn pressed while "let people invite me" is off promises something the lobby will
+// refuse. With the switch off the chips are drawn dimmed, the card says why in one line, and
+// pressing a chip still turns the master switch on with it - the chip a person presses is the
+// answer they meant.
+async function invitesOffContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const posts = []
+  const paint = async prefs => {
+    const snap = { state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+      prefs, roster: [], requests: [], seated: null }
+    const ctx = { rest: async (path, options) => {
+      posts.push([path, (options && options.body) || null])
+      return path === '/online/hall' ? snap : { ok: true, text: 'Saved.', prefs }
+    } }
+    sandbox.invitesOff = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(invitesOff)')
+      const queued = effects
+      effects = []
+      queued.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const chipFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-accept-chip'] === id)
+  const reason = 'Online invites are off — turn on to be asked'
+
+  // 1. Switch off, one game accepted by hand: no chip reads as on, and the card says why.
+  reset()
+  let tree = await paint({ open: false, games: { connect4: true }, until: {} })
+  assert.ok(words(tree).includes(reason), 'the card says why the chips are dark: ' + words(tree).slice(0, 400))
+  const chips = nodes(tree).filter(node => node.props && node.props['data-accept-chip'])
+  assert.equal(chips.length, 10, 'every game is still there to press')
+  assert.equal(chips.filter(node => node.props['aria-pressed'] === 'true').length, 0,
+    'no chip looks on while the master switch is off')
+  assert.equal(chipFor(tree, 'connect4').props['data-accept-dim'], '1', 'and the accepted one is drawn dimmed')
+  assert.ok(Number(chipFor(tree, 'connect4').props.style.opacity) < 1, 'dimmed, not the usual weight')
+
+  // 2. Pressing a dimmed chip turns the master switch on with it: the same one write.
+  posts.length = 0
+  chipFor(tree, 'chessboard').props.onClick()
+  await tick()
+  const wrote = posts.filter(item => item[0] === '/online/hall/prefs').pop()
+  assert.ok(wrote, 'the press is one prefs write')
+  assert.equal(JSON.stringify(wrote[1]), JSON.stringify({ games: { chessboard: true } }),
+    'it asks for the game, and the lobby turns the master switch on with it')
+
+  // 3. Switch on: the chips are their own weight again and the line is gone.
+  reset()
+  tree = await paint({ open: true, games: { connect4: true }, until: {} })
+  assert.ok(!words(tree).includes(reason), 'an open list says nothing about being off')
+  assert.equal(chipFor(tree, 'connect4').props['aria-pressed'], 'true', 'and the accepted game reads on')
+  assert.equal(chipFor(tree, 'connect4').props['data-accept-dim'], undefined, 'at full weight')
+  reset()
+  console.log('invites off: the chips are dimmed with one reason, and pressing one turns the switch on: passed')
 }
 
 // ---- "Yes, always" that the lobby will not save ----------------------------------------

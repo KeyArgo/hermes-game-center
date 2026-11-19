@@ -357,13 +357,15 @@ function PlayWithPeople({ ctx, view }) {
       jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Play with people' }),
       rowHead('accept', 'Games I accept', 'People who press Play can invite you to these.'),
       // Called as the block it is, the way onlineAccountBlock is: no state of its own, so the
-      // chip row is drawn in place and its presses go through this card's one door.
-      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE }),
+      // chip row is drawn in place and its presses go through this card's one door. With the
+      // master switch off the chips are drawn dark: a chip at full weight would promise an
+      // invite the lobby refuses.
+      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE, dim: !prefs.open }),
       // The master switch is The Hall's; saying so here is kinder than chips that look pressed
       // while the server is sending nobody.
       prefs.open ? null : jsx('div', {
         'data-people-open-off': '1', style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
-        children: 'Game requests are off. Turn on "Take game requests" in The Hall for people to reach these.'
+        children: 'Online invites are off — turn on to be asked'
       }),
       rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
       jsx('div', {
