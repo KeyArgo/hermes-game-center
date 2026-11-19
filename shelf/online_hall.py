@@ -637,6 +637,12 @@ class Hall:
                 self._delay = self.retry_first
                 self._unsaid()
                 log.info("lobby socket live as %s", self._you.get("name") or "this account")
+                learn = getattr(self.online, "learn_name", None)
+                if learn and self._you.get("name"):
+                    try:
+                        learn(self._you["name"])
+                    except Exception:
+                        log.warning("the lobby's name for this account could not be kept", exc_info=True)
             elif kind == "presence":
                 row = message.get("row") or {}
                 if isinstance(row, dict) and row.get("id"):

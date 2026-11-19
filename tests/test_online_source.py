@@ -668,3 +668,18 @@ def test_the_backoff_reaches_the_documented_two_minute_wait(tmp_path):
     clock[0] += 60
     source.refresh()
     assert reads() == tries + 1, "and the try comes when the two minutes are up"
+
+
+def test_the_lobby_name_fills_an_empty_stored_name(tmp_path):
+    """A computer signed in with a key but no stored name showed "Online as  on ..." (owner,
+    2026-11-19). When the lobby says who the key signs in as, that name is kept."""
+    from shelf.online_source import Online
+
+    source = Online(tmp_path, url="http://127.0.0.1:1", secret=lambda _n: "k")
+    assert source.snapshot()["name"] == ""
+    source.learn_name("Locutus")
+    assert source.snapshot()["name"] == "Locutus"
+    again = Online(tmp_path, url="http://127.0.0.1:1", secret=lambda _n: "k")
+    assert again.snapshot()["name"] == "Locutus", "and it is saved, not only held in memory"
+    source.learn_name("")
+    assert source.snapshot()["name"] == "Locutus", "an empty answer never wipes a name"

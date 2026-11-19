@@ -497,6 +497,16 @@ class Online:
         return {"ok": True, "text": "Signed out on this computer. Your account is still there.",
                 "online": self.snapshot()}
 
+    def learn_name(self, name: str) -> None:
+        """The lobby said who this key signs in as: keep that name when ours is empty or stale.
+
+        A computer signed in with a pasted key (or before names were stored) kept an empty name,
+        so the page read "Online as  on games.hermesnet.xyz" while the lobby knew the account."""
+        name = str(name or "").strip()[:40]
+        if name and self._state.get("name") != name:
+            self._state["name"] = name
+            self._save()
+
     def _remember(self, player: dict, fallback: str) -> None:
         name = str(player.get("name") or fallback)[:40]
         self._state["name"] = name
