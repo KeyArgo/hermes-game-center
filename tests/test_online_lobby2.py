@@ -559,7 +559,7 @@ def _fake_online(monkeypatch, started_flag):
             return {}
 
     class Hall:
-        def start(self):
+        def start(self, wake=True):
             started_flag.append("start")
 
         def snapshot(self):

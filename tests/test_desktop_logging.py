@@ -115,7 +115,10 @@ def test_a_report_too_big_to_be_one_line_is_refused_before_it_is_parsed(tmp_path
     The route reads the body itself now, from the request, with the cap in front of the parse.
     """
     from fastapi import FastAPI
-    from fastapi.testclient import TestClient
+    try:
+        from fastapi.testclient import TestClient
+    except (ImportError, RuntimeError) as exc:  # the test client needs an HTTP client package
+        pytest.skip(f"no fastapi test client here: {exc}")
 
     diagnostics.attach(tmp_path)
     app = FastAPI()

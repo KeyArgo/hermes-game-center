@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: "22"
       - name: Install the test dependencies
-        run: python -m pip install -U pip pytest aiohttp fastapi pillow numpy pyyaml
+        run: python -m pip install -U pip pytest aiohttp fastapi httpx2 pillow numpy pyyaml
       - name: Run the suite
         run: python -m pytest tests -q -p no:cacheprovider
       # bash on every runner, so one script serves all three platforms (Windows' default shell is pwsh,
