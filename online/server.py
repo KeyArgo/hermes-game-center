@@ -37,6 +37,7 @@ from online.store import BOTS_PER_OWNER, RENAME_DAYS, Store, token_hash  # noqa:
 from online import requests as play_requests  # noqa: E402
 from online.slots import spin as slot_spin, PAYOUTS_3OAK  # noqa: E402
 from shelf.jackpot import EarnTracker, Ledger  # noqa: E402
+from shelf import diagnostics  # noqa: E402
 
 log = logging.getLogger("gameshelf.online")
 
@@ -130,6 +131,12 @@ class App:
         self.requests = play_requests.Service(
             self.store, self.rooms, play_requests.AppHub(self), clock=self.clock)
         play_requests.service = self.requests
+        # The same health line the plugin writes, to this server's own logger (journald):
+        # RSS, threads and the sockets it holds, one line every five minutes.
+        self.health_watch = diagnostics.HealthSampler(logger=log, sockets=self._socket_count)
+
+    def _socket_count(self) -> int:
+        return sum(len(conns) for conns in self.conns.values())
 
     # Helpers -----------------------------------------------------------------
 
@@ -1469,6 +1476,25 @@ class App:
             await asyncio.sleep(5)
 
     @web.middleware
+    async def observe(self, request: web.Request, handler):
+        """One watch over every request: an unhandled error is logged with its
+        traceback (a plain HTTP refusal is not an error), and a call slower than
+        two seconds earns one warning. Keys in a query string are masked."""
+        start = self.clock()
+        try:
+            response = await handler(request)
+        except web.HTTPException:
+            raise
+        except Exception:
+            log.exception("%s %s failed", request.method, diagnostics.mask(request.path_qs))
+            raise
+        took = self.clock() - start
+        if took > diagnostics.SLOW_SECONDS:
+            log.warning("slow request %s %s took %.2fs",
+                        request.method, diagnostics.mask(request.path_qs), took)
+        return response
+
+    @web.middleware
     async def limits(self, request: web.Request, handler):
         if request.path.startswith("/api/") and not self.api_limit.allow(self.ip(request)):
             return web.json_response({"error": "Too many requests."}, status=429)
@@ -1477,7 +1503,7 @@ class App:
         return response
 
     def build(self) -> web.Application:
-        app = web.Application(client_max_size=16 * 1024, middlewares=[self.limits])
+        app = web.Application(client_max_size=16 * 1024, middlewares=[self.observe, self.limits])
         app.router.add_get("/", self.index)
         app.router.add_get("/t/{room}", self.index)
         app.router.add_get("/b/{bot}", self.index)
@@ -1545,6 +1571,7 @@ class App:
 
         async def start(app: web.Application) -> None:
             app[JANITOR] = asyncio.create_task(self.janitor(app))
+            self.health_watch.start()
 
         async def going_away(app: web.Application) -> None:
             # Runs before aiohttp waits on open handlers. Without it a restart leaves pages
@@ -1559,6 +1586,7 @@ class App:
                         await conn.ws.close(code=WSCloseCode.GOING_AWAY, message=b"restarting")
 
         async def stop(app: web.Application) -> None:
+            self.health_watch.stop()
             if self.http is not None:
                 await self.http.close()
             self.store.close()
