@@ -182,11 +182,17 @@ class Rooms:
         folder = self.folder(room["id"])
         # Each online table keeps its own chips. Without this, every room at one data root
         # would share a single wallet file and spend the same balance.
-        return module.create(folder, {
+        settings = {
             "allow_ai": True,
             "data_root": str(self.data_root),
             "wallet": str(folder / "wallet.json"),
-        })
+        }
+        if room["game"] == "blackjack":
+            # Blackjack online is two people at a lobby table, each with 10,000 chips of their
+            # own kept in the table state. Nobody's Jackpot wallet is spent, won, refilled or
+            # even opened for a room on a server.
+            settings["table_chips"] = True
+        return module.create(folder, settings)
 
     def state(self, room: dict) -> dict | None:
         try:
@@ -211,6 +217,11 @@ class Rooms:
         line = MODES[mode]
         if mode in {"bot", "bots"} and level in kit.LEVELS:
             line += f" level={level}"
+        if game == "blackjack" and mode == "two":
+            # Not a white-versus-black duel: two people each play their own hand against the
+            # dealer, from a stack of their own kept in the table state. The host takes the
+            # first seat now; the second waits for a person, exactly as a board room does.
+            line = "new white=human black=human players=2 chips=table"
         answer = self.table(room).command(line, source="command", player=person(host))
         if refused(answer):
             self.store.close_room(room["id"])
@@ -222,6 +233,20 @@ class Rooms:
 
     def bots_allowed(self, game: str) -> bool:
         return bool((getattr(self.games.get(game), "MANIFEST", {}) or {}).get("bots", True))
+
+    def between_hands(self, room: dict) -> str:
+        """A blackjack table takes a new person only between hands; "" for any other game.
+
+        Sitting down mid-hand would rebuild the two seats under a live round, and a bet already
+        on the felt would go with it, so the one open seat closes while a hand is being played.
+        """
+        if str(room.get("game") or "") != "blackjack":
+            return ""
+        state = self.state(room) or {}
+        bets = [value for value in (state.get("round_bets") or []) if isinstance(value, int)]
+        if state.get("phase") != "bet" or int(state.get("betting") or 0) or any(bets):
+            return "This table is in the middle of a hand. Sit down between hands."
+        return ""
 
     def bot_refusal(self, room: dict, player: dict, invited: bool = False) -> str:
         """Registered bots sit only where the host said yes: a bots-welcome table or an invite link."""
@@ -248,6 +273,10 @@ class Rooms:
         pictured["viewer_id"] = player_id
         pictured["permissions"] = permissions(pictured, player_id)
         pictured["permissions"]["can_claim"] = bool(self.claimable(room, player_id))
+        # A blackjack seat can be taken at the table only between hands, so the open seat is
+        # not offered while a hand is being played.
+        if self.between_hands(room):
+            pictured["permissions"]["can_join"] = False
         pictured["absent"] = self.absent_sides(room)
         pictured["pair"] = self.pair_info(room)
         pictured["open_league"] = bool(room.get("open_league"))
@@ -286,6 +315,13 @@ class Rooms:
             return {"ok": False, "text": "This table is closed.", "finished": None}
         host = player["id"] == room["host_id"]
         state = self.state(room)
+        if action in {"resign", "leave"} and room.get("game") == "blackjack":
+            # A session table has no match to resign, and each seat keeps its own chips. Ending
+            # the table from one seat would strand the other person, so the table says what it
+            # really offers: put it away here, or play on.
+            return {"ok": False,
+                    "text": "A blackjack table has no match to resign. Close the table to step away.",
+                    "finished": None}
         if action == "new":
             mode = args[0] if args else "two"
             if not host:
@@ -294,6 +330,9 @@ class Rooms:
                 return {"ok": False, "text": "Pick two players, play the bot, or watch bots.", "finished": None}
             line = MODES[mode]
         elif action in {"join", "sit"}:
+            between = self.between_hands(room)
+            if between:
+                return {"ok": False, "text": between, "finished": None}
             refusal = self.bot_refusal(room, player) if not self._seated(state, player["id"]) else ""
             if refusal:
                 return {"ok": False, "text": refusal, "finished": None}

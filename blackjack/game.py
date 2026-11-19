@@ -60,6 +60,10 @@ _BETS = (10, 25, 50, 100, 500, 1000)
 # and the owner's chips cannot be won by a guest.
 GUEST_CHIPS = 10_000
 GUEST_NAME = "Player 2"
+# What a seat at a lobby table sits down with. Online, both seats keep their own stack in the
+# table's own state - never in a wallet file, and never the owner's Jackpot chips - and the table
+# neither refills nor mints one: a lobby table is a game, not a way into somebody's wallet.
+TABLE_CHIPS = 10_000
 _RANKS = ("A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
 _SUITS = ("S", "H", "D", "C")
 
@@ -78,6 +82,11 @@ MAX_HANDS = 4
 DOUBLE_AFTER_SPLIT = True
 
 _WALLET = None
+# True while the table being driven is a lobby table (a room passes settings["table_chips"]).
+# ``create`` sets it for every command, exactly as it sets the wallet: a room builds a table,
+# runs one command and lets it go. A lobby table's chips are in its own state, so the kit's
+# save-undo doors must not read - or write - a wallet at all.
+_TABLE_MODE = False
 
 
 def use_wallet(path) -> None:
@@ -92,13 +101,36 @@ def _wallet() -> "wallet.Wallet":
     return _WALLET
 
 
+def _stacks(state: dict) -> list[int] | None:
+    """The two seats' own stacks, when this table keeps its chips in its own state."""
+    stacks = state.get("stacks")
+    if (isinstance(stacks, list) and len(stacks) == 2
+            and all(isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                    for value in stacks)):
+        return stacks
+    return None
+
+
+def _table_chips(state: dict) -> bool:
+    """True for a lobby table: each seat's chips are the table's, not a wallet's."""
+    return _stacks(state) is not None
+
+
 def chips_now() -> int:
-    """What the wallet holds, for the table's own undo when a save never lands."""
+    """What the wallet holds, for the table's own undo when a save never lands.
+
+    A lobby table has no wallet: its chips are in the table state, so there is nothing to read
+    here and nothing for the kit to put back.
+    """
+    if _TABLE_MODE:
+        return 0
     return int(_wallet().read()["chips"])
 
 
 def chips_reclaim(chips: int) -> None:
     """Take back a payout made for a state that could not be written: the hand was never settled."""
+    if _TABLE_MODE:
+        return
     chips = int(chips)
     if chips > 0:
         held = int(_wallet().read()["chips"])
@@ -112,13 +144,17 @@ def chips_refund(chips: int) -> None:
     bet has already left the wallet. It is a plain credit: no hand is counted, because no hand
     was played.
     """
+    if _TABLE_MODE:
+        return
     if int(chips) > 0:
         _wallet().credit(int(chips))
 
 
 def create(root: Path, settings: dict | None = None):
     settings = settings or {}
+    global _TABLE_MODE
     root = Path(root)
+    _TABLE_MODE = bool(settings.get("table_chips"))
     # A table plays with one wallet. Locally that is the profile's shared chips file.
     # Online, the server passes its own wallet so one room's chips never reach another's.
     use_wallet(Path(settings.get("wallet") or (root.parent / "wallet.json")))
@@ -126,21 +162,29 @@ def create(root: Path, settings: dict | None = None):
     # The table is live the moment it is placed: it waits on no "new" and no first
     # bet, and a table that reads as "idle" looks never started to a playthrough.
     if kit.load(root) is None:
-        kit.write(root, {
+        if not _TABLE_MODE:
+            # A local table: a person with no chips left is given the starting stake back. A
+            # lobby table never does this - nobody's wallet is opened for a room on a server.
+            if _wallet().read()["chips"] <= 0:
+                _wallet().refill()
+        state = {
             "schema_version": 2, "table_id": uuid.uuid4().hex, "owner_id": "",
             "score": {"white": 0, "black": 0, "draws": 0}, "moves": [],
             "rematch": {"requested_by": []}, "draw_offer": "", "game": ID,
             "turn": "white", "white": "human", "black": "human",
             "status": "active", "winner": "", "plies": 0, "last": "", "result_detail": "",
             **fresh(),
-        })
+        }
+        if _TABLE_MODE:
+            # Both seats sit down with a table-only stack, saved with the table.
+            state["stacks"] = [TABLE_CHIPS, TABLE_CHIPS]
+        kit.write(root, state)
     return table
 
 
 def fresh() -> dict:
-    held = _wallet().read()
-    if held["chips"] <= 0:
-        _wallet().refill()
+    # No wallet is read here: this shape is also built for a preview of a table nobody has
+    # started, and looking at a board must never mint chips into somebody's wallet.
     return {
         "shoe": uuid.uuid4().hex,
         "phase": "bet",
@@ -171,7 +215,14 @@ def setup(state: dict, options: dict) -> str:
     table nobody asked for.
     """
     said = str(options.get("players") or "").strip().lower()
+    chips = str(options.get("chips") or "").strip().lower()
+    if chips and chips != "table":
+        return ("Usage: /games blackjack allow-ai black=local players=2 chips=table "
+                "(two people, a table stack each)")
     if not said:
+        # A lone host at a lobby table: the shape waits for a person, the chips are the table's.
+        if chips == "table":
+            state["stacks"] = [TABLE_CHIPS, TABLE_CHIPS]
         return ""
     if said not in {"1", "2"}:
         return "Usage: /games blackjack allow-ai black=local players=1|players=2 (one or two people)"
@@ -185,6 +236,9 @@ def setup(state: dict, options: dict) -> str:
         state.pop("guest", None)
         state.pop("betting", None)
         state.pop("round_bets", None)
+    if chips == "table":
+        # A lobby table: each seat keeps its own 10,000 in the table's state, never in a wallet.
+        state["stacks"] = [TABLE_CHIPS, TABLE_CHIPS]
     return ""
 
 
@@ -315,13 +369,28 @@ def _active(state: dict) -> int:
 # table state. Hands carry the seat they belong to, so a round is settled hand by hand,
 # each to the person who owns it.
 
-def _table_players(state: dict) -> int:
+def _two_seats(state: dict) -> int:
+    """The shape the table was set up with: one person, or a seat for a second."""
     value = state.get("players")
     if isinstance(value, bool) or value is None:
         return 2 if value is True else 1
     if isinstance(value, int):
         return 2 if value == 2 else 1
     return 2 if str(value).strip() == "2" else 1
+
+
+def _table_players(state: dict) -> int:
+    """How many people are really at the table.
+
+    ``players=2`` is the shape a table is set up with: a second stack and a bet each. A lobby
+    table is set up before anybody has sat in that seat, and a seat with nobody in it is not a
+    second player - the host plays their own hand until a person sits down between hands.
+    """
+    if _two_seats(state) != 2:
+        return 1
+    if _table_chips(state) and not str(state.get("black_id") or ""):
+        return 1
+    return 2
 
 
 def _guest(state: dict) -> dict:
@@ -345,16 +414,36 @@ def _owner(hand: dict) -> int:
 
 
 def _player_name(state: dict, owner: int) -> str:
+    """What the felt calls one person.
+
+    A lobby table names the people who sat down (their own names, from their seats). The local
+    two-person screen keeps its plain "Player 1" and "Player 2".
+    """
+    if _table_chips(state):
+        seat = str(state.get("black_name" if owner else "white_name") or "")
+        if seat:
+            return seat
     return str(_guest(state)["name"]) if owner else "Player 1"
 
 
 def _stack(state: dict, owner: int) -> int:
+    """What one person can bet from: a lobby table's own stack, or the wallet / the guest's."""
+    stacks = _stacks(state)
+    if stacks is not None:
+        return int(stacks[1 if owner else 0])
     return int(_guest(state)["chips"]) if owner else int(_wallet().read()["chips"])
 
 
 def _stake(state: dict, owner: int, amount: int) -> bool:
-    """Take a wager from the person who made it: the wallet, or the guest's table stack."""
+    """Take a wager from the person who made it: the wallet, or the seat's own stack."""
     amount = int(amount)
+    stacks = _stacks(state)
+    if stacks is not None:
+        seat = 1 if owner else 0
+        if int(stacks[seat]) < amount:
+            return False
+        stacks[seat] = int(stacks[seat]) - amount
+        return True
     if not owner:
         return _wallet().debit(amount)
     guest = _guest(state)
@@ -367,6 +456,11 @@ def _stake(state: dict, owner: int, amount: int) -> bool:
 def _credit(state: dict, owner: int, amount: int) -> None:
     """Pay a finished hand back to the stack it was staked from - never across people."""
     amount = int(amount)
+    stacks = _stacks(state)
+    if stacks is not None:
+        seat = 1 if owner else 0
+        stacks[seat] = int(stacks[seat]) + amount
+        return
     if not owner:
         _wallet().credit(amount, hand=True)
         return
@@ -656,7 +750,7 @@ def _can_double(state: dict, hand: dict, chips: int | None = None) -> bool:
         return False
     if hand.get("from_split") and not DOUBLE_AFTER_SPLIT:
         return False
-    held = _wallet().read()["chips"] if chips is None else chips
+    held = _stack(state, _owner(hand)) if chips is None else chips
     return held >= int(hand.get("wager") or 0)
 
 
@@ -921,7 +1015,41 @@ def _start_round(state: dict, bets: list[int]) -> str:
     return state["note"]
 
 
+def _acting_owner(state: dict) -> int:
+    """Which person's move is on the felt: the bet being waited for, or the hand being played."""
+    if state.get("phase") == "play":
+        hands = _migrate(state)
+        return _owner(hands[_active(state)]) if hands else 0
+    return _betting_owner(state)
+
+
+def _sync_turn(state: dict) -> None:
+    """The kit's turn follows the person whose move it is.
+
+    White is the first seat, black the second. Blackjack's own turn is a hand - or a bet - and not
+    a colour, so the seat is read from the move on offer. That is what lets the table refuse a
+    move from the other person, and what makes an online seat's permissions follow the acting
+    seat instead of a board game's white and black.
+    """
+    if _table_players(state) != 2 or kit.seat_kind(str(state.get("black") or "")) != "human":
+        # One person at the table, or the local two-person screen where the second seat is the
+        # machine's: the move stays on the human side, as it always did.
+        state["turn"] = "white"
+        return
+    state["turn"] = "black" if _acting_owner(state) else "white"
+
+
 def play(state: dict, move) -> str:
+    """One move, then point the turn at the person whose move is next.
+
+    Every return path of the rules goes through here, so the seat that may act is never stale.
+    """
+    note = _play(state, move)
+    _sync_turn(state)
+    return note
+
+
+def _play(state: dict, move) -> str:
     token = str(move)
     _migrate(state)
     if state.get("phase") == "deal":
@@ -948,6 +1076,13 @@ def play(state: dict, move) -> str:
         return state["note"]
     if token == "topup":
         owner = _betting_owner(state)
+        stacks = _stacks(state)
+        if stacks is not None:
+            # A lobby table: a fresh table stack, never a fresh wallet.
+            stacks[1 if owner else 0] = TABLE_CHIPS
+            state["note"] = (f"{_player_name(state, owner)} is out of chips. "
+                             f"A fresh {TABLE_CHIPS:,} table chips.")
+            return state["note"]
         if owner:
             guest = _guest(state)
             guest["chips"] = GUEST_CHIPS
@@ -1073,7 +1208,7 @@ def draw(state: dict) -> list[str]:
     visible = [card for card in dealer_cards if card != "??"]
     dealer_total = _hand_value(visible) if visible else 0
     hands = _migrate(state)
-    held = _wallet().read()
+    held = None if _table_chips(state) else _wallet().read()
     two = _table_players(state) == 2
     lines = [
         f"Dealer: {' '.join(dealer_cards) or '(no cards)'}",
@@ -1114,7 +1249,7 @@ def draw(state: dict) -> list[str]:
         lines.append(f"Your total: {_hand_value(state.get('hand') or [])}")
         lines.append(f"Bet: {state.get('bet') or 0} chips")
     if not two:
-        lines.append(f"Chips: {held['chips']}")
+        lines.append(f"Chips: {held['chips'] if held is not None else _stack(state, 0)}")
     if state.get("note"):
         lines.append("")
         lines.append(str(state["note"]))
@@ -1173,7 +1308,9 @@ def _shown_players(state: dict, hands: list[dict], active: int, playing: bool) -
             "seat": owner,
             "name": _player_name(state, owner),
             "chips": _stack(state, owner),
-            "wallet": owner == 0,
+            # Whose chips are the Jackpot wallet's. A lobby table has no wallet: both seats
+            # are the table's own stacks.
+            "wallet": owner == 0 and not _table_chips(state),
             "bet": int(bets[owner]) or staked,
             "wager": staked,
             "net": net,
@@ -1185,14 +1322,34 @@ def _shown_players(state: dict, hands: list[dict], active: int, playing: bool) -
     return saying
 
 
+def _seat_of(state: dict, player) -> int | None:
+    """Which seat the person looking holds, from their id. None for a watcher.
+
+    A watcher has no seat: their picture is the public one, and the chips it shows are the
+    first seat's rather than anybody's private stack being handed to them.
+    """
+    pid = getattr(player, "id", None) if player is not None else None
+    if isinstance(player, dict):
+        pid = player.get("id")
+    pid = str(pid or "")
+    if not pid:
+        return None
+    if str(state.get("white_id") or "") == pid:
+        return 0
+    if str(state.get("black_id") or "") == pid:
+        return 1
+    return None
+
+
 def picture(state: dict, player=None) -> dict:
-    del player
+    # Who is looking decides which stack and which hand are theirs: online, seat 2's chips are
+    # theirs and nobody else's. A picture with no player is the table's public view.
+    seat = _seat_of(state, player)
     playing = state.get("phase") == "play"
     dealer = list(state.get("dealer") or [])
     if playing and len(dealer) > 1:
         dealer[1] = "??"
     visible = [card for card in dealer if card != "??"]
-    held = _wallet().read()
     hands = _migrate(state)
     active = _active(state) if hands else 0
     dealer_seat = _dealer_seat(state)
@@ -1215,7 +1372,12 @@ def picture(state: dict, player=None) -> dict:
         "player_total": _hand_value(state.get("hand") or []),
         "dealer_total": _hand_value(visible) if visible else 0,
         "bet": int(state.get("bet") or 0),
-        "chips": held["chips"],
+        # The stack of whoever is looking, or the first seat's for a watcher.
+        "chips": _stack(state, 0 if seat is None else seat),
+        # Which seat the picture was drawn for: 0 or 1 for a person at this table, -1 for
+        # somebody watching. Nothing else in the picture depends on it.
+        "your_seat": -1 if seat is None else seat,
+        "table_chips": _table_chips(state),
         "outcome": str(state.get("outcome") or ""),
         "won": int(state.get("won") or 0),
         "hands": int(state.get("hands") or 0),

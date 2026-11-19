@@ -225,6 +225,9 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     : `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}`
   // Go offers Pass as a move; the local table carries it, so this one does too.
   const passOffered = Boolean(picture && (picture.legal || []).includes('pass') && canMove)
+  // A session table (blackjack, slots) has no match to resign: the felt is one hand after
+  // another, so the only way out is putting the table away.
+  const sessionTable = stageView === 'blackjack' || stageView === 'slots'
   const winner = String((picture && picture.winner) || '')
   const iWon = Boolean(winner && mySide && winner === mySide)
   const resultLine = status === 'draw' ? 'It is a draw.'
@@ -306,7 +309,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         ] })
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
-        status === 'active' && !done ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
+        status === 'active' && !done && !sessionTable ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
         button('Close table', putAway, { disabled: busy, title: 'Puts this table away here. The match stays on the lobby server.' })
       ] })
     ]
