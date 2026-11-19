@@ -1,6 +1,6 @@
 # FAQ
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (8d207f36)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (06ce6970)_
 
 Short answers to the questions the code raises.
 
