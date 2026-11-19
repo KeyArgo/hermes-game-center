@@ -590,6 +590,22 @@ class Store:
         self.db.execute("UPDATE rooms SET closed = 1 WHERE id = ?", (room_id,))
         self.db.execute("UPDATE invites SET used_at = COALESCE(used_at, ?) WHERE room_id = ?", (time.time(), room_id))
 
+    def log_audit(self, action: str, *, actor_id: str = "server", actor_name: str = "server",
+                  actor_role: str = "server", target_id: str = "", target_name: str = "",
+                  reason: str = "", detail: dict | None = None) -> int:
+        """One row in the staff audit log, written by the code rather than by a staff action.
+
+        The same table, so a person reading the audit trail sees a sweep beside every
+        suspension, and the id comes back the way the admin surface's undo path expects.
+        """
+        cursor = self.db.execute(
+            "INSERT INTO audit (at, actor_id, actor_name, actor_role, action, target_id, target_name,"
+            " reason, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (time.time(), actor_id, actor_name, actor_role, action, target_id, target_name,
+             reason, json.dumps(detail or {})),
+        )
+        return int(cursor.lastrowid or 0)
+
     def open_rooms(self, *, public_only: bool = True, since: float = 0.0) -> list[dict]:
         rows = self.db.execute(
             "SELECT * FROM rooms WHERE closed = 0 AND active >= ? AND (public = 1 OR ? = 0) ORDER BY active DESC LIMIT 200",
@@ -608,6 +624,14 @@ class Store:
     def stale_rooms(self, before: float) -> list[str]:
         rows = self.db.execute("SELECT id FROM rooms WHERE closed = 0 AND active < ?", (before,)).fetchall()
         return [row["id"] for row in rows]
+
+    def idle_rooms(self, before: float, limit: int = 500) -> list[dict]:
+        """Open rooms whose last activity is older than `before`, quietest first."""
+        rows = self.db.execute(
+            "SELECT * FROM rooms WHERE closed = 0 AND active < ? ORDER BY active, id LIMIT ?",
+            (before, limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def mark_ladder(self, room_id: str, on: bool = True) -> None:
         """Remember which open rooms are bot-versus-bot ladder games, so their move clocks

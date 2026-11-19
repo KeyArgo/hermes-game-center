@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import shutil
 import sys
 import time
@@ -22,6 +23,8 @@ if str(_SHELF) not in sys.path:
 
 import kit  # noqa: E402
 from . import league  # noqa: E402
+
+log = logging.getLogger("gameshelf.online")
 
 # Listed first, in this order; any other table game found beside them follows by title.
 CURATED = ("connect4", "reversi", "checkers", "gomoku", "chessboard",
@@ -39,6 +42,9 @@ DISCONNECT_GRACE = 120.0
 # move clock starts. A bot that never arrives forfeits 15 s after that.
 LADDER_CONNECT_GRACE = 60.0
 ROOM_IDLE_DAYS = 3
+# A room nobody has been at for this long is closed by the server's sweep. An abandoned
+# table keeps its host "playing" until it is closed, and Play skips them.
+IDLE_CLOSE_SECONDS = 2 * 3600.0
 
 # Same refusal heuristics the Desktop adapter uses; the kit returns text, not typed results.
 _REFUSALS = (
@@ -640,3 +646,29 @@ class Rooms:
                 continue
             shutil.rmtree(folder, ignore_errors=True)
         return stale
+
+    def sweep_idle(self, now: float, connected=None) -> list[dict]:
+        """Close rooms that have been quiet for hours with nobody sitting at them.
+
+        ``connected(room, state)`` says whether anyone is still at the table; the server
+        passes the lobby's own answer (a socket on that room). Without one, idleness alone
+        decides. The close goes through the store's one close path, so the room's invites die
+        with it, and every close leaves an audit row and a log line naming room and game.
+        """
+        closed = []
+        for room in self.store.idle_rooms(now - IDLE_CLOSE_SECONDS):
+            state = self.state(room) or {}
+            if connected is not None and connected(room, state):
+                continue
+            idle_minutes = int(max(0.0, now - float(room.get("active") or 0)) // 60)
+            self.store.close_room(room["id"])
+            self.store.log_audit(
+                "close-idle-room", target_id=room["id"], target_name=str(room["game"]),
+                reason=f"nobody at the table for {idle_minutes} minutes",
+                detail={"game": room["game"], "idle_minutes": idle_minutes,
+                        "status": str(state.get("status") or "")},
+            )
+            log.warning("closed idle room %s (%s): nobody at the table for %d min",
+                        room["id"], room["game"], idle_minutes)
+            closed.append(room)
+        return closed

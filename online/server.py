@@ -1439,6 +1439,10 @@ class App:
 
     # Housekeeping ------------------------------------------------------------
 
+    def sweep_idle_rooms(self, now: float) -> list[dict]:
+        """Close rooms nobody has been at for hours, with no one seated still connected."""
+        return self.rooms.sweep_idle(now, connected=self.hub.seated_live)
+
     async def janitor(self, app: web.Application) -> None:
         last_housekeeping = 0.0
         while True:
@@ -1456,6 +1460,8 @@ class App:
                 if time.monotonic() - last_housekeeping >= 15:
                     last_housekeeping = time.monotonic()
                     self.rooms.expire()
+                    # A table left open is not a game: shut the quiet ones nobody is at.
+                    self.sweep_idle_rooms(time.time())
                     self.expire_challenges()
                     self.store.expire_punishments(time.time())
                     self.store.purge_chat(time.time() - CHAT_KEEP_DAYS * 86400)

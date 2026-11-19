@@ -12,6 +12,9 @@ from aiohttp import WSMsgType, web
 
 MAX_LOBBY_CONNECTIONS = 2000
 ROSTER_CAP = 200
+# A seat at a table counts as play while the room was touched this recently, even with no
+# socket on it: a move, a chat line, a seat taken. Past it, play needs someone at the table.
+PLAYING_IDLE_SECONDS = 15 * 60.0
 
 
 def _service():
@@ -68,13 +71,44 @@ class Hub:
         self.task = None
         self.lock = asyncio.Lock()
 
+    @staticmethod
+    def _seated(state: dict) -> list[str]:
+        return [str(state.get(f"{side}_id") or "") for side in ("white", "black")]
+
+    def _table_connection(self, room_id: str, player_id: str) -> bool:
+        """Whether this account holds a socket on that table, rather than on the lobby."""
+        rooms = getattr(self.app, "rooms", None)
+        return player_id in getattr(rooms, "online", {}).get(room_id, set())
+
+    def seated_live(self, room: dict, state: dict | None = None) -> bool:
+        """Whether someone seated at this room still has a socket on it.
+
+        A lobby socket is not a seat at a table: everyone signed in has one, so counting it
+        would keep an abandoned room "playing" for ever - which is the bug this answers.
+        """
+        state = (self.app.rooms.state(room) or {}) if state is None else state
+        return any(pid and self._table_connection(room["id"], pid) for pid in self._seated(state))
+
     def playing_players(self):
+        """Who is in a game: a seat at an open, active table that is still being played.
+
+        A room counts only while it is active AND either someone seated there is connected to
+        that table, or the room saw activity within the last fifteen minutes. The room's own
+        activity stamp is ``rooms.active``, which every command stamps. A table left open
+        overnight used to keep its host "playing" for fifteen hours, and Play skipped them.
+        """
         playing = set()
+        now = self.clock()
         for raw in self.app.store.db.execute('SELECT * FROM rooms WHERE closed = 0'):
             room = dict(raw)
             state = self.app.rooms.state(room) or {}
-            if state.get('status') == 'active':
-                playing.update(pid for pid in (state.get('white_id'), state.get('black_id')) if pid)
+            if state.get('status') != 'active':
+                continue
+            seated = [pid for pid in self._seated(state) if pid]
+            if not seated:
+                continue
+            if now - float(room.get('active') or 0) < PLAYING_IDLE_SECONDS or self.seated_live(room, state):
+                playing.update(seated)
         return playing
 
     def online_players(self):
