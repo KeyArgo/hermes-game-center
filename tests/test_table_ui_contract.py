@@ -208,7 +208,11 @@ def test_the_main_page_has_one_invite_switch_and_says_when_the_lobby_is_down():
     home = _src("70-home.js")
     assert "'Let people invite me'" in home, "the master switch is on the main page"
     assert "data-people-open" in home, "and it carries its own state for the page and the tests"
-    assert "'Not connected to the lobby — Retry'" in home, "a Hall that is not live says so"
+    # The reason a held switch is held is a sentence beside it, not a hover title: a dead box
+    # with the reason on hover reads as simply dead (owner, 2026-11-18).
+    assert "data-people-open-why" in home, "the switch says why it is held, for the page and the tests"
+    assert "'Lobby not connected — Retry'" in home, "a Hall that is not live says so"
+    assert "'Sign in above first.'" in home, "and a signed-out one asks for the sign-in"
     assert "'/online/hall/retry'" in home, "with the one press that dials again"
     assert "'Online invites are off — turn on to be asked'" not in home, \
         "the card no longer blames the person's own setting for a missing socket"

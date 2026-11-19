@@ -22902,12 +22902,14 @@ function PlayWithPeople({ ctx, view }) {
         ]
       }),
       jsx('span', {
-        'data-people-open-state': '1', role: 'status', 'aria-live': 'polite',
+        'data-people-open-state': '1',
+        'data-people-open-why': !signedIn ? 'signed-out' : notConnected ? 'unreachable' : 'state',
+        role: 'status', 'aria-live': 'polite',
         style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
         children: !signedIn
-          ? 'Sign in above to let people invite you.'
+          ? 'Sign in above first.'
           : notConnected
-            ? 'Not connected to the lobby — Retry'
+            ? 'Lobby not connected — Retry'
             : prefs.open ? 'ON — people who accept your games can ask you.' : 'OFF — nobody can invite you.'
       }),
       notConnected

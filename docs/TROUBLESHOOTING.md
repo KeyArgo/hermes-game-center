@@ -44,6 +44,7 @@ Real failure modes the code handles or the README already names, and what to do 
 | The bot ladder is missing | This build has `PANE_LADDER_OFF`: rated bot-versus-bot is not proven end to end. | Local play and online person-versus-person are unaffected. |
 | The dock says the server is down in one sentence | `lobby_url` is unreachable. | Nothing local stops working. Check the address, your network, or turn online play off. |
 | Sign-in fails after reinstalling | The recovery key is shown once and kept in Hermes's credential store. | Sign in with the key if you saved it, or create a new player. Game Center never writes the key to its own file. |
+| **Let people invite me** is greyed out | The switch is drawn from the lobby socket, so it is held while there is nothing to write to. The sentence beside it says which: "Sign in above first." (no account on this computer) or "Lobby not connected — Retry". | Sign in under **Get online**, then press **Retry** beside the switch — the shelf dials at once, without waiting out a backoff. A sign-in, a Retry and opening the Games page all dial now; until this fix they left a waiting socket alone, so the switch could stay grey for a minute after signing in. |
 | A self-hosted lobby is refused | The plugin only sends to the `lobby_url` you set. | Point `lobby_url` at your server and see [HOSTING.md](HOSTING.md). |
 
 ## The Champions tab and Experimental

@@ -7915,7 +7915,7 @@ async function playWithPeopleContract() {
   const openState = nodes(tree).find(node => node.props && node.props['data-people-open'])
   assert.ok(openState, 'the master switch is on the card')
   assert.equal(openState.props['data-people-open'], 'signed-out', 'and it knows nobody is signed in')
-  assert.ok(words(tree).includes('Sign in above to let people invite you.'),
+  assert.ok(words(tree).includes('Sign in above first.'),
     'it asks for the sign-in rather than blaming a switch: ' + words(tree).slice(0, 200))
 
   // 2. Signed in: both rows, their two sentences, and a chip per requestable game.
@@ -8046,6 +8046,46 @@ async function playWithPeopleContract() {
     assert.ok(!group.props.style.whiteSpace || group.props.style.whiteSpace !== 'nowrap', 'and holds no unbreakable line')
   }
   console.log('play with people: accept list, play now, status and offer lines: passed')
+
+  // 10. A switch that cannot be used says why in words beside it, not only in a hover title,
+  //     and offers the one control that fixes it (owner, 2026-11-18: "it won't let me check
+  //     Let people invite me" - the reason was a tooltip, so the box read as simply dead).
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint({ ...signedIn, linked: false }, run.ctx)
+  let why = nodes(tree).find(node => node.props && node.props['data-people-open-why'])
+  assert.ok(why, 'the switch carries its reason beside it: ' + words(tree).slice(0, 300))
+  assert.equal(why.props['data-people-open-why'], 'signed-out', 'and knows it is the sign-in')
+  assert.equal(words(why), 'Sign in above first.', 'said in plain words, not only on hover: ' + words(why))
+  assert.equal(nodes(tree).find(node => node.props && node.props.type === 'checkbox').props.disabled, true,
+    'the box is held, and the sentence beside it says why')
+  assert.ok(!findButton(tree, 'Retry'), 'nothing to dial before there is a person to dial for')
+
+  // 11. Not connected: the card names the lobby, offers Retry, and Retry is the one press that
+  //     asks the shelf to dial again now.
+  reset()
+  run = makeCtx({ ...liveSnap(), state: 'connecting' })
+  tree = await paint(signedIn, run.ctx)
+  why = nodes(tree).find(node => node.props && node.props['data-people-open-why'])
+  assert.equal(why.props['data-people-open-why'], 'unreachable', 'the card knows the lobby is not there')
+  assert.equal(words(why), 'Lobby not connected — Retry', 'and says so beside the switch: ' + words(why))
+  assert.equal(nodes(tree).find(node => node.props && node.props.type === 'checkbox').props.disabled, true,
+    'the box is held while there is no socket to write to')
+  const dialAgain = findButton(tree, 'Retry')
+  assert.ok(dialAgain, 'with the one control that fixes it')
+  dialAgain.props.onClick()
+  await tick()
+  const retried = run.posts.filter(item => item[0] === '/online/hall/retry').pop()
+  assert.ok(retried, 'Retry asks the shelf to dial again now')
+  assert.equal(retried[2], 'POST', 'as a POST')
+  // A live socket is not offered a dial it does not need, and the sentence goes back to on/off.
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint(signedIn, run.ctx)
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-people-open-why']).props['data-people-open-why'],
+    'state', 'a connected switch says what the switch is, not that the lobby is down')
+  assert.ok(!findButton(tree, 'Retry'), 'and offers no Retry')
+  console.log('play with people: a held switch says why beside it, with Retry when the lobby is down: passed')
 }
 
 // ---- The twenty-minute accept asks if it should stay -----------------------------------

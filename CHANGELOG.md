@@ -6,6 +6,24 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A sign-in, a Retry and the Games page now dial a waiting socket at once, and the invite switch
+  says why it is held.** Owner, 2026-11-18: *"it won't let me check Let people invite me"* — the box
+  was disabled with its reason only on hover. Two causes. (1) `shelf/online_hall.py` `start()` — the
+  one action behind the sign-in route, `GET /online/hall`, `GET /view` and Retry — returned the moment
+  it saw a worker thread, so a socket the lobby had refused (state `off`, waiting 60 s), a server with
+  no lobby socket, or a dropped line sat out its whole wait while every door that was supposed to
+  redial did nothing; the switch stayed dead for up to a minute after a person signed in, and Retry
+  could not shorten it. Every wait in the worker is now interruptible: `start()` sets a dial-now flag
+  and the worker (woken within 200 ms) dials immediately with a fresh backoff, while a connect attempt
+  already in flight is left alone. `retry()` also answers with the state the dial reached (bounded at
+  2 s) instead of the "connecting" snapshot taken before it, so `/online/hall/retry` no longer reports
+  "not connected" on a lobby that is up. (2) Play with people's switch carries the reason as visible
+  text beside it — "Sign in above first." / "Lobby not connected — Retry" — with the Retry button, and
+  `data-people-open-why` for the page and the tests. Guards: `tests/test_online_hall.py`
+  (`test_signing_in_again_dials_a_refused_socket_at_once`,
+  `test_retry_answers_with_the_state_the_dial_reached` — both fail against the old `start()`),
+  `tests/table_ui_harness.cjs` (the held switch says why beside it, Retry posts `/online/hall/retry`,
+  a live switch offers none) and `tests/test_table_ui_contract.py`.
 - **Find match: four ways an offer could outlive the choices behind it.** From huddle round 12's read of
   the server (lane F). (1) A person who was also looking for a game counted as a candidate even after
   turning that game off — the search row outlives the twenty-minute accept it opened — so an offer went
