@@ -22,6 +22,7 @@ const fireKey = key => {
   ;(windowListeners.keydown || []).forEach(fn => fn(event))
 }
 const sessionStore = {}
+const localStore = {}
 const fakeWindow = {
   addEventListener: (type, fn) => { windowListeners[type] = (windowListeners[type] || []).concat(fn) },
   removeEventListener: (type, fn) => { windowListeners[type] = (windowListeners[type] || []).filter(item => item !== fn) },
@@ -29,6 +30,11 @@ const fakeWindow = {
     getItem: key => (key in sessionStore ? sessionStore[key] : null),
     setItem: (key, value) => { sessionStore[key] = String(value) },
     removeItem: key => { delete sessionStore[key] }
+  },
+  localStorage: {
+    getItem: key => (key in localStore ? localStore[key] : null),
+    setItem: (key, value) => { localStore[key] = String(value) },
+    removeItem: key => { delete localStore[key] }
   },
   dispatchEvent: event => {
     ;(windowListeners[event.type] || []).forEach(fn => fn(event))
@@ -4000,7 +4006,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -6396,7 +6402,11 @@ async function refereeBadgeContract() {
 {
   // Sound: one remembered switch, and no audio stack is silence rather than a throw.
   const store = {}
-  sandbox.window.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v) } }
+  sandbox.window.localStorage = {
+    getItem: k => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v) },
+    removeItem: k => { delete store[k] }
+  }
   assert.equal(evaluate('gamesSoundOn()'), true, 'sound is on by default')
   evaluate('gamesSoundSet(false)')
   assert.equal(evaluate('gamesSoundOn()'), false, 'the switch is remembered on this machine')
@@ -8740,6 +8750,146 @@ async function inviteSwitchOptimisticContract() {
   assert.ok(words(tree).includes('Invites are closed on this server.'),
     'and says the lobby\'s reason: ' + words(tree).slice(-200))
   console.log('play with people: the invite switch ticks on the press, and rolls back if the lobby says no: passed')
+}
+
+// ---- Invites land in the side pane -----------------------------------------------------
+// With "Let people invite me" on, the Play while you code pane is shown. Closing it is
+// remembered until the switch is turned on again. An invite is drawn at the top of that
+// pane from the bell's own store, and Accept / Decline use the bell's routes.
+async function invitePaneContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const paneMemory = {}
+  sandbox.window.localStorage = {
+    getItem: key => (key in paneMemory ? paneMemory[key] : null),
+    setItem: (key, value) => { paneMemory[key] = String(value) },
+    removeItem: key => { delete paneMemory[key] }
+  }
+  const clearPaneMemory = () => {
+    delete paneMemory['gameshelf.pane.gone']
+    delete paneMemory['gameshelf.pane.inviteOn']
+  }
+  sandbox.paneSlotCtx = {
+    registerMany(items) {
+      sandbox.paneSlotItems = items
+      return () => { sandbox.paneSlotGone = (sandbox.paneSlotGone || 0) + 1 }
+    }
+  }
+  const arm = () => {
+    clearPaneMemory()
+    evaluate('WAIT_PANE_SLOT.ctx = paneSlotCtx; WAIT_PANE_SLOT.make = () => ({ id: "pane", area: "panes", title: "Play while you code" }); WAIT_PANE_SLOT.dispose = null')
+  }
+
+  // 1. Turning the switch on registers the pane. A close stays closed until the switch goes off and on.
+  arm()
+  evaluate("invitePaneFollow({ state: 'live', prefs: { open: false } })")
+  evaluate("invitePaneFollow({ state: 'live', prefs: { open: true } })")
+  assert.equal(evaluate('typeof WAIT_PANE_SLOT.dispose'), 'function', 'switch ON registers the pane')
+  assert.equal(sandbox.paneSlotItems[0].area, 'panes', 'in the panes area')
+  evaluate('closeWaitPane()')
+  assert.equal(evaluate('WAIT_PANE_SLOT.dispose'), null, '× takes the pane off')
+  evaluate("invitePaneFollow({ state: 'live', prefs: { open: true } })")
+  assert.equal(evaluate('WAIT_PANE_SLOT.dispose'), null, 'a close is remembered while the switch stays on')
+  evaluate("invitePaneFollow({ state: 'live', prefs: { open: false } })")
+  evaluate("invitePaneFollow({ state: 'live', prefs: { open: true } })")
+  assert.equal(evaluate('typeof WAIT_PANE_SLOT.dispose'), 'function', 'turning the switch on again shows the pane')
+
+  // The same door the checkbox uses: one press, the pane is registered.
+  arm()
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const quiet = {
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: false, games: {}, until: {} }, roster: [], requests: [], seated: null
+  }
+  const ctx = { rest: async path => (path === '/online/hall' ? quiet : { ok: true, text: '' }) }
+  reset()
+  sandbox.paneSwitchProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+  let tree = null
+  for (let pass = 0; pass < 2; pass += 1) {
+    cursor = 0
+    tree = evaluate('PlayWithPeople(paneSwitchProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    await tick()
+  }
+  nodes(tree).find(node => node.props && node.props.type === 'checkbox').props.onChange({ target: { checked: true } })
+  assert.equal(evaluate('typeof WAIT_PANE_SLOT.dispose'), 'function', 'the switch itself shows the pane')
+
+  // 2. An incoming request is the first thing in the pane, and both answers use the hall routes.
+  const now = Math.floor(Date.now() / 1000)
+  const invite = {
+    id: 'q9', state: 'pending', game: 'connect4', created: now, expires: now + 60,
+    from: { id: 'bea', name: 'Bea' }, to: { id: 'me', name: 'Ada' }
+  }
+  const seated = { room_id: 'room-9', game: 'connect4' }
+  const asked = []
+  const view = {
+    player: { id: 'me', name: 'Ada', named: true }, viewer_id: 'me', allow_ai: true,
+    play: [{ id: 'connect4', title: 'Connect Four', kind: 'table', installed: true, bots: true }],
+    lobby: { lines: [], looking: [] }
+  }
+  const paneCtx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { notify() {} },
+    rest: async (path, options) => {
+      asked.push([path, (options && options.body) || null])
+      if (path === '/view') return view
+      if (path === '/board') return { text: '', picture: null }
+      if (path.startsWith('/board')) return { text: '', picture: null }
+      if (path === '/online/hall') return { state: 'live', you: { id: 'me', name: 'Ada' }, prefs: { open: true }, requests: [], seated }
+      if (path === '/online/hall/respond') return { ok: true, text: 'Answered.' }
+      if (path === '/online/table/open') return { ok: true, text: 'Table opened.' }
+      return { ok: true }
+    }
+  }
+  evaluate("inviteBellFeed({ state: 'live', you: { id: 'me', name: 'Ada' }, prefs: { open: true }, requests: [] })")
+  sandbox.paneInviteSnap = {
+    state: 'live', you: { id: 'me', name: 'Ada' }, prefs: { open: true }, requests: [invite]
+  }
+  evaluate('inviteBellFeed(paneInviteSnap)')
+  reset()
+  sandbox.invitePaneProps = { ctx: paneCtx }
+  const drawPane = () => {
+    cursor = 0
+    const drawn = evaluate('WaitPane(invitePaneProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return drawn
+  }
+  tree = drawPane()
+  await tick()
+  tree = drawPane()
+  const block = nodes(tree).find(node => node.props && node.props['data-pane-invite'])
+  assert.ok(block, 'the pane draws the invite')
+  const kids = [].concat(tree.props.children)
+  const inviteAt = kids.findIndex(node => node && node.props && node.props['data-pane-invite'])
+  const headerAt = kids.findIndex(node => node && words(node).includes('Play while you code'))
+  assert.ok(inviteAt >= 0 && headerAt > inviteAt, 'the invite is above the rest of the pane')
+  assert.ok(words(block).includes('Bea invites you to Connect 4'), 'it names the person and the game: ' + words(block))
+  assert.match(words(block), /5[0-9] s|60 s/, 'and shows the countdown: ' + words(block))
+  const decline = nodes(tree).find(node => node.props && node.props['data-pane-invite-decline'])
+  const accept = nodes(tree).find(node => node.props && node.props['data-pane-invite-accept'])
+  assert.ok(accept && decline, 'Accept and Decline are on the invite')
+  await decline.props.onClick()
+  await tick()
+  const denied = asked.filter(item => item[0] === '/online/hall/respond').pop()
+  assert.deepEqual(JSON.parse(JSON.stringify(denied[1])), { id: 'q9', accept: false }, 'Decline answers the request no')
+  assert.equal(asked.filter(item => item[0] === '/online/table/open').length, 0, 'Decline opens no table')
+
+  sandbox.paneInviteSnap.requests = [{ ...invite, id: 'q10' }]
+  evaluate('inviteBellFeed(paneInviteSnap)')
+  tree = drawPane()
+  await nodes(tree).find(node => node.props && node.props['data-pane-invite-accept']).props.onClick()
+  await tick()
+  const taken = asked.filter(item => item[0] === '/online/hall/respond').pop()
+  assert.deepEqual(JSON.parse(JSON.stringify(taken[1])), { id: 'q10', accept: true }, 'Accept answers the request yes')
+  const opened = asked.filter(item => item[0] === '/online/table/open').pop()
+  assert.deepEqual(JSON.parse(JSON.stringify(opened[1])), { room_id: 'room-9' }, 'and opens the table the lobby seated')
+  evaluate("inviteBellFeed({ state: 'live', you: { id: 'me' }, prefs: { open: true }, requests: [] })")
+  console.log('invites: the side pane is shown with the switch, and an invite can be answered there: passed')
 }
 
 // ---- Your pet rides on your own lobby row ----------------------------------------------

@@ -245,6 +245,55 @@ function rememberPaneGone(gone) {
   }
 }
 
+// Set while "Let people invite me" is on. Cleared when it is turned off, so the next
+// time it is turned on the pane is shown again even if the person had closed it.
+const INVITE_PANE_SEEN_KEY = 'gameshelf.pane.inviteOn'
+
+function invitePaneSeen() {
+  try {
+    return window.localStorage.getItem(INVITE_PANE_SEEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function rememberInvitePaneSeen(on) {
+  try {
+    if (on) window.localStorage.setItem(INVITE_PANE_SEEN_KEY, '1')
+    else window.localStorage.removeItem(INVITE_PANE_SEEN_KEY)
+  } catch {
+    // The pane still follows the switch for this visit.
+  }
+}
+
+// The switch came on: the pane is shown, including after the person had closed it.
+function showPaneForInvites() {
+  rememberPaneGone(false)
+  rememberInvitePaneSeen(true)
+  if (mountWaitPane()) {
+    setTimeout(() => {
+      try { restoreWaitPane() } catch { /* nothing to reveal into */ }
+    }, 0)
+    return true
+  }
+  try { restoreWaitPane() } catch { /* already where it should be */ }
+  return Boolean(WAIT_PANE_SLOT.dispose)
+}
+
+// A hall snapshot. On shows the pane the first time, and again when the switch
+// is turned on after being off. Closing the pane is remembered for as long as
+// the switch stays on: a later snapshot does not put it back.
+function invitePaneFollow(snap) {
+  if (!snap || !snap.prefs || typeof snap.prefs.open !== 'boolean') return false
+  if (!snap.prefs.open) {
+    rememberInvitePaneSeen(false)
+    return false
+  }
+  if (!invitePaneSeen()) return showPaneForInvites()
+  if (paneGone()) return false
+  return mountWaitPane() || Boolean(WAIT_PANE_SLOT.dispose)
+}
+
 function mountWaitPane() {
   if (WAIT_PANE_SLOT.dispose || !WAIT_PANE_SLOT.ctx || !WAIT_PANE_SLOT.make) return false
   try {

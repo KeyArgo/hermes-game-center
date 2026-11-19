@@ -19784,6 +19784,55 @@ function rememberPaneGone(gone) {
   }
 }
 
+// Set while "Let people invite me" is on. Cleared when it is turned off, so the next
+// time it is turned on the pane is shown again even if the person had closed it.
+const INVITE_PANE_SEEN_KEY = 'gameshelf.pane.inviteOn'
+
+function invitePaneSeen() {
+  try {
+    return window.localStorage.getItem(INVITE_PANE_SEEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function rememberInvitePaneSeen(on) {
+  try {
+    if (on) window.localStorage.setItem(INVITE_PANE_SEEN_KEY, '1')
+    else window.localStorage.removeItem(INVITE_PANE_SEEN_KEY)
+  } catch {
+    // The pane still follows the switch for this visit.
+  }
+}
+
+// The switch came on: the pane is shown, including after the person had closed it.
+function showPaneForInvites() {
+  rememberPaneGone(false)
+  rememberInvitePaneSeen(true)
+  if (mountWaitPane()) {
+    setTimeout(() => {
+      try { restoreWaitPane() } catch { /* nothing to reveal into */ }
+    }, 0)
+    return true
+  }
+  try { restoreWaitPane() } catch { /* already where it should be */ }
+  return Boolean(WAIT_PANE_SLOT.dispose)
+}
+
+// A hall snapshot. On shows the pane the first time, and again when the switch
+// is turned on after being off. Closing the pane is remembered for as long as
+// the switch stays on: a later snapshot does not put it back.
+function invitePaneFollow(snap) {
+  if (!snap || !snap.prefs || typeof snap.prefs.open !== 'boolean') return false
+  if (!snap.prefs.open) {
+    rememberInvitePaneSeen(false)
+    return false
+  }
+  if (!invitePaneSeen()) return showPaneForInvites()
+  if (paneGone()) return false
+  return mountWaitPane() || Boolean(WAIT_PANE_SLOT.dispose)
+}
+
 function mountWaitPane() {
   if (WAIT_PANE_SLOT.dispose || !WAIT_PANE_SLOT.ctx || !WAIT_PANE_SLOT.make) return false
   try {
@@ -20947,6 +20996,16 @@ const PANE_CSS = `
 function WaitPane({ ctx }) {
   // The pane is a Game Center surface too: the same watch, the same log route.
   useEffect(() => diagSurfaceOpen(ctx), [ctx])
+  // The invite the bell already holds. watch is false: the bell polls, this only draws.
+  const inviteBell = useInviteBell(ctx, false)
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteNote, setInviteNote] = useState('')
+  const [inviteTick, setInviteTick] = useState(0)
+  useEffect(() => {
+    if (!inviteBell.request) return undefined
+    const timer = setInterval(() => setInviteTick(count => count + 1), 1000)
+    return () => clearInterval(timer)
+  }, [inviteBell.request && inviteBell.request.id])
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
   const [gameId, setGameId] = useState(saved.current)
@@ -21415,14 +21474,31 @@ function WaitPane({ ctx }) {
   const myName = (view && view.player && view.player.name) || ''
   const found = current ? othersLooking(lobby, current, myName) : []
 
+  // An invite sits above everything else in this pane. inviteTick is read so the
+  // countdown redraws each second; the request itself is the bell's.
+  const inviteBar = paneInviteBlock(ctx, inviteBell.request, inviteBusy, inviteNote, async accept => {
+    if (inviteBusy || !inviteBell.request) return
+    setInviteBusy(true)
+    setInviteNote('')
+    try {
+      const reply = await inviteBellAnswer(ctx, inviteBell.request, accept)
+      if (reply && reply.ok === false) setInviteNote(String(reply.text || 'The lobby did not take that answer.'))
+    } finally {
+      setInviteBusy(false)
+    }
+  })
+  void inviteTick
+
   // Out of the way beats everything else: a slim strip with one way back. The
   // polls above keep running quietly, so the dot still means your turn.
   if (chrome !== 'open') {
     const stripTurn = myTurn(latest.current.board, view)
-    return jsx('div', {
+    return jsxs('div', {
       className: 'games-wait-pane-strip',
       style: { height: 34, display: 'flex', alignItems: 'center', background: paper, boxSizing: 'border-box' },
-      children: jsx('button', {
+      children: [
+        inviteBar,
+        jsx('button', {
         type: 'button',
         'aria-label': 'Games. Restore the play pane',
         title: 'Play while you code — restore the pane',
@@ -21442,6 +21518,7 @@ function WaitPane({ ctx }) {
           jsx('span', { style: { fontWeight: 400, color: text.tertiary }, children: '— tap to reopen' })
         ]
       })
+      ]
     })
   }
 
@@ -22055,6 +22132,7 @@ function WaitPane({ ctx }) {
       style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', background: paper, containerType: 'inline-size' },
       children: [
         jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
+        inviteBar,
         header,
         settings
           ? settingsView
@@ -22078,6 +22156,7 @@ function WaitPane({ ctx }) {
     style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'auto', background: paper, boxSizing: 'border-box', containerType: 'inline-size' },
     children: [
       jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
+      inviteBar,
       ...(settings ? [header, settingsView] : [
         header,
         agentRow(agentNotice(busy, finished, approval), ctx),
@@ -23005,6 +23084,11 @@ function PlayWithPeople({ ctx, view }) {
         if (body.games && typeof body.games === 'object') next.games = { ...(next.games || {}), ...body.games }
         return next
       })
+      // The side pane opens with the tick, not after the lobby answers. Turning
+      // the switch off forgets a close, so the next on shows the pane again.
+      if (typeof body.open === 'boolean' && typeof invitePaneFollow === 'function') {
+        invitePaneFollow({ state: 'live', prefs: { open: body.open } })
+      }
     }
     try {
       const answer = ctx && typeof ctx.rest === 'function'
@@ -25575,6 +25659,9 @@ function inviteBellFeed(snap) {
   const request = inviteOf(snap)
   inviteBellPublish({ request })
   if (request) inviteBellNotify(request, snap)
+  // The side pane follows the same snapshot. No second poll: this is the read the
+  // Hall, the Games card and the bell already share.
+  if (typeof invitePaneFollow === 'function') invitePaneFollow(snap)
   inviteBellSchedule()
 }
 
@@ -25699,7 +25786,7 @@ function inviteBellMark(where, on) {
 
 // The store, as a component reads it: re-render on every change, and stand the shared poll up
 // while at least one surface is mounted.
-function useInviteBell(ctx) {
+function useInviteBell(ctx, watch = true) {
   const [, setTick] = useState(0)
   useEffect(() => {
     const listener = () => setTick(count => count + 1)
@@ -25708,10 +25795,66 @@ function useInviteBell(ctx) {
     return () => { INVITE_BELL.listeners.delete(listener) }
   }, [ctx])
   useEffect(() => {
+    // A surface that only draws the shared store (the side pane) must not start
+    // a second poll. The bell's own surfaces are the ones that watch.
+    if (!watch) return undefined
     if (!INVITE_BELL.watching) inviteBellWatch()
     return () => { if (!INVITE_BELL.listeners.size) inviteBellUnwatch() }
-  }, [])
+  }, [watch])
   return INVITE_BELL
+}
+
+// The invite at the top of the side pane. The words, the countdown and the two
+// answers are the bell's; this only places them. The system notice, when the
+// person asked for one, is ctx.os.notify inside inviteBellNotify — one notice,
+// not a second, and nothing here touches the host's page.
+function paneInviteBlock(ctx, request, busy, note, onAnswer) {
+  if (!request) return null
+  const line = inviteBellLine(request)
+  const left = Math.max(0, Math.round(Number(request.expires || 0) - Date.now() / 1000))
+  const name = String((request.from && request.from.name) || 'them')
+  const title = lobbyTitle(request.game)
+  const press = primary => ({
+    type: 'button',
+    disabled: Boolean(busy),
+    style: {
+      fontSize: 12, padding: '3px 10px', borderRadius: 999, cursor: busy ? 'default' : 'pointer',
+      border: `1px solid ${primary ? accent : stroke}`,
+      background: primary ? accent : 'transparent',
+      color: primary ? 'var(--ui-text-on-accent, white)' : text.secondary
+    }
+  })
+  return jsxs('div', {
+    'data-pane-invite': String(request.id),
+    role: 'status',
+    'aria-live': 'polite',
+    style: {
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0,
+      border: `1px solid ${accent}`, borderRadius: 10, padding: '8px 10px', background: fill
+    },
+    children: [
+      jsx('span', {
+        'data-pane-invite-line': '1',
+        style: { flex: '1 1 160px', minWidth: 0, fontSize: 13, fontWeight: 650, lineHeight: 1.4 },
+        children: `${line} — ${left} s`
+      }),
+      jsx('button', {
+        ...press(true),
+        'data-pane-invite-accept': '1',
+        'aria-label': `Accept ${name}'s invitation to ${title}`,
+        onClick: () => onAnswer(true),
+        children: 'Accept'
+      }),
+      jsx('button', {
+        ...press(false),
+        'data-pane-invite-decline': '1',
+        'aria-label': `Decline ${name}'s invitation to ${title}`,
+        onClick: () => onAnswer(false),
+        children: 'Decline'
+      }),
+      note ? jsx('span', { 'data-pane-invite-note': '1', style: { fontSize: 11, color: text.secondary }, children: note }) : null
+    ]
+  })
 }
 
 // The answer, from this surface: the same POST the Hall's own Accept and Decline send, so both

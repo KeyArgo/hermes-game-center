@@ -109,6 +109,9 @@ function inviteBellFeed(snap) {
   const request = inviteOf(snap)
   inviteBellPublish({ request })
   if (request) inviteBellNotify(request, snap)
+  // The side pane follows the same snapshot. No second poll: this is the read the
+  // Hall, the Games card and the bell already share.
+  if (typeof invitePaneFollow === 'function') invitePaneFollow(snap)
   inviteBellSchedule()
 }
 
@@ -233,7 +236,7 @@ function inviteBellMark(where, on) {
 
 // The store, as a component reads it: re-render on every change, and stand the shared poll up
 // while at least one surface is mounted.
-function useInviteBell(ctx) {
+function useInviteBell(ctx, watch = true) {
   const [, setTick] = useState(0)
   useEffect(() => {
     const listener = () => setTick(count => count + 1)
@@ -242,10 +245,66 @@ function useInviteBell(ctx) {
     return () => { INVITE_BELL.listeners.delete(listener) }
   }, [ctx])
   useEffect(() => {
+    // A surface that only draws the shared store (the side pane) must not start
+    // a second poll. The bell's own surfaces are the ones that watch.
+    if (!watch) return undefined
     if (!INVITE_BELL.watching) inviteBellWatch()
     return () => { if (!INVITE_BELL.listeners.size) inviteBellUnwatch() }
-  }, [])
+  }, [watch])
   return INVITE_BELL
+}
+
+// The invite at the top of the side pane. The words, the countdown and the two
+// answers are the bell's; this only places them. The system notice, when the
+// person asked for one, is ctx.os.notify inside inviteBellNotify — one notice,
+// not a second, and nothing here touches the host's page.
+function paneInviteBlock(ctx, request, busy, note, onAnswer) {
+  if (!request) return null
+  const line = inviteBellLine(request)
+  const left = Math.max(0, Math.round(Number(request.expires || 0) - Date.now() / 1000))
+  const name = String((request.from && request.from.name) || 'them')
+  const title = lobbyTitle(request.game)
+  const press = primary => ({
+    type: 'button',
+    disabled: Boolean(busy),
+    style: {
+      fontSize: 12, padding: '3px 10px', borderRadius: 999, cursor: busy ? 'default' : 'pointer',
+      border: `1px solid ${primary ? accent : stroke}`,
+      background: primary ? accent : 'transparent',
+      color: primary ? 'var(--ui-text-on-accent, white)' : text.secondary
+    }
+  })
+  return jsxs('div', {
+    'data-pane-invite': String(request.id),
+    role: 'status',
+    'aria-live': 'polite',
+    style: {
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0,
+      border: `1px solid ${accent}`, borderRadius: 10, padding: '8px 10px', background: fill
+    },
+    children: [
+      jsx('span', {
+        'data-pane-invite-line': '1',
+        style: { flex: '1 1 160px', minWidth: 0, fontSize: 13, fontWeight: 650, lineHeight: 1.4 },
+        children: `${line} — ${left} s`
+      }),
+      jsx('button', {
+        ...press(true),
+        'data-pane-invite-accept': '1',
+        'aria-label': `Accept ${name}'s invitation to ${title}`,
+        onClick: () => onAnswer(true),
+        children: 'Accept'
+      }),
+      jsx('button', {
+        ...press(false),
+        'data-pane-invite-decline': '1',
+        'aria-label': `Decline ${name}'s invitation to ${title}`,
+        onClick: () => onAnswer(false),
+        children: 'Decline'
+      }),
+      note ? jsx('span', { 'data-pane-invite-note': '1', style: { fontSize: 11, color: text.secondary }, children: note }) : null
+    ]
+  })
 }
 
 // The answer, from this surface: the same POST the Hall's own Accept and Decline send, so both

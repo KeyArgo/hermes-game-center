@@ -42,6 +42,16 @@ const PANE_CSS = `
 function WaitPane({ ctx }) {
   // The pane is a Game Center surface too: the same watch, the same log route.
   useEffect(() => diagSurfaceOpen(ctx), [ctx])
+  // The invite the bell already holds. watch is false: the bell polls, this only draws.
+  const inviteBell = useInviteBell(ctx, false)
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteNote, setInviteNote] = useState('')
+  const [inviteTick, setInviteTick] = useState(0)
+  useEffect(() => {
+    if (!inviteBell.request) return undefined
+    const timer = setInterval(() => setInviteTick(count => count + 1), 1000)
+    return () => clearInterval(timer)
+  }, [inviteBell.request && inviteBell.request.id])
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
   const [gameId, setGameId] = useState(saved.current)
@@ -510,14 +520,31 @@ function WaitPane({ ctx }) {
   const myName = (view && view.player && view.player.name) || ''
   const found = current ? othersLooking(lobby, current, myName) : []
 
+  // An invite sits above everything else in this pane. inviteTick is read so the
+  // countdown redraws each second; the request itself is the bell's.
+  const inviteBar = paneInviteBlock(ctx, inviteBell.request, inviteBusy, inviteNote, async accept => {
+    if (inviteBusy || !inviteBell.request) return
+    setInviteBusy(true)
+    setInviteNote('')
+    try {
+      const reply = await inviteBellAnswer(ctx, inviteBell.request, accept)
+      if (reply && reply.ok === false) setInviteNote(String(reply.text || 'The lobby did not take that answer.'))
+    } finally {
+      setInviteBusy(false)
+    }
+  })
+  void inviteTick
+
   // Out of the way beats everything else: a slim strip with one way back. The
   // polls above keep running quietly, so the dot still means your turn.
   if (chrome !== 'open') {
     const stripTurn = myTurn(latest.current.board, view)
-    return jsx('div', {
+    return jsxs('div', {
       className: 'games-wait-pane-strip',
       style: { height: 34, display: 'flex', alignItems: 'center', background: paper, boxSizing: 'border-box' },
-      children: jsx('button', {
+      children: [
+        inviteBar,
+        jsx('button', {
         type: 'button',
         'aria-label': 'Games. Restore the play pane',
         title: 'Play while you code — restore the pane',
@@ -537,6 +564,7 @@ function WaitPane({ ctx }) {
           jsx('span', { style: { fontWeight: 400, color: text.tertiary }, children: '— tap to reopen' })
         ]
       })
+      ]
     })
   }
 
@@ -1150,6 +1178,7 @@ function WaitPane({ ctx }) {
       style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', background: paper, containerType: 'inline-size' },
       children: [
         jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
+        inviteBar,
         header,
         settings
           ? settingsView
@@ -1173,6 +1202,7 @@ function WaitPane({ ctx }) {
     style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'auto', background: paper, boxSizing: 'border-box', containerType: 'inline-size' },
     children: [
       jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
+      inviteBar,
       ...(settings ? [header, settingsView] : [
         header,
         agentRow(agentNotice(busy, finished, approval), ctx),

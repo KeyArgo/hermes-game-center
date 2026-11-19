@@ -334,6 +334,11 @@ function PlayWithPeople({ ctx, view }) {
         if (body.games && typeof body.games === 'object') next.games = { ...(next.games || {}), ...body.games }
         return next
       })
+      // The side pane opens with the tick, not after the lobby answers. Turning
+      // the switch off forgets a close, so the next on shows the pane again.
+      if (typeof body.open === 'boolean' && typeof invitePaneFollow === 'function') {
+        invitePaneFollow({ state: 'live', prefs: { open: body.open } })
+      }
     }
     try {
       const answer = ctx && typeof ctx.rest === 'function'
