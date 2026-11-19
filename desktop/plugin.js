@@ -22853,13 +22853,15 @@ function PlayWithPeople({ ctx, view }) {
       jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Play with people' }),
       rowHead('accept', 'Games I accept', 'People who press Play can invite you to these.'),
       // Called as the block it is, the way onlineAccountBlock is: no state of its own, so the
-      // chip row is drawn in place and its presses go through this card's one door.
-      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE }),
+      // chip row is drawn in place and its presses go through this card's one door. With the
+      // master switch off the chips are drawn dark: a chip at full weight would promise an
+      // invite the lobby refuses.
+      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE, dim: !prefs.open }),
       // The master switch is The Hall's; saying so here is kinder than chips that look pressed
       // while the server is sending nobody.
       prefs.open ? null : jsx('div', {
         'data-people-open-off': '1', style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
-        children: 'Game requests are off. Turn on "Take game requests" in The Hall for people to reach these.'
+        children: 'Online invites are off — turn on to be asked'
       }),
       rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
       jsx('div', {
@@ -23862,12 +23864,13 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
 // The accept list as chips, on the page a person is already looking at (the Games page's
 // Play with people card). Every chip is one server write, the same one the Hall's per-game
 // switches make: the lobby keeps the list, so no screen keeps its own copy of it.
-function LobbyAcceptChips({ until, games, post, pending, busyNote }) {
+function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
   const now = Date.now() / 1000
   const untilAt = id => Number((until || {})[id] || 0)
   // A temporary accept is on while its window lasts, and the server sends it as on too; a
-  // clock that has run past it is off, exactly as the server will count it.
-  const isOn = id => Boolean(games && games[id]) && (!untilAt(id) || untilAt(id) > now)
+  // clock that has run past it is off, exactly as the server will count it. With the master
+  // switch off nothing is being taken, whatever the list says, so no chip reads as on.
+  const isOn = id => !dim && Boolean(games && games[id]) && (!untilAt(id) || untilAt(id) > now)
   const held = say => ({ disabled: Boolean(pending), title: pending ? busyNote : say })
   return jsx('div', {
     'data-accept-row': '1', role: 'group', 'aria-label': 'Games you accept',
@@ -23877,6 +23880,7 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote }) {
       const temp = on && untilAt(id) > 0
       return jsx('button', {
         'data-accept-chip': id,
+        ...(dim ? { 'data-accept-dim': '1' } : {}),
         'aria-pressed': on ? 'true' : 'false',
         ...held(on ? `Stop accepting requests for ${label}.` : `Accept requests for ${label}.`),
         onClick: () => post(`accept:${id}`, '/online/hall/prefs', lobbyAcceptBody(id, !on)),
@@ -23884,6 +23888,9 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote }) {
           fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
           border: `1px solid ${on ? accent : stroke}`,
           background: on ? fill : 'transparent', color: text.secondary,
+          // Dark while the master switch is off: a chip at full weight would promise an invite
+          // the lobby refuses. Pressing one still turns the master switch on with it.
+          opacity: dim ? 0.55 : 1,
           // A narrow pane wraps the words inside a chip rather than pushing the row sideways.
           whiteSpace: 'normal', textAlign: 'left', maxWidth: '100%'
         },
@@ -24093,6 +24100,17 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // control that takes you out of the lobby), then the master "Take game requests", then
   // one switch per game the server can seat. Every one of them is held while any Hall
   // POST is out, like every other control on this panel.
+  //
+  // A twenty-minute accept is counted where the switch is drawn: the server keeps sending
+  // the game as on until its sweep runs, and a switch drawn pressed after the moment has
+  // passed is one the person would press to turn off - and the page would post the stale
+  // on straight back.
+  const nowSeconds = Date.now() / 1000
+  const acceptsGame = id => {
+    const until = Number((prefs.until || {})[id] || 0)
+    // No window means a choice made by hand; one still running is on until its moment.
+    return Boolean(prefs.games && prefs.games[id]) && (until <= 0 || until > nowSeconds)
+  }
   const toggle = (label, checked, key, body, title, only) => jsxs('label', {
     title: pending ? HALL_BUSY_NOTE : title, 'data-hall-toggle': key,
     ...(only ? { 'data-hall-game': only } : {}),
@@ -24103,7 +24121,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       jsx('span', { children: label })
     ]
   })
-  const offered = LOBBY_GAME_IDS.filter(id => prefs.games && prefs.games[id])
+  const offered = LOBBY_GAME_IDS.filter(id => acceptsGame(id))
   const header = jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
     toggle('Appear offline', invisible, 'invisible', on => ({ invisible: on }),
       'When this is on, nobody sees you in the lobby list and nobody can ask you to a game. Turn it off to be listed again.'),
@@ -24116,7 +24134,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       ? `Taking requests for: ${offered.map(lobbyTitle).join(', ')}.`
       : 'No game is switched on yet, so nobody can ask you for one.' }),
     jsx('div', { role: 'group', 'aria-label': 'Games you take requests for', style: { display: 'flex', flexWrap: 'wrap', gap: 10 }, children:
-      LOBBY_GAMES.map(([id, label]) => toggle(label, prefs.games && prefs.games[id], 'game',
+      LOBBY_GAMES.map(([id, label]) => toggle(label, acceptsGame(id), 'game',
         on => ({ games: { [id]: on } }),
         `Accept requests for ${label}. The master switch above still has to be on.`, id))
     })

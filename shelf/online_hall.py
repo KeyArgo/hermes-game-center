@@ -139,7 +139,9 @@ class Hall:
             data = {
                 "state": self._state,
                 "you": copy.deepcopy(self._you),
-                "prefs": copy.deepcopy(self._prefs),
+                # Counted at the moment it is read: a twenty-minute accept that has run out is
+                # off here, so no screen ever draws a stale on - or posts one back.
+                "prefs": self._drop_run_out(copy.deepcopy(self._prefs), time.time()),
                 "roster": [copy.deepcopy(row) for row in roster],
                 "requests": [copy.deepcopy(req) for req in self._requests.values()],
                 "seated": copy.deepcopy(self._seated),
@@ -213,6 +215,12 @@ class Hall:
                     self._prefs["open"] = frame["open"]
                 for game, enabled in frame.get("games", {}).items():
                     self._prefs.setdefault("games", {})[game] = enabled
+                    if enabled:
+                        # Turning on a game whose twenty minutes are over is a plain choice:
+                        # the server keeps no window for it, so the lapsed stamp goes too.
+                        stamps = self._prefs.setdefault("until", {})
+                        if game in stamps and float(stamps.get(game) or 0) <= time.time():
+                            stamps.pop(game, None)
                 if "open" not in frame and any(frame.get("games", {}).values()):
                     # A chip turned on turns the master switch on with it, as the server does:
                     # a chip shown on really accepts.
@@ -462,6 +470,25 @@ class Hall:
                     pending["answer"] = dict(message)
                     pending["event"].set()
             # pong and anything unknown: nothing to do.
+
+    @staticmethod
+    def _drop_run_out(prefs: dict, now: float) -> dict:
+        """A twenty-minute window that has passed is off: game false, no window left.
+
+        The server counts a lapsed window as off the moment it passes, so the screen has to
+        as well; a stale on is one the page would draw pressed and post straight back.
+        """
+        until_in = prefs.get("until") if isinstance(prefs, dict) else None
+        until_in = until_in if isinstance(until_in, dict) else {}
+        games = dict(prefs.get("games") or {}) if isinstance(prefs, dict) else {}
+        until = {game: at for game, at in until_in.items() if float(at or 0) > now}
+        for game in until_in:
+            if game not in until:
+                games[game] = False
+        out = dict(prefs) if isinstance(prefs, dict) else {}
+        out["games"] = games
+        out["until"] = until
+        return out
 
     @staticmethod
     def _clean_prefs(prefs) -> dict:

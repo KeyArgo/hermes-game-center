@@ -492,6 +492,101 @@ def test_a_standing_choice_survives_playing_it_with_the_switch_off(world):
     run(scenario())
 
 
+def test_a_stale_prefs_save_does_not_make_a_run_out_window_standing(world):
+    """A screen still showing a chip on is not the person choosing it for good.
+
+    The twenty minutes are over (the sweep has not tidied the row yet) and the page posts
+    the accept list it still has: that game goes off, exactly as the clock says, and it
+    does not become a standing choice the person never made.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        bea = people["Bea"]
+        here(hub, bea)
+        assert (await look(service, bea, ["chessboard"]))["ok"]
+        clock.now += TEMP_SECONDS + 1
+        ack = await service.handle(bea, {"t": "prefs", "games": {"chessboard": True}})
+        assert ack["ok"], ack
+        row = store.db.execute(
+            "SELECT enabled, until, standing FROM availability_games "
+            "WHERE player_id = ? AND game = 'chessboard'", (bea["id"],)).fetchone()
+        assert (row["enabled"], row["until"], row["standing"]) == (0, 0.0, 0), \
+            "a window that has run out is off, not a choice by hand"
+        assert service.standing(bea["id"], "chessboard") is False
+        prefs = service.prefs(bea["id"])
+        assert prefs["games"]["chessboard"] is False and prefs["until"] == {}
+
+    run(scenario())
+
+
+def test_a_stale_prefs_save_does_not_make_another_game_s_old_window_standing(world):
+    """The same row is not promoted just because the page did not name it.
+
+    A save that only turns the master switch on still lists every game the server has on;
+    one of those rows is a window that has run out, and it must go off rather than stay on
+    for good.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        bea = people["Bea"]
+        here(hub, bea)
+        assert (await look(service, bea, ["connect4"]))["ok"]
+        clock.now += TEMP_SECONDS + 1
+        ack = await service.handle(bea, {"t": "prefs", "open": True})
+        assert ack["ok"], ack
+        row = store.db.execute(
+            "SELECT enabled, until, standing FROM availability_games "
+            "WHERE player_id = ? AND game = 'connect4'", (bea["id"],)).fetchone()
+        assert (row["enabled"], row["until"], row["standing"]) == (0, 0.0, 0), \
+            "the switch alone does not keep a twenty-minute game"
+        assert service.standing(bea["id"], "connect4") is False
+        # And a game the person turns on when it is plainly off is still a choice by hand.
+        assert (await service.handle(bea, {"t": "prefs", "games": {"chessboard": True}}))["ok"]
+        assert service.standing(bea["id"], "chessboard") is True
+
+    run(scenario())
+
+
+def test_a_running_window_is_left_as_it_is_by_a_prefs_save(world):
+    """Nineteen minutes in, the page's own echo changes nothing.
+
+    The window is still running, so a save that lists the game as on keeps the window: it
+    is not promoted to standing, and it is not cut short either.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        bea = people["Bea"]
+        here(hub, bea)
+        started_at = clock.now
+        assert (await look(service, bea, ["chessboard"]))["ok"]
+        clock.now = started_at + TEMP_SECONDS - 60
+        assert (await service.handle(bea, {"t": "prefs", "games": {"chessboard": True}}))["ok"]
+        row = store.db.execute(
+            "SELECT enabled, until, standing FROM availability_games "
+            "WHERE player_id = ? AND game = 'chessboard'", (bea["id"],)).fetchone()
+        assert (row["enabled"], row["standing"]) == (1, 0), "still a window, not a choice"
+        assert row["until"] == pytest.approx(started_at + TEMP_SECONDS)
+        # It still runs out on its own minute, and then it is off.
+        clock.now = started_at + TEMP_SECONDS + 1
+        assert service.prefs(bea["id"])["games"]["chessboard"] is False
+
+    run(scenario())
+
+
+def test_the_offer_card_s_comment_says_what_the_code_does():
+    """Only the person asked may answer, match offer or not (_may_answer).
+
+    The comment beside the offer flag used to say either side may join it, which is the
+    opposite of the code and sent a reader looking for a second door that does not exist.
+    """
+    source = (ROOT / "online" / "requests.py").read_text()
+    assert "either may join it" not in source, "the offer is answered by the person asked, alone"
+    assert "only the person asked may answer" in source
+
+
 def test_always_makes_it_permanent(world):
     _store, _rooms, people, clock, hub, service = world
 
