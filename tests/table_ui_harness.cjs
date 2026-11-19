@@ -2306,8 +2306,18 @@ async function paneContract() {
     'and nothing else registers it in the status bar')
   // One visible item, plus the over-chat stage: it draws nothing while both switches are off, and is in
   // the status bar only because the composer dock's transform traps a fixed box drawn from the slot.
-  assert.deepEqual(entries.filter(item => item.area === 'right').map(item => item.id).sort(), ['overchat-stage', 'status'],
-    'the status bar has the one Games item and the invisible over-chat stage, nothing else')
+  // The invite is the third: it draws nothing unless somebody is asking, and it is in the status bar
+  // because that is a surface mounted wherever the person is in Hermes (77-invite-bell.js).
+  assert.deepEqual(entries.filter(item => item.area === 'right').map(item => item.id).sort(), ['invite', 'overchat-stage', 'status'],
+    'the status bar has one Games item, the invisible over-chat stage and the invite, nothing else')
+  assert.equal(entries.find(item => item.id === 'invite').render().type.name, 'InviteBell',
+    'and the invite item is the invite')
+  // The titlebar's right cluster carries the stand-in for a window whose status bar is hidden. It is
+  // the same component, so one store and one poll are behind both.
+  assert.equal(entries.find(item => item.id === 'invite-titlebar').render().type.name, 'InviteBell',
+    'the titlebar draws the invite when the status bar is not there')
+  assert.ok(entries.find(item => item.id === 'invite-titlebar').area.includes('titleBar'),
+    'in the titlebar area, which is drawn whatever the status bar is doing')
   assert.equal(entries.find(item => item.id === 'overchat-stage').render().type.name, 'OverChatStage',
     'and the stage item is the over-chat stage')
   // The composer slot still owns WHERE the machines go: its anchor is the only thing measured.
@@ -3990,7 +4000,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -7340,6 +7350,186 @@ async function gcextrasContract() {
   for (let settle = 0; settle < 3; settle += 1) { drawPage(); await tick() }
   reset()
   console.log('gcextras: backgammon cover, project link row and the copyable version chip: passed')
+}
+
+// ---- An invite reaches the person wherever they are --------------------------
+// Owner (2026-11-19): "make sure it actually pops up on their screen no matter where they are
+// instead of requiring them to be in game center". The status-bar item and the titlebar's right
+// cluster are mounted for as long as the window is open, so the invite is drawn there, both
+// answers work from it, and the poll behind it is one shared read of the Hall.
+async function inviteBellContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  sandbox.setTimeout = (fn, delay) => { bellDelays.push(delay); return bellDelays.length }
+  sandbox.clearTimeout = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const bellDelays = []
+  const draw = value => {
+    sandbox.inviteProps = value
+    cursor = 0
+    const tree = evaluate('InviteBell(inviteProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return tree
+  }
+  // A read is a round trip: draw (which starts it), let it settle, draw again.
+  const settle = async value => { draw(value); await tick(); return draw(value) }
+  const bell = tree => nodes(tree).filter(node => node.props && node.props['data-invite-bell'])[0]
+  const line = tree => nodes(tree).find(node => node.props && node.props['data-invite-line'] !== undefined)
+  const accept = tree => nodes(tree).find(node => node.props && node.props['data-invite-accept'] !== undefined)
+  const decline = tree => nodes(tree).find(node => node.props && node.props['data-invite-decline'] !== undefined)
+  const invite = { id: 'q1', state: 'pending', from: { id: 'bea', name: 'Bea' }, to: { id: 'me', name: 'Ada' }, game: 'connect4', created: 0, expires: 90 }
+  const liveSnap = (extra = {}) => ({
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: true, games: { connect4: true }, until: {} },
+    roster: [], requests: [invite], seated: null, ...extra
+  })
+  const makeCtx = (extra = {}) => {
+    const asked = []
+    const notified = []
+    const state = { snap: extra.snap || liveSnap(), seated: extra.seated || null }
+    const ctx = {
+      storage: { get: (key, fallback) => (key === 'pane-alerts' ? (extra.alerts || fallback) : fallback), set() {}, remove() {} },
+      os: { notify: payload => notified.push(payload), openExternal: () => true },
+      rest: async (path, options) => {
+        asked.push([path, (options && options.body) || null])
+        if (path === '/online/hall') return state.seated ? { ...state.snap, requests: [], seated: state.seated } : state.snap
+        if (path === '/online/hall/respond') return extra.respond || { ok: true, text: 'You are seated.' }
+        if (path === '/online/table/open') return { ok: true, text: 'Table opened.' }
+        return { ok: true, text: '' }
+      }
+    }
+    return { ctx, asked, notified, state }
+  }
+  // Every case starts from "nobody is asking", so one case cannot leave a request on the next.
+  // The feed's freshness is cleared with it: this stands for "no Hall has read just now".
+  const bellClear = () => { evaluate("inviteBellFeed({ state: 'off', you: { id: 'me' }, prefs: {}, requests: [] }); INVITE_BELL.fresh = 0; inviteBellMark('statusbar', false); inviteBellMark('titlebar', false)") }
+  // The host door this contract watches. An earlier contract replaced host.navigate with its own
+  // recorder and never put it back, so this one takes the door for itself.
+  const went = []
+  sandbox.host.navigate = route => { went.push(route) }
+
+  reset()
+  bellClear()
+  // 1. The always-mounted surface shows the invite, and both answers are on it.
+  const run = makeCtx()
+  let tree = await settle({ ctx: run.ctx, where: 'statusbar' })
+  assert.ok(bell(tree), 'the status bar draws the invite')
+  assert.equal(bell(tree).props['data-invite-bell'], 'statusbar', 'from the status-bar surface')
+  assert.equal(words(line(tree)), 'Bea invites you to Connect 4', 'in plain words, naming the person and the game')
+  assert.ok(accept(tree) && decline(tree), 'with Accept and Decline on the same line')
+  assert.equal(words(bell(tree)).includes('Decline'), true)
+  assert.equal(bellDelays.at(-1), 3000, 'while a request is pending the poll runs at the Hall\'s 3 s')
+
+  // 1b. Accept answers the request, opens the table the lobby seated, and goes to it.
+  run.state.seated = { room_id: 'r7', game: 'connect4' }
+  await accept(tree).props.onClick()
+  await tick()
+  const answered = run.asked.filter(item => item[0] === '/online/hall/respond').pop()
+  assert.deepEqual(JSON.parse(JSON.stringify(answered[1])), { id: 'q1', accept: true },
+    'Accept answers with the same route and body the Hall sends')
+  const opened = run.asked.filter(item => item[0] === '/online/table/open').pop()
+  assert.deepEqual(JSON.parse(JSON.stringify(opened[1])), { room_id: 'r7' }, 'and opens the room the lobby seated')
+  assert.equal(went.at(-1), '/games', 'then goes to the table, which is the Games screen')
+  assert.equal(evaluate('INVITE_BELL.request'), null, 'and the callout leaves at the press')
+
+  reset()
+  bellClear()
+  // 2. Decline answers no, and the line leaves without opening anything.
+  const refusing = makeCtx()
+  went.length = 0
+  tree = await settle({ ctx: refusing.ctx, where: 'statusbar' })
+  await decline(tree).props.onClick()
+  await tick()
+  const denied = refusing.asked.filter(item => item[0] === '/online/hall/respond').pop()
+  assert.deepEqual(JSON.parse(JSON.stringify(denied[1])), { id: 'q1', accept: false }, 'Decline answers the request no')
+  assert.equal(refusing.asked.filter(item => item[0] === '/online/table/open').length, 0, 'and opens no table')
+  assert.equal(went.length, 0, 'and moves nobody')
+  tree = draw({ ctx: refusing.ctx, where: 'statusbar' })
+  assert.equal(bell(tree), undefined, 'the callout is gone once it is answered')
+
+  reset()
+  bellClear()
+  // 3. One surface draws at a time: the titlebar is the stand-in, never a second copy.
+  const both = makeCtx()
+  let status = await settle({ ctx: both.ctx, where: 'statusbar' })
+  // The titlebar copy is on screen too (its own registration is mounted); the store says so.
+  evaluate("inviteBellMark('titlebar', true)")
+  status = draw({ ctx: both.ctx, where: 'statusbar' })
+  const title = draw({ ctx: both.ctx, where: 'titlebar' })
+  assert.ok(bell(status), 'the status bar draws while it is mounted')
+  assert.equal(bell(title), undefined, 'and the titlebar does not draw the same invite again')
+  reset()
+  bellClear()
+  const alone = makeCtx()
+  tree = await settle({ ctx: alone.ctx, where: 'titlebar' })
+  assert.ok(bell(tree), 'a window whose status bar is not there gets the titlebar copy')
+  assert.equal(bell(tree).props['data-invite-bell'], 'titlebar')
+
+  reset()
+  bellClear()
+  // 4. Nothing is read while the window is hidden, and coming back reads at once.
+  const hidden = makeCtx()
+  sandbox.document.hidden = true
+  const armed = bellDelays.length
+  tree = draw({ ctx: hidden.ctx, where: 'statusbar' })
+  await tick()
+  assert.equal(hidden.asked.filter(item => item[0] === '/online/hall').length, 0,
+    'a hidden window asks the lobby nothing')
+  assert.equal(bellDelays.length, armed, 'and arms no timer to ask later')
+  sandbox.document.hidden = false
+  ;(windowListeners.visibilitychange || []).forEach(fn => fn({ type: 'visibilitychange' }))
+  await tick()
+  tree = await settle({ ctx: hidden.ctx, where: 'statusbar' })
+  assert.equal(hidden.asked.filter(item => item[0] === '/online/hall').length, 1,
+    'coming back is a read at once')
+  assert.ok(bell(tree), 'and the invite is on screen again')
+
+  reset()
+  bellClear()
+  // 5. Nothing pending: the same poll drops to the alert line's 8 s, never faster.
+  const quiet = makeCtx({ snap: liveSnap({ requests: [] }) })
+  tree = await settle({ ctx: quiet.ctx, where: 'statusbar' })
+  assert.equal(bell(tree), undefined, 'with no request there is no callout')
+  assert.equal(bellDelays.at(-1), 8000, 'and the read is the quiet one')
+
+  reset()
+  bellClear()
+  // 6. A Hall on screen has already answered: the bell does not ask the same question again.
+  const fed = makeCtx()
+  tree = await settle({ ctx: fed.ctx, where: 'statusbar' })
+  const before = fed.asked.filter(item => item[0] === '/online/hall').length
+  evaluate("inviteBellFeed({ state: 'live', you: { id: 'me' }, prefs: { open: true }, requests: [] })")
+  await evaluate('inviteBellTick()')
+  assert.equal(fed.asked.filter(item => item[0] === '/online/hall').length, before,
+    'a fresh Hall feed stands the bell\'s own read down')
+  evaluate('INVITE_BELL.fresh = 0')
+  await evaluate('inviteBellTick()')
+  assert.equal(fed.asked.filter(item => item[0] === '/online/hall').length, before + 1,
+    'and a stale one makes it read again')
+
+  reset()
+  bellClear()
+  // 7. The system notice: once per invite, and only for a game the person asked to hear about.
+  const quietAlerts = makeCtx()
+  tree = await settle({ ctx: quietAlerts.ctx, where: 'statusbar' })
+  assert.equal(quietAlerts.notified.length, 0, 'no notice for a game whose alert switch is off')
+  reset()
+  bellClear()
+  evaluate("INVITE_BELL.notified = ''")
+  const loud = makeCtx({ alerts: { paused: false, games: { connect4: true } } })
+  tree = await settle({ ctx: loud.ctx, where: 'statusbar' })
+  assert.equal(loud.notified.length, 1, 'a switched-on alert gets one notice')
+  assert.equal(loud.notified[0].body, 'Bea invites you to Connect 4', 'that says who and what')
+  tree = await settle({ ctx: loud.ctx, where: 'statusbar' })
+  assert.equal(loud.notified.length, 1, 'and the same invite never rings twice')
+
+  reset()
+  bellClear()
+  evaluate("INVITE_BELL.notified = ''")
+  sandbox.document.hidden = undefined
+  console.log('invite bell: an invite is on screen wherever the person is, and both answers work: passed')
 }
 
 // ---- the board's name for the side to move ----------------------------------

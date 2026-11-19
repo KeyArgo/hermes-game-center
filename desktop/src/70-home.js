@@ -296,6 +296,9 @@ function PlayWithPeople({ ctx, view }) {
         const answer = await ctx.rest('/online/hall')
         if (alive && answer && typeof answer === 'object') {
           setSnap(answer)
+          // The invite bell reads from this very answer: one poll of the Hall serves this card
+          // and the always-mounted callout (77-invite-bell.js).
+          inviteBellFeed(answer)
           // The lobby is up: whatever Retry said about not reaching it is no longer true.
           if (answer.state === 'live') setDownNote('')
         }

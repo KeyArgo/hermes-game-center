@@ -91,6 +91,21 @@ export default {
         render: () => jsx(OverChatStrip, { ctx })
       },
       {
+        // An invite, on a surface that is mounted all the time (77-invite-bell.js). The status bar
+        // is the one the person already reads; the titlebar copy below is its stand-in for a window
+        // whose status bar is hidden. Only one of the two ever draws.
+        id: 'invite',
+        area: STATUSBAR_AREAS.right,
+        order: 142,
+        render: () => jsx(InviteBell, { ctx, where: 'statusbar' })
+      },
+      {
+        id: 'invite-titlebar',
+        area: TITLEBAR_AREAS.right,
+        order: 998,
+        render: () => jsx(InviteBell, { ctx, where: 'titlebar' })
+      },
+      {
         // The fixed stage that draws those machines at the top of the window. It lives in the status bar
         // because the composer dock is centred with a transform, which traps a fixed box drawn inside it
         // (78-overchat-slot.js). It renders nothing while both switches are off.

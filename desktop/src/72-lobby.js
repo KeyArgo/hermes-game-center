@@ -354,7 +354,12 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       try {
         const answer = await ctx.rest('/online/hall')
         if (!alive.current) return
-        if (answer && typeof answer === 'object') setSnap(answer)
+        if (answer && typeof answer === 'object') {
+          setSnap(answer)
+          // The invite bell reads from this very answer: one poll of the Hall serves the panel
+          // and the always-mounted callout (77-invite-bell.js).
+          inviteBellFeed(answer)
+        }
         setStale(false)
       } catch (error) {
         // Keep the last snapshot; the next tick retries. It is simply not live any more.

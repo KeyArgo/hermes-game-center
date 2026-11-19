@@ -6,6 +6,19 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **An invite reaches the person wherever they are.** A play request was only visible on the Games page
+  (the Hall's request cards) and in the Play with people card, so somebody reading their chat had no way
+  to know a person had asked them to play until they went looking (owner, 2026-11-19: *"make sure it
+  actually pops up on their screen no matter where they are instead of requiring them to be in game
+  center"*). The request is drawn in the **status bar** now — *"Ada invites you to Connect 4"* with
+  Accept and Decline — and the titlebar's right cluster carries the same line when the status bar is not
+  there; both are contributions to SDK areas this plugin already renders into, and nothing reads or
+  styles the host's markup. Accept answers the request, opens the table the lobby seated and goes to it;
+  Decline answers no. One shared poll behind both surfaces: 3 s while a request is waiting, 8 s when
+  none is, none while the window is hidden, and the Hall's own 3 s read feeds the same store. Guards:
+  `tests/table_ui_harness.cjs` (`inviteBellContract` — fails against the old bundle, and so does the
+  status-bar inventory in `paneContract`).
+
 - **The review guards skip a virtualenv left inside the tree.** `test_resilience` (every state file
   written through a temp file) and `test_catalog_review_guards` (no hardcoded Hermes home, and the
   network section names every host) walk `*.py` under the repo, and a `.venv`, `venv` or

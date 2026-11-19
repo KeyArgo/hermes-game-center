@@ -103,6 +103,18 @@ your roster asks you for a game (**Ask**, offered only to someone online who acc
 take), you accept, and both of you are seated at a private table — no code to paste. When you are not
 signed in, or online play is off, the Hall is simply closed and the roster empty.
 
+**An invite reaches you wherever you are.** A play request — a person's **Ask**, or a find-match offer —
+is also drawn in the **status bar**, beside the Games item: *"Ada invites you to Connect 4"* with
+**Accept** and **Decline** on the same line. That item is mounted for as long as the window is open, so
+the request reaches you while you are reading a chat or working on another screen, and it does not ask
+you to open Game Center to see or answer it. **Accept** answers the request, seats you both and opens the
+table; **Decline** answers no. Only one copy is drawn: the status bar first, and the titlebar's right
+cluster only when the status bar is not there (Simple mode rests it hidden). The read behind it is the
+Hall's own: every 3 seconds while a request is waiting, every 8 seconds when none is, and nothing at all
+while the window is hidden — and while the Hall is on screen its poll feeds the same line, so the lobby
+is asked once. A system notification goes out once per invite, and only for a game whose **Tell me when
+someone wants a match** switch is on.
+
 The lobby is a **side panel** with the panels it needs and no more: on the Games screen it is
 `minmax(220px, 280px)` wide, enough to type a sentence in its chat box, and the game cards use
 `minmax(min(100%, 200px), 1fr)`.
