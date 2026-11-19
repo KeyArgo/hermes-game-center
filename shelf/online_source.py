@@ -109,7 +109,9 @@ def downloads_folder() -> Path:
     folder is the answer when there is not. A folder that is not there yet is made: the
     person asked for a file, not for a lesson about folders.
     """
-    home = Path.home()
+    # The person's own home, for their Downloads folder - not Hermes's home, which is never
+    # written here (the catalog guard keeps Path.home() for that question).
+    home = Path(os.path.expanduser("~"))
     candidate = home / "Downloads"
     if os.name != "nt":
         setting = Path(os.environ.get("XDG_CONFIG_HOME") or (home / ".config")) / "user-dirs.dirs"
