@@ -576,6 +576,17 @@ def test_a_running_window_is_left_as_it_is_by_a_prefs_save(world):
     run(scenario())
 
 
+def test_the_offer_card_s_comment_says_what_the_code_does():
+    """Only the person asked may answer, match offer or not (_may_answer).
+
+    The comment beside the offer flag used to say either side may join it, which is the
+    opposite of the code and sent a reader looking for a second door that does not exist.
+    """
+    source = (ROOT / "online" / "requests.py").read_text()
+    assert "either may join it" not in source, "the offer is answered by the person asked, alone"
+    assert "only the person asked may answer" in source
+
+
 def test_always_makes_it_permanent(world):
     _store, _rooms, people, clock, hub, service = world
 

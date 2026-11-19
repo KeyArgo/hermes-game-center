@@ -680,7 +680,8 @@ class Service:
             "state": row["state"],
             "created": row["created"],
             "expires": row["expires"],
-            # A match offer, not an ask: neither side sent it, so either may join it.
+            # A match offer, not an ask: neither side sent it, but only the person asked may
+            # answer it - the seeker's way out is cancel (see _may_answer).
             "offer": bool(row.get("offer")),
         }
 
