@@ -1,5 +1,5 @@
 # SECURITY
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 What this plugin does to your machine and your network, and how to stop it. Sourced from
 README.md ("What this plugin does on your machine"), `plugin.yaml`, and the Desktop table code.
@@ -23,8 +23,9 @@ do not open a public issue with a working exploit in it.
   of yours in the plugin's data folder.
 - The single secret in play is the **online recovery key** for the optional lobby. It goes through
   Hermes's own credential route — the same place a provider API key lives — under
-  `HERMES_GAMESHELF_LOBBY_KEY`. It is shown once at player creation, is never written to a file of
-  the plugin's own, and is never logged.
+  `HERMES_GAMESHELF_LOBBY_KEY`. It is shown once at player creation, is never written to the plugin's
+  data folder, and is never logged. The one file that can hold it is the account file you choose to
+  save with **Save my account file**, which lands in Downloads.
 - `plugin.yaml` also exposes `lobby_key` as a `type: secret` config field you can paste by hand.
   Honest caveat: whatever Hermes stores for plugin config is then holding that value. If that
   bothers you, do not paste it into the config field — create the player and let the credential
@@ -46,6 +47,9 @@ do not open a public issue with a working exploit in it.
   move it picks. When you choose to use them it also sends the optional posts you make: a strategy
   card, a report, a block or a bot challenge. It does not send your Hermes chats, your files, your
   model or its key. The server sees your IP the way any website does.
+- A lobby server you host yourself reads a game's `HERMES-REMOVE.txt` from
+  `https://raw.githubusercontent.com` when someone asks to remove a tile; that request is made by the
+  server, never by this plugin on your machine.
 - Polling happens only while the Game Center page or the dock's alerts are active, backing off
   15 → 30 → 60 → 120 s after a miss. Nothing is polled while online play is off.
 - **Community creations** cards only hand an HTTPS URL to your browser when you press **Open**. The
