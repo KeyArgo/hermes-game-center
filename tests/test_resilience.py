@@ -143,7 +143,10 @@ def test_every_state_file_is_written_through_a_temp_file() -> None:
     direct = []
     for path in sorted(ROOT.rglob("*.py")):
         parts = path.relative_to(ROOT).parts
-        if {"tests", "tools", "examples", "third_party", "vendor", "node_modules", "docs"} & set(parts):
+        # A virtualenv inside the tree is third-party code: its files are not ours to hold to this
+        # rule, and a `.venv` left behind by a check must never fail the suite.
+        if {"tests", "tools", "examples", "third_party", "vendor", "node_modules", "docs",
+                ".venv", "venv", "site-packages"} & set(parts):
             continue
         text = path.read_text(encoding="utf-8")
         for match in re.finditer(r"(\w+(?:\.\w+)*)\.write_(?:text|bytes)\(", text):

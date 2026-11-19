@@ -6,6 +6,14 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The review guards skip a virtualenv left inside the tree.** `test_resilience` (every state file
+  written through a temp file) and `test_catalog_review_guards` (no hardcoded Hermes home, and the
+  network section names every host) walk `*.py` under the repo, and a `.venv`, `venv` or
+  `site-packages` folder there made them fail on third-party code — someone else's `Path.home()` or
+  registry URL. All three now skip those paths. Proved by hand: a throwaway `.venv/probe.py` with a
+  `Path.home()` and a third-party URL failed both files, and passes with the skip in place (the probe
+  is gone).
+
 - **`POST /log` refuses a body over 8 KB instead of parsing it.** The route declared its body as a
   parameter, so FastAPI read and parsed whatever arrived before the handler ran — 20 multi-megabyte
   frames a minute were all decoded, and a page could make the plugin chew on them (disk stayed safe:

@@ -43,10 +43,12 @@ MANIFEST = ROOT / "plugin.yaml"
 README = ROOT / "README.md"
 
 # Directories that are not shipped code: tests, build tooling, sample games, vendored copies and
-# recorded evidence. Everything else in the tree runs on a person's machine.
+# recorded evidence. Everything else in the tree runs on a person's machine. A virtualenv inside the
+# tree (`.venv`, `venv`, any `site-packages`) is third-party code: it is not ours, and a `.venv` left
+# behind by a check must not fail the guards with someone else's `Path.home()` or URL.
 _NOT_SHIPPED = {"tests", "tools", "examples", "docs", "third_party", "vendor", "node_modules",
                 ".git", "assets", "screenshots", "proof", "test-artifacts", "scripts", "build",
-                "dist", "__pycache__"}
+                "dist", "__pycache__", ".venv", "venv", "site-packages"}
 
 
 def _python_files(*, developer_scripts: bool = False) -> list[Path]:
