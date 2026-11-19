@@ -191,3 +191,50 @@ def test_the_board_can_never_draw_over_the_header():
             style = following.split("style:", 1)[1].split("}", 1)[0] if "style:" in following else ""
             assert "'1 1 auto'" not in style, f"{name}: the board hero is flexible again: {line.strip()}"
             assert "'0 0 auto'" in style, f"{name}: the board hero does not keep its height: {line.strip()}"
+
+
+def _src(name: str) -> str:
+    return (ROOT / "desktop" / "src" / name).read_text(encoding="utf-8")
+
+
+def test_the_main_page_has_one_invite_switch_and_says_when_the_lobby_is_down():
+    """Play with people carries its own ON/OFF switch, and "not connected" is not "off".
+
+    A socket that never came up drew an empty accept list, and the card said "Online
+    invites are off" - so a person turned the switch on, the press was refused, and both
+    screens blamed their own setting. The switch is drawn from the Hall's state now, and a
+    Hall that is not live says so with the one control that fixes it.
+    """
+    home = _src("70-home.js")
+    assert "'Let people invite me'" in home, "the master switch is on the main page"
+    assert "data-people-open" in home, "and it carries its own state for the page and the tests"
+    assert "'Not connected to the lobby — Retry'" in home, "a Hall that is not live says so"
+    assert "'/online/hall/retry'" in home, "with the one press that dials again"
+    assert "'Online invites are off — turn on to be asked'" not in home, \
+        "the card no longer blames the person's own setting for a missing socket"
+    # The switch reads the Hall's own state, so a blank snapshot cannot look like OFF.
+    assert "const live = liveOf(snap)" in home
+    assert "dim: !prefs.open || !live" in home, "no chip looks live while the socket is down"
+
+    lobby = _src("72-lobby.js")
+    assert "data-hall-not-connected" in lobby, "the Hall panel says it too"
+    assert "'/online/hall/retry'" in lobby
+    assert "'Joining the Hall…'" not in lobby, "it no longer waits forever without saying so"
+
+
+def test_one_name_at_a_time_when_signed_in():
+    """Signed in to the lobby, the lobby account's name is the one the page shows.
+
+    Two names lived side by side: this computer's name (players.json) and the lobby
+    account's. Settings called the first "the name other players see", the chat used the
+    second, and a person who renamed themselves locally was still called by the old name
+    in #games.
+    """
+    home = _src("70-home.js")
+    assert "You are ${onlineName} online" in home, "the Games header names the lobby account"
+    assert "data-online-name-clash" in home, "and Get online says both names when they differ"
+    settings = _src("60-settings-and-alerts.js")
+    assert "This computer's name." in settings, "the local name is labelled as local"
+    assert "Other people see your online name" in settings
+    lobby = _src("72-lobby.js")
+    assert "in this chat." in lobby, "the chat column says whose name a line carries"

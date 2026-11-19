@@ -185,6 +185,13 @@ function OnlineGetOnlineCard({ ctx, view }) {
   const hostWord = onlineHost(online.url)
   const remote = Boolean(where && where.active && where.active !== 'local')
   const settled = online.on && online.linked && !online.offline
+  // Two names, one person: the local one is this computer's label, and the lobby's is what
+  // everyone else sees. Saying both is the only way neither reads as a lie.
+  const localName = String((view && view.player && view.player.name) || '')
+  const nameClash = settled && localName && online.name && localName !== online.name
+  const nameLine = nameClash
+    ? `This computer calls you ${localName}; the lobby knows you as ${online.name}. Other people see ${online.name} — Change my name below changes that one.`
+    : ''
 
   if (settled && !managed) {
     return jsxs('div', {
@@ -192,6 +199,7 @@ function OnlineGetOnlineCard({ ctx, view }) {
       style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: text.secondary },
       children: [
         jsx('span', { 'data-online-card-line': '1', children: `Online as ${online.name} on ${hostWord} ✓` }),
+        nameLine ? jsx('span', { 'data-online-name-clash': '1', children: `· ${nameLine}` }) : null,
         jsx('span', { 'aria-hidden': true, children: '·' }),
         textLink('Manage', () => setManaged(true), 'Open the online steps again')
       ]
@@ -243,6 +251,7 @@ function OnlineGetOnlineCard({ ctx, view }) {
       ] }),
       whereBlock,
       onlineAccountBlock({ online, fields, call, busy, note, problem, setNote, suggest }),
+      nameLine ? jsx('div', { 'data-online-name-clash': '1', style: { fontSize: 11, color: text.tertiary, lineHeight: 1.5 }, children: nameLine }) : null,
       onlineCheckBlock(check)
     ]
   })
@@ -257,7 +266,11 @@ function OnlineGetOnlineCard({ ctx, view }) {
 // disagree. The card is drawn only when this window is signed in to online play.
 function PlayWithPeople({ ctx, view }) {
   const online = onlineView(view)
-  const signedIn = Boolean(online.on && online.linked && !online.offline)
+  const signedIn = Boolean(online.on && online.linked)
+  // Whether the lobby's own socket is up. The switch and every chip are drawn from this,
+  // so a card that cannot act says so instead of drawing "invites are off": a socket that
+  // never came up used to look exactly like a person who had turned invitations off.
+  const liveOf = snap => Boolean(snap) && snap.state === 'live'
   // The Hall's own snapshot, read here every few seconds. It is the same door The Hall reads,
   // so an accept made in either place is what this card shows on its next turn.
   const [snap, setSnap] = useState(null)
@@ -271,7 +284,7 @@ function PlayWithPeople({ ctx, view }) {
   const asked = useRef({})
 
   useEffect(() => {
-    if (!signedIn || !ctx || typeof ctx.rest !== 'function') return undefined
+    if (!online.on || !ctx || typeof ctx.rest !== 'function') return undefined
     let alive = true
     let timer = null
     const read = async () => {
@@ -283,9 +296,10 @@ function PlayWithPeople({ ctx, view }) {
     read()
     timer = setInterval(read, HALL_POLL_MS)
     return () => { alive = false; if (timer) clearInterval(timer) }
-  }, [ctx, signedIn])
+  }, [ctx, online.on])
 
-  if (!signedIn) return null
+  // Online play off: there is nothing to accept and nobody to ask, so the card is not drawn.
+  if (!online.on) return null
 
   // One door for both rows, held while its own POST is out, and a refusal is said in the
   // lobby's own words rather than swallowed.
@@ -319,6 +333,10 @@ function PlayWithPeople({ ctx, view }) {
 
   const you = (snap && snap.you) || {}
   const prefs = (snap && snap.prefs) || { open: false, games: {}, until: {} }
+  const live = liveOf(snap)
+  // Not connected is not the same as switched off: say which it is, with the one control
+  // that fixes the first.
+  const notConnected = signedIn && !live
   const requests = (snap && snap.requests) || []
   const mine = Array.isArray(you.looking) ? you.looking : []
   const nowSeconds = Date.now() / 1000
@@ -335,6 +353,63 @@ function PlayWithPeople({ ctx, view }) {
   const comingOffer = came[0] || null
   const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
   const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.5, minWidth: 0 }
+
+  // Retry: ask the shelf to dial the lobby again now, then read what it says, so the card
+  // never sits on "not connected" after a press that fixed it.
+  const retry = async () => {
+    if (pending) return
+    setPending('retry')
+    setNote('')
+    try {
+      const answer = ctx && typeof ctx.rest === 'function'
+        ? await ctx.rest('/online/hall/retry', { method: 'POST' })
+        : { ok: false, text: 'Game Center cannot be reached.' }
+      if (answer && answer.ok === false) setNote(String(answer.text || ''))
+      const next = await ctx.rest('/online/hall')
+      if (next && typeof next === 'object') setSnap(next)
+    } catch {
+      setNote('That did not reach Game Center. Try again.')
+    } finally {
+      setPending('')
+    }
+  }
+
+  // The one switch for the master accept list, always on the page: what it reads is what
+  // the lobby says right now, and when there is no socket it says that instead of OFF.
+  const openSwitch = jsxs('div', {
+    'data-people-open': !signedIn ? 'signed-out' : notConnected ? 'unreachable' : (prefs.open ? 'on' : 'off'),
+    style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, minWidth: 0 },
+    children: [
+      jsx('label', {
+        'aria-label': 'Let people invite me',
+        title: notConnected
+          ? 'The lobby is not connected, so this switch cannot be read or changed yet. Press Retry.'
+          : signedIn ? 'When this is on, people who press Play can invite you to the games you accept.' : 'Sign in above first.',
+        style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 650, cursor: 'pointer' },
+        children: [
+          jsx('input', {
+            type: 'checkbox',
+            checked: Boolean(live && prefs.open),
+            disabled: Boolean(pending) || !signedIn || notConnected,
+            onChange: event => post('open', '/online/hall/prefs', { open: event.target.checked })
+          }),
+          jsx('span', { children: 'Let people invite me' })
+        ]
+      }),
+      jsx('span', {
+        'data-people-open-state': '1', role: 'status', 'aria-live': 'polite',
+        style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
+        children: !signedIn
+          ? 'Sign in above to let people invite you.'
+          : notConnected
+            ? 'Not connected to the lobby — Retry'
+            : prefs.open ? 'ON — people who accept your games can ask you.' : 'OFF — nobody can invite you.'
+      }),
+      notConnected
+        ? button('Retry', retry, { primary: true, disabled: Boolean(pending), title: 'Dial the lobby again now.' })
+        : null
+    ]
+  })
 
   // One label row: the row's name, then the sentence that says what pressing it does.
   const rowHead = (key, label, say) => jsxs('div', {
@@ -355,18 +430,15 @@ function PlayWithPeople({ ctx, view }) {
     },
     children: [
       jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Play with people' }),
+      // The master switch comes first: it is the answer to "who may invite me", and it is
+      // drawn from the lobby's own state rather than from a chip quietly looking pressed.
+      openSwitch,
       rowHead('accept', 'Games I accept', 'People who press Play can invite you to these.'),
       // Called as the block it is, the way onlineAccountBlock is: no state of its own, so the
       // chip row is drawn in place and its presses go through this card's one door. With the
-      // master switch off the chips are drawn dark: a chip at full weight would promise an
-      // invite the lobby refuses.
-      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE, dim: !prefs.open }),
-      // The master switch is The Hall's; saying so here is kinder than chips that look pressed
-      // while the server is sending nobody.
-      prefs.open ? null : jsx('div', {
-        'data-people-open-off': '1', style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
-        children: 'Online invites are off — turn on to be asked'
-      }),
+      // master switch off - or no socket to write to - the chips are drawn dark: a chip at
+      // full weight would promise an invite the lobby refuses.
+      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE, dim: !prefs.open || !live }),
       rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
       jsx('div', {
         role: 'group', 'aria-label': 'Play now',
@@ -910,6 +982,12 @@ function GameCenterPage({ ctx, onArea }) {
     })
   }
 
+  // Who this page says the person is: signed in to online play, the lobby account's name is
+  // the one other people see, and the local name is only this computer's label.
+  const pageOnline = onlineView(view)
+  const onlineLinked = Boolean(pageOnline.on && pageOnline.linked)
+  const onlineName = pageOnline.name || ''
+
   const store = jsxs('div', {
     style: { display: 'flex', flexDirection: 'column', gap: 18, padding: 18, paddingBottom: 96, minWidth: 0, overflow: 'auto', background: paper },
     children: [
@@ -943,7 +1021,11 @@ function GameCenterPage({ ctx, onArea }) {
                   ] }),
                   jsx('div', {
                     style: { fontSize: 12, color: text.tertiary, marginTop: 4 },
-                    children: view.player.named ? `You are ${view.player.name}` : 'Pick a name in Settings to chat'
+                    // One name at a time, and the honest one: signed in, other people see the
+                    // lobby account's name, so that is what this line says.
+                    children: onlineLinked
+                      ? `You are ${onlineName} online`
+                      : view.player.named ? `You are ${view.player.name}` : 'Pick a name in Settings to chat'
                   }),
                   jsx('div', {
                     style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },

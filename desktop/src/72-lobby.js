@@ -442,6 +442,20 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     children: [heading('The Hall'), ...children, checkPanel]
   })
   const note = say => shell([jsx('div', { style: muted, children: say })])
+  // Not connected, said plainly with the one control that fixes it: a Hall that never came up
+  // used to read "Joining the Hall…" for as long as the person was willing to wait.
+  const notConnected = (say, why) => shell([
+    jsxs('div', {
+      'data-hall-not-connected': '1', role: 'status', 'aria-live': 'polite',
+      style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, ...muted },
+      children: [
+        jsx('span', { style: { flex: 1, minWidth: 120 }, children: why ? `${say} ${why}` : say }),
+        button('Retry', () => post('retry', '/online/hall/retry'), {
+          primary: true, ...held('Dial the lobby again now.')
+        })
+      ]
+    })
+  ])
 
   // 'off' also covers a sign-in the lobby refused, with online play still on. Say that, what it means and
   // the way back; "turn online play on" would send them to a switch that is already on.
@@ -453,8 +467,8 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   if (state === 'old-server') return note('This lobby server has no Hall yet. Find a match still works.')
   // A server that is down says so (the Hall keeps dialling and clears this by itself), rather than
   // sitting on "Joining the Hall…" for a day (owner, 2026-11-18: sentinel was down, both PCs looked empty).
-  if (state === 'connecting' && refused) return note(`${refused} Until then nobody here can see anyone online.`)
-  if (state !== 'live') return note(stale ? 'Reconnecting…' : 'Joining the Hall…')
+  if (state === 'connecting' && refused) return notConnected('Not connected to the lobby — Retry.', `${refused} Until then nobody here can see anyone online.`)
+  if (state !== 'live') return notConnected('Not connected to the lobby — Retry.', stale ? 'Reconnecting by itself; Retry dials now.' : '')
 
   // The switches, in the order the person meets them: appear offline first (the one
   // control that takes you out of the lobby), then the master "Take game requests", then
@@ -783,9 +797,15 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
           jsx('div', { 'data-lobby-chat-where': lobby.shared ? 'online' : 'signed-out', style: muted, children: lobby.shared
             ? (lobby.reached === false ? 'Everyone online reads this. The lobby could not be read just now; trying again.' : 'Everyone online reads this.')
             : 'Sign in to online play to chat.' }),
-          view.player.named ? null : jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
+          // Signed in, this column is the lobby's chat and the name on a line is the lobby
+          // account's, never this computer's name - so say whose name it is, and offer the
+          // local-name box only when there is no lobby name to show.
+          signedIn
+            ? jsx('div', { 'data-lobby-chat-name': '1', style: muted, children: `You are ${online.name || 'signed in'} in this chat.` })
+            : null,
+          !signedIn && !view.player.named ? jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
             jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }) }), button('Set', setPlayerName, { disabled: !name.trim() })
-          ] }),
+          ] }) : null,
           jsx('div', { style: muted, children: lookingLine }),
           lobby.shared ? jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
             ? posts.map((item, index) => jsxs('div', { 'data-lobby-post': String(index), children: [

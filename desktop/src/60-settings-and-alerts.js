@@ -148,6 +148,9 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
   const list = matchable(view.play)
   const watched = setup.watched || {}
   const player = view.player || {}
+  // Signed in to online play, other people never see this name: they see the lobby account's.
+  const settingsOnline = (view && view.online) || {}
+  const settingsLinked = Boolean(settingsOnline.on && settingsOnline.linked)
 
   const save = async (body, said) => {
     setBusy(true)
@@ -213,7 +216,9 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
               suggestNameButton(setName, ctx),
               button('Save name', () => save({ name: name.trim() }), { primary: true, disabled: busy || !name.trim() })
             ] }),
-            jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: player.named ? `You are ${player.name}. This is the name other players see.` : 'Other players see this name. Game Center does not ask for an account or an email.' })
+            jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: settingsLinked
+              ? `This computer's name. Other people see your online name, ${settingsOnline.name || 'your lobby account'} — change that under Get online in Game Center.`
+              : player.named ? `You are ${player.name}. This is the name other players see.` : 'Other players see this name. Game Center does not ask for an account or an email.' })
           ]
         }),
         jsxs('section', {
