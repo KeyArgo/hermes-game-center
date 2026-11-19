@@ -58,7 +58,10 @@ MAX_OPEN_ROOMS = 2000
 # number past this is a client bug, not a wallet, and is refused rather than stored.
 BALANCE_MAX = 10 ** 15
 LOBBY_CACHE_SECONDS = 2.0
-CHAT_DAYS = 7
+# How long a chat line is kept, in the lobby and at every table: thirty days, so a
+# conversation is still there the next week. This is not LOBBY_HOURS - that one says how long
+# an open room stays listed, and raising chat retention must never leave old rooms in the lobby.
+CHAT_KEEP_DAYS = 30
 LOBBY_HOURS = 24
 JANITOR = web.AppKey("janitor", asyncio.Task)
 IMPORTMAP = json.dumps({"imports": {
@@ -588,9 +591,10 @@ class App:
 
     async def lobby_chat(self, request: web.Request) -> web.Response:
         if request.method == "GET":
-            # Nothing older than the day the lobby keeps: the janitor deletes it, and
-            # the answer never carries it even in the moment before the sweep.
-            messages = self.store.recent_chat("__lobby__", 50, since=time.time() - LOBBY_HOURS * 3600)
+            # Chat is kept for CHAT_KEEP_DAYS, not for the day a room stays listed: the
+            # janitor deletes it, and the answer never carries it even in the moment before
+            # the sweep.
+            messages = self.store.recent_chat("__lobby__", 50, since=time.time() - CHAT_KEEP_DAYS * 86400)
             player = self.me(request)
             if player:
                 blocked = {r[0] for r in self.store.db.execute("SELECT blocked_id FROM blocks WHERE player_id=?", (player["id"],))}
@@ -1444,9 +1448,9 @@ class App:
                     self.rooms.expire()
                     self.expire_challenges()
                     self.store.expire_punishments(time.time())
-                    self.store.purge_chat(time.time() - CHAT_DAYS * 86400)
-                    # Lobby posts keep for one day, no longer.
-                    self.store.purge_lobby_posts(time.time() - LOBBY_HOURS * 3600)
+                    self.store.purge_chat(time.time() - CHAT_KEEP_DAYS * 86400)
+                    # Lobby posts are chat too: they keep for the same thirty days.
+                    self.store.purge_lobby_posts(time.time() - CHAT_KEEP_DAYS * 86400)
                     self.store.expire_removals(time.time() - arcade.REMOVAL_DAYS * 86400)
                     for limiter in (self.cmd_limit, self.chat_limit, self.lobby_chat_limit, self.session_limit, self.api_limit, self.removal_limit, self.login_limit, self.queue_limit, self.alert_limit, self.ladder_limit, self.balance_limit):
                         limiter.prune()

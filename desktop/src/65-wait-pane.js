@@ -740,35 +740,24 @@ function WaitPane({ ctx }) {
             className: 'games-pane-board-main',
             ref: boardBox,
             style: { gridArea: 'board', minWidth: 0 },
-            children: pictured.view === 'slots' ? jsx(Jackpot2Full, { ctx }) : pictured.view === 'blackjack'
-              ? jsx(BlackjackTable, {
-                  picture: pictured,
-                  against: opponentWords(pictured, view, soloGame),
-                  interactive: Boolean(current && access.can_move && !working),
-                  busy: working,
-                  onMove: token => move(current, token),
-                  onSetting: (path, body) => ctx.rest(path, { method: 'POST', body })
-                })
-              : pictured.view === 'seabattle'
-                ? jsx(SeaBattleTable, {
-                    picture: pictured,
-                    interactive: Boolean(current && access.can_move && !working),
-                    busy: working,
-                    onMove: token => move(current, token)
-                  })
-                : jsx(pictured && pictured.view === 'backgammon' ? BackgammonSvg : BoardSvg, {
-                    picture: pictured,
-                    height: boardH,
-                    flat: true,
-                    onPhase: setBgPhase,
-                    interactive: Boolean(current && access.can_move && !working),
-                    // The person's own move is drawn the moment they make it, while the
-                    // table's answer is still on its way: a search or a model takes its time,
-                    // and a board that sits still reads as a board that did not hear the click.
-                    pending: preview,
-                    onPending: mv => { if (access.can_move && !working) setPreview(mv) },
-                    onMove: token => move(current, token)
-                  })
+            // One switch for every table (64b-table-stage.js): the online table comes through
+            // here too, so a game draws the same picture wherever it is being played.
+            children: tableStage({
+              picture: pictured,
+              ctx,
+              height: boardH,
+              flat: true,
+              interactive: Boolean(current && access.can_move && !working),
+              busy: working,
+              against: opponentWords(pictured, view, soloGame),
+              onPhase: setBgPhase,
+              // The person's own move is drawn the moment they make it, while the
+              // table's answer is still on its way: a search or a model takes its time,
+              // and a board that sits still reads as a board that did not hear the click.
+              pending: preview,
+              onPending: mv => { if (access.can_move && !working) setPreview(mv) },
+              onMove: token => move(current, token)
+            })
           }),
           pictured.view === 'slots' ? null : jsxs('div', {
             role: 'status', 'aria-live': 'polite', className: 'games-status games-pane-board-status',
