@@ -607,3 +607,32 @@ def test_an_old_database_gains_the_new_columns_and_its_last_game(world, tmp_path
             reopened.close()
 
     run(scenario())
+
+
+# --- what the screen is told ------------------------------------------------------
+
+def test_a_looking_ack_carries_the_prefs_it_changed(world):
+    """Play <game> opens a twenty-minute accept; the ack has to say so.
+
+    Nothing pushes prefs back on its own, so without this the chip stayed off (and said
+    nothing about twenty minutes) until the screen reconnected.
+    """
+    _store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        bea = people["Bea"]
+        here(hub, bea)
+        started = await look(service, bea, ["hex"])
+        assert started["ok"], started
+        prefs = started["prefs"]
+        assert prefs["games"]["hex"] is True
+        assert prefs["until"]["hex"] == pytest.approx(clock.now + TEMP_SECONDS)
+        assert prefs["open"] is False, "the master switch was not touched"
+        # The authoritative shape, the same one hello carries.
+        assert prefs == service.prefs(bea["id"])
+        # Once the twenty minutes are over, the same read says off and there is no window.
+        clock.now += TEMP_SECONDS + 1
+        gone = service.prefs(bea["id"])
+        assert gone["games"]["hex"] is False and gone["until"] == {}
+
+    run(scenario())

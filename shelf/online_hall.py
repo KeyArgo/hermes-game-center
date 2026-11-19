@@ -231,7 +231,9 @@ class Hall:
         """Find match: <games> to start (or 'all'), on=False to stop.
 
         The server keeps it until the person stops it or is seated, and pairs them
-        with anyone else looking for (or open to) the same game right now.
+        with anyone else looking for (or open to) the same game right now. The ack
+        carries the server's own prefs, because a Play opens a twenty-minute accept
+        that nothing else would show until the next reconnect.
         """
         if not isinstance(on, bool):
             return {"ok": False, "text": "Say whether to look for a match."}
@@ -253,6 +255,10 @@ class Hall:
                     self._you["looking"] = list(REQUESTABLE)
                 else:
                     self._you["looking"] = [game for game in REQUESTABLE if game in set(frame["games"])]
+                if isinstance(answer.get("prefs"), dict):
+                    # Only a server that knows these sends them; an older one sends none and
+                    # what the press changed above is all there is to show.
+                    self._prefs = self._clean_prefs(answer["prefs"])
         return answer
 
     def request(self, to, game) -> dict:

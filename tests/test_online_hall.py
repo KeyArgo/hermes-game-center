@@ -524,3 +524,41 @@ def test_always_keeps_a_game_and_a_looking_ack_carries_ask_always():
     hall._pending = {"h7": {"event": threading.Event(), "answer": None}}
     hall._apply({"t": "ack", "op": "h7", "ok": True, "text": "Looking for Chess.", "ask_always": True})
     assert hall._pending["h7"]["answer"]["ask_always"] is True
+
+
+def test_a_looking_ack_sets_the_switches_it_came_with():
+    """Play <game> opened a twenty-minute accept on the server; the ack carries it.
+
+    The ack is the only thing that knows, so the page has to take its prefs from there:
+    without it the chip stayed off and said nothing about twenty minutes.
+    """
+    class Wire:
+        # The one Hall method the press path really uses: prefs are cleaned on the way in.
+        _clean_prefs = staticmethod(Hall._clean_prefs)
+
+        def __init__(self):
+            self._lock = threading.Lock()
+            self._prefs = {"open": False, "games": {}, "until": {}}
+            self._you = {"id": "me", "name": "Ada", "invisible": False, "looking": []}
+            self.frames = []
+
+        def send(self, frame):
+            self.frames.append(frame)
+            return {"ok": True, "text": "Looking for Chessboard.", "ask_always": True,
+                    "prefs": {"open": False,
+                              "games": {"chessboard": True, "connect4": False},
+                              "until": {"chessboard": 1700000000.0}}}
+
+    wire = Wire()
+    answer = Hall.looking(wire, ["chessboard"])
+    assert answer["ok"] is True
+    assert wire.frames[-1] == {"t": "looking", "games": ["chessboard"]}, wire.frames[-1]
+    assert wire._you["looking"] == ["chessboard"]
+    assert wire._prefs["games"]["chessboard"] is True, "the twenty-minute accept shows at once"
+    assert wire._prefs["until"]["chessboard"] == 1700000000.0
+    assert wire._prefs["games"]["connect4"] is False
+    # An older server sends no prefs on the ack: what the press changed still applies.
+    wire = Wire()
+    wire.send = lambda frame: {"ok": True, "text": "Looking for Connect4."}
+    Hall.looking(wire, ["connect4"])
+    assert wire._you["looking"] == ["connect4"]

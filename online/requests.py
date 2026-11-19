@@ -263,6 +263,9 @@ class Service:
         await self._emit(frames)
         ack = self._ack(frame, True, self._looking_text(games))
         ack["looking"] = games
+        # The switches as they are now: a Play opens a twenty-minute accept, and the ack is
+        # the only thing that says so until the screen reconnects.
+        ack["prefs"] = self.prefs(player["id"])
         if granted:
             # "Always let people invite you to X?": asked once, when the window opens.
             ack["ask_always"] = True
