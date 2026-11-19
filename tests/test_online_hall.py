@@ -486,6 +486,57 @@ def test_the_hall_lists_every_game_the_server_can_seat():
     assert sorted(HALL_GAMES) == sorted(SERVER_GAMES)
 
 
+def test_a_window_that_has_run_out_reads_off_in_the_snapshot():
+    """The screen never sees a stale on, so it can never echo one back.
+
+    The server counts an expired twenty minutes as off the moment it passes; a snapshot
+    that still said on would have the page draw the chip pressed and post it that way.
+    """
+    hall = Hall.__new__(Hall)
+    hall._lock = threading.Lock()
+    hall._state = "live"
+    hall._error = ""
+    hall._you = {"id": "me", "name": "Ada", "invisible": False, "looking": []}
+    hall._roster = {}
+    hall._requests = {}
+    hall._seated = None
+    now = time.time()
+    hall._prefs = {
+        "open": False,
+        "games": {"chessboard": True, "connect4": True},
+        "until": {"chessboard": now - 1, "connect4": now + 600},
+    }
+    prefs = hall.snapshot()["prefs"]
+    assert prefs["games"]["chessboard"] is False, "a lapsed window is off"
+    assert "chessboard" not in prefs["until"], "and it has no window to show"
+    assert prefs["games"]["connect4"] is True, "a running one is still on"
+    assert prefs["until"]["connect4"] == now + 600
+
+
+def test_turning_on_a_game_whose_window_has_lapsed_leaves_no_window_behind():
+    """A press after the twenty minutes is a plain choice, and reads as one.
+
+    Keeping the lapsed stamp would have the chip read off again on the very next draw.
+    """
+    class Wire:
+        def __init__(self):
+            self._lock = threading.Lock()
+            self._prefs = {"open": False, "games": {"chessboard": True}, "until": {"chessboard": 1.0}}
+            self._you = {"id": "me", "name": "Ada", "invisible": False, "looking": []}
+            self.frames = []
+
+        def send(self, frame):
+            self.frames.append(frame)
+            return {"ok": True, "text": "Saved."}
+
+    wire = Wire()
+    assert Hall.prefs(wire, games={"chessboard": True})["ok"] is True
+    assert wire.frames[-1] == {"t": "prefs", "games": {"chessboard": True}}
+    assert "chessboard" not in wire._prefs["until"], "the lapsed window is gone"
+    assert wire._prefs["games"]["chessboard"] is True
+    assert wire._prefs["open"] is True, "and the chip turned the master switch on with it"
+
+
 def test_always_keeps_a_game_and_a_looking_ack_carries_ask_always():
     """"Always let people invite you to Chess?": both ends of that question.
 
