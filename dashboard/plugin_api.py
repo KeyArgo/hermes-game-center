@@ -1588,8 +1588,9 @@ def _online_payload_unsafe(*, refresh: bool = True) -> dict:
         payload["alert"] = None
         return payload
     # While online play is on, the lobby connection is kept up by anything that asks
-    # about the online side - not only by the lobby page being open. Idempotent.
-    _online_hall(source).start()
+    # about the online side - not only by the lobby page being open. A read: it keeps the
+    # worker running and never wakes it (GET /view is polled every few seconds).
+    _online_hall(source).start(wake=False)
     if refresh:
         source.refresh()
         source.check_queue()
@@ -1786,9 +1787,10 @@ def online_check() -> dict[str, Any]:
 def online_hall_view() -> dict[str, Any]:
     source, _ = _online_pair()
     hall = _online_hall(source)
-    # Keep the lobby socket live across a Hermes restart: a GET re-opens it.
+    # Keep the lobby socket live across a Hermes restart: a GET re-opens it. A read, though: the
+    # page polls this every 3 s, so it must not shorten the worker's own wait.
     if source.on:
-        hall.start()
+        hall.start(wake=False)
     return hall.snapshot()
 
 

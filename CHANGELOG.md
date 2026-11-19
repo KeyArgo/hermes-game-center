@@ -6,6 +6,18 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Reading the Hall no longer dials the lobby.** `GET /online/hall` and `GET /view` are polls —
+  the Games card and the Hall panel each run one every 3 s while they are open — and both used to
+  call `start()`, which woke the worker out of its own wait. The deliberate 60-second pause after a
+  refused sign-in, and after a server with no lobby socket, was therefore never honoured: with a
+  page open that was a TCP-and-HTTP dial (or a refused auth) every 1.5–3 s forever, and one
+  `lobby socket:` line per attempt. `Hall.start(wake=False)` keeps the worker running without
+  nudging it, and the two GET routes use it; a sign-in, a signup, Retry, `/online/on`,
+  `/online/check` and every action on the Hall still wake the worker and dial at once. Guards:
+  `tests/test_online_hall.py` (`test_a_read_of_the_hall_never_wakes_the_worker_but_a_press_does`,
+  `test_the_two_read_routes_ask_the_hall_without_nudging_it` — both fail against the old
+  `start()`).
+
 - **A sign-in, a Retry and the Games page now dial a waiting socket at once, and the invite switch
   says why it is held.** Owner, 2026-11-18: *"it won't let me check Let people invite me"* — the box
   was disabled with its reason only on hover. Two causes. (1) `shelf/online_hall.py` `start()` — the

@@ -286,8 +286,9 @@ def test_hall_routes_return_contract_d_shape(monkeypatch):
             self.started = False
             self.calls = []
 
-        def start(self):
+        def start(self, **kwargs):
             self.started = True
+            self.start_calls = getattr(self, "start_calls", []) + [kwargs]
 
         def snapshot(self):
             return {"state": "live", "you": {"id": "a", "name": "Ada"},
@@ -317,6 +318,7 @@ def test_hall_routes_return_contract_d_shape(monkeypatch):
     view = plugin_api.online_hall_view()
     assert set(view) == {"state", "you", "prefs", "roster", "requests", "seated"}
     assert hall.started, "GET lazily starts the hall when online is on"
+    assert hall.start_calls == [{"wake": False}], "and asks as a read, never as a press"
 
     assert plugin_api.online_hall_prefs({"open": True, "games": {"connect4": True}})["ok"]
     assert plugin_api.online_hall_request({"to": "b", "game": "connect4"})["ok"]
@@ -757,3 +759,101 @@ def test_turning_a_chip_on_puts_the_master_switch_on():
     wire._prefs["open"] = True
     Hall.prefs(wire, open=False, games={"connect4": True})
     assert wire._prefs["open"] is False
+
+
+def test_a_read_of_the_hall_never_wakes_the_worker_but_a_press_does(monkeypatch):
+    """GET /view and GET /online/hall are polls: they keep the worker running, never nudge it.
+
+    A refused sign-in and a server with no lobby socket each wait 60 s before the next dial, on
+    purpose. The page reads the Hall every 3 s - twice over with the Games card and the Hall both
+    open - so a read that woke the worker turned those pauses into a dial every 1.5 s, forever,
+    with a log line for each one.
+    """
+    import types
+
+    from shelf import online_hall as mod
+
+    dialled = []
+
+    class NoHall:
+        """A server that answers the upgrade with 404: it has no lobby socket at all."""
+
+        def __init__(self, url, timeout=5):
+            dialled.append(url)
+            raise mod.wsmod.SocketError("The table refused the connection (HTTP/1.1 404 Not Found).")
+
+    monkeypatch.setattr(mod.wsmod, "Socket", NoHall)
+    online = types.SimpleNamespace(on=True, url="http://127.0.0.1:1", key=lambda: "k",
+                                   game=lambda: "connect4")
+    hall = mod.Hall(online)
+    hall.start()
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and hall.snapshot()["state"] != "old-server":
+            time.sleep(0.02)
+        assert hall.snapshot()["state"] == "old-server", hall.snapshot()
+        assert len(dialled) == 1, dialled
+
+        # Every read the page makes: the worker must stay in its 60-second pause.
+        for _ in range(25):
+            hall.start(wake=False)
+            time.sleep(0.01)
+        assert len(dialled) == 1, (
+            f"a read woke the worker out of its 60 s pause: {len(dialled)} dials"
+        )
+
+        # A press is still a press: sign in again, or press Retry, and it dials at once.
+        hall.start()
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline and len(dialled) < 2:
+            time.sleep(0.02)
+        assert len(dialled) == 2, "a sign-in or a Retry must still dial at once"
+    finally:
+        hall.stop()
+
+
+def test_the_two_read_routes_ask_the_hall_without_nudging_it(monkeypatch):
+    """GET /view (through the online payload) and GET /online/hall are reads, not presses."""
+    import types
+
+    from dashboard import plugin_api
+
+    calls = []
+
+    class FakeHall:
+        def start(self, **kwargs):
+            calls.append(("start", kwargs))
+
+        def snapshot(self):
+            return {"state": "live", "you": {}, "prefs": {}, "roster": [], "requests": [],
+                    "seated": None}
+
+    class FakeSource:
+        on = True
+
+        def refresh(self):
+            pass
+
+        def check_queue(self):
+            pass
+
+        def snapshot(self):
+            return {"on": True, "match": None}
+
+        def set_ladder(self, view):
+            pass
+
+        def poll_alert(self):
+            pass
+
+        def live_alert(self):
+            return None
+
+    source = FakeSource()
+    ladder = types.SimpleNamespace(status=lambda: {})
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (source, ladder))
+    monkeypatch.setattr(plugin_api, "_online_hall", lambda src: FakeHall())
+
+    plugin_api.online_hall_view()
+    plugin_api._online_payload_unsafe(refresh=False)
+    assert calls == [("start", {"wake": False}), ("start", {"wake": False})], calls

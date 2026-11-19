@@ -115,17 +115,23 @@ class Hall:
 
     # Lifecycle ---------------------------------------------------------------
 
-    def start(self) -> None:
-        """Make sure the lobby socket is being dialled - and dial now if it is waiting.
+    def start(self, *, wake: bool = True) -> None:
+        """Make sure the lobby socket is being dialled - and, for a press, dial now.
 
         Idempotent, and a no-op before online play is on and there is a key to sign in with,
         so a GET that calls this before sign-in is harmless.
 
-        A worker that is already running used to make this return while doing nothing: a
-        socket that had been refused (its state ``off``), a server with no lobby socket, or a
-        dropped line left the person on "Not connected to the lobby" for the whole of a wait
-        they never asked for - and the sign-in, the page opening and Retry that were supposed
-        to fix it dialled nothing. Now it wakes that worker, which dials at once.
+        ``wake=False`` is the read path: ``GET /online/hall`` and ``GET /view`` run every three
+        seconds while a page is open, so they only make sure the worker is running. Waking on a
+        read turned the deliberate 60-second pause after a refused sign-in - or after a server
+        with no lobby socket - into a dial every 1.5 s for as long as anyone was looking, with a
+        log line for each one. A press keeps the wake: a sign-in, Retry and every action on the
+        Hall are the doors a person asks through, and the worker dials at once for them.
+
+        A worker that is already running used to make this return while doing nothing: a socket
+        that had been refused (its state ``off``), a server with no lobby socket, or a dropped
+        line left the person on "Not connected to the lobby" for the whole of a wait they never
+        asked for. Now a press wakes that worker, which dials at once.
         """
         with self._lifecycle:
             if not self.online.on:
@@ -136,7 +142,7 @@ class Hall:
                 return
             if self._thread is not None and self._thread.is_alive():
                 with self._lock:
-                    if self._state != "live" and not self._dialling:
+                    if wake and self._state != "live" and not self._dialling:
                         self._dial.set()
                 return
             with self._lock:
