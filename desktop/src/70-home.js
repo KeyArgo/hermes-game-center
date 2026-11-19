@@ -283,6 +283,13 @@ function PlayWithPeople({ ctx, view }) {
   // The games the once-only "always?" question is still to ask about, in the order the
   // server granted them - the question in front is the one on screen.
   const [askAlways, setAskAlways] = useState([])
+  // The switch and the accept chips, as the person just set them. The lobby's answer replaces
+  // this; a refusal clears it, so the tick does not wait on the round trip and does not stay
+  // if the lobby says no.
+  const [wish, setWish] = useState(null)
+  // Set for the whole round trip, including the moment before React has redrawn `pending`,
+  // so a second press on the same control cannot send a second POST.
+  const inflight = useRef(false)
   // Games already asked about in this visit. The server sends ask_always once per change,
   // and this keeps a second press from drawing the same question again.
   const asked = useRef({})
@@ -315,19 +322,43 @@ function PlayWithPeople({ ctx, view }) {
   // One door for both rows, held while its own POST is out, and a refusal is said in the
   // lobby's own words rather than swallowed.
   const post = async (key, path, body) => {
-    if (pending) return { ok: false }
+    if (inflight.current || pending) return { ok: false }
+    inflight.current = true
     setPending(key)
     setNote('')
+    // The tick moves now. The request is still in flight; a refusal puts it back.
+    if (path === '/online/hall/prefs' && body && typeof body === 'object') {
+      setWish(prev => {
+        const next = { ...(prev || {}) }
+        if (typeof body.open === 'boolean') next.open = body.open
+        if (body.games && typeof body.games === 'object') next.games = { ...(next.games || {}), ...body.games }
+        return next
+      })
+    }
     try {
       const answer = ctx && typeof ctx.rest === 'function'
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
-      if (answer && answer.ok === false) setNote(String(answer.text || ''))
-      // The lobby answers a Play, a Find match or a prefs write with the accept list as it now
-      // stands, so the chip the press just made temporary reads "for 20 min" on the next draw
-      // instead of waiting for the next poll.
-      if (answer && answer.prefs && typeof answer.prefs === 'object') {
+      if (answer && answer.ok === false) {
+        setWish(null)
+        setNote(String(answer.text || 'The lobby did not take that.'))
+      } else if (answer && answer.prefs && typeof answer.prefs === 'object') {
+        // The lobby answers a Play, a Find match or a prefs write with the accept list as it now
+        // stands, so the chip the press just made temporary reads "for 20 min" on the next draw
+        // instead of waiting for the next poll.
         setSnap(previous => (previous ? { ...previous, prefs: answer.prefs } : previous))
+        setWish(null)
+      } else if (path === '/online/hall/prefs' && body && typeof body === 'object') {
+        setSnap(previous => {
+          if (!previous) return previous
+          const nextPrefs = { ...(previous.prefs || {}) }
+          if (typeof body.open === 'boolean') nextPrefs.open = body.open
+          if (body.games && typeof body.games === 'object') {
+            nextPrefs.games = { ...(nextPrefs.games || {}), ...body.games }
+          }
+          return { ...previous, prefs: nextPrefs }
+        })
+        setWish(null)
       }
       // A Play that had to accept the game for twenty minutes comes back with ask_always:
       // the press that opened that window is the one moment to ask whether it should stay.
@@ -335,15 +366,23 @@ function PlayWithPeople({ ctx, view }) {
       if (granted.length) setAskAlways(queue => queue.concat(granted))
       return answer || { ok: true }
     } catch {
+      setWish(null)
       setNote('That did not reach Game Center. Try again.')
       return { ok: false }
     } finally {
+      inflight.current = false
       setPending('')
     }
   }
 
   const you = (snap && snap.you) || {}
   const prefs = (snap && snap.prefs) || { open: false, games: {}, until: {} }
+  // What the card draws: the press, until the lobby's answer takes its place.
+  const shown = {
+    open: wish && typeof wish.open === 'boolean' ? wish.open : Boolean(prefs.open),
+    games: { ...(prefs.games || {}), ...((wish && wish.games) || {}) },
+    until: prefs.until || {}
+  }
   const live = liveOf(snap)
   // Not connected is not the same as switched off: say which it is, with the one control
   // that fixes the first.
@@ -406,7 +445,7 @@ function PlayWithPeople({ ctx, view }) {
   // The one switch for the master accept list, always on the page: what it reads is what
   // the lobby says right now, and when there is no socket it says that instead of OFF.
   const openSwitch = jsxs('div', {
-    'data-people-open': !signedIn ? 'signed-out' : notConnected ? 'unreachable' : (prefs.open ? 'on' : 'off'),
+    'data-people-open': !signedIn ? 'signed-out' : notConnected ? 'unreachable' : (shown.open ? 'on' : 'off'),
     style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, minWidth: 0 },
     children: [
       jsx('label', {
@@ -422,9 +461,12 @@ function PlayWithPeople({ ctx, view }) {
         children: [
           jsx('input', {
             type: 'checkbox',
-            checked: Boolean(live && prefs.open),
+            checked: Boolean(live && shown.open),
             disabled: Boolean(pending) || !signedIn || notConnected,
-            onChange: event => post('open', '/online/hall/prefs', { open: event.target.checked })
+            onChange: event => {
+              if (inflight.current) return
+              post('open', '/online/hall/prefs', { open: event.target.checked })
+            }
           }),
           jsx('span', { children: 'Let people invite me' })
         ]
@@ -439,7 +481,7 @@ function PlayWithPeople({ ctx, view }) {
             : whyHeld === 'refused' ? refused
               : whyHeld === 'old-server' ? 'This lobby server has no Hall yet — invites cannot be checked on it.'
                 : whyHeld === 'unreachable' ? 'Lobby not connected — Retry'
-                  : prefs.open ? 'ON — people who accept your games can ask you.' : 'OFF — nobody can invite you.'
+                  : shown.open ? 'ON — people who accept your games can ask you.' : 'OFF — nobody can invite you.'
       }),
       // Retry is the one control that fixes a socket that is not up. It cannot fix a server without
       // a Hall, so it is not offered against that one.
@@ -476,7 +518,7 @@ function PlayWithPeople({ ctx, view }) {
       // chip row is drawn in place and its presses go through this card's one door. With the
       // master switch off - or no socket to write to - the chips are drawn dark: a chip at
       // full weight would promise an invite the lobby refuses.
-      LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE, dim: !prefs.open || !live }),
+      LobbyAcceptChips({ until: shown.until, games: shown.games, post, pending, busyNote: HALL_BUSY_NOTE, dim: !shown.open || !live }),
       rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
       jsx('div', {
         role: 'group', 'aria-label': 'Play now',

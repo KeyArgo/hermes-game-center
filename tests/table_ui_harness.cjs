@@ -4000,7 +4000,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8678,6 +8678,68 @@ async function switchReasonsContract() {
   assert.ok(!findButton(tree, 'Retry'), 'with no pointless Retry beside it')
   assert.equal(switchFor(tree).props['data-people-open'], 'unreachable', 'the switch is still held')
   console.log('play with people: a held switch says why - busy, refused, or no Hall: passed')
+}
+
+// ---- The invite switch ticks on the press, not when the lobby answers ------------------
+// The owner had to press twice or wait: the box only filled in after the POST came back.
+// One press shows ON at once, sends one POST, ignores a second press while that is in
+// flight, and goes back with the lobby's reason if the lobby says no.
+async function inviteSwitchOptimisticContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const snap = {
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: false, games: {}, until: {} },
+    roster: [], requests: [], seated: null
+  }
+  let release = () => {}
+  const held = new Promise(resolve => { release = resolve })
+  const posts = []
+  const ctx = { rest: async (path, options) => {
+    posts.push([path, (options && options.body) || null])
+    if (path === '/online/hall') return snap
+    if (path === '/online/hall/prefs') return held
+    return { ok: true, text: '' }
+  } }
+  const paint = async () => {
+    sandbox.optimisticProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(optimisticProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const box = tree => nodes(tree).find(node => node.props && node.props.type === 'checkbox')
+  const openOf = tree => nodes(tree).find(node => node.props && node.props['data-people-open'])
+  reset()
+  let tree = await paint()
+  assert.equal(openOf(tree).props['data-people-open'], 'off', 'the switch starts off')
+  box(tree).props.onChange({ target: { checked: true } })
+  tree = await paint()
+  assert.equal(box(tree).props.checked, true, 'one press ticks the switch before the lobby answers')
+  assert.equal(openOf(tree).props['data-people-open'], 'on', 'and the card reads ON at once')
+  const prefsPosts = posts.filter(item => item[0] === '/online/hall/prefs')
+  assert.equal(prefsPosts.length, 1, 'and that press is a single POST')
+  assert.equal(JSON.stringify(prefsPosts[0][1]), JSON.stringify({ open: true }))
+  box(tree).props.onChange({ target: { checked: false } })
+  await tick()
+  assert.equal(posts.filter(item => item[0] === '/online/hall/prefs').length, 1,
+    'a second press while the first is in flight does not send another POST')
+  assert.equal(openOf(await paint()).props['data-people-open'], 'on', 'the tick stays on while the lobby is thinking')
+  release({ ok: false, text: 'Invites are closed on this server.' })
+  await tick()
+  tree = await paint()
+  assert.equal(openOf(tree).props['data-people-open'], 'off', 'a refusal puts the tick back')
+  assert.ok(words(tree).includes('Invites are closed on this server.'),
+    'and says the lobby\'s reason: ' + words(tree).slice(-200))
+  console.log('play with people: the invite switch ticks on the press, and rolls back if the lobby says no: passed')
 }
 
 // ---- Your pet rides on your own lobby row ----------------------------------------------
