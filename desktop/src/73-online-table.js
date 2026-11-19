@@ -103,6 +103,8 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const [resultShown, setResultShown] = useState(true)
   const alive = useRef(true)
   const inFlight = useRef(false)
+  // Leaving is its own door. A move that is still out must not swallow Back.
+  const leaving = useRef(false)
   // Which read is the newest. A 400 ms poll can overlap — a slow answer, or this screen
   // reading again when the room changes — and the answers can then arrive out of order.
   // Only the newest read may paint, so a late answer never puts an older board back on screen.
@@ -145,14 +147,15 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
           held.current = next
           setTable(next)
         } else if (seen.current) {
-          // A finished game that the server has closed stays on this screen. Forgetting
-          // the room here is what put the local computer board underneath it.
+          // A finished game whose read came back empty stays on this screen. Forgetting
+          // the room here is what put the local computer board underneath it. `held`
+          // marks that this close is ours, so it is not the server saying the room is gone.
           const previous = held.current
           const previousStatus = String((previous && previous.picture && previous.picture.status) || '')
           const finished = ['win', 'draw', 'resigned', 'abandoned', 'done'].includes(previousStatus)
             || Boolean(previous && previous.finished)
           if (finished && previous) {
-            const closed = { ...previous, state: 'closed' }
+            const closed = { ...previous, state: 'closed', held: true }
             held.current = closed
             setTable(closed)
           } else {
@@ -322,49 +325,68 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     return () => clearTimeout(timer)
   }, [picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
 
-  // Back leaves the room. Hiding the table used to leave the seat in the Hall, and the
-  // Hall, mounted again on the way out, opened that same room. A hand still being played
-  // (blackjack) is refused, and the person stays seated until it settles.
-  const stepAway = async () => {
-    if (busy) return
-    setBusy(true)
-    const room = String((table && table.room_id) || roomId || '')
-    let refused = ''
-    try {
-      if (ctx && typeof ctx.rest === 'function') {
-        const answer = await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })
-        if (answer && answer.ok === false) refused = String(answer.text || 'The table refused that.')
-        else await ctx.rest('/online/table/close', { method: 'POST' })
-      }
-    } catch (error) {
-      // The screen still goes back: the seat is marked left either way.
-    }
-    if (refused) {
-      if (alive.current) { setFailure(refused); setBusy(false) }
-      return
-    }
-    markHallLeft(room)
-    rememberOnlineRoom('')
-    if (alive.current) setBusy(false)
+  // Back, Close table, and a room the server has already closed all leave this
+  // screen. The request is a courtesy. A refused leave, a dead socket, or no
+  // answer at all still forgets the room and returns to the Games page.
+  const roomNow = () => String((table && table.room_id) || roomId || '')
+  const goGames = () => {
     if (onBack) onBack()
     else if (onClose) onClose()
   }
-
-  // Putting the table away is not resigning and not closing the match: the room stays on the
-  // lobby server. So it is one press, with no question asked.
-  const putAway = async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      if (ctx && typeof ctx.rest === 'function') await ctx.rest('/online/table/close', { method: 'POST' })
-    } catch (error) {
-      // The table goes away here either way; the room is the server's to settle.
+  const bestEffort = (serverLeave) => {
+    if (!ctx || typeof ctx.rest !== 'function') return
+    const rest = ctx.rest
+    // Leave and close are both optional. Neither one is waited on, so a hung
+    // socket cannot keep the screen up.
+    if (serverLeave) {
+      Promise.resolve(rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })).catch(() => {})
     }
-    rememberOnlineRoom('')
-    if (alive.current) setBusy(false)
-    if (onClose) onClose()
-    else if (onBack) onBack()
+    Promise.resolve(rest('/online/table/close', { method: 'POST' })).catch(() => {})
   }
+  const leaveHome = (serverLeave) => {
+    if (leaving.current) return
+    leaving.current = true
+    markHallLeft(roomNow())
+    rememberOnlineRoom('')
+    bestEffort(serverLeave)
+    goGames()
+  }
+  const stepAway = () => leaveHome(true)
+  // Putting the table away here is not resigning. The match stays on the lobby
+  // server; this computer just stops pointing at it.
+  const putAway = () => leaveHome(false)
+  // No asks the server to decline. An old server answers "Unknown action." and
+  // the person still leaves, the same way Back does.
+  const declineRematch = async () => {
+    if (leaving.current) return
+    let answer = null
+    try {
+      if (ctx && typeof ctx.rest === 'function') {
+        answer = await ctx.rest('/online/table/cmd', { method: 'POST', body: { action: 'decline', args: [] } })
+      }
+    } catch (error) {
+      answer = null
+    }
+    if (answer && answer.ok !== false) {
+      if (leaving.current) return
+      leaving.current = true
+      markHallLeft(roomNow())
+      rememberOnlineRoom('')
+      if (ctx && typeof ctx.rest === 'function') {
+        ctx.rest('/online/table/close', { method: 'POST' }).catch(() => {})
+      }
+      goGames()
+      return
+    }
+    leaveHome(true)
+  }
+  // A room the server says is gone is not a screen to sit on.
+  useEffect(() => {
+    if (!table || table.held) return undefined
+    if (state !== 'closed' && state !== 'error') return undefined
+    leaveHome(true)
+    return undefined
+  }, [state, table && table.held, table && table.room_id])
 
   const header = jsxs('div', {
     style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 10, borderBottom: `1px solid ${stroke}` },
@@ -378,8 +400,8 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
         status === 'active' && !done && !sessionTable ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
-        stageView === 'blackjack' ? button('Leave table', stepAway, { disabled: busy, title: 'Get up from the table. A hand still being played has to finish first.' }) : null,
-        button('Close table', putAway, { disabled: busy, title: 'Puts this table away here. The match stays on the lobby server.' })
+        stageView === 'blackjack' ? button('Leave table', stepAway, { title: 'Get up from the table. The screen leaves either way.' }) : null,
+        button('Close table', putAway, { title: 'Puts this table away here. The match stays on the lobby server.' })
       ] })
     ]
   })
@@ -429,7 +451,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
             () => command('rematch'),
             { primary: true, disabled: busy || iAsked, title: 'Ask for another game with the same seats. It starts when you have both said yes.' }
           ),
-          stageView === 'blackjack' ? null : button('No', () => command('decline'), {
+          stageView === 'blackjack' ? null : button('No', declineRematch, {
             disabled: busy, title: 'Decline the rematch. The other person is told, and the table closes.'
           }),
           button('Back to games', stepAway, { primary: stageView === 'blackjack' })

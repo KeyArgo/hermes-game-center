@@ -4254,6 +4254,8 @@ async function onlineTableContract() {
         if (path === '/online/table/open') return extra.open || { ok: true, text: 'Table opened.' }
         if (path === '/online/table/cmd') {
           const body = (options && options.body) || {}
+          if (body.action === 'decline' && extra.decline) return extra.decline
+          if (body.action === 'leave' && extra.leave) return extra.leave
           if (extra.refuse) return { ok: false, text: 'That move is not legal.', picture: minePicture }
           if (extra.hold) return new Promise(resolve => { extra.hold.release = () => resolve({ ok: true, text: `Played ${body.action}.`, picture: theirsPicture }) })
           return { ok: true, text: `Played ${body.action}.`, picture: theirsPicture }
@@ -4327,8 +4329,9 @@ async function onlineTableContract() {
   boardNode(tree).props.onMove('5')
   tree = draw('OnlineTable(onlineProps)', 'onlineProps', slowProps)
   assert.equal(boardNode(tree).props.interactive, false, 'the board is locked while a command is out')
-  assert.equal(findButton(tree, 'Resign').props.disabled, true, 'and so are the table controls')
-  assert.equal(findButton(tree, 'Close table').props.disabled, true)
+  assert.equal(findButton(tree, 'Resign').props.disabled, true, 'resign waits for the move that is out')
+  assert.equal(findButton(tree, 'Close table').props.disabled, undefined, 'Close table still leaves while a move is out')
+  assert.notEqual(findButton(tree, 'Back').props.disabled, true, 'Back still leaves while a move is out')
   boardNode(tree).props.onMove('6')
   assert.equal(commands(slow).length, 1, 'a second click while one is out sends nothing')
   hold.release()
@@ -4722,6 +4725,97 @@ async function onlineTableContract() {
   const noted = makeCtx(live({ ...wonPicture, rematch_note: 'Bea declined a rematch.' }, { finished: true }))
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: noted.ctx, roomId: 'r1', onBack: () => {} })
   assert.ok(words(tree).includes('Bea declined a rematch.'), 'a decline is said on the result')
+
+  // A closed room, a refused leave, and Close table all return to Games, and the
+  // Hall does not open that room again.
+  reset()
+  const deadRoom = 'dead-bj'
+  const deadBack = []
+  const deadRun = makeCtx(live(minePicture, {
+    room_id: deadRoom, state: 'closed', error: 'This table is closed or does not exist.'
+  }), { leave: { ok: false, text: 'The table is not connected.' } })
+  evaluate(`rememberOnlineRoom('${deadRoom}', 'connect4')`)
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
+    game, ctx: deadRun.ctx, roomId: deadRoom, onBack: () => deadBack.push('back')
+  })
+  assert.ok(deadBack.includes('back'), 'a closed table leaves the screen on its own')
+  assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'and forgets the room')
+  assert.equal(evaluate(`HALL_LEFT.has('${deadRoom}')`), true, 'and tells the Hall that room was left')
+  assert.ok(deadRun.asked.some(item => item[0] === '/online/table/close'), 'and asks the plugin to drop the table')
+
+  reset()
+  const refusedRoom = 'refused-bj'
+  const refusedBack = []
+  const refusedRun = makeCtx(live(minePicture, { room_id: refusedRoom }), {
+    leave: { ok: false, text: 'The table is not connected.' }
+  })
+  evaluate(`rememberOnlineRoom('${refusedRoom}', 'connect4')`)
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
+    game, ctx: refusedRun.ctx, roomId: refusedRoom, onBack: () => refusedBack.push('back')
+  })
+  findButton(tree, 'Back').props.onClick()
+  await tick()
+  assert.equal(refusedBack.pop(), 'back', 'Back leaves even when leave is refused')
+  assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'the refused leave still forgets the room')
+  assert.equal(evaluate(`HALL_LEFT.has('${refusedRoom}')`), true, 'and the Hall is told')
+  assert.ok(refusedRun.asked.some(item => item[0] === '/online/table/close'), 'Close follows the refused leave')
+
+  reset()
+  const shutRoom = 'shut-bj'
+  const shutBack = []
+  const shutRun = makeCtx(live(minePicture, { room_id: shutRoom, state: 'error', error: 'This table is closed or does not exist.' }))
+  evaluate(`rememberOnlineRoom('${shutRoom}', 'connect4')`)
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
+    game, ctx: shutRun.ctx, roomId: shutRoom, onClose: () => shutBack.push('close'), onBack: () => shutBack.push('back')
+  })
+  // The closed answer already went home. Close table is the same door if they press it first.
+  if (!shutBack.length) findButton(tree, 'Close table').props.onClick()
+  await tick()
+  assert.ok(shutBack.length > 0, 'Close table leaves a dead room')
+  assert.equal(evaluate('ONLINE_ROOM.roomId'), '')
+  assert.equal(evaluate(`HALL_LEFT.has('${shutRoom}')`), true)
+
+  reset()
+  const replayedDead = []
+  const deadHall = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path, options) => {
+      replayedDead.push([path, options || null])
+      if (path === '/online/hall') {
+        return { state: 'live', you: { id: 'me', name: 'Ada' }, prefs: { open: true, games: {} },
+          roster: [], requests: [], seated: { room_id: deadRoom, game: 'blackjack' } }
+      }
+      if (path === '/online/table/open') return { ok: false, text: 'This table is closed or does not exist.' }
+      return { ok: true }
+    }
+  }
+  sandbox.hallProps = { ctx: deadHall, current: 'blackjack', view: { online: { on: true } }, onPlayHere: match => replayedDead.push(['play', match]) }
+  cursor = 0
+  evaluate('LobbyHall(hallProps)')
+  effects.forEach(effect => effect())
+  effects = []
+  await tick()
+  cursor = 0
+  evaluate('LobbyHall(hallProps)')
+  effects.forEach(effect => effect())
+  effects = []
+  await tick()
+  assert.equal(replayedDead.filter(item => item[0] === 'play').length, 0, 'a Hall remount does not reopen a room that was left')
+
+  reset()
+  const oldServer = []
+  const oldRun = makeCtx(live(wonPicture, { finished: true, room_id: 'old-c4' }), {
+    decline: { ok: false, text: 'Unknown action.' }
+  })
+  const oldProps = { game, ctx: oldRun.ctx, roomId: 'old-c4', onBack: () => oldServer.push('back') }
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', oldProps)
+  findButton(tree, 'No').props.onClick()
+  await tick()
+  const oldCmds = oldRun.asked.filter(item => item[0] === '/online/table/cmd').map(item => item[1].body.action)
+  assert.deepEqual(oldCmds, ['decline', 'leave'], 'an old server that rejects decline still leaves: ' + oldCmds.join(','))
+  assert.ok(oldRun.asked.some(item => item[0] === '/online/table/close'), 'and the table is closed here')
+  assert.equal(oldServer.pop(), 'back', 'and the decliner goes back to Games')
 
   evaluate("rememberOnlineRoom('')")
   reset()

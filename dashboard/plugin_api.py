@@ -1767,18 +1767,28 @@ def online_table_open(body: dict | None = None) -> dict[str, Any]:
 _SEAT_OVER = {"win", "draw", "resigned", "abandoned", "done"}
 
 
-def _drop_finished_seat(source, table: dict | None) -> None:
-    picture = (table or {}).get("picture") if isinstance(table, dict) else None
-    status = str((picture or {}).get("status") or "") if isinstance(picture, dict) else ""
-    if status in _SEAT_OVER:
-        _online_hall(source).drop_seat(str((table or {}).get("room_id") or "") or None)
+def _drop_stale_seat(source, table: dict | None) -> None:
+    """Forget a seat the Hall must not open again.
+
+    A finished picture, a closed room, or a socket that has already failed are
+    all the same kind of fact: this computer is not sitting there. Waiting for
+    a successful leave is what put people back on a table the server had closed.
+    """
+    if not isinstance(table, dict):
+        return
+    picture = table.get("picture") if isinstance(table.get("picture"), dict) else {}
+    status = str(picture.get("status") or "")
+    room = table.get("room") if isinstance(table.get("room"), dict) else {}
+    state = str(table.get("state") or "")
+    if state in {"closed", "error"} or bool(room.get("closed")) or status in _SEAT_OVER:
+        _online_hall(source).drop_seat(str(table.get("room_id") or "") or None)
 
 
 @router.get("/online/table")
 def online_table_view() -> dict[str, Any]:
     source, _ = _online_pair()
     table = _online_table(source).snapshot() or None
-    _drop_finished_seat(source, table)
+    _drop_stale_seat(source, table)
     return {"table": table}
 
 
@@ -1786,12 +1796,19 @@ def online_table_view() -> dict[str, Any]:
 def online_table_cmd(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
-    answer = _online_table(source).command(body.get("action"), body.get("args", []))
-    # Leaving is the end of this seat. A finished picture is too: Back must not
-    # find it still waiting and open the same room again.
-    if str(body.get("action") or "") == "leave" and answer.get("ok"):
-        _online_hall(source).drop_seat()
-    _drop_finished_seat(source, {"picture": answer.get("picture"), "room_id": ""})
+    table = _online_table(source)
+    answer = table.command(body.get("action"), body.get("args", []))
+    # Leaving is the end of this seat, whether or not the server accepted it.
+    # A finished or closed picture is too: Back must not find it still waiting.
+    snap = table.snapshot() or {}
+    room_id = str(snap.get("room_id") or "") or None
+    action = str(body.get("action") or "")
+    if action in {"leave", "decline"}:
+        _online_hall(source).drop_seat(room_id)
+    merged = dict(snap)
+    if isinstance(answer.get("picture"), dict):
+        merged["picture"] = answer["picture"]
+    _drop_stale_seat(source, merged)
     return answer
 
 
@@ -1804,7 +1821,10 @@ def online_table_chat(body: dict | None = None) -> dict[str, Any]:
 @router.post("/online/table/close")
 def online_table_close() -> dict[str, Any]:
     source, _ = _online_pair()
-    _online_table(source).close()
+    table = _online_table(source)
+    room_id = str((table.snapshot() or {}).get("room_id") or "") or None
+    table.close()
+    _online_hall(source).drop_seat(room_id)
     return {"ok": True}
 
 

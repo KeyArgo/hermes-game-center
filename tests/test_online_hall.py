@@ -1173,3 +1173,60 @@ def test_leaving_a_table_drops_the_hall_seat(monkeypatch):
     viewed = plugin_api.online_table_view()
     assert viewed["table"]["picture"]["status"] == "win"
     assert hall.snapshot()["seated"] is None, "a finished table drops the seat too"
+
+
+def test_a_closed_or_refused_table_drops_the_hall_seat(monkeypatch):
+    """Close, a dead socket, and a refused leave all forget the seat.
+
+    The lobby has already closed the room. Waiting for leave to succeed is what
+    put the person back on that table the next time Game Center opened.
+    """
+    import types
+
+    from dashboard import plugin_api
+
+    hall = plugin_api.online_hall.Hall(types.SimpleNamespace(on=False, key=lambda: "", url="http://127.0.0.1:9"))
+    seated = {"room_id": "dead", "game": "blackjack", "side": "white", "opponent": "Bea"}
+
+    class Table:
+        def __init__(self):
+            self.snap = {
+                "room_id": "dead", "state": "closed", "picture": None,
+                "error": "This table is closed or does not exist.",
+            }
+            self.closed = False
+
+        def snapshot(self):
+            return dict(self.snap)
+
+        def command(self, action, args):
+            return {"ok": False, "text": "The table is not connected.", "picture": None}
+
+        def close(self):
+            self.closed = True
+            self.snap = dict(self.snap, state="closed")
+
+    table = Table()
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (hall.online, None))
+    monkeypatch.setattr(plugin_api, "_online_hall", lambda src: hall)
+    monkeypatch.setattr(plugin_api, "_online_table", lambda src: table)
+
+    hall._seated = dict(seated)
+    viewed = plugin_api.online_table_view()
+    assert viewed["table"]["state"] == "closed"
+    assert hall.snapshot()["seated"] is None, "a closed table drops the seat on read"
+
+    hall._seated = dict(seated)
+    plugin_api.online_table_close()
+    assert table.closed
+    assert hall.snapshot()["seated"] is None, "Close table drops the seat"
+
+    hall._seated = dict(seated)
+    answer = plugin_api.online_table_cmd({"action": "leave", "args": []})
+    assert answer["ok"] is False
+    assert hall.snapshot()["seated"] is None, "a refused leave still drops the seat"
+
+    hall._seated = dict(seated)
+    answer = plugin_api.online_table_cmd({"action": "decline", "args": []})
+    assert answer["ok"] is False
+    assert hall.snapshot()["seated"] is None, "a refused decline still drops the seat"
