@@ -223,9 +223,9 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const [seatProblem, setSeatProblem] = useState(null)
   const [seatAttempt, setSeatAttempt] = useState(0)
   // Check online: each step to the lobby with what went wrong, for when two computers cannot see
-  // each other (owner, 2026-11-18). null until the person asks.
-  const [checked, setChecked] = useState(null)
-  const [checking, setChecking] = useState(false)
+  // each other (owner, 2026-11-18). The run and the rows live in 62-pane-state.js, so the Get
+  // online card on the Games page shows exactly the same answer.
+  const check = useOnlineCheck(ctx)
   // Rooms already opened, so a seat the server keeps reporting opens the table once.
   const handled = useRef(new Set())
   const alive = useRef(true)
@@ -314,34 +314,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // Every control on this panel posts through the one pending slot, so every control wears the
   // same lock and the same reason while anything is out.
   const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
-  const runCheck = async () => {
-    if (checking || !ctx || typeof ctx.rest !== 'function') return
-    setChecking(true)
-    try {
-      const answer = await ctx.rest('/online/check')
-      if (alive.current) setChecked(answer && typeof answer === 'object' ? answer : { ok: false, steps: [] })
-    } catch (error) {
-      if (alive.current) setChecked({ ok: false, steps: [{ name: 'Game Center', ok: false, text: 'Game Center did not answer. Reopen Hermes and try again.' }] })
-    } finally {
-      if (alive.current) setChecking(false)
-    }
-  }
-  const checkPanel = jsxs('div', { 'data-hall-check': '1', style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
-    button(checking ? 'Checking…' : 'Check online', runCheck, {
-      disabled: checking,
-      title: 'Checks each step from this computer to the lobby and says which one is not working.'
-    }),
-    checked ? jsxs('div', { role: 'status', 'aria-live': 'polite', style: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }, children: [
-      ...(Array.isArray(checked.steps) ? checked.steps : []).map((row, index) => jsxs('div', {
-        'data-hall-check-row': row.ok ? 'ok' : 'fix',
-        children: [
-          jsx('span', { style: { fontWeight: 650, color: row.ok ? text.secondary : accent }, children: `${row.ok ? 'OK' : 'Fix'} · ${row.name}: ` }),
-          jsx('span', { style: { color: text.secondary }, children: String(row.text || '') })
-        ]
-      }, index)),
-      checked.ok ? jsx('div', { style: { color: text.tertiary }, children: 'Every step works.' }) : null
-    ] }) : null
-  ] })
+  const checkPanel = onlineCheckBlock(check)
   const shell = children => jsxs('div', {
     'data-hall': '1', 'data-hall-state': state,
     style: { borderTop: `1px solid ${stroke}`, paddingTop: 10, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 },
@@ -353,7 +326,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // the way back; "turn online play on" would send them to a switch that is already on.
   const refused = snap && typeof snap.error === 'string' ? snap.error.trim() : ''
   if (state === 'off' && refused) {
-    return note(`${refused} Until you sign in again, nobody can see you and you cannot see anyone. Sign in again with your name and the recovery key you saved (I have a key).`)
+    return note(`${refused} Until you sign in again, nobody can see you and you cannot see anyone. Sign in again with your name and the recovery key you saved (I have a player).`)
   }
   if (state === 'off') return note('Turn online play on to see who is here.')
   if (state === 'old-server') return note('This lobby server has no Hall yet. Find a match still works.')

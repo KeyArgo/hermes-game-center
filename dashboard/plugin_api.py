@@ -23,6 +23,11 @@ from urllib.parse import quote, urlsplit
 
 from fastapi import APIRouter
 
+try:  # the dashboard serves these under FastAPI; a bare test host only has the router
+    from fastapi import Request
+except ImportError:  # pragma: no cover - only a host with no FastAPI at all
+    Request = Any  # type: ignore[assignment,misc]
+
 _HERE = Path(__file__).resolve().parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
@@ -1590,6 +1595,57 @@ def online_forget() -> dict[str, Any]:
     _online_hall(source).stop()
     _online_table(source).close()
     return _online_answer(source.forget())
+
+
+@router.post("/online/rename")
+def online_rename(body: dict | None = None) -> dict[str, Any]:
+    """Change my name: the lobby's own sentence comes straight back to the page."""
+    source, _ladder = _online_pair()
+    return _online_answer(source.rename(str((body or {}).get("name") or "")))
+
+
+def _downloads_dir() -> Path:
+    """This computer's Downloads folder (Windows and Linux), through the one helper."""
+    return online_source.downloads_folder()
+
+
+def _from_this_computer(request: Any) -> bool:
+    """Whether this request came from the computer Hermes is running on."""
+    host = str(getattr(getattr(request, "client", None), "host", "") or "")
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host.lower() == "localhost"
+
+
+@router.get("/online/key")
+def online_key(request: Request) -> dict[str, Any]:
+    """The saved recovery key, for the person sitting at the computer that holds it.
+
+    The key is a credential, so it has exactly one door and that door is local: another
+    computer reading this Hermes gets a sentence, never the key. It is also never part of
+    /view or /online - those carry no key at all - so no snapshot can leak it either.
+    """
+    if not _from_this_computer(request):
+        return {"ok": False, "key": "",
+                "text": "The key can only be shown on the computer that holds it. Open Game Center on "
+                        "that computer (the Hermes this window reaches when the connection is This "
+                        "device), or save your account file there."}
+    source, _ladder = _online_pair()
+    if not source.key():
+        return {"ok": False, "key": "",
+                "text": "This computer has no key yet. Create my player, or sign in with the key you saved."}
+    return {"ok": True, "key": source.key(), "text": "Your key is shown below. Do not share it."}
+
+
+@router.post("/online/account-file")
+def online_account_file() -> dict[str, Any]:
+    """Save my account file: name, key and server in one file in Downloads, and say where."""
+    source, _ladder = _online_pair()
+    answer = source.account_file(_downloads_dir())
+    return _online_answer(answer)
 
 
 @router.post("/online/table/open")

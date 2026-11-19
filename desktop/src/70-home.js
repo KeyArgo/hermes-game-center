@@ -106,6 +106,148 @@ function InferenceAutoPlayButton({ ctx }) {
   })
 }
 
+// ---- Get online: the one card at the top of the Games page ---------------------------------
+//
+// Everything a person needs to start playing with other people, in the order they meet it:
+// which Game Center this window is on, turning online play on, a name (or the player they
+// already have), the name they are known by, their key, and Check online. The steps are the
+// pane's own (onlineAccountBlock, 62-pane-state.js), so the two surfaces cannot drift. Once
+// there is nothing left to do, the card is one line, and Manage opens it again.
+const ONLINE_SETTINGS_ROUTE = '/settings?tab=gateway'
+
+function OnlineGetOnlineCard({ ctx, view }) {
+  const fresh = onlineView(view)
+  // The last answer to one of the card's own presses, painted at once. The page's own poll
+  // replaces it on its next turn, so the card never shows something the gateway has moved on
+  // from: a stale answer would be a card that disagrees with the rest of the page.
+  const [live, setLive] = useState(null)
+  const online = live || fresh
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const [problem, setProblem] = useState('')
+  const [managed, setManaged] = useState(false)
+  // The Hermes connection this window is using: '' or 'local' is this computer, anything else
+  // is another machine's Hermes (the desktop's registered gateways).
+  const [where, setWhere] = useState(null)
+  const fields = useOnlineFields()
+  const suggest = useOnlineSuggest(ctx, online.on && !online.linked)
+  const check = useOnlineCheck(ctx)
+
+  useEffect(() => { setLive(null) }, [view])
+
+  useEffect(() => {
+    let alive = true
+    async function read() {
+      try {
+        if (typeof host === 'undefined' || !host || typeof host.connections !== 'function') return
+        const answer = await host.connections()
+        const rows = Array.isArray(answer) ? answer : (answer && Array.isArray(answer.connections) ? answer.connections : [])
+        const active = typeof host.activeConnectionId === 'function' ? String(host.activeConnectionId() || '') : ''
+        const mine = rows.find(row => row && String(row.id) === active) || null
+        if (alive) {
+          setWhere({
+            active,
+            label: mine ? String(mine.label || mine.id || '') : active,
+            canOpen: typeof host.navigate === 'function'
+          })
+        }
+      } catch {
+        // An older desktop has no registry: the card then says what it does know.
+        if (alive) setWhere({ active: '', label: '', canOpen: false })
+      }
+    }
+    read()
+    return () => { alive = false }
+  }, [ctx])
+
+  // One door for every online action, the same shape the pane uses: the answer carries the
+  // new online view, so what is painted is the server's own answer and not a guess.
+  const call = async (path, body, method) => {
+    if (!ctx || typeof ctx.rest !== 'function') return { ok: false, text: 'Game Center cannot be reached.' }
+    setBusy(true)
+    setProblem('')
+    try {
+      const options = body === undefined ? { method: method || 'POST' } : { method: 'POST', body }
+      const answer = await ctx.rest(path, options)
+      if (answer && answer.online) setLive(answer.online)
+      if (answer && answer.key_to_copy) fields.setShownKey(String(answer.key_to_copy))
+      setNote((answer && answer.text) || '')
+      if (answer && answer.ok === false) setProblem(String(answer.text || 'That did not work.'))
+      return answer || {}
+    } catch {
+      setProblem('That did not reach Game Center. Try again.')
+      return { ok: false }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const hostWord = onlineHost(online.url)
+  const remote = Boolean(where && where.active && where.active !== 'local')
+  const settled = online.on && online.linked && !online.offline
+
+  if (settled && !managed) {
+    return jsxs('div', {
+      'data-online-card': 'collapsed',
+      style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: text.secondary },
+      children: [
+        jsx('span', { 'data-online-card-line': '1', children: `Online as ${online.name} on ${hostWord} ✓` }),
+        jsx('span', { 'aria-hidden': true, children: '·' }),
+        textLink('Manage', () => setManaged(true), 'Open the online steps again')
+      ]
+    })
+  }
+
+  const whereBlock = jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }, children: [
+    jsx('div', {
+      'data-online-card-host': '1',
+      style: { fontSize: 13, fontWeight: 650 },
+      children: `Game Center on ${hostWord}`
+    }),
+    remote
+      ? jsxs('div', { 'data-online-card-connection': 'remote', style: { fontSize: 12, color: text.secondary, lineHeight: 1.5 }, children: [
+          jsx('span', { children: `This window runs Game Center on ${where.label || where.active}. To use this computer’s, switch the connection to This device in the status bar` }),
+          where.canOpen
+            ? jsx('span', { children: ', or press ' })
+            : jsx('span', { children: ', in Settings → Gateways.' }),
+          where.canOpen
+            ? jsx('button', {
+                type: 'button',
+                'data-online-card-settings': '1',
+                onClick: () => {
+                  try { host.navigate(ONLINE_SETTINGS_ROUTE) } catch { /* an older desktop has no router */ }
+                },
+                style: { background: 'transparent', border: 0, padding: 0, font: 'inherit', color: accent, cursor: 'pointer', textDecoration: 'underline' },
+                children: 'Open connection settings'
+              })
+            : null
+        ] })
+      : jsx('div', {
+          'data-online-card-connection': 'this-device',
+          style: { fontSize: 12, color: text.secondary, lineHeight: 1.5 },
+          children: 'This window runs Game Center on this computer.'
+        })
+  ] })
+
+  return jsxs('section', {
+    'data-online-card': 'open',
+    'aria-label': 'Get online',
+    style: {
+      display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0,
+      border: `1px solid ${stroke}`, borderRadius: 10, background: card, padding: '10px 12px'
+    },
+    children: [
+      jsxs('div', { style: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }, children: [
+        jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Get online' }),
+        settled ? textLink('Hide', () => setManaged(false), 'Fold the card back to one line') : null
+      ] }),
+      whereBlock,
+      onlineAccountBlock({ online, fields, call, busy, note, problem, setNote, suggest }),
+      onlineCheckBlock(check)
+    ]
+  })
+}
+
 function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
@@ -600,6 +742,9 @@ function GameCenterPage({ ctx, onArea }) {
     style: { display: 'flex', flexDirection: 'column', gap: 18, padding: 18, paddingBottom: 96, minWidth: 0, overflow: 'auto', background: paper },
     children: [
       tabs,
+      // Get online: the first thing on the page, because playing with another person starts
+      // here - which Game Center this window is on, and the four steps that sign you in.
+      jsx(OnlineGetOnlineCard, { ctx, view }),
       jsxs('div', {
         style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'end', flexWrap: 'wrap' },
         children: [

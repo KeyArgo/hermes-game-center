@@ -6,6 +6,19 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Get online: one card at the top of the Games page does the whole sign-in.** The owner (2026-11-18):
+  the online steps were spread between the dock's Lobby tab and Settings and nobody could find the start
+  of them. The card names the lobby it talks to and which Hermes connection this window is on (with
+  **Open connection settings** when it is another machine), then the switch, the name (**Create my
+  player** / **I have a player**, with **Suggest a name** when the build has the generator), **You are
+  &lt;name&gt; online · Change my name · Sign out**, **Show my key** (masked until pressed, this computer
+  only), **Save my account file** (a `GameCenter-<name>.json` in Downloads), and **Check online**. It
+  folds to one line — *Online as &lt;name&gt; on &lt;host&gt; ✓ · Manage* — once everything works. The
+  steps are one block (`onlineAccountBlock`, `62-pane-state.js`) drawn by the card and the pane, so the
+  two cannot drift; **Change my name** posts to the lobby and repeats its own refusal (the 30-day rule)
+  word for word, and the key has a local-only route (`GET /online/key`) that never appears in a snapshot.
+  Guards: `tests/test_online_account.py` and the *get online card* contract in `tests/table_ui_harness.cjs`.
+
 - **The Games page no longer carries backdrop Size and Visibility, and the side pane opens at 368 px.**
   The owner (2026-11-18): the slot machine settings on the Game Center main page "don't seem to work,
   maybe we should remove those", and "the right pane for the game center should default where it is

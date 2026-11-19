@@ -67,9 +67,11 @@ function WaitPane({ ctx }) {
   const [onlineBusy, setOnlineBusy] = useState(false)
   const [onlineNote, setOnlineNote] = useState('')
   const [onlineProblem, setOnlineProblem] = useState('')
-  const [keyToCopy, setKeyToCopy] = useState('')
-  const [onlineName, setOnlineName] = useState('')
-  const [onlineKey, setOnlineKey] = useState('')
+  // The account form (name, saved key, the key shown once) is the Games page's card's own
+  // state too: one hook, in 62-pane-state.js, so the two surfaces ask for the same things.
+  const onlineFields = useOnlineFields()
+  // "Suggest a name" asks its route only while the sign-in form is what is on screen.
+  const onlineSuggest = useOnlineSuggest(ctx, onlineView(view).on && !onlineView(view).linked)
   const [ladderAsk, setLadderAsk] = useState(null)
   const [ladderChampion, setLadderChampion] = useState('')
   // "Play here": the room of a match the lobby handed over, played in this pane on the server
@@ -291,7 +293,7 @@ function WaitPane({ ctx }) {
       if (answer && answer.online) {
         setView(current => ({ ...(current || {}), online: answer.online }))
       }
-      if (answer && answer.key_to_copy) setKeyToCopy(String(answer.key_to_copy))
+      if (answer && answer.key_to_copy) onlineFields.setShownKey(String(answer.key_to_copy))
       setOnlineNote((answer && answer.text) || '')
       if (answer && answer.ok === false) setOnlineProblem(String(answer.text || 'That did not work.'))
       return answer || {}
@@ -955,40 +957,14 @@ function WaitPane({ ctx }) {
     children: [
       jsx('div', { style: { fontWeight: 650, fontSize: 13 }, children: 'Play with people online' }),
       jsx('div', { style: { fontSize: 12, color: onlineOffline ? text.tertiary : text.secondary }, children: onlineLine(online, title) }),
-      !online.on ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-        jsx('div', {
-          style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45, border: `1px solid ${stroke}`, borderRadius: 6, padding: '6px 8px' },
-          children: online.disclosure || `Online play talks to ${online.url} and nothing else.`
-        }),
-        jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
-          button('Turn on online play', () => onlineCall('/online/on'), { primary: true, disabled: onlineBusy }),
-          button('Not now', () => setOnlineNote('Online stays off. Everything here still plays on this computer.'), { disabled: onlineBusy })
-        ] })
-      ] }) : null,
-      online.on && !online.linked ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-        jsx('div', { style: { fontSize: 12, color: text.secondary }, children: `Games with other people happen on ${onlineHost(online.url)}. Pick the name you will be known by there.` }),
-        jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
-          field(onlineName, setOnlineName, 'Your name online', () => onlineCall('/online/signup', { name: onlineName.trim() })),
-          button('Create my player', () => onlineCall('/online/signup', { name: onlineName.trim() }), { primary: true, disabled: onlineBusy || !onlineName.trim() })
-        ] }),
-        jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
-          field(onlineKey, setOnlineKey, 'Recovery key you saved', () => onlineCall('/online/signin', { name: onlineName.trim(), key: onlineKey.trim() })),
-          button('I have a key', () => onlineCall('/online/signin', { name: onlineName.trim(), key: onlineKey.trim() }), { disabled: onlineBusy || !onlineName.trim() || !onlineKey.trim() })
-        ] }),
-      ] }) : null,
-      keyToCopy ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
-        jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: 'This is your recovery key. It is shown once, and it is what signs you in on another computer. It is kept with your other Hermes credentials.' }),
-        jsx('div', { style: { fontFamily: 'var(--font-mono, ui-monospace, monospace)', fontSize: 12, overflowWrap: 'anywhere' }, children: keyToCopy }),
-        jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center' }, children: [
-          button('Copy recovery key', () => copyText(keyToCopy, setOnlineNote), { primary: true }),
-          textLink('Hide this key', () => setKeyToCopy(''))
-        ] })
-      ] }) : null,
+      // The account steps (turn on, pick a name, sign in, change the name, the key) are the
+      // same ones the Games page's Get online card draws, from the same block: one piece of
+      // markup and one piece of state, so the two surfaces cannot drift apart.
+      onlineAccountBlock({
+        online, fields: onlineFields, call: onlineCall, busy: onlineBusy,
+        note: onlineNote, problem: onlineProblem, setNote: setOnlineNote, suggest: onlineSuggest
+      }),
       online.on && online.linked ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-        jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: text.secondary }, children: [
-          jsx('span', { children: `You are ${online.name} online.` }),
-          textLink('Sign out here', () => onlineCall('/online/forget'))
-        ] }),
         onlineAlert ? jsx('div', {
           role: 'status', 'aria-live': 'polite',
           style: { fontSize: 12, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
@@ -1033,10 +1009,7 @@ function WaitPane({ ctx }) {
             jsx('span', { children: 'Tell me when someone online wants this game (at most once every ten minutes, never during a match)' })
           ] })
         ] })
-      ] }) : null,
-      // Whoever turned it on can turn it off, signed in or not: an unlinked person
-      // must not be stuck with online play on.
-      online.on ? jsx('div', { style: { display: 'flex', marginTop: 6 }, children: textLink('Turn online play off', () => onlineCall('/online/off')) }) : null
+      ] }) : null
     ]
   })
 
@@ -1143,13 +1116,7 @@ function WaitPane({ ctx }) {
           jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
             field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
             button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
-          ] }),
-          onlineProblem
-            ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' }, children: onlineProblem })
-            : null,
-          onlineNote
-            ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: onlineNote })
-            : null
+          ] })
         ]
       }),
       jsxs('div', {

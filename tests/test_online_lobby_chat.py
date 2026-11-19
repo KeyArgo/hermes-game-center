@@ -124,7 +124,7 @@ def test_check_online_walks_every_step_and_names_who_the_hall_lists(tmp_path):
             stranger = _pc(tmp_path / "pc-two", base, "not-a-real-key")
             steps = await asyncio.to_thread(stranger.check)
             assert steps[-1]["name"] == "Account" and steps[-1]["ok"] is False, steps
-            assert "I have a key" in steps[-1]["text"], steps
+            assert "I have a player" in steps[-1]["text"], steps
         finally:
             await client.close()
         steps = await asyncio.to_thread(one.check)
