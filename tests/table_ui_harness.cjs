@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -7044,11 +7044,12 @@ async function lobbyAsksContract() {
   await tick()
   assert.deepEqual(JSON.parse(JSON.stringify(posts(run, '/online/hall/respond').pop())),
     { id: 'o1', accept: false }, 'Not now says not this time')
-  // The same offer, made to the other side: the dialog reads the same, and either may join.
+  // The same offer, read by the person who sent it: no dialog, no answer they would be
+  // refused for - the asker waits on the panel instead (offerSidesContract below).
   run = makeCtx(snapshot({ you: { ...you, id: 'bea' }, requests: [offer] }))
   tree = await settle(props({ ctx: run.ctx }))
   const otherSide = nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'LobbyOfferDialog')
-  assert.equal(otherSide.props.otherName, 'Ada', 'the person who was offered reads the other name')
+  assert.equal(otherSide, undefined, 'the asker is not offered the dialog for an ask they sent')
   // A plain request is still a card, not a dialog.
   reset()
   run = makeCtx(snapshot({ requests: [{ ...offer, offer: false }] }))
@@ -8118,4 +8119,94 @@ async function alwaysInviteContract() {
   assert.equal(nodes(tree).filter(node => node.props && node.props['data-ask-always']).length, 0,
     'an ack without ask_always asks nothing')
   console.log('always invite: the twenty-minute accept asks once whether it should stay: passed')
+}
+
+// ---- Who answers an offer, and who waits ------------------------------------------------
+// Find match asks one person for sixty seconds at a time. Only the person asked can answer
+// (the server refuses anyone else), so only the person asked sees Join / Not now; the asker
+// sees who is being asked, how many seconds are left, and the control that stops the ask -
+// never a dialog they could press and be refused for.
+async function offerSidesContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const draw = value => {
+    sandbox.hallProps = value
+    cursor = 0
+    const tree = evaluate('LobbyHall(hallProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return tree
+  }
+  const settle = async value => { draw(value); await tick(); return draw(value) }
+  const snapshot = (extra = {}) => ({
+    state: 'live', you: { id: 'me', name: 'Ada', looking: [] }, prefs: { open: false, games: {} },
+    roster: [], requests: [], seated: null, ...extra
+  })
+  const makeCtx = snap => {
+    const asked = []
+    const ctx = { rest: async (path, options) => {
+      asked.push([path, (options && options.body) || null])
+      if (path === '/online/hall') return snap
+      return { ok: true, text: 'Cancelled.' }
+    } }
+    return { ctx, asked }
+  }
+  const props = extra => ({ ctx: null, current: 'connect4', view: {}, onPlayHere: () => {}, ...extra })
+  const dialogIn = tree => nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'LobbyOfferDialog')
+  const now = Math.floor(Date.now() / 1000)
+  const toMe = { id: 'o1', state: 'pending', offer: true, game: 'connect4', created: now - 18, expires: now + 42,
+    from: { id: 'bea', name: 'Bea' }, to: { id: 'me', name: 'Ada' } }
+  const fromMe = { ...toMe, from: { id: 'me', name: 'Ada' }, to: { id: 'bea', name: 'Bea' } }
+
+  // 1. The person asked is the one who answers: the dialog, with Join and Not now.
+  reset()
+  let run = makeCtx(snapshot({ requests: [toMe] }))
+  let tree = await settle(props({ ctx: run.ctx }))
+  const dialog = dialogIn(tree)
+  assert.ok(dialog, 'the person asked gets the offer dialog')
+  assert.equal(dialog.props.card.id, 'o1', 'for the offer the server sent them')
+  assert.equal(dialog.props.otherName, 'Bea', 'naming the person who is asking')
+  const answers = []
+  sandbox.offerSidesProps = { card: toMe, other: { id: 'bea', name: 'Bea' }, otherName: 'Bea',
+    busy: false, busyNote: 'busy',
+    onJoin: () => answers.push('join'), onNotNow: () => answers.push('not now') }
+  const dialogTree = evaluate('LobbyOfferDialog(offerSidesProps)')
+  assert.ok(findButton(dialogTree, 'Join') && findButton(dialogTree, 'Not now'), 'and the two answers')
+  assert.ok(!words(tree).includes('Asking Bea'), 'and is not told they are asking anyone')
+  const line = nodes(tree).find(node => node.props && node.props['data-lobby-offer-line'] === '1')
+  assert.ok(words(line).includes('Bea wants to play Connect 4'), 'the offer is one sentence on the panel too')
+  assert.ok(!words(line).includes('both looking'), 'and it does not claim both were looking: ' + words(line))
+
+  // 2. The asker waits: who is being asked, the seconds left, and a cancel - no dialog.
+  reset()
+  run = makeCtx(snapshot({ you: { id: 'me', name: 'Ada', looking: ['connect4'] }, requests: [fromMe] }))
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(dialogIn(tree), undefined, 'the asker is never given an answer dialog of their own ask')
+  const askingLine = nodes(tree).find(node => node.props && node.props['data-lobby-asking'] === '1')
+  assert.ok(askingLine, 'the panel says the ask is out: ' + words(tree).slice(-300))
+  assert.match(words(askingLine), /Asking Bea — 4[0-2] s/, 'naming who and how long is left')
+  const cancel = findButton(tree, 'Cancel')
+  assert.ok(cancel, 'with the control that takes the ask back')
+  await cancel.props.onClick()
+  await tick()
+  const cancelled = run.asked.filter(item => item[0] === '/online/hall/cancel').pop()
+  assert.ok(cancelled, 'Cancel is the lobby cancel door')
+  assert.equal(JSON.stringify(cancelled[1]), JSON.stringify({ id: 'o1' }), 'for the offer that is out')
+  const findSpot = nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'LobbyFindMatch')
+  assert.ok(findSpot && findSpot.props.looking.includes('connect4'),
+    'and the search itself is still on, with its own stop, after the ask is taken back')
+
+  // 3. A person looking at a different board is neither: their panel has no offer line at all.
+  reset()
+  run = makeCtx(snapshot({ you: { id: 'zed', name: 'Zed', looking: [] }, requests: [fromMe] }))
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(dialogIn(tree), undefined, 'an offer between two other people is not this person’s')
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-lobby-offer-line'] === '1'), undefined,
+    'and is not drawn on their panel')
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-lobby-asking'] === '1'), undefined,
+    'nor is it their ask to wait on')
+  reset()
+  console.log('offers: the person asked answers, the asker waits with a cancel: passed')
 }

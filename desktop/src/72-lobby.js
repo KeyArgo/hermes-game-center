@@ -209,9 +209,9 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote }) {
   })
 }
 
-// A match offer. Find match made it, so neither person sent it: whichever of you
-// presses Join sits both down at the same private table. The dialog is the ask; the
-// dim line under the roster is the same news kept on the panel.
+// A match offer. Find match made it, so neither person sent it: the person asked
+// is the one who can answer it (the server refuses anyone else), so the dialog is
+// drawn only for them. The asker waits, with the seconds left and a way to take it back.
 function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote }) {
   const title = lobbyOfferLine(otherName, card.game)
   return jsx('div', {
@@ -229,7 +229,7 @@ function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busy
       },
       children: [
         jsx('div', { style: { fontSize: 16, fontWeight: 700 }, children: title }),
-        jsx('div', { style: { fontSize: 12, color: text.secondary, lineHeight: 1.5 }, children: 'You are both looking for this game. Join and you sit down together at a private table inside Hermes — no code to copy.' }),
+        jsx('div', { style: { fontSize: 12, color: text.secondary, lineHeight: 1.5 }, children: 'Find match asked you because you accept this game. Join and you sit down together at a private table inside Hermes — no code to copy.' }),
         jsxs('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 2 }, children: [
           jsx('button', {
             'data-lobby-offer-notnow': '1',
@@ -425,13 +425,17 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     })
   ] })
 
-  // A match offer from find match. Which of the two sent it does not matter: the dialog
-  // is the same for both, and either side may join.
+  // A match offer from find match. It is one person's ask: only the person asked can
+  // answer it, so only they get the dialog. The asker waits instead - who is being asked,
+  // the seconds left, and the control that takes the ask back. The Post is already
+  // nobody's: the server withdraws the offer when the search ends.
   const offerCards = requests.filter(req => req && req.state === 'pending' && req.offer)
-  const offer = offerCards[0] || null
-  const offerOther = offer
-    ? (String(offer.from && offer.from.id) === String(you.id) ? (offer.to || {}) : (offer.from || {}))
-    : null
+  const offer = offerCards.find(req => req.to && String(req.to.id) === String(you.id)) || null
+  const asking = offerCards.find(req => req.from && String(req.from.id) === String(you.id)) || null
+  const offerOther = offer ? (offer.from || {}) : null
+  // How long the ask has left, in whole seconds: "Asking Bea — 42 s". The server's expires is
+  // the moment it lapses, not a length, so the count is that moment minus now.
+  const offerSeconds = asking ? Math.max(0, Math.round(Number(asking.expires || 0) - Date.now() / 1000)) : 0
 
   // The roster, you left out. A dot says whether each person can play now, and Ask is
   // offered only to someone online who accepts a game you are also taking — for the game
@@ -520,6 +524,17 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       children: [
         jsx('span', { children: `${lobbyOfferLine(offerOther.name, offer.game)} — Join or Not now on the dialog.` }),
         jsx('span', { children: ' (Not sent to the model: Game Center shows this itself.)' })
+      ]
+    }) : null,
+    // The asker's own line: who is being asked and how long is left, with the one control
+    // that ends this ask. Find match's Stop looking is right above it, for the search itself.
+    asking ? jsxs('div', {
+      'data-lobby-asking': '1', role: 'status', 'aria-live': 'polite',
+      style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11, color: text.tertiary, lineHeight: 1.45 },
+      children: [
+        jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asking ${(asking.to && asking.to.name) || 'someone'} — ${offerSeconds} s` }),
+        button('Cancel', () => post(`cancel:${asking.id}`, '/online/hall/cancel', { id: asking.id }),
+          held('Take this ask back: nobody will be seated by it.'))
       ]
     }) : null,
     seatProblem ? jsxs('div', {
