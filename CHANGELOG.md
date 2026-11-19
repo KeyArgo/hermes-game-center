@@ -6,6 +6,17 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The Jackpot cabinet always shows all three reel rows, and Normal / Bigger / Biggest stay on one
+  line.** The cabinet's content column is a flex column inside a fixed 720 px machine, so a taller
+  panel below the reels was paid for out of the reel window - measured at 271 px against the design
+  312, which cut the bottom row of the drum off (owner, 2026-11-18: "always 3 rows"). The window now
+  keeps its own height (`flexShrink: 0`, `minHeight: cell x rows`, and `data-jp2-window-rows` so the
+  number is measurable) and the control panel below it is the part that flexes and scrolls; the
+  Classic cabinet's reel row is pinned the same way. The three size pills ride in their own
+  non-wrapping row, so a narrow cabinet wraps the row as a whole instead of splitting them 2 + 1.
+  Guards: `tests/jackpot2_fit.mjs`, which measures the window's layout height against `cell x rows` in
+  the pane, the full view, the over-chat copy and at Biggest - and that file's copy section had been
+  looking for markup the app no longer draws, so it is pointed at the real copy again.
 - **The slot spins and pays points only for the chat you are looking at.** Every hook fires for every
   chat on the machine, so a workturn in a side chat, a delegated subagent or a review pane turned the
   owner's machine over while he was reading something else (owner, 2026-11-18: "slot spins and points

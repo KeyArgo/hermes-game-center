@@ -1165,8 +1165,13 @@ function JackpotMachine(props) {
 
   const windowBox = jsx('div', {
     'data-jp2-window': '1',
+    // The window's own height, as an attribute as well as a style: the three rows are a promise the
+    // browser-side fit test measures (window height === cell x rows), and the count has to travel
+    // with the drawing for it to be measurable at all.
+    'data-jp2-window-rows': String(rows),
     style: {
-      position: 'relative', width: windowW, height: windowH, margin: '0 auto', display: 'flex',
+      position: 'relative', width: windowW, height: windowH, minHeight: windowH, flexShrink: 0,
+      margin: '0 auto', display: 'flex',
       borderRadius: 12, overflow: 'hidden', background: JP2_NAVY,
       border: `1px solid rgba(62,224,197,${flash ? 0.55 : 0.24})`,
       boxShadow: `inset 0 10px 34px rgba(0,0,0,.78), 0 0 44px rgba(62,224,197,${flash ? 0.4 : 0.12})`,
@@ -1435,6 +1440,18 @@ function JackpotMachine(props) {
             ]
           }, 'header'),
           windowBox,
+          // The panel below the reels is what flexes and scrolls now. The cabinet's content column is
+          // a flex column inside a fixed 720 px machine, and it used to hand a taller panel its room by
+          // squeezing the reel window (measured: 271 px against a design 312, so the bottom row of the
+          // drum was cut off). The window does not shrink any more; this does. Nothing is hidden - it
+          // scrolls inside itself.
+          jsx('div', {
+            'data-jp2-panel': '1',
+            style: {
+              display: 'flex', flexDirection: 'column', gap: 10, flex: '1 1 auto', minHeight: 0,
+              overflowY: 'auto', overflowX: 'hidden'
+            },
+            children: [
           // Counters: the wallet, the stake, and what the last spin paid.
           jsx('div', {
             style: { display: 'flex', gap: 8 },
@@ -1692,6 +1709,8 @@ function JackpotMachine(props) {
               }, 'points-control')
             ]
           }, 'footer')
+            ]
+          }, 'panel')
         ]
       }, 'content'),
       leverEl,

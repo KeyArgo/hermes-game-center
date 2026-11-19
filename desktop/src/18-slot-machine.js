@@ -1368,11 +1368,13 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             children: jackpot ? 'JACKPOT!' : '\u00a0'
           }),
           jsxs('div', {
-            style: { display: 'flex', alignItems: 'center', gap: SM_px(4) },
+            // The reels keep their own height (owner, 2026-11-18: "always 3 rows"): this row and the
+            // window inside it never shrink, so a taller panel below cannot eat a reel row.
+            style: { display: 'flex', alignItems: 'center', gap: SM_px(4), flexShrink: 0 },
             children: [
               markers('left'),
               jsxs('div', {
-                style: { position: 'relative', display: 'flex', border: `${SM_px(4)}px solid ${smEdge()}`, borderRadius: SM_px(6), background: smShell(), boxShadow: smLook('windowShadow', `inset 0 ${SM_px(6)}px ${SM_px(12)}px rgba(0,0,0,0.6)`) },
+                style: { flexShrink: 0, position: 'relative', display: 'flex', border: `${SM_px(4)}px solid ${smEdge()}`, borderRadius: SM_px(6), background: smShell(), boxShadow: smLook('windowShadow', `inset 0 ${SM_px(6)}px ${SM_px(12)}px rgba(0,0,0,0.6)`) },
                 children: [
                   ...reelColumns,
                   paylineSvg,
