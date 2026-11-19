@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import atexit
 import functools
+import inspect
 import logging
 import re
 import sys
@@ -85,7 +86,27 @@ def attach(data_root: Path | str) -> logging.Logger:
 def wrap_rest(endpoint: Callable, *, clock: Callable[[], float] = time.monotonic) -> Callable:
     """One REST handler, watched: an unhandled error is logged with its traceback and
     re-raised (the host still answers the request its own way); a call slower than
-    ``SLOW_SECONDS`` earns one warning. The signature is preserved for FastAPI."""
+    ``SLOW_SECONDS`` earns one warning. The signature is preserved for FastAPI.
+
+    A coroutine handler is watched from its own coroutine: a plain wrapper around one would return
+    the coroutine object itself, which the host would read as the response.
+    """
+    if inspect.iscoroutinefunction(endpoint):
+
+        @functools.wraps(endpoint)
+        async def watched_async(*args: Any, **kwargs: Any):
+            start = clock()
+            try:
+                return await endpoint(*args, **kwargs)
+            except Exception:
+                log.exception("REST handler %s failed", endpoint.__name__)
+                raise
+            finally:
+                took = clock() - start
+                if took > SLOW_SECONDS:
+                    log.warning("slow request %s took %.2fs", endpoint.__name__, took)
+
+        return watched_async
 
     @functools.wraps(endpoint)
     def watched(*args: Any, **kwargs: Any):

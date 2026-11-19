@@ -6,6 +6,17 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **`POST /log` refuses a body over 8 KB instead of parsing it.** The route declared its body as a
+  parameter, so FastAPI read and parsed whatever arrived before the handler ran — 20 multi-megabyte
+  frames a minute were all decoded, and a page could make the plugin chew on them (disk stayed safe:
+  lines are trimmed to 300 characters and the file rotates at 1 MB × 3). The route reads the request
+  body itself now, with the cap in front of the parse (`413`-style answer
+  `{"ok": false, "reason": "too_big"}`), and the parse is a straight `json.loads`. The REST watch
+  learned to wrap a coroutine handler (a plain wrapper hands the host the coroutine object as its
+  response). Guards: `tests/test_desktop_logging.py`
+  (`test_a_report_too_big_to_be_one_line_is_refused_before_it_is_parsed` — a real FastAPI app through
+  `TestClient`, fails against the old route).
+
 - **The 120-second backoff step runs.** `Online._fail` capped the failure count at
   `len(BACKOFF_SECONDS) - 1` and then indexed `BACKOFF_SECONDS[fails - 1]`, so the fourth entry could
   never be read: a server that stayed down was retried every 60 s forever, not the 15, 30, 60, 120

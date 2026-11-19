@@ -699,12 +699,53 @@ _LOG_TIMES: deque = deque()
 _LOG_LOCK = threading.Lock()
 _LOG_PER_MINUTE = 20
 _LOG_LINE = 300
+# A report is one short line, so a body bigger than this is not one: it is refused before it is read
+# or parsed (the page never sends more than a few hundred bytes). Without it the route parsed
+# whatever a page sent, before the handler - and the rate limit counted after that work.
+_LOG_BODY_BYTES = 8 * 1024
+
+
+async def _report_body(request: Request) -> dict | None:
+    """The report a surface posted, read with a cap. ``None`` means it was too big to be one."""
+    try:
+        declared = int(str(request.headers.get("content-length") or 0))
+    except (TypeError, ValueError):
+        return None
+    if declared > _LOG_BODY_BYTES:
+        return None
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > _LOG_BODY_BYTES:
+            return None
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+    if not raw:
+        return {}
+    try:
+        body = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    return body if isinstance(body, dict) else {}
 
 
 @router.post("/log")
-def log_report(body: dict | None = None) -> dict:
+async def log_report(request: Request) -> dict:
     """One short line from a Game Center surface into the plugin's own log.
-    Secrets are masked by the log itself; a long message is trimmed, not stored."""
+
+    The body is read here rather than declared as a parameter: FastAPI reads and parses a declared
+    body before the handler runs, so a size check there would come after the work it is meant to
+    prevent. Secrets are masked by the log itself; a long message is trimmed, not stored.
+    """
+    body = await _report_body(request)
+    if body is None:
+        return {"ok": False, "reason": "too_big"}
+    return _log_report(body)
+
+
+def _log_report(body: dict | None = None) -> dict:
+    """The report itself: one line, rate limited, secrets masked by the log."""
     body = body if isinstance(body, dict) else {}
     kind = str(body.get("kind") or "")
     if kind not in {"error", "rejection", "heap"}:
