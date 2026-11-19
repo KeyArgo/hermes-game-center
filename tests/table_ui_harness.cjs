@@ -3934,7 +3934,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -7924,6 +7924,16 @@ async function playWithPeopleContract() {
   assert.equal(chipFor(tree, 'chessboard').props['aria-pressed'], 'false', 'an expired accept is off')
   assert.ok(!words(chipFor(tree, 'chessboard')).includes('for 20 min'), 'and no longer says twenty minutes')
 
+  // 3b. With the master switch off, the card says why the chips cannot be reached.
+  reset()
+  run = makeCtx(liveSnap({ prefs: { open: false, games: { connect4: true }, until: {} } }))
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(words(tree).includes('Game requests are off.'), 'a closed accept list says so: ' + words(tree).slice(0, 300))
+  reset()
+  run = makeCtx(liveSnap())
+  tree = await paint(signedIn, run.ctx)
+  assert.ok(!words(tree).includes('Game requests are off'), 'an open one says nothing about it')
+
   // 4. Pressing an accept chip writes the accept list, once, on the server.
   reset()
   run = makeCtx(liveSnap())
@@ -7971,11 +7981,14 @@ async function playWithPeopleContract() {
   reset()
   run = makeCtx(liveSnap({
     you: { id: 'me', name: 'Ada', invisible: false, looking: ['chessboard'] },
-    requests: [{ id: 'o1', state: 'pending', offer: true, game: 'chessboard', created: now - 18, expires: 60,
+    requests: [{ id: 'o1', state: 'pending', offer: true, game: 'chessboard', created: now - 18, expires: now + 42,
       from: { id: 'me', name: 'Ada' }, to: { id: 'bea', name: 'Bea' } }]
   }))
   tree = await paint(signedIn, run.ctx)
-  assert.ok(words(tree).includes('Asking Bea — 42 s'), 'the search says who is being asked and how long is left: ' + words(tree).slice(-300))
+  // A couple of seconds can pass between building the offer and painting it, so the count is
+  // read as "about forty seconds left" rather than one exact number.
+  assert.match(words(tree), /Asking Bea — 4[0-2] s/,
+    'the search says who is being asked and how long is left: ' + words(tree).slice(-300))
 
   // 8. An offer that comes in names the game, not its id.
   reset()

@@ -263,6 +263,11 @@ function PlayWithPeople({ ctx, view }) {
   const [snap, setSnap] = useState(null)
   const [pending, setPending] = useState('')
   const [note, setNote] = useState('')
+  // The game the once-only "always?" question is about, while it is on screen.
+  const [askGame, setAskGame] = useState('')
+  // Games already asked about in this visit. The server sends ask_always once per change,
+  // and this keeps a second press from drawing the same question again.
+  const asked = useRef({})
 
   useEffect(() => {
     if (!signedIn || !ctx || typeof ctx.rest !== 'function') return undefined
@@ -292,6 +297,13 @@ function PlayWithPeople({ ctx, view }) {
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
       if (answer && answer.ok === false) setNote(String(answer.text || ''))
+      // A Play that had to accept the game for twenty minutes comes back with ask_always:
+      // the press that opened that window is the one moment to ask whether it should stay.
+      const played = body && Array.isArray(body.games) ? body.games[0] : ''
+      if (answer && answer.ask_always && played && !asked.current[played]) {
+        asked.current[played] = true
+        setAskGame(played)
+      }
       return answer || { ok: true }
     } catch {
       setNote('That did not reach Game Center. Try again.')
@@ -306,15 +318,16 @@ function PlayWithPeople({ ctx, view }) {
   const requests = (snap && snap.requests) || []
   const mine = Array.isArray(you.looking) ? you.looking : []
   const nowSeconds = Date.now() / 1000
+  // A pending offer that has run out is not one that is out any more.
   const sent = requests.filter(req => req && req.state === 'pending' && req.offer
-    && req.from && String(req.from.id) === String(you.id))
+    && req.from && String(req.from.id) === String(you.id)
+    && Number(req.expires || 0) > nowSeconds)
   const came = requests.filter(req => req && req.state === 'pending' && req.offer
     && req.to && String(req.to.id) === String(you.id))
   const asking = sent[0] || null
-  // How long the offer has left, in whole seconds: "Asking Bea — 42 s".
-  const left = asking
-    ? Math.max(0, Math.round(Number(asking.created || 0) + Number(asking.expires || 0) - nowSeconds))
-    : 0
+  // How long the offer has left, in whole seconds: "Asking Bea — 42 s". The server's expires is
+  // the moment it lapses, not a length, so the count is that moment minus now.
+  const left = asking ? Math.max(0, Math.round(Number(asking.expires || 0) - nowSeconds)) : 0
   const comingOffer = came[0] || null
   const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
   const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.5, minWidth: 0 }
@@ -342,6 +355,12 @@ function PlayWithPeople({ ctx, view }) {
       // Called as the block it is, the way onlineAccountBlock is: no state of its own, so the
       // chip row is drawn in place and its presses go through this card's one door.
       LobbyAcceptChips({ until: prefs.until, games: prefs.games, post, pending, busyNote: HALL_BUSY_NOTE }),
+      // The master switch is The Hall's; saying so here is kinder than chips that look pressed
+      // while the server is sending nobody.
+      prefs.open ? null : jsx('div', {
+        'data-people-open-off': '1', style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
+        children: 'Game requests are off. Turn on "Take game requests" in The Hall for people to reach these.'
+      }),
       rowHead('play', 'Play now', 'Asks people who accept that game, longest-waiting first, one at a time.'),
       jsx('div', {
         role: 'group', 'aria-label': 'Play now',
@@ -383,6 +402,28 @@ function PlayWithPeople({ ctx, view }) {
             'data-people-offer': String(comingOffer.id), role: 'status', 'aria-live': 'polite',
             style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
             children: `${lobbyOfferLine((comingOffer.from && comingOffer.from.name) || '', comingOffer.game)} — Join or Not now on the dialog.`
+          })
+        : null,
+      // The once-only question: the twenty-minute accept is already in place, so both answers
+      // work; "Yes, always" is the one that keeps it without a window.
+      askGame
+        ? jsxs('div', {
+            'data-ask-always': askGame, role: 'status', 'aria-live': 'polite',
+            style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0, borderTop: `1px solid ${stroke}`, paddingTop: 8 },
+            children: [
+              jsx('span', { style: { ...muted, color: text.secondary, flex: 1, whiteSpace: 'normal' }, children: `Always let people invite you to ${lobbyTitle(askGame)}?` }),
+              button('Yes, always', async () => {
+                await post('always', '/online/hall/prefs', { always: { [askGame]: true } })
+                setAskGame('')
+              }, { primary: true, title: `Keep ${lobbyTitle(askGame)} on your accept list from now on.` }),
+              jsx('button', {
+                'data-ask-just': '1',
+                ...held(`Leave ${lobbyTitle(askGame)} accepted for the next twenty minutes only.`),
+                onClick: () => setAskGame(''),
+                style: { fontSize: 12, padding: '4px 10px', borderRadius: 8, border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary, cursor: 'pointer' },
+                children: 'Just 20 minutes'
+              })
+            ]
           })
         : null,
       note ? jsx('div', { role: 'alert', style: { ...muted, color: text.primary }, children: note }) : null
