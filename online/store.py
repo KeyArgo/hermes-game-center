@@ -1278,6 +1278,17 @@ class Store:
         windows = dict(until or {})
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # A window that has run out is off before the save is merged. A screen still
+            # showing that game on is not the person choosing it for good, so the row must
+            # already be off when the "turned on by hand" branch looks at it.
+            run_out = {
+                str(row["game"]) for row in self.db.execute(
+                    "SELECT game FROM availability_games "
+                    "WHERE player_id = ? AND until > 0 AND until <= ?",
+                    (player_id, float(now)))
+            }
+            self.clear_expired_windows(now)
+
             self.db.execute(
                 "INSERT INTO availability (player_id, open, updated) VALUES (?, ?, ?) "
                 "ON CONFLICT(player_id) DO UPDATE SET open = excluded.open, updated = excluded.updated",
@@ -1307,9 +1318,14 @@ class Store:
                         "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = 0, standing = 1",
                         (player_id, game),
                     )
+                elif game in run_out:
+                    # A window that has run out. The sweep above already turned the game
+                    # off, and a screen that still lists it on is not the person turning it
+                    # on by hand.
+                    continue
                 else:
                     # Turned on by hand: a standing choice. A window still running stays as
-                    # it is; one that has run out is replaced by the choice.
+                    # it is; one that has run out was turned off above and is not here.
                     self.db.execute(
                         "INSERT INTO availability_games (player_id, game, enabled, until, standing) "
                         "VALUES (?, ?, 1, 0, 1) "
