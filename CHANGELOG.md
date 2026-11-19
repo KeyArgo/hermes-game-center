@@ -24,6 +24,15 @@ top of Game Center's Settings and at `GET /v1/version`.
   `test_retry_answers_with_the_state_the_dial_reached` — both fail against the old `start()`),
   `tests/table_ui_harness.cjs` (the held switch says why beside it, Retry posts `/online/hall/retry`,
   a live switch offers none) and `tests/test_table_ui_contract.py`.
+- **A diagnostic log that catches problems, memory included.** Game Center now keeps `game-center.log`
+  (1 MB × 3 files) in its own data folder: unhandled REST and hook errors with tracebacks, requests
+  slower than 2 s, the lobby socket's connect / disconnect / reconnect, and one health line every
+  5 minutes (RSS, threads, open lobby sockets) that warns when memory grows on 6 samples in a row by
+  more than 50 MB. Keys and tokens are masked, tracebacks included. A self-hosted lobby server writes
+  the same lines to its own logger (journald). The Games page and the side pane report their own
+  crashes and five-minute heap samples to a rate-limited `POST /log` (20/min) — never the host app's
+  errors, never its markup. Stdlib only; [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) reads every line.
+
 - **Find match: four ways an offer could outlive the choices behind it.** From huddle round 12's read of
   the server (lane F). (1) A person who was also looking for a game counted as a candidate even after
   turning that game off — the search row outlives the twenty-minute accept it opened — so an offer went

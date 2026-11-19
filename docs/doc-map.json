@@ -132,9 +132,15 @@
     ]
   },
   "docs/TROUBLESHOOTING.md": {
-    "code": [],
+    "code": [
+      "shelf/diagnostics.py",
+      "dashboard/plugin_api.py",
+      "online/server.py",
+      "desktop/src/09-diagnostics.js"
+    ],
     "markers": [
-      "Chrome"
+      "Chrome",
+      "game-center.log"
     ]
   },
   "docs/USAGE.md": {

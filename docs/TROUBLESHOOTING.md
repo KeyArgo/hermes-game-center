@@ -54,6 +54,26 @@ Real failure modes the code handles or the README already names, and what to do 
 | The **Champions** tab says the matches do not run | It is a placeholder in this version. | Nothing to fix. Play and Experimental are unaffected. |
 | Every Experimental card is locked | The shelf is a shop window, not a door. | Start the talking tables from chat (`/games mafia new`). A game that is not in `shelf/curated.json` cannot reach Play. |
 
+## The diagnostic log
+
+Game Center keeps its own log, `game-center.log`, in the plugin's data folder — the same folder
+its state lives in (Hermes's plugin-data folder for `hermes-gameshelf`, not the install folder).
+It rotates at 1 MB and keeps three older files (`game-center.log.1` … `.3`). Keys and tokens are
+masked as `***` on the way out, tracebacks included, so the file is safe to attach to a bug report.
+A lobby server you host yourself writes the same health, slow-request and error lines to its own
+logger (journald when it runs as a service), not to this file.
+
+| Line | What it means | What to do |
+|---|---|---|
+| `health rss=…MB threads=… lobby_sockets=…` | One snapshot every 5 minutes while the plugin runs: the process's resident memory, its thread count, and the lobby sockets it holds open. | Nothing — it is the baseline a problem is measured against. |
+| `WARNING … memory keeps growing (+…MB over 6 samples)` | Memory grew on 6 samples in a row (half an hour), more than 50 MB together. Something may be leaking. | Restart Hermes when convenient; if it returns, report it with the log attached. |
+| `ERROR … REST handler … failed` + traceback | A request from the Games page or the pane crashed. The page shows its own refusal; the traceback names the cause. | Read the traceback's last line; report it with the log if it repeats. |
+| `ERROR … the automatic spin … did not run` / `the win bonus was not awarded` | A chat hook hit an error. It is swallowed: the turn or the game continues. | Only worth reporting if it repeats. |
+| `WARNING … slow request … took …s` | One request took longer than 2 seconds. | A cold start or a busy disk explains one; a run of them is worth reporting. |
+| `lobby connect …` / `lobby disconnect …` / `lobby reconnect in …s` | The online lobby socket opened, dropped, or is dialing again. | Reconnects after a network drop are normal; only continuous failures mean the server is unreachable. |
+| `desktop error: …` / `desktop rejection: …` | A crash inside the Games page or the side pane — only Game Center's own code is reported, never the host app's. At most 20 lines a minute. | The boundary card offers a way out; report the line if the crash repeats. |
+| `desktop heap used=…MB` | The browser's JavaScript heap, every 5 minutes while a Game Center surface is open (only where the browser offers `performance.memory`). | A number that climbs without coming down is worth reporting with the log. |
+
 ## Development and test runs
 
 | What you see | Why | What to do |
