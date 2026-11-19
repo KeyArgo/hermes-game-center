@@ -3949,8 +3949,48 @@ async function experimentalShelfContract() {
   console.log('library: the Experimental section renders, titled, with every game locked: passed')
 }
 
+// The diagnostic watch: only our own errors and rejections reach POST /log, and
+// no listener outlives the last surface. The heap watch's five-minute pace and
+// performance.memory read are pinned by tests/test_desktop_logging.py.
+async function diagnosticsContract() {
+  reset()
+  assert.equal(evaluate('diagWatch.surfaces'), 0, 'every earlier surface closed its watch')
+  const calls = []
+  sandbox.diagCtx = { rest: (path, options) => { calls.push({ path, options }); return Promise.resolve({ ok: true }) } }
+  const cleanup = evaluate('diagSurfaceOpen(diagCtx)')
+  assert.equal(typeof cleanup, 'function', 'a surface returns its cleanup')
+  fakeWindow.dispatchEvent(new FakeEvent('error', {
+    message: 'TypeError: own crash', filename: 'https://host/plugins/hermes-gameshelf/desktop/plugin.js', lineno: 12
+  }))
+  fakeWindow.dispatchEvent(new FakeEvent('error', {
+    message: 'host crash', filename: 'https://host/app/main.js', lineno: 3
+  }))
+  assert.equal(calls.length, 1, 'only our own error is reported, never the host app\'s')
+  assert.equal(calls[0].path, '/log')
+  assert.equal(calls[0].options.method, 'POST')
+  assert.equal(calls[0].options.body.kind, 'error')
+  assert.ok(calls[0].options.body.message.includes('own crash'), 'the line carries the message')
+  assert.ok(calls[0].options.body.message.length <= 260, 'and stays short')
+  fakeWindow.dispatchEvent(new FakeEvent('unhandledrejection', {
+    reason: { message: 'own rejection', stack: 'at hermes-gameshelf/desktop/plugin.js:1:1' }
+  }))
+  fakeWindow.dispatchEvent(new FakeEvent('unhandledrejection', {
+    reason: { message: 'host rejection', stack: 'at app/main.js:1:1' }
+  }))
+  assert.equal(calls.length, 2, 'our own unhandled rejection is reported too')
+  assert.equal(calls[1].options.body.kind, 'rejection')
+  cleanup()
+  assert.equal(evaluate('diagWatch.surfaces'), 0)
+  fakeWindow.dispatchEvent(new FakeEvent('error', {
+    message: 'late', filename: 'hermes-gameshelf/plugin.js', lineno: 1
+  }))
+  assert.equal(calls.length, 2, 'no listener outlives the last surface')
+  delete sandbox.diagCtx
+  console.log('diagnostics: own errors and rejections reach /log, the host\'s never do: passed')
+}
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).catch(error => { console.error(error); process.exitCode = 1 })
+
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.

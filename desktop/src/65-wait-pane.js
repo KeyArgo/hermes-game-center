@@ -40,6 +40,8 @@ const PANE_CSS = `
 `
 
 function WaitPane({ ctx }) {
+  // The pane is a Game Center surface too: the same watch, the same log route.
+  useEffect(() => diagSurfaceOpen(ctx), [ctx])
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
   const [gameId, setGameId] = useState(saved.current)

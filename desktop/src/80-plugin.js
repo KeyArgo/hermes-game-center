@@ -119,6 +119,8 @@ export { BoardSvg, coverArt, startingPicture, tableAccess }
 // header, top right, beside search (owner's ask, 2026-11-11); on every other screen (Settings,
 // Champions, Community, ...) it floats top right instead of the old bottom-right corner.
 function GameCenterRoute({ ctx }) {
+  // The page is a Game Center surface: its own errors and heap go to the plugin's log.
+  useEffect(() => diagSurfaceOpen(ctx), [ctx])
   const [area, setArea] = useState('games')
   return jsxs('div', {
     style: { position: 'relative', height: '100%' },

@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 import uuid
+from collections import deque
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlsplit
@@ -690,6 +691,40 @@ def about():
 def version_route():
     """Same source as the chip in the status bar, so a screenshot matches a commit."""
     return {"success": True, "name": "Game Center", **_build_stamp()}
+
+
+# The desktop surfaces report their own errors and heap here (desktop/src/09-diagnostics.js).
+# At most 20 reports a minute: a crash loop must not fill the log, and the window slides.
+_LOG_TIMES: deque = deque()
+_LOG_LOCK = threading.Lock()
+_LOG_PER_MINUTE = 20
+_LOG_LINE = 300
+
+
+@router.post("/log")
+def log_report(body: dict | None = None) -> dict:
+    """One short line from a Game Center surface into the plugin's own log.
+    Secrets are masked by the log itself; a long message is trimmed, not stored."""
+    body = body if isinstance(body, dict) else {}
+    kind = str(body.get("kind") or "")
+    if kind not in {"error", "rejection", "heap"}:
+        return {"ok": False, "reason": "bad_kind"}
+    now = time.monotonic()
+    with _LOG_LOCK:
+        while _LOG_TIMES and now - _LOG_TIMES[0] > 60.0:
+            _LOG_TIMES.popleft()
+        if len(_LOG_TIMES) >= _LOG_PER_MINUTE:
+            return {"ok": False, "reason": "rate_limited"}
+        _LOG_TIMES.append(now)
+    if kind == "heap":
+        used = body.get("used")
+        if not isinstance(used, (int, float)) or used < 0:
+            return {"ok": False, "reason": "bad_heap"}
+        diagnostics.log.info("desktop heap used=%.1fMB", used / (1024 * 1024))
+    else:
+        message = " ".join(str(body.get("message") or "").split())[:_LOG_LINE]
+        diagnostics.log.info("desktop %s: %s", kind, message)
+    return {"ok": True}
 
 
 @router.get("/view")

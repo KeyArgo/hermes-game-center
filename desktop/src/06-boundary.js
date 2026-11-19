@@ -15,6 +15,11 @@ class GamesBoundary extends Component {
   componentDidCatch(failure) {
     try {
       console.error('[gameshelf] a screen crashed and was contained', failure)
+      // A crash the boundary contains never reaches window.onerror, so it is
+      // reported here — one short line, only while a surface holds the watch open.
+      if (typeof diagSend === 'function') {
+        diagSend({ kind: 'error', message: String((failure && failure.message) || failure || 'crash').slice(0, 200) })
+      }
     } catch {
       // Logging must never be the second crash.
     }
