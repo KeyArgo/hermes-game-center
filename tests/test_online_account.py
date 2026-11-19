@@ -9,6 +9,7 @@ reach a snapshot, a log line, or another computer.
 
 from __future__ import annotations
 
+import os
 import asyncio
 import json
 import sys
@@ -175,9 +176,12 @@ def test_a_name_that_is_not_a_file_name_still_gives_one_file(tmp_path):
 
 def test_downloads_is_the_plain_folder_each_system_uses(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows reads the home from here
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     assert online_source.downloads_folder() == tmp_path / "Downloads", "no setting means ~/Downloads"
 
+    if os.name == "nt":
+        return  # Windows has no user-dirs file; the plain folder is its whole answer
     xdg = tmp_path / ".config" / "user-dirs.dirs"
     xdg.parent.mkdir(parents=True, exist_ok=True)
     xdg.write_text('XDG_DOWNLOAD_DIR="$HOME/Telechargements"\n', encoding="utf-8")

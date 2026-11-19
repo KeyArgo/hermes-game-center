@@ -182,6 +182,14 @@ def test_a_new_person_joins_between_hands_only(setup):
     # on a bet that nobody can make.
     assert rooms.run(room, people["Ada"], "move", ["bet10"])["ok"]
     state = rooms.state(room)
+    # The shoe is the table's own, so a deal can be a natural, which settles at once; the host
+    # simply bets again. Waiting on the empty seat would leave hands at 0 and the phase at bet.
+    for _ in range(10):
+        if state["phase"] == "play":
+            break
+        assert state["hands"] >= 1, "the lone host is waiting on a seat nobody is in"
+        assert rooms.run(room, people["Ada"], "move", ["bet10"])["ok"]
+        state = rooms.state(room)
     assert state["phase"] == "play", "a lone host plays their own hand"
     refused = rooms.run(room, people["Eve"], "join")
     assert not refused["ok"] and "between hands" in refused["text"], refused["text"]
