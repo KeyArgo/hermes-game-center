@@ -38,6 +38,13 @@ MODES = {
 }
 FINISHED = {"win", "draw", "resigned"}
 DISCONNECT_GRACE = 120.0
+# A rematch that one person asked for and the other never answers.
+REMATCH_ANSWER_SECONDS = 60.0
+# A finished room with nobody asking for another game. The two-hour idle sweep
+# is the backstop for a room this does not catch.
+FINISHED_ROOM_SECONDS = 5 * 60.0
+# These are not white-versus-black. A rematch keeps the seats as they are.
+NO_COLOUR_SWAP = {"blackjack", "slots"}
 # A ladder room with no seated bot connected yet is not clocked for this long, then the
 # move clock starts. A bot that never arrives forfeits 15 s after that.
 LADDER_CONNECT_GRACE = 60.0
@@ -284,6 +291,9 @@ class Rooms:
         if self.between_hands(room):
             pictured["permissions"]["can_join"] = False
         pictured["absent"] = self.absent_sides(room)
+        note = str((self.state(room) or {}).get("rematch_note") or "")
+        if note:
+            pictured["rematch_note"] = note
         pictured["pair"] = self.pair_info(room)
         pictured["open_league"] = bool(room.get("open_league"))
         pictured["labels"] = self.labels(room)
@@ -317,17 +327,21 @@ class Rooms:
     def run(self, room: dict, player: dict, action: str, args: list[str] | None = None) -> dict:
         """One table action as this player. Returns {ok, text, finished}."""
         args = [str(item)[:16] for item in (args or [])][:3]
+        fresh = self.store.room(room["id"])
+        if fresh:
+            room = fresh
         if room.get("closed"):
             return {"ok": False, "text": "This table is closed.", "finished": None}
         host = player["id"] == room["host_id"]
         state = self.state(room)
-        if action in {"resign", "leave"} and room.get("game") == "blackjack":
-            # A session table has no match to resign, and each seat keeps its own chips. Ending
-            # the table from one seat would strand the other person, so the table says what it
-            # really offers: put it away here, or play on.
+        if action == "resign" and room.get("game") == "blackjack":
+            # A session table has no match to resign. Leaving is how a person gets up,
+            # and that is a seat, not a result.
             return {"ok": False,
-                    "text": "A blackjack table has no match to resign. Close the table to step away.",
+                    "text": "A blackjack table has no match to resign. Leave the table to step away.",
                     "finished": None}
+        if action == "decline":
+            return self._decline_rematch(room, player, state)
         if action == "new":
             mode = args[0] if args else "two"
             if not host:
@@ -362,6 +376,8 @@ class Rooms:
             # result without the leaver. Resign on its own first so the record names them.
             resigned = self._command(room, player, "resign")
             left = self._command(room, player, "leave")
+            if left["ok"]:
+                self._close_when_empty(room)
             return {"ok": left["ok"], "text": left["text"], "finished": resigned["finished"]}
         elif action == "lesson":
             if not host:
@@ -374,7 +390,12 @@ class Rooms:
             line = action
         else:
             return {"ok": False, "text": "Unknown action.", "finished": None}
-        return self._command(room, player, line)
+        answer = self._command(room, player, line)
+        if action == "rematch" and answer.get("ok"):
+            self._after_rematch(room)
+        if action == "leave" and answer.get("ok"):
+            self._close_when_empty(room)
+        return answer
 
     def _command(self, room: dict, player: dict, line: str) -> dict:
         # A ladder bot that misses the move clock forfeits even if its move lands before
@@ -443,6 +464,9 @@ class Rooms:
                 pair = self.store.pair_for_room(room["id"])
                 recorded = self.store.record_match(room["id"], int(state["online_match"]), state)
                 state["online_open"] = False
+                state["finished_at"] = state.get("finished_at") or self.clock()
+                state["rematch_asked_at"] = 0
+                state["rematch_note"] = ""
                 kit.write(root, state)
                 self.store.mark_ladder(room["id"], False)
                 if pair:
@@ -459,6 +483,123 @@ class Rooms:
                 kit.write(root, state)
                 self.store.mark_ladder(room["id"], False)
         return None
+
+    def _write_state(self, room: dict, mutate) -> dict | None:
+        root = self.folder(room["id"])
+        with kit.locked(root):
+            state = kit.load(root)
+            if not state:
+                return None
+            mutate(state)
+            kit.write(root, state)
+            return state
+
+    def _human_seats(self, state: dict) -> list[tuple[str, str, str]]:
+        found = []
+        for side in kit.SIDES:
+            if kit.seat_kind(state.get(side, "")) != "human":
+                continue
+            pid = str(state.get(f"{side}_id") or "")
+            if pid:
+                found.append((side, pid, str(state.get(f"{side}_name") or side)))
+        return found
+
+    def _close_finished(self, room: dict, reason: str) -> None:
+        """The store's one close path. Invites die with the room; the idle sweep stays the backstop."""
+        current = self.store.room(room["id"]) or room
+        if current.get("closed"):
+            return
+        self.store.close_room(room["id"])
+        self.store.log_audit(
+            "close-finished-room", target_id=room["id"], target_name=str(room.get("game") or ""),
+            reason=reason, detail={"game": room.get("game") or "", "reason": reason},
+        )
+        log.info("closed finished room %s (%s): %s", room["id"], room.get("game"), reason)
+
+    def _decline_rematch(self, room: dict, player: dict, state: dict | None) -> dict:
+        if not state or state.get("status") not in FINISHED:
+            return {"ok": False, "text": "There is no rematch to decline.", "finished": None}
+        name = str(player.get("name") or "The other player")
+        note = f"{name} declined a rematch."
+        self._write_state(room, lambda saved, text=note: saved.__setitem__("rematch_note", text))
+        self._close_finished(room, note)
+        return {"ok": True, "text": note, "finished": None, "closed": True}
+
+    def _after_rematch(self, room: dict) -> None:
+        state = self.state(room) or {}
+        if state.get("status") in FINISHED:
+            if not state.get("rematch_asked_at"):
+                now = self.clock()
+                self._write_state(
+                    room, lambda saved, stamp=now: saved.__setitem__(
+                        "rematch_asked_at", saved.get("rematch_asked_at") or stamp))
+            return
+        if state.get("status") != "active":
+            return
+
+        def fresh(saved: dict) -> None:
+            # The kit copies the finished game forward, including the clock we use to
+            # close it. A game that just started is not a finished one.
+            saved.pop("finished_at", None)
+            saved.pop("rematch_asked_at", None)
+            saved.pop("rematch_note", None)
+            if str(room.get("game") or "") in NO_COLOUR_SWAP:
+                return
+            for suffix in ("", "_id", "_name"):
+                white, black = f"white{suffix}", f"black{suffix}"
+                saved[white], saved[black] = saved[black], saved[white]
+
+        self._write_state(room, fresh)
+
+    def _close_when_empty(self, room: dict) -> None:
+        """Both people have got up from a finished table (or a session table)."""
+        fresh_room = self.store.room(room["id"]) or room
+        if fresh_room.get("closed"):
+            return
+        state = self.state(fresh_room) or {}
+        if self._human_seats(state):
+            return
+        status = str(state.get("status") or "")
+        session = str(fresh_room.get("game") or "") in NO_COLOUR_SWAP
+        if status in FINISHED or status == "abandoned" or session:
+            self._close_finished(fresh_room, "both players left")
+
+    def sweep_finished(self, now: float) -> list[str]:
+        """Close a finished room that will not be replayed.
+
+        A decline closes at once (see ``_decline_rematch``). Here: one person asked
+        and the other said nothing for a minute, or five minutes passed with nobody
+        asking. Rooms this misses still fall to the two-hour idle sweep.
+        """
+        closed = []
+        for room in self.store.open_rooms(public_only=False):
+            state = self.state(room) or {}
+            if state.get("status") not in FINISHED:
+                continue
+            requested = list((state.get("rematch") or {}).get("requested_by") or [])
+            asked = float(state.get("rematch_asked_at") or 0)
+            finished_at = float(state.get("finished_at") or 0)
+            if not finished_at:
+                stamp = now
+                self._write_state(
+                    room, lambda saved, at=stamp: saved.__setitem__("finished_at", saved.get("finished_at") or at))
+                continue
+            note = ""
+            if requested and asked and now - asked >= REMATCH_ANSWER_SECONDS:
+                names = {pid: name for _side, pid, name in self._human_seats(state)}
+                missing = [names[pid] for pid in names if pid not in set(requested)]
+                who = missing[0] if missing else "The other player"
+                note = f"{who} did not answer."
+            elif not requested and now - finished_at >= FINISHED_ROOM_SECONDS:
+                note = "no rematch"
+            else:
+                continue
+            if note and note != "no rematch":
+                text = note
+                self._write_state(room, lambda saved, line=text: saved.__setitem__("rematch_note", line))
+            self._close_finished(room, note)
+            closed.append(room["id"])
+        return closed
 
     @staticmethod
     def _seated(state: dict | None, player_id: str) -> list[str]:

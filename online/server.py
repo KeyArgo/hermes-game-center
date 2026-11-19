@@ -1362,6 +1362,12 @@ class App:
                 answer = {"ok": False, "text": "Unknown message."}
             await _send(conn.ws, {"t": "result", "ref": ref, "ok": answer["ok"], "text": answer["text"],
                                   "finished": answer.get("finished")})
+            if answer.get("closed"):
+                await self.broadcast(conn.room_id)
+                text = str(answer.get("text") or "This table is closed.")
+                for other in list(self.conns.get(room["id"], ())):
+                    await _send(other.ws, {"t": "closed", "text": text})
+                return
             if kind == "close" and answer["ok"]:
                 for other in list(self.conns.get(room["id"], ())):
                     await _send(other.ws, {"t": "closed", "text": "The host closed this table."})
@@ -1456,6 +1462,8 @@ class App:
                 self.store.clear_expired_windows(now)
                 await self.requests.pair_looking(now)
                 for room_id in self.rooms.check_clocks(now):
+                    await self.broadcast(room_id)
+                for room_id in self.rooms.sweep_finished(now):
                     await self.broadcast(room_id)
                 if time.monotonic() - last_housekeeping >= 15:
                     last_housekeeping = time.monotonic()
