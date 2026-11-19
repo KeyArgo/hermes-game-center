@@ -24517,6 +24517,11 @@ function LobbyWhoOnline({ view, ctx, current, onPlayHere }) {
   const pet = usePetAvatar()
   const online = onlineView(view)
   const presence = (view.online && view.online.presence) || {}
+  // These rows are lobby accounts, so this computer's own row is the one wearing the name it signed
+  // in as. The local players.json name is a different identity - it is never sent to the lobby - and
+  // matching on it put the pet on a stranger's row and left its own bare.
+  const lobbyName = String(online.name || '').trim().toLowerCase()
+  const mine = row => Boolean(lobbyName) && String(row.name || '').trim().toLowerCase() === lobbyName
   const muted = { fontSize: 12, color: text.tertiary }
   if (!online.on || online.offline) {
     const rows = (view.lobby && view.lobby.looking) || []
@@ -24533,7 +24538,7 @@ function LobbyWhoOnline({ view, ctx, current, onPlayHere }) {
   const group = (label, rows, kind, empty) => jsxs('div', { style: { minWidth: 150 }, children: [
     jsx('div', { style: { fontSize: 12, fontWeight: 650 }, children: label }),
     rows.length ? rows.map((row, index) => jsxs('div', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.secondary, marginTop: 4 }, children: [
-      jsx(Avatar, { name: row.name, kind, pet: row.name === (view.player && view.player.name) ? pet : '' }),
+      jsx(Avatar, { name: row.name, kind, pet: mine(row) ? pet : '' }),
       jsx('span', { children: row.name }),
       row.game ? jsx('span', { children: row.game }) : null,
       row.rating != null ? jsx('span', { children: `${row.provisional ? '~' : ''}${row.rating}` }) : null

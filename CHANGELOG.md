@@ -6,6 +6,12 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Your pet rides on your own row in "Seen in the lobby".** The row was matched against the local
+  players.json name, but those rows are lobby accounts: signed in as "Potato" with a local name of
+  "BlueWren", BlueWren's row wore the pet and Potato's had none. It is matched against the name this
+  computer signed in as now. Guards: `tests/table_ui_harness.cjs` (`lobbyPetContract` — fails
+  against the old row).
+
 - **A held invite switch says why it is held, in words beside it.** The switch is disabled while
   another Hall action is still out, while the lobby refuses this computer's sign-in, and while the
   server has no Hall at all — and it said the same "Lobby not connected — Retry" for all of them, or

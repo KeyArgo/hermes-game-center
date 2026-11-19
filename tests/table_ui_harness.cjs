@@ -3990,7 +3990,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8291,6 +8291,50 @@ async function switchReasonsContract() {
   assert.ok(!findButton(tree, 'Retry'), 'with no pointless Retry beside it')
   assert.equal(switchFor(tree).props['data-people-open'], 'unreachable', 'the switch is still held')
   console.log('play with people: a held switch says why - busy, refused, or no Hall: passed')
+}
+
+// ---- Your pet rides on your own lobby row ----------------------------------------------
+// "Seen in the lobby" lists lobby accounts. Attaching the pet by the local players.json name put it
+// on a stranger's row whenever the two names differed, and left your own row bare.
+async function lobbyPetContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  sandbox.host.request = async method => (method === 'pet.info'
+    ? { enabled: true, slug: 'cat' }
+    : { ok: true, dataUri: 'data:image/png;base64,AAAA' })
+  const view = {
+    player: { name: 'BlueWren', named: true },
+    online: {
+      on: true, linked: true, name: 'Potato', offline: false,
+      presence: {
+        humans: [
+          { id: 'lobby:1', name: 'Potato', status: 'online' },
+          { id: 'lobby:2', name: 'BlueWren', status: 'online' }
+        ],
+        bots: []
+      }
+    }
+  }
+  const ctx = { rest: async path => (path === '/online/hall'
+    ? { state: 'live', you: { id: 'lobby:1', name: 'Potato' }, prefs: { open: false, games: {} }, roster: [], requests: [], seated: null }
+    : { ok: true }) }
+  reset()
+  sandbox.whoProps = { view, ctx, current: 'connect4', onPlayHere: () => {} }
+  let tree = null
+  for (let pass = 0; pass < 3; pass += 1) {
+    cursor = 0
+    tree = evaluate('LobbyWhoOnline(whoProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    await tick()
+  }
+  const avatars = nodes(tree).filter(node => typeof node.type === 'function' && node.type.name === 'Avatar')
+  const wearing = avatars.filter(node => node.props.pet)
+  assert.equal(wearing.length, 1, 'one row wears your pet, not two: ' + avatars.map(node => node.props.name).join(', '))
+  assert.equal(wearing[0].props.name, 'Potato', 'and it is your lobby row, not the local name\'s')
+  console.log('lobby: your pet rides on your own lobby row: passed')
 }
 
 // ---- The twenty-minute accept asks if it should stay -----------------------------------
