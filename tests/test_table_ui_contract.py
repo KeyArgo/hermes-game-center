@@ -218,7 +218,9 @@ def test_the_main_page_has_one_invite_switch_and_says_when_the_lobby_is_down():
         "the card no longer blames the person's own setting for a missing socket"
     # The switch reads the Hall's own state, so a blank snapshot cannot look like OFF.
     assert "const live = liveOf(snap)" in home
-    assert "dim: !prefs.open || !live" in home, "no chip looks live while the socket is down"
+    # shown.open is the switch the person just pressed, until the lobby answers; it is prefs.open
+    # otherwise. Either way a dead socket keeps the chips dark.
+    assert "dim: !shown.open || !live" in home, "no chip looks live while the socket is down"
 
     lobby = _src("72-lobby.js")
     assert "data-hall-not-connected" in lobby, "the Hall panel says it too"
