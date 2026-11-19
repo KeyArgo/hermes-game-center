@@ -23,15 +23,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(autouse=True)
 def _clean_logger():
-    """Each test starts with no file handler on the gameshelf logger."""
-    logger = logging.getLogger(diagnostics.LOGGER_NAME)
-    for handler in list(logger.handlers):
-        logger.removeHandler(handler)
-        handler.close()
+    """Each test starts with no file handler on the gameshelf or shelf loggers."""
+    loggers = [logging.getLogger(name) for name in (diagnostics.LOGGER_NAME, *diagnostics.ALSO_LOGGED)]
+    for logger in loggers:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+            handler.close()
     yield
-    for handler in list(logger.handlers):
-        logger.removeHandler(handler)
-        handler.close()
+    for logger in loggers:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+            handler.close()
     diagnostics.stop_health()
 
 
@@ -242,3 +244,13 @@ def test_the_lobby_logs_connect_disconnect_and_reconnect(tmp_path, monkeypatch):
     assert "lobby reconnect" in text
     assert "supersecret123" not in text
     assert diagnostics.lobby_socket_count() == 0  # nothing left registered after stop
+
+def test_the_shelf_modules_reach_the_file_too(tmp_path):
+    """The Hall, the socket and the stores log under ``shelf.*``; a reason the lobby could not be
+    reached is worth nothing if it never lands in the file a person is asked to send."""
+    diagnostics.attach(tmp_path)
+    diagnostics.attach(tmp_path)
+    logging.getLogger("shelf.online_hall").warning("could not reach wss://lobby.example: refused")
+    text = _text(tmp_path)
+    assert "shelf.online_hall" in text and "could not reach wss://lobby.example" in text
+    assert text.count("could not reach") == 1, "one handler per logger, never two copies of a line"

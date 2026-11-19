@@ -27,6 +27,9 @@ from pathlib import Path
 from typing import Any
 
 LOGGER_NAME = "gameshelf"
+# The shelf modules (the Hall, the socket, the stores) log under their own names; the file
+# carries them too, so the reason a lobby could not be reached is in the log a person sends.
+ALSO_LOGGED = ("shelf",)
 LOG_NAME = "game-center.log"
 LOG_MAX_BYTES = 1_000_000
 LOG_BACKUPS = 3
@@ -73,8 +76,9 @@ def attach(data_root: Path | str) -> logging.Logger:
     )
     handler.setFormatter(_MaskFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     handler.setLevel(logging.INFO)
-    log.setLevel(logging.INFO)
-    log.addHandler(handler)
+    for logger in (log, *(logging.getLogger(name) for name in ALSO_LOGGED)):
+        logger.setLevel(logging.INFO)
+        logger.addHandler(handler)
     return log
 
 

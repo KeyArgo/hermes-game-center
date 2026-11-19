@@ -485,6 +485,7 @@ class Hall:
                     self._delay = self.retry_first
                 continue
             # A plain drop: reconnect with backoff.
+            diagnostics.log.info("lobby reconnect in %ss", self._delay)
             verdict = self._wait(self._delay)
             if verdict == "stop":
                 break
