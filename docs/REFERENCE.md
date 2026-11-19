@@ -1,6 +1,6 @@
 # Reference
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (bfcbdca0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (94ad3259)_
 
 Every tool, command, hook, HTTP route and config key the plugin exposes, in tables. The prose for each setting is in [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -55,9 +55,9 @@ The shelf verbs are in `shelf/commands.py`; the table verbs are in `kit.py`.
 
 | Hook | Handler | What it does |
 |---|---|---|
-| `pre_llm_call` | `earn_pull` in `__init__.py` | With auto-spin on, takes one spin for a new turn, only while a machine is on screen. One spin per `turn_id`; any failure is swallowed. |
-| `pre_tool_call` | `earn_tool` in `__init__.py` | Auto-spin at most once per 1.2 seconds across a burst of tool calls. |
-| `post_api_request` | `earn_tokens` in `__init__.py` | Counts tokens from the reply's usage once per `api_request_id`, pays 1 point per 100,000 tokens, and may size an automatic bet from the reply. |
+| `pre_llm_call` | `earn_pull` in `__init__.py` | With auto-spin on, takes one spin for the person's own message - at least double the smallest bet, sized by what the turn before it cost - and only while a machine is on screen AND only for the chat on screen (the runtime id the desktop reports). One spin per `turn_id`; a delegated subagent never spins; any failure is swallowed. |
+| `pre_tool_call` | `earn_tool` in `__init__.py` | Auto-spin at the smallest bet, at most once per 1.2 seconds across a burst of tool calls, and only for the chat on screen. |
+| `post_api_request` | `earn_tokens` in `__init__.py` | Counts tokens from the reply's usage once per `api_request_id`, pays 1 point per 100,000 tokens for the chat on screen, and does not spin: one spin per turn already happened when the message was sent. |
 
 The hooks return no text, so the prompt is untouched. The win bonus is a kit sink (`kit_module.set_bonus_sink`), not a hook: every won game credits 100 points to the local wallet.
 
@@ -76,6 +76,7 @@ The hooks return no text, so the prompt is untouched. The win bonus is a kit sin
 | `GET` | `/api/setup` | `setup_state` |
 | `POST` | `/api/setup` | `setup_save` |
 | `POST` | `/api/settings` | `settings_save` |
+| `GET` | `/api/name/suggest` | `suggest_a_name` |
 | `GET` | `/api/alerts` | `alerts` |
 | `POST` | `/api/alerts/dismiss` | `alerts_dismiss` |
 | `GET` | `/api/about` | `about` |

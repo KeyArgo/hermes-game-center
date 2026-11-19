@@ -6,6 +6,44 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **No default player name, and a Suggest a name button wherever a name is asked for.** The suggestion
+  came from the local player id, which is "local" on every computer, so every PC was offered the same
+  name and the welcome asked a question whose answer was already written in (owner, 2026-11-18:
+  "There should not be a default user, but we can add a user name generator"). The welcome, Settings
+  and the online sign-in open with an empty box now; each carries **Suggest a name**, and every press
+  asks the shelf for a fresh one (`GET /name/suggest`, `shelf.who.random_name`, drawn locally from the
+  same word lists and already passing `name_problem`). The setup payload's `suggested_name` stays for
+  an older desktop and is always `""`. Guards: `tests/test_name_generator.py` and
+  `tests/test_name_suggest_ui.py` (plus the welcome contract in `tests/table_ui_harness.cjs`).
+- **The Play pane always opens on the right of the chat.** The host adopts a contributed pane once and
+  then remembers where the person put it, so a pane that had ever been dragged elsewhere - or that a
+  host update re-homed into the wrong group - stayed wrong for good (owner, 2026-11-18: "#4 pane always
+  right"). Its dock hint now carries `enforce: true`, which the host re-asserts on every boot's first
+  adoption pass with no user-placement exemption (`enforceDockedPanes` in the Desktop's pane-shell
+  store). On Windows the check is: restart the Desktop app, then look. Guards:
+  `tests/test_play_pane_always_right.py`.
+- **The Jackpot cabinet always shows all three reel rows, and Normal / Bigger / Biggest stay on one
+  line.** The cabinet's content column is a flex column inside a fixed 720 px machine, so a taller
+  panel below the reels was paid for out of the reel window - measured at 271 px against the design
+  312, which cut the bottom row of the drum off (owner, 2026-11-18: "always 3 rows"). The window now
+  keeps its own height (`flexShrink: 0`, `minHeight: cell x rows`, and `data-jp2-window-rows` so the
+  number is measurable) and the control panel below it is the part that flexes and scrolls; the
+  Classic cabinet's reel row is pinned the same way. The three size pills ride in their own
+  non-wrapping row, so a narrow cabinet wraps the row as a whole instead of splitting them 2 + 1.
+  Guards: `tests/jackpot2_fit.mjs`, which measures the window's layout height against `cell x rows` in
+  the pane, the full view, the over-chat copy and at Biggest - and that file's copy section had been
+  looking for markup the app no longer draws, so it is pointed at the real copy again.
+- **The slot spins and pays points only for the chat you are looking at.** Every hook fires for every
+  chat on the machine, so a workturn in a side chat, a delegated subagent or a review pane turned the
+  owner's machine over while he was reading something else (owner, 2026-11-18: "slot spins and points
+  ONLY for the chat the person is looking at"). The desktop now posts the chat on screen - the RUNTIME
+  `host.state.focusedSessionId` the hooks carry, never the stored id - with its `/jackpot/visible`
+  report, re-sent on every focus move and every 20 s; the wallet keeps it with a stamp, and a missing,
+  different or older-than-a-minute report spins nothing and pays no points. A subagent (`parent_session_id`
+  set) never spins. Bets: a tool call stays the smallest bet, your own message is one spin at least
+  double the smallest and sized by what the turn before it cost, and an intermediate model reply pays
+  points instead of spinning. A skip is logged once at debug so the match can be proved live. Guards:
+  `tests/test_focused_chat_spins.py`.
 - **The Games page no longer carries backdrop Size and Visibility, and the side pane opens at 368 px.**
   The owner (2026-11-18): the slot machine settings on the Game Center main page "don't seem to work,
   maybe we should remove those", and "the right pane for the game center should default where it is

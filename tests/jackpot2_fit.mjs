@@ -138,6 +138,54 @@ const dismissWelcome = async () => {
   return done
 }
 
+// The reel window's height as LAYOUT, not as drawn: every surface scales the cabinet with a transform
+// (the pane's fit, the full view's fit, the backdrop's share), and offsetHeight is the one number a
+// transform does not touch. So "the window is cell*rows tall" is comparable between all of them, and
+// a window that a flex column squeezed shows up here as a smaller number.
+const reelWindow = scope => evaluate(`(() => {
+  const root = document.querySelector(${JSON.stringify(scope)})
+  if (!root) return { present: false, scope: ${JSON.stringify(scope)} }
+  const win = root.querySelector('[data-jp2-window]')
+  const reel = root.querySelector('[data-jp2-reel]')
+  if (!win || !reel) return { present: false, window: !!win, reel: !!reel }
+  const cell = Number(reel.getAttribute('data-jp2-cell')) || 0
+  const rows = Number(win.getAttribute('data-jp2-window-rows')) || 0
+  return {
+    present: true, height: win.offsetHeight, reelHeight: reel.offsetHeight,
+    cell, rows, expected: cell * rows,
+    reels: root.querySelectorAll('[data-jp2-reel]').length
+  }
+})()`)
+
+// The defect this guards (owner, 2026-11-18: "always 3 rows"): the cabinet's content column is a flex
+// column inside a 720 px machine, so anything that grew the panel below the reels was paid for out of
+// the reel window - measured at 222 px and 304 px against a design 312. Every reel row has to be there
+// in every surface, whatever the panel holds and whatever size the copy is drawn at.
+const checkReelWindow = async (label, scope) => {
+  const facts = await reelWindow(scope)
+  const ok = Boolean(facts && facts.present && facts.expected > 0
+    && facts.height === facts.expected && facts.reelHeight === facts.expected
+    && facts.reels === 3)
+  check(`all three reel rows are on screen ${label}`, ok, JSON.stringify(facts))
+  return facts
+}
+
+// The three size pills (owner, 2026-11-18: they must stay on one line). The size row is a wrapping
+// flex row, so at a narrow cabinet the three of them used to split 2 + 1; they ride in their own row.
+const pillsOneLine = async (scope, where) => {
+  const facts = await evaluate(`(() => {
+    const panel = document.querySelector(${JSON.stringify(scope)})
+    const buttons = panel ? [...panel.querySelectorAll('button[data-jp2-oc]')] : []
+    const named = buttons.filter(b => ['Normal', 'Bigger', 'Biggest'].includes((b.textContent || '').trim()))
+    if (!panel || named.length !== 3) return { present: false, found: named.map(b => (b.textContent || '').trim()) }
+    const tops = named.map(b => Math.round(b.getBoundingClientRect().top))
+    return { present: true, oneLine: new Set(tops).size === 1, tops }
+  })()`)
+  check(`Normal, Bigger and Biggest stay on one line ${where}`,
+    Boolean(facts && facts.present && facts.oneLine), JSON.stringify(facts))
+  return facts
+}
+
 await cdp('Page.enable')
 await cdp('Runtime.enable')
 
@@ -193,6 +241,7 @@ if (paneTile && paneTile.tile) {
     check('nothing of the pane cabinet is clipped by its own frame', insideFrame,
       JSON.stringify(facts.frame))
     check('the pane cabinet is a real machine, not a plate', facts.spin === true, `SPIN present: ${facts.spin}`)
+    await checkReelWindow('in the pane', '.games-wait-pane')
     await shot('jp2-pane')
   }
 }
@@ -218,16 +267,21 @@ const switchOn = async () => {
 }
 
 const layerFacts = () => evaluate(`(() => {
-  const mirror = document.querySelector('[data-jp2-surface="mirror"]')
-  const layer = mirror || document.querySelector('[data-jp2-layer]')
-  const machine = layer && layer.querySelector('[data-jp2="machine"]')
-  if (!layer) return { present: false, machine: !!machine }
-  const style = getComputedStyle(layer)
-  const box = layer.getBoundingClientRect()
+  // As the app draws it: the composer's own slot holds [data-overchat="jackpot"], and the copy inside
+  // it is [data-jp2-surface="copy"]. (The old [data-jp2-layer] / "mirror" markup this used to look for
+  // is gone, which left this whole section passing on a page with nothing on it.)
+  const host = document.querySelector('[data-overchat="jackpot"]')
+  const copy = host && host.querySelector('[data-jp2-surface="copy"]')
+  const machine = copy && copy.querySelector('[data-jp2="machine"]')
+  if (!host) return { present: false, machine: !!machine }
+  const style = getComputedStyle(host)
+  const box = (copy || host).getBoundingClientRect()
   return {
-    present: true, machine: !!machine, visibility: style.visibility, opacity: style.opacity,
+    present: true, machine: !!machine, visibility: style.visibility,
+    opacity: copy ? getComputedStyle(copy).opacity : style.opacity,
     z: style.zIndex, pointerEvents: style.pointerEvents,
-    width: box.width, height: box.height, mirror: !!mirror
+    width: box.width, height: box.height, left: box.left, right: box.right,
+    top: box.top, bottom: box.bottom, mirror: false
   }
 })()`)
 
@@ -238,18 +292,20 @@ if (chip && chip.ok) {
   check('the cabinet offers the Show as backdrop switch', (await switchOn()) === true)
   await click('[data-jp2="full-back"]')
   await sleep(2000)
+  // The Games page has no conversation, so it draws no copy: the switch is a setting on the cabinet,
+  // and the copy is drawn in the composer's own slot (measured on the pane page further down, where a
+  // real composer is on screen). A copy drawn here would float over the shelf with nothing under it.
   const on = await layerFacts()
-  check('the switch floats a copy over the conversation', Boolean(on && on.present && on.visibility === 'visible'),
-    JSON.stringify(on))
-  check('the copy holds a real machine', Boolean(on && on.machine), JSON.stringify(on))
+  check('the Games page draws no copy (the copy lives over the conversation)',
+    Boolean(on && !on.present), JSON.stringify(on))
 
-  // ---- into the full view and back: the copy has to survive the trip ----
+  // ---- into the full view and back: the cabinet stays where it belongs ----
   const opened = await click('[data-game-tile="slots"]')
   check('the Games page offers Slots', opened === true)
   await sleep(2500)
   const inGames = await layerFacts()
-  check('the copy is still on screen with the Jackpot full view open',
-    Boolean(inGames && inGames.present && inGames.visibility === 'visible'), JSON.stringify(inGames))
+  check('the Games page still draws no copy with the full view open',
+    Boolean(inGames && !inGames.present), JSON.stringify(inGames))
 
   for (const size of [{ width: 1400, height: 900 }, { width: 900, height: 500 }]) {
     await resize(size.width, size.height)
@@ -291,19 +347,25 @@ if (chip && chip.ok) {
       console.log(`info ${label} :: the page scrolls at this height; the cabinet is fitted to its ${Math.round(facts.frameWidth)}x${Math.round(facts.frameHeight)} frame`)
     }
     const stillThere = await layerFacts()
-    check(`the copy survives a resize to ${label}`,
-      Boolean(stillThere && stillThere.present && stillThere.visibility === 'visible'), JSON.stringify(stillThere))
+    check(`the Games page draws no copy at ${label}`,
+      Boolean(stillThere && !stillThere.present), JSON.stringify(stillThere))
+    await checkReelWindow(`in the full view at ${label}`, '[data-jp2="full"]')
     await shot(`jp2-full-${label}`)
   }
 
-  // Back to the games list — the copy must not have been taken away with the view.
-  await resize(1400, 900)
+  // ---- the size pills share one line, and the reels keep their three rows at Biggest ----
+  await pillsOneLine('[data-jp2="full"] [data-jp2-oc="controls"]', 'in the full view')
+  check('the cabinet offers Biggest', (await click('[data-jp2="full"] [data-jp2-oc="size-biggest"]')) === true)
+  await sleep(1800)
+  await checkReelWindow('in the full view at Biggest', '[data-jp2="full"]')
+
+  // Back to the games list — the cabinet does not depend on the full view.
   const wentBack = await click('[data-jp2="full-back"]')
   check('the full view offers a way back', wentBack === true)
   await sleep(2000)
   const after = await layerFacts()
-  check('the copy is still on screen after coming back to the games list',
-    Boolean(after && after.present && after.visibility === 'visible'), JSON.stringify(after))
+  check('the Games page draws no copy after coming back to the games list',
+    Boolean(after && !after.present), JSON.stringify(after))
   await shot('jp2-copy-after-back')
 }
 
@@ -464,7 +526,8 @@ const overlayFacts = () => evaluate(`(() => {
     return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }
   }
   const old = document.querySelector('[data-jackpot="overchat"] .sm-machine')
-  const surface = document.querySelector('[data-jp2-surface="mirror"]') || document.querySelector('[data-jp2-layer]')
+  const host = document.querySelector('[data-overchat="jackpot"]')
+  const surface = host && host.querySelector('[data-jp2-surface="copy"]')
   const machine = surface && surface.querySelector('[data-jp2="machine"]')
   return {
     chat: box(document.querySelector('#chat')), old: box(old), machine: box(machine),
@@ -487,6 +550,16 @@ check('the Jackpot copy starts at the top of the chat (top middle)',
   `chat ${describe(onChat && onChat.chat)}, Jackpot ${describe(onChat && onChat.machine)}`)
 if (onChat && onChat.machine) await shot('jp2-over-chat-centred')
 
+// ---- the reels in the copy, and at the biggest size ----
+// The copy is the same cabinet, so it must show all three rows too - at its share of the slot and at
+// twice the size, where anything that clips the drum has the most room to show.
+await checkReelWindow('in the over-chat copy', '[data-overchat="jackpot"]')
+await pillsOneLine('.games-wait-pane [data-jp2-oc="controls"]', 'in the pane cabinet')
+check('the pane cabinet offers Biggest', (await click('.games-wait-pane [data-jp2-oc="size-biggest"]')) === true)
+await sleep(1800)
+await checkReelWindow('in the over-chat copy at Biggest', '[data-overchat="jackpot"]')
+await checkReelWindow('in the pane cabinet at Biggest', '.games-wait-pane')
+
 // Drive the native range setter and events just as a user changing each slider would.
 const setRange = (key, value) => evaluate(`(() => {
   const input = document.querySelector(${JSON.stringify('[data-jp2-oc-range="' + key + '"]')})
@@ -508,7 +581,8 @@ check('the over-chat copy offers an X close button', Boolean(smaller && smaller.
 // Over the chat the machine is to watch: the spin and lever take no click there, the
 // sound switch and the X still do. Checked by what a real click would hit, not by a style string.
 const watchOnly = await evaluate(`(() => {
-  const surface = document.querySelector('[data-jp2-surface="mirror"]') || document.querySelector('[data-jp2-layer]')
+  const host = document.querySelector('[data-overchat="jackpot"]')
+  const surface = host && host.querySelector('[data-jp2-surface="copy"]')
   const pe = sel => { const n = surface && surface.querySelector(sel); return n ? getComputedStyle(n).pointerEvents : 'absent' }
   const tab = sel => { const n = surface && surface.querySelector(sel); return n ? n.tabIndex : null }
   const box = surface && surface.querySelector('[data-jp2-toggle] input')

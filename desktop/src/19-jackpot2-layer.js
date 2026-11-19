@@ -680,13 +680,19 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         tag('Backdrop size', 'size-tag'),
         slider('size', 'size', size, setSize),
         readout('size', `${Math.round(size * 100)}%`),
-        // The slider's own three stops, so the backdrop can be made big without dragging for it.
-        ...JP2L_SIZE_PRESETS.map(preset => button(
-          `size-${preset.id}`,
-          preset.label,
-          `Backdrop size: ${preset.label.toLowerCase()}, ${Math.round(preset.size * 100)}% of the size it has always been`,
-          () => setSize(preset.size)
-        ))
+        // The slider's own three stops, so the backdrop can be made big without dragging for it. They
+        // ride in one row of their own that never wraps: the size row wraps as a whole when the cabinet
+        // is narrow, and inside it the three pills used to split 2 + 1 (owner, 2026-11-18).
+        jsx('span', {
+          'data-jp2-oc': 'size-presets',
+          style: { display: 'inline-flex', flexWrap: 'nowrap', gap: dark ? 4 : 6, minWidth: 0 },
+          children: JP2L_SIZE_PRESETS.map(preset => button(
+            `size-${preset.id}`,
+            preset.label,
+            `Backdrop size: ${preset.label.toLowerCase()}, ${Math.round(preset.size * 100)}% of the size it has always been`,
+            () => setSize(preset.size)
+          ))
+        }, 'size-presets')
       ], dark ? 64 : 74),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.

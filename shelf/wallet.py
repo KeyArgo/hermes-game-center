@@ -100,7 +100,11 @@ _BLANK = {"chips": START_CHIPS, "spins": 0, "biggest": 0, "hands": 0, "bet": MIN
           # and the automatic spin runs while ANY of them is. One boolean
           # that every surface wrote to was a flag the last surface to close could clear while
           # another was still drawing, which is how the Jackpot cabinet sat there spinning nothing.
-          "visible_sources": {}}
+          "visible_sources": {},
+          # The chat the person is looking at, as the hooks name it (a runtime session id), and when
+          # the desktop last said so. An automatic spin belongs to that chat and to no other, so a
+          # chat nobody is watching cannot turn the machine over.
+          "focus_session": "", "focus_at": 0}
 # Keys the wallet stores as real numbers rather than whole counts. Everything else is an int, and
 # a float in an int key is a corrupt file rather than a setting.
 FLOAT_KEYS = frozenset({"overchat_alpha", "overchat_scale"})
@@ -108,6 +112,28 @@ FLOAT_KEYS = frozenset({"overchat_alpha", "overchat_scale"})
 DEFAULT_MACHINE = "fruit9"
 # The latest slot spins, newest first, for the Jackpot table and the overlay over the chat.
 FEED_SIZE = 20
+# How old the desktop's "this is the chat I am showing" report may be before the shelf stops acting
+# on it. The page re-sends it on every focus move and every 20 s, so 60 s is two missed beats: from
+# then on the machine is being watched by nobody as far as the shelf knows, and it spins nothing.
+FOCUS_TTL = 60
+
+
+def focused(held: dict, session_id: str, now: float | None = None) -> bool:
+    """Whether ``session_id`` is the chat the desktop last reported as the one on screen.
+
+    Missing, different and stale all mean no: the hook then spins nothing and pays no points. This is
+    the one rule the hooks and ``slotplay.autospin`` both read, so the two cannot drift apart.
+    """
+    wanted = str(session_id or "").strip()[:64]
+    if not wanted:
+        return False
+    if str(held.get("focus_session") or "") != wanted:
+        return False
+    stamp = int(held.get("focus_at") or 0)
+    if stamp <= 0:
+        return False
+    moment = time.time() if now is None else now
+    return moment - stamp <= FOCUS_TTL
 
 
 def wallet_path(data_root: Path) -> Path:
@@ -210,6 +236,10 @@ class Wallet:
         data["overchat"] = bool(isinstance(raw, dict) and raw.get("overchat") is True)
         machine = raw.get("machine") if isinstance(raw, dict) else None
         data["machine"] = machine if isinstance(machine, str) and machine else DEFAULT_MACHINE
+        # The chat on screen: a string, so it needs its own line like the machine above (the integer
+        # branch skips it, and without this the stamp was dropped on the very next load).
+        focus = raw.get("focus_session") if isinstance(raw, dict) else None
+        data["focus_session"] = focus[:64] if isinstance(focus, str) else ""
         feed = raw.get("feed") if isinstance(raw, dict) else None
         data["feed"] = [row for row in feed if isinstance(row, dict)][:FEED_SIZE] if isinstance(feed, list) else []
         # Easter eggs already found. A list of ids, not a count: the record is which ones, so a new
@@ -235,7 +265,7 @@ class Wallet:
             data["bet"] = max(MIN_BET, int(chips))
         return data
 
-    def set_visible(self, on: bool, source: str = "slots") -> dict:
+    def set_visible(self, on: bool, source: str = "slots", session_id: str | None = None) -> dict:
         """Whether a surface is showing a machine. Auto-spin refuses while none of them is.
 
         ``source`` names the surface doing the drawing: 'slots' is the original copy over the chat
@@ -243,6 +273,11 @@ class Wallet:
         Jackpot cabinet. Each surface keeps its own flag and the wallet's own truth is whether any of
         them is on, so a surface closing cannot switch the automatic spin off while another is still
         on screen: two machines may float at once.
+
+        ``session_id`` is the chat the person is looking at, stamped with the moment it was said:
+        passing it (the desktop does, every 20 s and on every focus move) is what lets a spin belong
+        to them. Leaving it out is an older desktop, and the last report stands rather than being
+        wiped by a machine that only knows it is on screen.
         """
         name = str(source or "slots")[:32] or "slots"
         with self._held() as data:
@@ -253,7 +288,14 @@ class Wallet:
                 sources.pop(name, None)
             data["visible_sources"] = sources
             data["visible"] = bool(sources)
+            if session_id is not None:
+                data["focus_session"] = str(session_id or "")[:64]
+                data["focus_at"] = int(time.time())
         return data
+
+    def is_focused(self, session_id: str, now: float | None = None) -> bool:
+        """Whether ``session_id`` is the chat the person is looking at, from a fresh report."""
+        return focused(self.read(), session_id, now)
 
     def debit(self, chips: int) -> bool:
         """Take chips for a bet. False, and nothing taken, when there are not enough."""

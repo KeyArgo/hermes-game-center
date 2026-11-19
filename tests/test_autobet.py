@@ -31,17 +31,20 @@ def test_the_bet_never_exceeds_the_cap_the_person_set() -> None:
 
 def test_auto_bet_is_on_by_default_and_the_spin_uses_it(tmp_path: Path) -> None:
     wallet = Wallet(wallet_path(tmp_path))
-    wallet.set_visible(True)
+    wallet.set_visible(True, session_id="chat-1")
     wallet.set_autoplay(True)
     held = wallet.read()
     assert held["autobet"] is True, "auto-bet ships on"
     assert held["autobet_max"] == 8
 
-    row = autospin(wallet, kind="turn")
+    row = autospin(wallet, kind="turn", session_id="chat-1")
     assert row and row["bet"] == MIN_BET, "a turn starting is the cheapest bet"
 
+    row = autospin(wallet, kind="message", session_id="chat-1")
+    assert row and row["bet"] >= MIN_BET * 2, "the person's own message is never the cheapest bet"
+
     before = wallet.read()["chips"]
-    row = autospin(wallet, kind="reply", tokens=400_000)
+    row = autospin(wallet, kind="reply", tokens=400_000, session_id="chat-1")
     assert row and row["bet"] > MIN_BET, "a big reply bets more"
     # A spin that pays back exactly its bet leaves the balance unchanged, so check the arithmetic.
     assert wallet.read()["chips"] == before - row["bet"] + row["payout"]
@@ -49,21 +52,21 @@ def test_auto_bet_is_on_by_default_and_the_spin_uses_it(tmp_path: Path) -> None:
 
 def test_auto_bet_off_uses_the_bet_on_the_table(tmp_path: Path) -> None:
     wallet = Wallet(wallet_path(tmp_path))
-    wallet.set_visible(True)
+    wallet.set_visible(True, session_id="chat-1")
     wallet.set_autoplay(True)
     wallet.set_autobet(on=False)
     wallet.set_bet(MIN_BET * 2)
-    row = autospin(wallet, kind="turn")
+    row = autospin(wallet, kind="turn", session_id="chat-1")
     assert row and row["bet"] == MIN_BET * 2
 
 
 def test_a_bet_the_wallet_cannot_cover_falls_back_to_the_smallest(tmp_path: Path) -> None:
     wallet = Wallet(wallet_path(tmp_path))
-    wallet.set_visible(True)
+    wallet.set_visible(True, session_id="chat-1")
     wallet.set_autoplay(True)
     with wallet._held() as data:  # noqa: SLF001 - the test is about the wallet's own floor
         data["chips"] = MIN_BET + 1
-    row = autospin(wallet, kind="reply", tokens=2_000_000)
+    row = autospin(wallet, kind="reply", tokens=2_000_000, session_id="chat-1")
     assert row and row["bet"] == MIN_BET, "the machine keeps turning, at the smallest bet"
 
 

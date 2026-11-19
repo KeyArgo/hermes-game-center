@@ -63,7 +63,9 @@ def test_the_welcome_is_asked_once_and_never_again(tmp_path, monkeypatch):
     view = api.view()
     assert view["setup"]["welcome_needed"] is True
     assert view["player"]["named"] is False
-    suggested = view["setup"]["suggested_name"]
+    # No default name and nothing pre-filled (owner, 2026-11-18); the box offers Suggest a name.
+    assert view["setup"]["suggested_name"] == "", "the welcome still hands the page a ready-made name"
+    suggested = api.suggest_a_name()["name"]
     assert suggested and name_problem(suggested) == ""
 
     answer = api.setup_save({"name": suggested, "games": ["connect4"], "done": True})

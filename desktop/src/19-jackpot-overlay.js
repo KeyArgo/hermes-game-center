@@ -92,7 +92,9 @@ async function jpVisible(delta, send) {
   JP_VIEWERS = Math.max(0, JP_VIEWERS + delta)
   const on = JP_VIEWERS > 0
   if (!send) return
-  try { await send('/jackpot/visible', { on }) } catch { /* a failed report just means no spin */ }
+  // The chat on screen rides along: the shelf only spins for that one, and a report without it (or a
+  // stale one) spins nothing. gcFocusedChat lives with the Jackpot cabinet's own report.
+  try { await send('/jackpot/visible', { on, session_id: gcFocusedChat() }) } catch { /* a failed report just means no spin */ }
 }
 
 function JackpotStatusItem({ ctx }) {
@@ -406,7 +408,8 @@ function JackpotOverlay({ ctx, onClose, data }) {
   // Opening this overlay puts the machine on screen; closing it takes it away.
   useEffect(() => {
     jpVisible(1, door)
-    return () => jpVisible(-1, door)
+    const stillFocused = gcRepeatFocus(() => jpVisible(0, door))
+    return () => { stillFocused(); jpVisible(-1, door) }
   }, [ctx])
   const close = () => { if (typeof onClose === 'function') onClose() }
   const closeButton = jsx('button', {
@@ -573,12 +576,14 @@ function SlotsOverChatCopy({ ctx, width, height }) {
     return () => { alive = false; clearTimeout(timer) }
   }, [ctx])
 
-  // While the machine is drawn it counts as visible for auto-spin, so a reply spins it even when the
-  // person is in another game. It is only mounted while it is shown, so being mounted IS being visible.
+  // While the machine is drawn it counts as visible for auto-spin, so a turn in this chat spins it even
+  // when the person is in another game. It is only mounted while it is shown, so being mounted IS
+  // being visible; the chat it belongs to is re-sent on every focus move and every 20 s.
   useEffect(() => {
     const door = (path, body) => ctx.rest(path, { method: 'POST', body })
     jpVisible(1, door)
-    return () => jpVisible(-1, door)
+    const stillFocused = gcRepeatFocus(() => jpVisible(0, door))
+    return () => { stillFocused(); jpVisible(-1, door) }
   }, [ctx])
 
   // The symbol art and the fonts settle after the first paint, and each of those changes the cabinet's

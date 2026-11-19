@@ -180,16 +180,22 @@ def spin(wallet, *, bet: int | None = None, auto: bool = False, machine: str | N
     return dict(row, chips=held["chips"])
 
 
-def autospin(wallet, kind: str = "turn", tokens: int = 0) -> dict | None:
-    """The automatic spin: only with auto-play on, only while the machine is on screen, and only
-    with chips in the wallet. Nothing is banked, so nothing spins behind a closed machine.
+def autospin(wallet, kind: str = "turn", tokens: int = 0, session_id: str = "") -> dict | None:
+    """The automatic spin: only with auto-play on, only while the machine is on screen, only for the
+    chat the person is looking at, and only with chips in the wallet. Nothing is banked, so nothing
+    spins behind a closed machine or behind a chat nobody is reading.
 
     The bet sizes itself when auto-bet is on (the default): a frequent, cheap hook pays the
-    smallest bet, a real inference reply pays more the more tokens it cost, never above the cap
-    the person set. With auto-bet off it is the bet on the table, exactly as before.
+    smallest bet, the person's own message pays at least double that, and a real inference reply pays
+    more the more tokens it cost, never above the cap the person set. With auto-bet off it is the bet
+    on the table, exactly as before.
     """
     held = wallet.read()
     if not held.get("autoplay") or not held.get("visible"):
+        return None
+    # The chat on screen, and only that one: every hook fires for every chat on this Hermes, which is
+    # how a workturn in a side chat used to turn the owner's machine over.
+    if not wallet.is_focused(session_id):
         return None
     stake = int(held.get("bet") or MIN_BET)
     if held.get("autobet", True):

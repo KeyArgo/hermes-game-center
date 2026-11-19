@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def test_the_plugin_registers_a_tool_hook() -> None:
     source = (ROOT / "__init__.py").read_text()
     assert 'register_hook("pre_tool_call", earn_tool)' in source, "tools were silent: no hook was registered"
-    assert 'slots.autospin(wallet, kind="tool")' in source, "the tool spin is the cheap kind"
+    assert 'slots.autospin(wallet, kind="tool", session_id=' in source, "the tool spin is the cheap kind"
 
 
 def test_the_manifest_declares_every_hook_it_uses() -> None:

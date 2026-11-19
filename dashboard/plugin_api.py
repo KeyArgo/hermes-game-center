@@ -31,7 +31,7 @@ from shelf.catalog import Catalog, community_games, makers_shelf, plugin_roots  
 from shelf.commands import run  # noqa: E402
 from shelf.lobby import snapshot  # noqa: E402
 from shelf.setup import MAX_ROWS, RATE_SECONDS, Setup, apply_choice, looking_now  # noqa: E402
-from shelf.who import NameBook, identify, name_problem, suggest_name  # noqa: E402
+from shelf.who import NameBook, identify, name_problem, random_name  # noqa: E402
 from shelf import champions as champion_store  # noqa: E402
 from shelf import playbook, pet  # noqa: E402
 from shelf import tournament as tournaments  # noqa: E402
@@ -302,7 +302,10 @@ def _setup_payload(catalog: Catalog, player) -> dict:
     return {
         "welcome_needed": not saved["seen"],
         "name": player.name if player.named else "",
-        "suggested_name": suggest_name(getattr(player, "id", "")),
+        # There is no default name to hand the page any more: nothing is pre-filled, and the box
+        # offers "Suggest a name" (/name/suggest) instead. It stays in the payload - always empty -
+        # so an older desktop reads a blank field rather than crashing on a missing key.
+        "suggested_name": "",
         "watched": saved["watched"],
         "paused": saved["paused"],
         "ai_choice": saved["ai"],
@@ -329,6 +332,18 @@ def _alerts_payload(catalog: Catalog, player) -> dict:
         # Said the same way everywhere: this is not a search of the internet.
         "source": "this Hermes and the chats it shares",
     }
+
+
+@router.get("/name/suggest")
+def suggest_a_name() -> dict:
+    """A fresh player name for the box's **Suggest a name** button - a new one on every press.
+
+    No default name any more (owner, 2026-11-18): the welcome, Settings and the online sign-in all
+    open with an empty box, and this is what fills it when the person would rather not type. The name
+    is drawn locally from the shelf's own word lists and passes the same rules as a typed one, so
+    Continue can be pressed at once.
+    """
+    return {"ok": True, "name": random_name()}
 
 
 def _save_name(book: NameBook, player, raw: Any) -> tuple[bool, str]:
@@ -872,15 +887,21 @@ def jackpot_prefs(body: dict | None = None) -> dict:
 
 @router.post("/jackpot/visible")
 def jackpot_visible(body: dict | None = None) -> dict:
-    """Whether a surface is showing a machine. Auto-spin only runs while one of them is.
+    """Whether a surface is showing a machine, and which chat the person is looking at.
 
     ``source`` names the surface: the original copy over the chat (the default, which is what the
     older desktop posts) or the Jackpot cabinet. Each keeps its own flag, so closing one cannot
     switch the automatic spin off while another is still drawing: two machines may float at once.
+
+    ``session_id`` is the chat on screen, as the RUNTIME id the hooks carry (not the stored one),
+    stamped with the moment it arrived. A spin belongs to that chat and to no other, so it is sent
+    on every focus move and every 20 s; a report older than the shelf's window spins nothing. A post
+    without it (an older desktop) leaves the last report standing.
     """
     body = body or {}
     wallet = _jackpot_wallet()
-    wallet.set_visible(bool(body.get("on")), str(body.get("source") or "slots"))
+    wallet.set_visible(bool(body.get("on")), str(body.get("source") or "slots"),
+                       session_id=body.get("session_id"))
     return _jackpot_payload(wallet)
 
 

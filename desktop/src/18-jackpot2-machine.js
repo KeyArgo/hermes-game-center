@@ -120,11 +120,39 @@ let JP2_LAST = null
 // surface reports under, so it cannot clear the original machine's own flag (or be cleared by it).
 let JP2_VIEWERS = 0
 
+// Which chat the person is looking at, as the shelf's hooks name it. The hooks carry the RUNTIME
+// session id (focusedStoredSessionId is the durable one and would never match), so that is what is
+// read here. A draft has none - '' - and the shelf reads that as "no chat on screen": no spin.
+function gcFocusedChat() {
+  try {
+    const atom = host && host.state && host.state.focusedSessionId
+    const value = atom && typeof atom.get === 'function' ? atom.get() : atom
+    return typeof value === 'string' ? value : ''
+  } catch {
+    return ''
+  }
+}
+
+// Keep saying which chat is on screen while a machine is drawn: on every focus move, and every 20 s
+// because the shelf's stamp is only good for 60. Returns the one call that stops both.
+function gcRepeatFocus(again) {
+  const stops = []
+  try {
+    const atom = host && host.state && host.state.focusedSessionId
+    if (atom && typeof atom.subscribe === 'function') stops.push(atom.subscribe(() => { again() }))
+  } catch {
+    // An app without the atom: the beat below still refreshes the stamp.
+  }
+  const beat = setInterval(() => { again() }, 20000)
+  stops.push(() => clearInterval(beat))
+  return () => stops.forEach(stop => { try { stop() } catch { /* already gone */ } })
+}
+
 async function jp2Visible(delta, ctx) {
   JP2_VIEWERS = Math.max(0, JP2_VIEWERS + Number(delta || 0))
   try {
     if (ctx && typeof ctx.rest === 'function') {
-      await ctx.rest('/jackpot/visible', { method: 'POST', body: { on: JP2_VIEWERS > 0, source: 'jackpot2' } })
+      await ctx.rest('/jackpot/visible', { method: 'POST', body: { on: JP2_VIEWERS > 0, source: 'jackpot2', session_id: gcFocusedChat() } })
     }
   } catch (err) {
     // A report that did not arrive only means no automatic spin; nothing else waits on it.
@@ -528,11 +556,13 @@ function JackpotMachine(props) {
   }, [mode])
 
   // This cabinet is on screen for as long as it is mounted, and the shelf spins on the hook path
-  // while any surface says so. Without this report the automatic spin was refused on every reply and
-  // every tool call while the cabinet was the only machine drawn.
+  // while any surface says so - for the chat the person is looking at and no other. Without this
+  // report the automatic spin was refused on every reply and every tool call while the cabinet was
+  // the only machine drawn; without the repeat it went stale a minute after the page opened.
   useEffect(() => {
     jp2Visible(1, ctx)
-    return () => { jp2Visible(-1, ctx) }
+    const stillFocused = gcRepeatFocus(() => jp2Visible(0, ctx))
+    return () => { stillFocused(); jp2Visible(-1, ctx) }
   }, [ctx])
 
   // The full view measures the ELEMENT IT IS MOUNTED IN, not the window: the same cabinet is mounted
@@ -1135,8 +1165,13 @@ function JackpotMachine(props) {
 
   const windowBox = jsx('div', {
     'data-jp2-window': '1',
+    // The window's own height, as an attribute as well as a style: the three rows are a promise the
+    // browser-side fit test measures (window height === cell x rows), and the count has to travel
+    // with the drawing for it to be measurable at all.
+    'data-jp2-window-rows': String(rows),
     style: {
-      position: 'relative', width: windowW, height: windowH, margin: '0 auto', display: 'flex',
+      position: 'relative', width: windowW, height: windowH, minHeight: windowH, flexShrink: 0,
+      margin: '0 auto', display: 'flex',
       borderRadius: 12, overflow: 'hidden', background: JP2_NAVY,
       border: `1px solid rgba(62,224,197,${flash ? 0.55 : 0.24})`,
       boxShadow: `inset 0 10px 34px rgba(0,0,0,.78), 0 0 44px rgba(62,224,197,${flash ? 0.4 : 0.12})`,
@@ -1405,6 +1440,18 @@ function JackpotMachine(props) {
             ]
           }, 'header'),
           windowBox,
+          // The panel below the reels is what flexes and scrolls now. The cabinet's content column is
+          // a flex column inside a fixed 720 px machine, and it used to hand a taller panel its room by
+          // squeezing the reel window (measured: 271 px against a design 312, so the bottom row of the
+          // drum was cut off). The window does not shrink any more; this does. Nothing is hidden - it
+          // scrolls inside itself.
+          jsx('div', {
+            'data-jp2-panel': '1',
+            style: {
+              display: 'flex', flexDirection: 'column', gap: 10, flex: '1 1 auto', minHeight: 0,
+              overflowY: 'auto', overflowX: 'hidden'
+            },
+            children: [
           // Counters: the wallet, the stake, and what the last spin paid.
           jsx('div', {
             style: { display: 'flex', gap: 8 },
@@ -1662,6 +1709,8 @@ function JackpotMachine(props) {
               }, 'points-control')
             ]
           }, 'footer')
+            ]
+          }, 'panel')
         ]
       }, 'content'),
       leverEl,

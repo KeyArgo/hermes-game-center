@@ -141,7 +141,7 @@ await cdp('Page.navigate', { url: URL_BASE })
 await sleep(6000)
 
 // A fresh scratch root lands on the first-run card ("Pick a name"). Play only exists after
-// it, and the card is finished by Continue (or Skip for now) — "Use this" only fills the name.
+// it, and the card is finished by Continue (or Skip for now) — "Suggest a name" only fills the box.
 const welcomed = await evaluate(`(() => {
   const node = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Continue')
     || [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Skip for now')

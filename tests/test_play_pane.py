@@ -118,7 +118,10 @@ def test_the_pane_is_a_right_hand_pane_with_a_quick_game_and_an_agent_line() -> 
     assert "PANES_AREA" in src, "the pane is registered through the SDK's panes area"
     assert "id: 'pane'" in src
     assert "placement: 'right'" in src
-    assert "dock: { pane: 'workspace', pos: 'right' }" in src
+    # The dock hint is asserted where it is written: the built bundle is rebuilt once, on the merged
+    # tree, and the hint now carries enforce: true (tests/test_play_pane_always_right.py).
+    pane_part = (ROOT / "desktop" / "src" / "80-plugin.js").read_text(encoding="utf-8")
+    assert "dock: { pane: 'workspace', pos: 'right', enforce: true }" in pane_part
     # One click, the four quick games, the computer at Normal.
     assert "const QUICK_GAMES = ['connect4', 'reversi', 'gomoku', 'breakthrough']" in src
     assert "item.title || item.id" in src, "the tiles carry the game's own title"
