@@ -15,10 +15,11 @@ from __future__ import annotations
 import asyncio
 import time
 
-# Games a person can ask another person to play. Blackjack and slots are not.
+# Games a person can ask another person to play. Blackjack is one: two people at one
+# table, each against the dealer. Slots is not - it has no table to sit at.
 REQUESTABLE = (
     "connect4", "reversi", "checkers", "gomoku", "chessboard",
-    "go", "hex", "breakthrough", "seabattle",
+    "go", "hex", "breakthrough", "seabattle", "blackjack",
 )
 REQUEST_SECONDS = 90
 HOUR = 3600.0

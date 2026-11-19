@@ -221,3 +221,226 @@ $ node tests/table_ui_harness.cjs    → harness exit=0  (whole harness, incl. g
 - No host DOM is read or styled anywhere: the card uses only `host.connections()`,
   `host.activeConnectionId()`, `host.navigate()` and `ctx.rest()`, each behind a `typeof` guard.
 - No new dependencies; `python3 tools/doc_stamp.py --write` was run before each docs-bearing commit.
+
+---
+
+# LANE REPORT — Lane D (D1, D2)
+
+Worktree `/home/dev/wt/polish/gc-lanes/tnd`, branch `lane/tnd`, from `ecc08a0`. Two commits, one per item:
+
+| Item | Commit | Subject |
+|---|---|---|
+| D1 | `c4a2d75` | D1: Sea Battle placements stay with the person who made them |
+| D2 | `6b940bf` | D2: Blackjack can be asked for in Find match |
+
+`desktop/plugin.js` is in **no** commit: it was built locally once (for `tests/table_ui_harness.cjs`) and
+then `git checkout desktop/plugin.js`. The tree is clean, nothing was pushed, and no gateway, profile,
+sentinel or remote was touched. `python3 tools/doc_stamp.py --write` was run before the docs-bearing
+commit (it restamped the 19 doc headers; the only content change is in `docs/ONLINE-PLAY.md`).
+
+Runner note (same as lane B found): the `python3` on PATH is the Hermes venv with no pytest, so every
+Python run below is `/usr/bin/python3 -m pytest` (3.13.13). Node is v26.
+
+---
+
+## D1 — Sea Battle placements leak through the move list
+
+### Files changed
+- `kit.py` — three helpers beside `_level_note` (`_public_hook`, `_public_move`, `_public_refusal`) and
+  `Table.picture` now:
+  * reads the game's optional `public_move(text) -> bool`;
+  * drops every ply it calls private from `moves`, blanks `last` when `last` is private;
+  * drops a refusal record whose `played` move or any proposed move is private;
+  * gives a **named** viewer who is not the seat to move only the public entries of `legal` (the mover's
+    own list is untouched, and a viewer-less read is untouched — see UNSURE 2);
+  * a hook that raises counts as "not public" (fail closed) and logs at debug.
+  Games with no hook keep exactly the picture they had.
+- `seabattle/game.py` — `public_move(text)` returns True for `fire …` only. Placements, `unplace`,
+  `random`, `duplicate` and `look` are private.
+- `tests/test_seabattle_private_moves.py` (new) — two tests.
+- `docs/ONLINE-PLAY.md` (the "Sea Battle's fleet stays with the seat that laid it" paragraph),
+  `CHANGELOG.md`.
+
+### Tests
+`tests/test_seabattle_private_moves.py::test_the_other_seat_and_a_watcher_never_see_a_placement` —
+Black's and a watcher's picture mid-placement (White has laid three ships by hand): `json.dumps(picture)`
+contains no `place `, no `S` hull on either board, `own_ships`/`enemy_ships`/`enemy_fleet` empty, and none
+of White's hull squares drawn; White's own picture still lists her three ships, draws her hull, and still
+offers her next placements in `legal`.
+`tests/test_seabattle_private_moves.py::test_shots_are_listed_for_both_people_and_placements_never_are` —
+both fleets laid by hand, White fires: `fire b2` is in the move list of both seats **and** the watcher,
+and `place ` is in none of the three pictures.
+
+### FAIL (before) — `ecc08a0`
+```
+$ /usr/bin/python3 -m pytest tests/test_seabattle_private_moves.py -q
+E       AssertionError: Black's picture carries White's placements
+E       assert 'place ' not in '{"view": "s...labels": []}'
+E         'place ' is contained here:
+E           ndom", "unplace carrier", "unplace battleship", "unplace cruiser", "place submarine f1 h", ...
+E           "place submarine f2 h", "place submarine g2 h", ... (the whole legal list)
+2 failed in 3.96s
+```
+The first run of the second test also failed for a test-side reason of mine (a room keeps three words of
+a move, so `["place", name, square, "v"]` is cut to three words and placed horizontally); the fixtures
+now lay every ship left to right, and from then on both tests failed on the leak itself — the second one
+on `"Ada's picture carries a placement"`, with the full placement list quoted out of `moves`.
+
+### PASS (after)
+```
+$ /usr/bin/python3 -m pytest tests/test_seabattle_private_moves.py -q
+..                                                                       [100%]
+2 passed in 4.25s
+
+$ ... test_seabattle.py test_seabattle_board.py test_seabattle_placement.py \
+      test_seabattle_attribution.py test_seabattle_review.py test_online_viewer_pictures.py -q
+66 passed, 15 skipped in 24.65s
+
+$ ... test_online_rooms.py test_online_table.py test_match_lifecycle.py test_seabattle_model_seat.py -q
+114 passed in 35.84s
+
+$ ... test_person_playthrough.py -q          → 42 passed in 47.66s
+$ ... test_browser_click_play.py test_table_ui_contract.py -q → 6 passed, 1 skipped
+$ ... test_check_game_session.py test_ia.py test_windows_import.py -q → 27 passed
+```
+`test_person_playthrough.py` failed on the first cut of the fix (three seabattle cases, "hinted 'random',
+not a legal move") because those tests read a picture with **no** player; the `legal` filter now needs a
+named viewer, which is exactly the distinction UNSURE 2 describes. All green after that.
+
+### Outward paths searched (D1)
+- `kit.py` `Table.picture` — `moves`, `last`, `refusals` and (for a non-mover) `legal`: **fixed**.
+- `online/rooms.py` — `Rooms.picture` hands the viewer to the table, so the server's picture is the filtered
+  one. `room_summary`/`state()` are not involved. No other picture, history or replay path here.
+- `online/server.py` — `broadcast` sends `room_summary` + `picture` + `matches` + presence; `room_summary`
+  carries status/plies/seats/ratings/labels and **no** move text (there is no "last move" field in the room
+  list at all). `get_room`, `lobby`, `live_bot_rooms`, `spectate` all go through `room_summary`. The only
+  move text over HTTP is `GET /api/matches/{room}/{no}` (see UNSURE 4).
+- `online/store.py` — `record_match` writes `state["moves"]` into the `matches` row (called only when a match
+  is finished, `rooms.py:436-438`); `recent_matches` (sent on every broadcast) selects no moves.
+- `online/web/app.js` — draws `picture.moves` (now filtered server-side); `REQUESTABLE_GAMES` updated for D2.
+- `dashboard/plugin_api.py` — `/board` → `shelf.catalog.picture` → `kit.Table.picture` with the desktop
+  player (the local owner's table, now filtered the same way). The review/replay/`tournament/import` code
+  around 2367-2400 builds pictures from local state on the owner's own machine.
+- `shelf/review.py`, `shelf/ladder.py`, `shelf/tournament.py`, `shelf/tutorials.py` — read `state["moves"]`
+  locally, never send them anywhere.
+- `shelf/online_source.py`, `shelf/online_hall.py` — carry no moves; the desktop only proxies server frames.
+- `desktop/src` — `30-game-page.js` draws `picture.moves` (filtered); `73-online-table.js` draws no move list.
+- `online/presence.py`, `matchqueue.py`, `arcade.py`, `bouts.py`, `league.py` — no move text.
+- The Sea Battle picture itself (checked, left alone): a watcher gets no `own_ships`/`tray`/`enemy_fleet`;
+  a seat sees its own fleet; `last_shot(s)` are shots (public); at a finished game both fleets are shown.
+
+---
+
+## D2 — Blackjack by "Find match"
+
+### Files changed
+- `online/requests.py` — `blackjack` added to `REQUESTABLE`, and the comment now says why (two people at
+  one table, each against the dealer; slots has no table to sit at).
+- `desktop/src/72-lobby.js` — `['blackjack', 'Blackjack']` in `LOBBY_GAMES`; the two stale chat comments
+  now name the server's real constant (`CHAT_KEEP_DAYS`) and the thirty days it keeps.
+- `online/web/app.js` — `['blackjack', 'Blackjack']` in `REQUESTABLE_GAMES`.
+- `tests/test_online_requests.py` — new
+  `test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer`;
+  `test_blackjack_and_slots_refused` becomes `test_slots_cannot_be_requested` (the old assertion encoded
+  the behaviour this item removes).
+- `tests/test_online_lobby2.py` — new `test_find_match_can_seat_a_blackjack_table`;
+  `test_find_match_takes_every_game_at_once` now uses `slots` as its refused example.
+- `tests/table_ui_harness.cjs` — the Hall switch list and the "one chip per game, plus All games" count.
+- `docs/ONLINE-PLAY.md` (a Find match sentence under the blackjack paragraph), `CHANGELOG.md`.
+
+`online/requests.py:483` already creates the room as `rooms.create(game, white, True, "two")`, and T9's
+`Rooms.create`/`Rooms.table` already turn a blackjack "two" room into `players=2` with
+`table_chips: True`, so nothing in the room path needed changing — the item was the missing list entry.
+
+### Tests
+`tests/test_online_requests.py::test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer`
+— Ada asks Bea for blackjack, Bea accepts: one `seated` frame pair and one room; `state["players"] == 2`,
+`white_id` = the asker, `black_id` = the person who accepted; each person's picture has two `human` seats,
+`table_players == 2`, `table_chips is True`, their own `your_seat`, a 10,000-chip stack for their seat, no
+player at the table using a wallet, `can_manage` only for the host, `can_move` for the host's first bet,
+and no `wallet.json` in the room folder.
+`tests/test_online_lobby2.py::test_find_match_can_seat_a_blackjack_table` — both PCs look for blackjack,
+the offer names `blackjack`, and accepting it seats both people at one two-seat table.
+`tests/test_online_lobby2.py::test_hermes_lobby_lists_every_game_the_server_can_seat` /
+`::test_the_website_lobby_lists_every_game_the_server_can_seat` — the existing mirrors.
+`tests/table_ui_harness.cjs` — the Hall switches and the Find match chips.
+
+### FAIL (before)
+```
+$ /usr/bin/python3 -m pytest tests/test_online_requests.py::test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer \
+    tests/test_online_lobby2.py::test_find_match_can_seat_a_blackjack_table -q
+E       AssertionError: That game cannot be requested.
+E       assert False        (find match: "That game cannot be chosen.")
+2 failed in 7.68s
+```
+Then, with `blackjack` in `REQUESTABLE` **only** (the mirror guard doing its job):
+```
+$ ... test_hermes_lobby_lists_every_game_the_server_can_seat
+E       AssertionError: ['connect4', 'reversi', ... 'seabattle']
+E       assert [...] == ['blackjack', 'breakthrough', ...]
+$ ... test_the_website_lobby_lists_every_game_the_server_can_seat
+E       assert [...] == [...]
+2 failed in 4.35s
+```
+and the built-bundle harness, before `LOBBY_GAMES` gained blackjack:
+```
+$ node tests/table_ui_harness.cjs
+AssertionError [ERR_ASSERTION] at lobbyAsksContract:6766
+  + 'seabattle',
+-   'blackjack'
+```
+and, with the switch list fixed but the chip count not:
+```
+AssertionError [ERR_ASSERTION]: a chip per game, plus All games
+11 !== 10
+```
+
+### PASS (after)
+```
+$ /usr/bin/python3 -m pytest tests/test_seabattle_private_moves.py tests/test_online_requests.py tests/test_online_lobby2.py -q
+43 passed in 9.59s
+
+$ ... test_online_hall.py test_online_table.py test_online_blackjack.py test_online_lobby.py \
+      test_online_chat_retention.py -q                    → 40 passed in 13.50s
+$ ... test_online_table_stage.py test_online_viewer_pictures.py test_online_admin_http.py -q
+                                                          → 20 passed in 5.70s
+$ ... test_online_site_assets.py test_online_static.py test_coming_soon.py test_brand_copy.py -q
+                                                          → 9 passed in 3.34s
+$ ... test_online_server.py -q                            → 8 passed in 3.52s
+$ ... test_online_lobby_chat.py test_center.py test_docs_consistency.py test_docs_current.py -q
+                                                          → 29 passed in 16.65s
+$ node tests/table_ui_harness.cjs                         → exit=0 (whole harness, built bundle)
+```
+`desktop/plugin.js` was restored with `git checkout desktop/plugin.js` after the harness run.
+
+---
+
+## UNSURE
+
+1. **White's own placements leave her own move list too.** `public_move` is viewer-independent by design
+   (the brief's shape), so the mover does not see her own `place …` lines either. Nothing is lost that
+   matters — her fleet is drawn, and the command answers "Ship placed." — but if you want the mover to keep
+   her own lines, the hook needs a viewer parameter.
+2. **`legal` is filtered only for a *named* viewer who is not the seat to move.** A picture read with no
+   player (`kit.picture()`) keeps the mover's full legal list, because `tests/test_person_playthrough.py`
+   reads tables that way and a viewer-less read can only come from the machine that owns `state.json`.
+   Online always names the viewer (a websocket connection always has a player id), so no online path is
+   left open.
+3. **Refusal records naming a private proposal are dropped for everyone**, including the person whose
+   agent proposed it. A model seat that proposes a bad placement gets no badge for it.
+4. **`GET /api/matches/{room}/{no}` still returns a finished match's moves, placements included.** It is
+   recorded only when a match is finished, and a finished Sea Battle already shows both fleets in the
+   picture (`finished` → `enemy_fleet` and `S` on both boards), so this is the game's own end-of-game
+   reveal rather than a new leak. Left as it is; say the word if a replay should be filtered too.
+5. **`last` no longer carries a placement,** so the desktop's "a new move arrived" reset
+   (`desktop/src/30-game-page.js:531`, keyed on `pictured.last`) does not fire on each placement; the board
+   still redraws from `own_cells` and the ship appears. Worth a look in the live test.
+6. **A Find match offer has no asker**, so either person may be seat 1; the test asserts the two people are
+   the two seats and each is in their own seat, not a fixed order. An explicit *request* always puts the
+   asker in the first seat (asserted).
+7. **"Both owners right"** I read as: both seats are human, each person holds their own seat and their own
+   stack, and the table owner is the host (`can_manage` only for them). `permissions.can_resign` /
+   `can_draw` still read true for a blackjack seat even though `Rooms.run` refuses resign at a blackjack
+   table — presentation hints only, `Table.command` is the boundary. Unchanged.
+8. The slots line in `online/requests.py`'s comment and the doc wording say slots has no table to sit at;
+   if slots ever gets a table, `REQUESTABLE` and both lists need the same one-line change.

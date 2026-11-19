@@ -6,6 +6,19 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Blackjack can be asked for in Find match.** `online/requests.py` `REQUESTABLE` listed every board
+  game and left blackjack out, so a Find match chip for it could not exist and neither the desktop
+  lobby nor the website's Hall offered one - two PCs could not meet for Blackjack, which is the owner's
+  own test (owner, 2026-11-18). Blackjack is on the chips now, in `REQUESTABLE`, in
+  `desktop/src/72-lobby.js` `LOBBY_GAMES` and in the website's `REQUESTABLE_GAMES`; the matched table is
+  the two-seat blackjack one T9 built (both seats human, the person who asked in the first seat, the
+  other beside them, a 10,000-chip stack of each person's own inside the table and no wallet opened).
+  Slots stays out: it has no table to sit at. Also: the lobby comment said the server's chat constant is
+  `CHAT_DAYS`; it is `CHAT_KEEP_DAYS`. Guards: `tests/test_online_requests.py`
+  (`test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer`,
+  `test_slots_cannot_be_requested`), `tests/test_online_lobby2.py`
+  (`test_find_match_can_seat_a_blackjack_table`, and the two list-mirroring tests) and
+  `tests/table_ui_harness.cjs`.
 - **A Sea Battle fleet no longer leaks through the move list.** The boards were drawn per viewer, but
   every ply is written down as its text, and the picture handed the whole list - plus the mover's own
   legal list - to the other seat and to anybody watching. `place carrier b2 h` is a fleet, so the other

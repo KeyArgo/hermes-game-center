@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (ecc08a03)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (c4a2d752)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -183,6 +183,8 @@ Jackpot wallet: an online table never spends, wins, refills or even opens a wall
 lobby table cannot touch the chips on this computer. The move on offer belongs to one person at a time —
 the table refuses a press from the other seat and from a watcher — and a finished hand settles back to
 betting with the table still open. There is no resign at a session table: **Close table** puts it away.
+**Blackjack has a chip in Find match** like the board games: ask for it (or take a request for it) and the
+matched table is that two-seat one above, one person in each seat.
 
 **Sea Battle's fleet stays with the seat that laid it.** The boards were already drawn per viewer; the
 move list every viewer receives now carries the **shots only**. A placement (`place carrier b2 h`), an
