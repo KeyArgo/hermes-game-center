@@ -99,7 +99,12 @@ class Hub:
             prefs = _prefs_for(_service(), player_id)
         else:
             prefs = prefs_by_player[player_id]
-        games = [game for game, enabled in prefs.get('games', {}).items() if enabled] if prefs.get('open') else []
+        # A game is listed when it is taken now: a standing choice with the switch on, or
+        # a twenty-minute window, which needs no switch.
+        open_flag = bool(prefs.get('open'))
+        until = prefs.get('until') or {}
+        games = [game for game, enabled in prefs.get('games', {}).items()
+                 if enabled and (open_flag or game in until)]
         return {'id': player_id, 'name': player['name'], 'status': self.status(player_id, playing), 'games': games}
 
     def roster(self, viewer, playing=None, prefs_by_player=None):

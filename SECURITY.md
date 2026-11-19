@@ -1,5 +1,5 @@
 # SECURITY
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (fb515595)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (98c57d82)_
 
 What this plugin does to your machine and your network, and how to stop it. Sourced from
 README.md ("What this plugin does on your machine"), `plugin.yaml`, and the Desktop table code.

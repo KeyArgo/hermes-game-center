@@ -242,6 +242,12 @@ LATE_COLUMNS = (
     # A match offer is a request neither side asked for: find match made it, and either
     # person may join it. The flag is what lets the other side answer it.
     ("play_requests", "offer", "INTEGER NOT NULL DEFAULT 0"),
+    # When this account last finished a game. 0 means never, which asks for a game first:
+    # find match asks the person who has waited longest.
+    ("availability", "last_game_end", "REAL NOT NULL DEFAULT 0"),
+    # A game played but not accepted is accepted until this moment (owner: twenty minutes).
+    # 0 means a standing choice, which is what the old rows are.
+    ("availability_games", "until", "REAL NOT NULL DEFAULT 0"),
 )
 BOTS_PER_OWNER = 3
 PLAYER_COLUMNS = "id, name, public, created, bot, owner_id, renamed"
@@ -328,6 +334,12 @@ class Store:
             have = {row[1] for row in self.db.execute(f"PRAGMA table_info({table})")}
             if column not in have:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+        backfill_last_game = """
+            UPDATE availability SET last_game_end = COALESCE((SELECT MAX(m.finished) FROM matches m
+                WHERE m.finished > 0 AND (m.white_id = availability.player_id OR m.black_id = availability.player_id)), 0)
+            WHERE last_game_end = 0
+        """
+        self.db.execute(backfill_last_game)
         used = {r[0] for r in self.db.execute("SELECT name_key FROM players WHERE name_key != ''")}
         for row in self.db.execute("SELECT id, name FROM players WHERE name_key = '' ORDER BY rowid").fetchall():
             key = guard.skeleton(row['name'])
@@ -723,6 +735,7 @@ class Store:
         rated = False
         winner = str(state.get("winner") or "")
         reason = str(state.get("result_reason") or state.get("status") or "")
+        finished = time.time()
         self.db.execute("BEGIN IMMEDIATE")
         try:
             inserted = self.db.execute(
@@ -732,10 +745,14 @@ class Store:
                 (room_id, match_no, room["game"], ids["white"], ids["black"],
                  str(state.get("white_name") or ""), str(state.get("black_name") or ""),
                  kinds["white"], kinds["black"], winner, reason, int(state.get("plies") or 0),
-                 json.dumps(list(state.get("moves") or [])), 1 if rated else 0, time.time()),
+                 json.dumps(list(state.get("moves") or [])), 1 if rated else 0, finished),
             ).rowcount == 1
             if inserted:
                 self._bot_record(room["game"], ids, kinds, winner)
+                # Both seats have just played, so find match now asks them last.
+                for side in ("white", "black"):
+                    if ids[side] and kinds[side] == "human":
+                        self.set_last_game_end(ids[side], finished)
             self.db.execute("COMMIT")
         except Exception:
             self.db.execute("ROLLBACK")
@@ -1244,7 +1261,14 @@ class Store:
         }
         return (bool(row["open"]) if row else False), games
 
-    def save_availability(self, player_id: str, open_flag: bool, games: dict[str, bool], now: float) -> None:
+    def save_availability(self, player_id: str, open_flag: bool, games: dict[str, bool], now: float,
+                          until: dict[str, float] | None = None) -> None:
+        """Save the switches. `until` gives absolute twenty-minute windows per game.
+
+        A game named there keeps that moment (0 = a standing choice). A game left out
+        keeps whatever window it had, and a game being turned off loses it.
+        """
+        windows = dict(until or {})
         self.db.execute("BEGIN IMMEDIATE")
         try:
             self.db.execute(
@@ -1253,15 +1277,56 @@ class Store:
                 (player_id, 1 if open_flag else 0, now),
             )
             for game, enabled in games.items():
-                self.db.execute(
-                    "INSERT INTO availability_games (player_id, game, enabled) VALUES (?, ?, ?) "
-                    "ON CONFLICT(player_id, game) DO UPDATE SET enabled = excluded.enabled",
-                    (player_id, game, 1 if enabled else 0),
-                )
+                if not enabled:
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 0, 0) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 0, until = 0",
+                        (player_id, game),
+                    )
+                elif game in windows:
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 1, ?) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
+                        (player_id, game, float(windows[game] or 0)),
+                    )
+                else:
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled) VALUES (?, ?, 1) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1",
+                        (player_id, game),
+                    )
             self.db.execute("COMMIT")
         except BaseException:
             self.db.execute("ROLLBACK")
             raise
+
+    def availability_until(self, player_id: str) -> dict[str, float]:
+        """{game: moment} for the games accepted on a twenty-minute window."""
+        return {
+            str(row["game"]): float(row["until"])
+            for row in self.db.execute(
+                "SELECT game, until FROM availability_games WHERE player_id = ? AND until > 0", (player_id,))
+        }
+
+    def set_game_window(self, player_id: str, game: str, until: float, now: float) -> None:
+        """A game played but not accepted: accepted until `until` (0 = permanent)."""
+        self.db.execute(
+            "INSERT INTO availability (player_id, open, updated) VALUES (?, 0, ?) "
+            "ON CONFLICT(player_id) DO UPDATE SET updated = excluded.updated",
+            (player_id, float(now)),
+        )
+        self.db.execute(
+            "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 1, ?) "
+            "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
+            (player_id, game, float(until)),
+        )
+
+    def clear_expired_windows(self, now: float) -> int:
+        """A twenty-minute window that has run out counts as off."""
+        return self.db.execute(
+            "UPDATE availability_games SET enabled = 0, until = 0 WHERE until > 0 AND until <= ?",
+            (float(now),),
+        ).rowcount
 
     def invisible(self, player_id: str) -> bool:
         """True when the account is appearing offline. No row means visible."""
@@ -1289,6 +1354,31 @@ class Store:
 
     # Find match --------------------------------------------------------------
 
+    def last_game_ends(self, player_ids) -> dict[str, float]:
+        """When each account last finished a game; 0 when it never has.
+
+        The column is preferred and the match record is the fallback, so an account that
+        has never opened its switches still sorts by the games it has played.
+        """
+        wanted = [str(pid) for pid in player_ids if pid]
+        if not wanted:
+            return {}
+        marks = ",".join("?" for _ in wanted)
+        rows = self.db.execute(
+            "SELECT p.id AS pid, COALESCE(a.last_game_end, "
+            "(SELECT MAX(m.finished) FROM matches m WHERE m.finished > 0 AND "
+            "(m.white_id = p.id OR m.black_id = p.id)), 0) AS last "
+            f"FROM players p LEFT JOIN availability a ON a.player_id = p.id WHERE p.id IN ({marks})",
+            wanted)
+        return {str(row["pid"]): float(row["last"] or 0) for row in rows}
+
+    def set_last_game_end(self, player_id: str, when: float) -> None:
+        self.db.execute(
+            "INSERT INTO availability (player_id, open, updated, last_game_end) VALUES (?, 0, ?, ?) "
+            "ON CONFLICT(player_id) DO UPDATE SET last_game_end = MAX(availability.last_game_end, excluded.last_game_end)",
+            (player_id, float(when), float(when)),
+        )
+
     def looking_games(self, player_id: str) -> list[str]:
         """The games this account is actively looking for. Empty means not looking."""
         return [str(row["game"]) for row in self.db.execute(
@@ -1310,6 +1400,10 @@ class Store:
 
     def clear_looking(self, player_id: str) -> int:
         return self.db.execute("DELETE FROM looking WHERE player_id = ?", (player_id,)).rowcount
+
+    def clear_looking_expired(self, before: float) -> int:
+        """Drop searches whose twenty-minute window has run out."""
+        return self.db.execute("DELETE FROM looking WHERE created <= ?", (float(before),)).rowcount
 
     def all_looking(self) -> list[dict]:
         """Every account still looking, with the game and when it started."""
@@ -1371,6 +1465,22 @@ class Store:
             "SELECT COUNT(*) FROM play_requests WHERE to_id = ? AND state = 'pending'",
             (player_id,),
         ).fetchone()[0])
+
+    def offers_made_since(self, from_id: str, game: str, since: float) -> set[str]:
+        """Who this person has already offered this game to since their search began.
+
+        Every offer is kept, answered or not, so the same person is never asked twice in
+        one search.
+        """
+        return {str(row["to_id"]) for row in self.db.execute(
+            "SELECT to_id FROM play_requests WHERE from_id = ? AND game = ? AND offer = 1 AND created >= ?",
+            (from_id, game, float(since)))}
+
+    def pending_offers_from(self, player_id: str) -> list[dict]:
+        """The match offers this person is waiting on an answer to."""
+        return [dict(row) for row in self.db.execute(
+            "SELECT * FROM play_requests WHERE from_id = ? AND state = 'pending' AND offer = 1 "
+            "ORDER BY created, id", (player_id,))]
 
     def pair_pending(self, a: str, b: str) -> bool:
         return self.db.execute(

@@ -905,7 +905,9 @@ class App:
                 frame["games"] = body["games"]
             if "invisible" in body:
                 frame["invisible"] = body["invisible"]
-            if "open" in frame or "games" in frame or "invisible" in frame:
+            if "always" in body:
+                frame["always"] = body["always"]
+            if "open" in frame or "games" in frame or "invisible" in frame or "always" in frame:
                 ack = await self.requests.handle(player, frame)
                 if not ack["ok"]:
                     return _ack_response(ack)
@@ -1437,9 +1439,10 @@ class App:
                 now = self.clock()
                 self.queue.prune(now)
                 await self.requests.expire(now)
-                # Find match: someone who left the lobby is not looking any more, and
-                # everyone still looking gets paired the moment a partner appears.
+                # Find match: someone who left the lobby is not looking any more, a window
+                # that has run out counts as off, and everyone still looking gets paired.
                 self.store.clear_looking_outside(self.hub.online_players())
+                self.store.clear_expired_windows(now)
                 await self.requests.pair_looking(now)
                 for room_id in self.rooms.check_clocks(now):
                     await self.broadcast(room_id)
