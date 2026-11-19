@@ -1,6 +1,6 @@
 # Development
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (07e35119)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (5e23cf40)_
 
 Repo layout, how to build the Desktop bundle, how to run each suite, and what CI does.
 

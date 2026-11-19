@@ -6,6 +6,29 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Find match: four ways an offer could outlive the choices behind it.** From huddle round 12's read of
+  the server (lane F). (1) A person who was also looking for a game counted as a candidate even after
+  turning that game off — the search row outlives the twenty-minute accept it opened — so an offer went
+  out that nobody could take (`_partner_for` now asks `accepts()` first). (2) Changing a search left the
+  old offer pending and the seeker "mid-offer", so the new game was never asked: replacing a search now
+  withdraws (same lock, `cancelled`) any offer for a game no longer searched, before pairing again.
+  (3) Playing a game already chosen with the master switch off overwrote the standing choice with the
+  twenty-minute window, and the chip was gone when the window ended: `availability_games` gains
+  `standing` (migrated and backfilled), `set_game_window` keeps the choice under the window, and
+  `clear_expired_windows` restores `enabled = standing`. (4) The offer card now carries `from_id` /
+  `to_id`, only `to_id` may accept, and a no from the seeker is a **withdrawal** (not somebody else's
+  decline) that asks the next person at once. Also: a looking ack carries the authoritative `prefs`
+  (with `until`) and `shelf/online_hall.py` applies it, so a Play's twenty-minute accept shows at once
+  instead of waiting for a reconnect; and turning a game chip on with the master switch off turns the
+  master switch on with it, so a chip shown on really accepts (an explicit `open` in the same frame
+  still wins). Guards: `tests/test_online_matchmaking.py`
+  (`test_a_search_that_turned_the_game_off_is_not_asked_for_it`,
+  `test_changing_the_search_withdraws_the_offer_it_stops_covering`,
+  `test_a_standing_choice_survives_playing_it_with_the_switch_off`,
+  `test_the_seeker_withdraws_their_own_offer_and_the_next_person_is_asked`,
+  `test_a_looking_ack_carries_the_prefs_it_changed`), `tests/test_online_requests.py`
+  (`test_turning_a_game_on_turns_the_master_switch_on`) and `tests/test_online_hall.py`
+  (`test_a_looking_ack_sets_the_switches_it_came_with`, `test_turning_a_chip_on_puts_the_master_switch_on`).
 - **Blackjack can be asked for in Find match.** `online/requests.py` `REQUESTABLE` listed every board
   game and left blackjack out, so a Find match chip for it could not exist and neither the desktop
   lobby nor the website's Hall offered one - two PCs could not meet for Blackjack, which is the owner's

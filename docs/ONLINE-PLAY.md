@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (07e35119)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (5e23cf40)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -83,7 +83,9 @@ again.
 **Taking requests** is two rows of switches under it: one master switch, and one switch for each of the
 nine games the server can seat (Connect 4, Reversi, Checkers, Gomoku, Chess, Go, Hex, Breakthrough, Sea
 Battle). The master switch gates everything; the per-game ones say what you will play. Both are saved on
-the account, and the line under them names exactly what you are taking requests for.
+the account, and the line under them names exactly what you are taking requests for. Turning a game on
+with the master switch off turns the master switch on with it, so a chip shown on always accepts; turning
+the master switch off yourself is left alone.
 
 The Hall is what makes **ask a person to play** work: you set which games you are open to, someone on
 your roster asks you for a game (**Ask**, offered only to someone online who accepts a game you also
@@ -101,12 +103,14 @@ plus **All games**, and nothing is picked for you. Press the games you want (one
 and the lobby starts looking for exactly those; press a chip again to stop looking for that game, press
 **Stop looking** to stop altogether. The chips read back what the server is looking for, so a chip can
 never claim a game the lobby was not told about, and find match stays on — with Hermes closed to the lobby
-panel, across a reconnect — until you stop it or you are seated.
+panel, across a reconnect — until you stop it or you are seated. Changing the games takes back any offer
+that was out for a game you stopped looking for, and the new games are asked straight away.
 
 While it is on, the server asks **one person at a time**: whoever accepts that game and has waited
 longest since their last game (never played counts first), for **sixty seconds**. Only people who are
-online, visible and **not already at a table** are asked — nobody seated in a game is invited to another
-one, and they stay listed as *playing*. If the person declines, or the sixty seconds run out, the next
+online, visible, **not already at a table** and accepting that game right now are asked — somebody who is
+looking too but has since turned the game off is not, and nobody seated in a game is invited to another
+one, where they stay listed as *playing*. If the person declines, or the sixty seconds run out, the next
 one is asked straight away, and nobody is asked twice in the same search. When there is nobody left it
 says so — *"Nobody is free for Chess right now — still looking"* — and asks whoever comes online next,
 for as long as the search lasts: twenty minutes, or until you press **Stop looking**. A person who
@@ -115,13 +119,16 @@ declined a game is left alone for ten minutes.
 The offer names the person and the game — *"Ada wants to play Chess — Join / Not now"* — with a grey
 line beside the roster saying the same thing (Game Center draws that line itself: it is **not** a chat
 message and is never sent to your model). The person asked is the one who can press **Join**; that seats
-both at the same private unrated table inside Hermes, by the same path a request takes.
+both at the same private unrated table inside Hermes, by the same path a request takes. The person who
+started the search sees the same line with **Cancel**: their own offer cannot be joined by them, and
+cancelling it asks the next person at once.
 
 Pressing **Play** for a game you have not chosen accepts it for **twenty minutes**, so somebody can be
 asked for a game you wanted to play right now. The first time that happens the lobby asks *"Always let
 people invite you to Chess?"*: **Yes, always** makes it a standing choice, and **Just 20 minutes** simply
 lets the window run out. A game on its twenty minutes shows **for 20 min** beside it, and stops counting
-as accepted when the time is up.
+as accepted when the time is up. A game you had already chosen keeps its chip after those twenty minutes
+— the window goes, the choice stays — and the Play's twenty-minute accept shows on the screen at once.
 
 ## Your name and your recovery key
 
