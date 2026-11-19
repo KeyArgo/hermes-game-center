@@ -11,11 +11,19 @@ appears in the snapshot, an error, or a log.
 from __future__ import annotations
 
 import copy
+import logging
 import queue
 import threading
 import time
 
 from shelf import ws as wsmod
+
+log = logging.getLogger(__name__)
+
+# One sentence for every door while the socket is not live. The screen repeats it word for
+# word beside a Retry, so a person who presses a chip on a cold Hall is told the truth and
+# given the one control that fixes it, rather than being told their invites are off.
+NOT_CONNECTED = "Not connected to the lobby yet — Retry"
 
 # Games a person can be asked to play, mirrored from online/requests.py so the
 # prefs the page sends are shaped the way the server expects.
@@ -76,6 +84,26 @@ class Hall:
         self._roster: dict = {}
         self._requests: dict = {}
         self._seated = None
+        # The last thing said about why the socket is not live, so a dial that keeps failing
+        # is one log line and not one every second.
+        self._said = ""
+
+    # Logging -----------------------------------------------------------------
+
+    def _unsaid(self) -> None:
+        """Clear the "already logged" flag: something changed worth saying again."""
+        self._said = ""
+
+    def _say(self, text: str, *, exc_info: bool = False) -> None:
+        """Log the reason the socket is not live, once, until it changes.
+
+        A Hall that cannot connect used to say nothing at all, which left a person with
+        "invites are off" and no line in any log to look at.
+        """
+        if text == self._said:
+            return
+        self._said = text
+        log.info("lobby socket: %s", text, exc_info=exc_info)
 
     # Lifecycle ---------------------------------------------------------------
 
@@ -86,7 +114,11 @@ class Hall:
         so a GET that calls this before sign-in is a harmless no-op.
         """
         with self._lifecycle:
-            if not self.online.on or not self.online.key():
+            if not self.online.on:
+                self._say("not opened: online play is off")
+                return
+            if not self.online.key():
+                self._say("not opened: this computer has no sign-in key")
                 return
             if self._thread is not None and self._thread.is_alive():
                 return
@@ -129,6 +161,23 @@ class Hall:
 
     # The view ----------------------------------------------------------------
 
+    def retry(self) -> dict:
+        """Dial the lobby again now, and hand back the view as it stands.
+
+        The screen's one Retry. A live socket is left alone; anything else is closed and
+        opened again with a fresh backoff, so a person is never told to wait out a delay
+        they did not ask for. Never raises: a dial that fails is a state, not an error.
+        """
+        if self._thread is not None and self._thread.is_alive():
+            with self._lock:
+                if self._state == "live":
+                    return self.snapshot()
+        self.stop()
+        self._unsaid()
+        self.start()
+        log.info("the person asked to reconnect to the lobby (state %s)", self._state)
+        return self.snapshot()
+
     def snapshot(self) -> dict:
         """Exactly the contract-D GET shape. Never carries the key or token."""
         with self._lock:
@@ -161,7 +210,7 @@ class Hall:
         """
         with self._lock:
             if self._state != "live":
-                return {"ok": False, "text": "The lobby is not connected."}
+                return {"ok": False, "text": NOT_CONNECTED}
             self._ref += 1
             op = f"h{self._ref}"
             event = threading.Event()
@@ -321,16 +370,21 @@ class Hall:
                     self._state = "old-server" if slow else "connecting"
                     if not slow:
                         self._missed()
+                if slow:
+                    self._say(f"this server has no lobby socket ({self.online.url})")
+                else:
+                    self._say(f"could not open the socket at {self.online.url}: {exc}")
                 if self._stop.wait(60 if slow else self._delay):
                     break
                 if not slow:
                     self._delay = min(self._delay * 2, self.retry_most)
                 continue
-            except OSError:
+            except OSError as exc:
                 with self._lock:
                     self._socket = None
                     self._state = "connecting"
                     self._missed()
+                self._say(f"could not reach {self.online.url}: {exc}")
                 if self._stop.wait(self._delay):
                     break
                 self._delay = min(self._delay * 2, self.retry_most)
@@ -344,6 +398,8 @@ class Hall:
                     self._state = "connecting"
                 self._fail_pending("The lobby connection dropped.")
                 self._drain_out()
+            if outcome == "" and not self._stop.is_set():
+                self._say("the lobby connection dropped; dialling again")
             try:
                 sock.close()
             except Exception:
@@ -352,6 +408,7 @@ class Hall:
                 break
             if outcome == "auth":
                 # A refused sign-in will not change by trying again fast; wait.
+                self._say("the lobby refused this computer's sign-in key")
                 if self._stop.wait(60):
                     break
                 continue
@@ -442,6 +499,8 @@ class Hall:
                 self._error = ""
                 self._misses = 0
                 self._delay = self.retry_first
+                self._unsaid()
+                log.info("lobby socket live as %s", self._you.get("name") or "this account")
             elif kind == "presence":
                 row = message.get("row") or {}
                 if isinstance(row, dict) and row.get("id"):

@@ -1753,6 +1753,18 @@ def online_hall_view() -> dict[str, Any]:
     return hall.snapshot()
 
 
+@router.post("/online/hall/retry")
+def online_hall_retry() -> dict[str, Any]:
+    """Dial the lobby again now: the one control beside "Not connected to the lobby yet"."""
+    source, _ = _online_pair()
+    hall = _online_hall(source)
+    answer = hall.retry()
+    answer = dict(answer or {})
+    answer["ok"] = answer.get("state") == "live"
+    answer["text"] = "" if answer["ok"] else online_hall.NOT_CONNECTED
+    return answer
+
+
 @router.post("/online/hall/prefs")
 def online_hall_prefs(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
@@ -1762,7 +1774,11 @@ def online_hall_prefs(body: dict | None = None) -> dict[str, Any]:
     # window and keeps the game on the accept list. Older desktops never send it.
     if "always" in body:
         extra["always"] = body["always"]
-    return _online_hall(source).prefs(open=body.get("open"), games=body.get("games"), **extra)
+    hall = _online_hall(source)
+    # Every door opens the socket, not only a GET: a press that arrives before any page
+    # has polled used to be refused with nothing having tried to connect at all.
+    hall.start()
+    return hall.prefs(open=body.get("open"), games=body.get("games"), **extra)
 
 
 @router.post("/online/hall/looking")
@@ -1771,29 +1787,37 @@ def online_hall_looking(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
     on = body.get("on")
-    return _online_hall(source).looking(body.get("games"), all_games=body.get("all") is True,
-                                        on=True if on is None else on)
+    hall = _online_hall(source)
+    hall.start()
+    return hall.looking(body.get("games"), all_games=body.get("all") is True,
+                        on=True if on is None else on)
 
 
 @router.post("/online/hall/request")
 def online_hall_request(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
-    return _online_hall(source).request(body.get("to"), body.get("game"))
+    hall = _online_hall(source)
+    hall.start()
+    return hall.request(body.get("to"), body.get("game"))
 
 
 @router.post("/online/hall/respond")
 def online_hall_respond(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
-    return _online_hall(source).respond(body.get("id"), body.get("accept"))
+    hall = _online_hall(source)
+    hall.start()
+    return hall.respond(body.get("id"), body.get("accept"))
 
 
 @router.post("/online/hall/cancel")
 def online_hall_cancel(body: dict | None = None) -> dict[str, Any]:
     source, _ = _online_pair()
     body = body or {}
-    return _online_hall(source).cancel(body.get("id"))
+    hall = _online_hall(source)
+    hall.start()
+    return hall.cancel(body.get("id"))
 
 
 @router.post("/online/queue")

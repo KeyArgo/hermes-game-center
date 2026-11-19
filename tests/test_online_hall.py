@@ -146,9 +146,50 @@ def test_hall_snapshot_shape_when_off(tmp_path):
     # No key and online off: start() opens no socket.
     hall.start()
     assert hall.snapshot()["state"] == "off"
-    # Not connected: a client frame refuses plainly rather than blocking forever.
-    assert hall.prefs(open=True) == {"ok": False, "text": "The lobby is not connected."}
+    # Not connected: a client frame refuses plainly, in the words the screen puts beside
+    # Retry, rather than blocking forever or reading as "your invites are off".
+    assert hall.prefs(open=True) == {"ok": False, "text": "Not connected to the lobby yet — Retry"}
     assert hall.request("someone", "connect4")["ok"] is False
+
+
+def test_every_door_says_not_connected_and_retry_dials_again(tmp_path):
+    """The one sentence and the one control: press Retry and the Hall dials at once.
+
+    The Hall said "The lobby is not connected." from a state nothing could see or fix: the
+    card drew an empty accept list as "invites are off", and no line was logged anywhere.
+    """
+    import logging
+
+    source = Online(tmp_path, url="http://127.0.0.1:1", secret=lambda _name: "k")
+    hall = Hall(source)
+    hall.start()
+    try:
+        # It cannot reach 127.0.0.1:1, so every door says the same thing.
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline and hall.snapshot()["state"] == "live":
+            time.sleep(0.02)
+        not_live = hall.snapshot()
+        assert not_live["state"] != "live"
+        assert hall.looking(["connect4"])["text"] == "Not connected to the lobby yet — Retry"
+        # Nothing is lost by asking again: the state stays a state, never an exception.
+        after = hall.retry()
+        assert after["state"] in {"off", "connecting", "old-server"}
+    finally:
+        hall.stop()
+
+
+def test_the_reason_a_socket_could_not_be_opened_reaches_the_log(tmp_path, caplog):
+    """A Hall that cannot connect says why, once, in the logger the other shelf parts use."""
+    source = Online(tmp_path, url="http://127.0.0.1:1", secret=lambda _name: "")
+    source.turn_on()
+    hall = Hall(source)
+    with caplog.at_level("INFO", logger="shelf.online_hall"):
+        hall.start()
+        hall.stop()
+    text = " ".join(record.getMessage() for record in caplog.records)
+    assert "no sign-in key" in text, text
+    # The credential is never in a log line, even the one that says there is none.
+    assert "SECRET-KEY-VALUE" not in text
 
 
 def test_hall_validates_client_frames(tmp_path):
@@ -276,7 +317,7 @@ def test_a_dropped_socket_never_leaves_a_stale_live_state(monkeypatch):
         assert hall.snapshot()["state"] == "connecting", hall.snapshot()
 
         answer = hall.request("web:2", "connect4")
-        assert answer == {"ok": False, "text": "The lobby is not connected."}, answer
+        assert answer == {"ok": False, "text": "Not connected to the lobby yet — Retry"}, answer
         assert hall._out.qsize() == 0, "a request was queued while the lobby was down"
     finally:
         hall.stop()
