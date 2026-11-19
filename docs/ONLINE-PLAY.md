@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -22,6 +22,8 @@ turn it on**, and this page explains exactly what happens when you do.
 > computer and keeps working when the server is down.
 
 That paragraph is generated from the `lobby_url` setting, so it always names the address actually used.
+The one file that can hold the key is the account file you choose to save with **Save my account file**
+(below); Game Center never writes it anywhere else.
 
 ## Get online: the card at the top of the Games page
 
@@ -70,7 +72,9 @@ reaches you the moment it is sent. It is the socket at `/api/lobby/socket`, and 
 roster needs: your display name, which games you will accept a challenge in (your **prefs**), whether you
 are appearing offline, which games **find match** is on for, and the requests you send or answer. It never
 carries your recovery key beyond the one sign-in frame, and it opens only after you have turned online
-play on and signed in. Turning online play off, or signing out here, closes it at once.
+play on and signed in. Turning online play off, or signing out here, closes it at once. If the connection
+drops, the Hall dials again on its own: after 1 second, then 2, then 4, up to 8 seconds between tries.
+The log records each wait as `lobby reconnect in …s`.
 
 **Everyone who is signed in is listed while they are online** — the roster is the lobby connection, not
 the queue: nobody has to queue, say hello or open a page to appear in it. A person's row says whether they
@@ -86,6 +90,13 @@ Battle). The master switch gates everything; the per-game ones say what you will
 the account, and the line under them names exactly what you are taking requests for. Turning a game on
 with the master switch off turns the master switch on with it, so a chip shown on always accepts; turning
 the master switch off yourself is left alone.
+
+**Let people invite me** sits on the Games page under **Play with people**, above the per-game chips. It is on
+only while online play is on, you are signed in and the Hall's socket is live. When it is held, the sentence
+beside it says why: **Sign in above first.** or **Lobby not connected — Retry**. Press **Retry** to dial the
+lobby again at once; a sign-in, a Retry and opening the Games page all redial immediately. This is the same
+choice as the Hall's **Take game requests** master switch — the two surfaces write one setting, so they
+cannot disagree.
 
 The Hall is what makes **ask a person to play** work: you set which games you are open to, someone on
 your roster asks you for a game (**Ask**, offered only to someone online who accepts a game you also
@@ -139,6 +150,12 @@ twenty minutes — the window goes, the choice stays. If the lobby refuses the
 Online identity is a display name plus a **recovery key**, the same scheme the website uses, so one
 account works in both places.
 
+**Which name people see.** Signed in, the name shown on the Games page, in the pane, in Settings and in
+the `#games` chat is your lobby account name; that is what other players see. The name you typed on this
+computer is still shown as "this computer's name" — if the two differ, the **Get online** card says so in
+one line. Signed out, the local name is the one shown here. Changing the local name in Settings never
+renames your lobby account; use **Change my name** under **Get online** for that.
+
 - **Create my player** picks a new name and shows the key once, with **Copy recovery key**. Save it
   somewhere safe: it is what signs you in on another computer or in a browser.
 - **I have a player** signs in with a name and a key you already have.
@@ -150,8 +167,10 @@ account works in both places.
   file** writes `GameCenter-<name>.json` with `name`, `key`, `server` and `saved_at` into your Downloads
   folder and tells you the path.
 - The key is stored through **Hermes's own credential route** — the same `.env` store and secret scope a
-  provider API key uses, as `HERMES_GAMESHELF_LOBBY_KEY`. It is never written to Game Center's own files,
+  provider API key uses, as `HERMES_GAMESHELF_LOBBY_KEY`. It is never written to Game Center's data folder,
   never put in a log, and never part of the page's state (the view reports only whether a key is present).
+  The one file that can hold it is the account file you choose to save with **Save my account file**, which
+  lands in Downloads.
 - If a Hermes build has no credential route, the key is not kept at all: the dock says so and asks you to
   paste it into **Plugins → Game Center → Online recovery key** (a `secret` field in the manifest).
 - **Sign out** removes the key from this computer. It does not delete the account.

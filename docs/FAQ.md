@@ -1,6 +1,6 @@
 # FAQ
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 Short answers to the questions the code raises.
 
@@ -18,7 +18,11 @@ The display name you pick, your recovery key when you sign in, which game you ar
 
 ## Where is my recovery key kept?
 
-In Hermes's own credential store, under `HERMES_GAMESHELF_LOBBY_KEY`. It is shown once when you create a player, is never written to a Game Center file and is never logged. You can also paste it into the plugin's `lobby_key` config field by hand.
+In Hermes's own credential store, under `HERMES_GAMESHELF_LOBBY_KEY`. It is shown once when you create a player, is never written to Game Center's data folder and is never logged. The one exception is the account file you choose to save with **Save my account file**, which puts the key in Downloads. You can also paste it into the plugin's `lobby_key` config field by hand.
+
+## Which name do other people see?
+
+Signed in to the lobby, your lobby account name — on the Games page, in the pane, in Settings and in the `#games` chat. Signed out, this computer's name. Changing the name in Settings changes only this computer's label; **Change my name** under **Get online** renames the lobby account. See [ONLINE-PLAY.md](ONLINE-PLAY.md#your-name-and-your-recovery-key).
 
 ## Where are my chips and points?
 

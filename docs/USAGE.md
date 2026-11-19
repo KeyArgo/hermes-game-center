@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -20,7 +20,7 @@ The eleven Play cards are the curated list. **Experimental**, **Settings** and *
 
 ## Put your name on it
 
-Game Center has no default player name. The welcome, Settings and the online sign-in all open with an empty name box, and each has **Suggest a name** beside it: one press fills the box with a fresh name (draw a new one by pressing again), or you type your own. Nothing is sent anywhere by picking a name; it is what the table and other players see.
+Game Center has no default player name. The welcome, Settings and the online sign-in all open with an empty name box, and each has **Suggest a name** beside it: one press fills the box with a fresh name (press again for another), or you type your own. Picking a name sends nothing. While online play is off, it is the name shown at the table and to other people on this computer. Once you sign in to the lobby, other people see your lobby account name instead — the name you typed here is only this computer's label. The two are shown together under **Get online** when they differ; see [ONLINE-PLAY.md](ONLINE-PLAY.md#your-name-and-your-recovery-key). The welcome also offers one chip per game you would play with someone; these write the same per-game alert switches as Settings. **Continue** saves the name and chips, **Skip for now** starts without a name, and either choice ends the first-run welcome (Settings can show it again).
 
 ## Start a game
 

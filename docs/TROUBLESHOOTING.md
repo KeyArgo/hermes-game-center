@@ -1,6 +1,6 @@
 # Troubleshooting
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 Real failure modes the code handles or the README already names, and what to do about each.
 
@@ -43,7 +43,7 @@ Real failure modes the code handles or the README already names, and what to do 
 | No match alerts pop up | This build has `ALERTS_OFF`: the status bar shows a quiet count, no notification is drawn. | The per-game switches in Settings are still saved; alerts are a known gap, not a broken switch. |
 | The bot ladder is missing | This build has `PANE_LADDER_OFF`: rated bot-versus-bot is not proven end to end. | Local play and online person-versus-person are unaffected. |
 | The dock says the server is down in one sentence | `lobby_url` is unreachable. | Nothing local stops working. Check the address, your network, or turn online play off. |
-| Sign-in fails after reinstalling | The recovery key is shown once and kept in Hermes's credential store. | Sign in with the key if you saved it, or create a new player. Game Center never writes the key to its own file. |
+| Sign-in fails after reinstalling | The recovery key is shown once and kept in Hermes's credential store. | Sign in with the key if you saved it, or create a new player. Game Center never writes the key to its own data folder; only the account file you choose to save holds it, in Downloads. |
 | **Let people invite me** is greyed out | The switch is drawn from the lobby socket, so it is held while there is nothing to write to. The sentence beside it says which: "Sign in above first." (no account on this computer) or "Lobby not connected — Retry". | Sign in under **Get online**, then press **Retry** beside the switch — the shelf dials at once, without waiting out a backoff. A sign-in, a Retry and opening the Games page all dial now; until this fix they left a waiting socket alone, so the switch could stay grey for a minute after signing in. |
 | A self-hosted lobby is refused | The plugin only sends to the `lobby_url` you set. | Point `lobby_url` at your server and see [HOSTING.md](HOSTING.md). |
 
@@ -57,11 +57,16 @@ Real failure modes the code handles or the README already names, and what to do 
 ## The diagnostic log
 
 Game Center keeps its own log, `game-center.log`, in the plugin's data folder — the same folder
-its state lives in (Hermes's plugin-data folder for `hermes-gameshelf`, not the install folder).
-It rotates at 1 MB and keeps three older files (`game-center.log.1` … `.3`). Keys and tokens are
-masked as `***` on the way out, tracebacks included, so the file is safe to attach to a bug report.
-A lobby server you host yourself writes the same health, slow-request and error lines to its own
-logger (journald when it runs as a service), not to this file.
+its state lives in, never the install folder. That folder is `<Hermes home>/plugin-data/hermes-gameshelf/`:
+`~/.hermes/plugin-data/hermes-gameshelf/game-center.log` on Linux and macOS, and
+`%LOCALAPPDATA%\hermes\plugin-data\hermes-gameshelf\game-center.log` on Windows
+(`%USERPROFILE%\AppData\Local\hermes\plugin-data\hermes-gameshelf\` when `LOCALAPPDATA` is unset).
+A profile or `HERMES_HOME` changes `<Hermes home>`, so the exact path is whatever Hermes reports as its
+home. It rotates at 1 MB and keeps three older files (`game-center.log.1` … `.3`). Keys and tokens —
+tracebacks included — are replaced with `***` as the line is written. Names, lobby addresses and local
+paths are **not** masked, so read the file before sharing it. A lobby server you host yourself writes the
+same health, slow-request and error lines to its own logger (journald when it runs as a service), not to
+this file.
 
 | Line | What it means | What to do |
 |---|---|---|
@@ -73,6 +78,15 @@ logger (journald when it runs as a service), not to this file.
 | `lobby connect …` / `lobby disconnect …` / `lobby reconnect in …s` | The online lobby socket opened, dropped, or is dialing again. | Reconnects after a network drop are normal; only continuous failures mean the server is unreachable. |
 | `desktop error: …` / `desktop rejection: …` | A crash inside the Games page or the side pane — only Game Center's own code is reported, never the host app's. At most 20 lines a minute. | The boundary card offers a way out; report the line if the crash repeats. |
 | `desktop heap used=…MB` | The browser's JavaScript heap, every 5 minutes while a Game Center surface is open (only where the browser offers `performance.memory`). | A number that climbs without coming down is worth reporting with the log. |
+
+## Sending the log
+
+Attach `game-center.log` (and the numbered backups if the problem started before the current file) to a
+GitHub issue using the repository's bug-report template, or to a private report through GitHub's
+**Security → Report a vulnerability** form when the problem is a security issue. Include your OS, the
+output of `hermes --version`, the version chip text from Settings (click it to copy), and the steps that
+reproduced the problem. Never put a working exploit in a public issue.
+[CONTRIBUTING.md](../.github/CONTRIBUTING.md) has the full reporting instructions.
 
 ## Development and test runs
 
