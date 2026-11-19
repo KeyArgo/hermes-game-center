@@ -8174,6 +8174,8 @@ async function offerSidesContract() {
     onJoin: () => answers.push('join'), onNotNow: () => answers.push('not now') }
   const dialogTree = evaluate('LobbyOfferDialog(offerSidesProps)')
   assert.ok(findButton(dialogTree, 'Join') && findButton(dialogTree, 'Not now'), 'and the two answers')
+  assert.equal(/both looking|you are both/.test(words(dialogTree)), false,
+    'the dialog does not claim both were looking: ' + words(dialogTree))
   assert.ok(!words(tree).includes('Asking Bea'), 'and is not told they are asking anyone')
   const line = nodes(tree).find(node => node.props && node.props['data-lobby-offer-line'] === '1')
   assert.ok(words(line).includes('Bea wants to play Connect 4'), 'the offer is one sentence on the panel too')

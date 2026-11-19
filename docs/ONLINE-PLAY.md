@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (07e35119)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (d03ef3cd)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -112,16 +112,22 @@ says so — *"Nobody is free for Chess right now — still looking"* — and ask
 for as long as the search lasts: twenty minutes, or until you press **Stop looking**. A person who
 declined a game is left alone for ten minutes.
 
-The offer names the person and the game — *"Ada wants to play Chess — Join / Not now"* — with a grey
-line beside the roster saying the same thing (Game Center draws that line itself: it is **not** a chat
-message and is never sent to your model). The person asked is the one who can press **Join**; that seats
-both at the same private unrated table inside Hermes, by the same path a request takes.
+The offer names the person and the game — *"Ada wants to play Chess"* — with a grey line beside the
+roster saying the same thing (Game Center draws that line itself: it is **not** a chat message and is
+never sent to your model). **Only the person asked gets the Join / Not now dialog**: the lobby refuses
+an answer from anyone else, so the person doing the asking is never shown one. They see
+*"Asking Ada — 42 s"* on the panel instead, counting down the sixty seconds, with **Cancel** to take
+that ask back and **Stop looking** to end the search. Pressing **Join** seats both at the same private
+unrated table inside Hermes, by the same path a request takes.
 
 Pressing **Play** for a game you have not chosen accepts it for **twenty minutes**, so somebody can be
 asked for a game you wanted to play right now. The first time that happens the lobby asks *"Always let
 people invite you to Chess?"*: **Yes, always** makes it a standing choice, and **Just 20 minutes** simply
-lets the window run out. A game on its twenty minutes shows **for 20 min** beside it, and stops counting
-as accepted when the time is up.
+lets the window run out. The question is asked once per game, wherever the press came from — the Games
+page's **Play** row or the Hall's **Find match** chips (an **All games** search grants the 20 minutes for
+every game it covers, and asks about each one in turn). A game on its twenty minutes shows **for 20 min**
+beside it straight away, and stops counting as accepted when the time is up. If the lobby refuses the
+**Yes, always** save, the question stays on screen with the lobby's own sentence, so you can press again.
 
 ## Your name and your recovery key
 

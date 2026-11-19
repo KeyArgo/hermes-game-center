@@ -152,4 +152,29 @@ async function offerSidesOnTheSite() {
   console.log('site: the person asked answers an offer, the seeker waits with a cancel: passed')
 }
 
-offerSidesOnTheSite().catch(error => { console.error(error); process.exitCode = 1 })
+// SITE_ONLY=copy or SITE_ONLY=sides runs one of the two, which is how a single change was
+// shown failing on its own; with nothing set both run.
+const only = process.env.SITE_ONLY || ''
+const all = () => offerSidesOnTheSite().then(() => offerCopyOnTheSite())
+const chosen = only === 'copy' ? offerCopyOnTheSite : only === 'sides' ? offerSidesOnTheSite : all
+chosen().catch(error => { console.error(error); process.exitCode = 1 })
+
+// ---- What an offer says ----------------------------------------------------------------
+// One sentence, the owner's: "<name> wants to play <Game>". Find match asks one person
+// whether they want a game now, so the page must not tell them they were both looking.
+async function offerCopyOnTheSite() {
+  const now = Math.floor(Date.now() / 1000)
+  const toMe = { id: 'o1', state: 'pending', offer: true, game: 'chessboard', created: now - 5, expires: now + 55,
+    from: { id: 'bea', name: 'Bea' }, to: { id: 'me', name: 'Ada' } }
+  reset()
+  const run = makeHall({ requests: [toMe] })
+  const tree = await settle({ ...props({}), hall: run.hall })
+  const article = nodes(tree).find(node => node.type === 'article' && String(node.props.className).includes('offer'))
+  assert.ok(article, 'the offer is drawn as its own card')
+  const line = words(article.props.children[0])
+  assert.ok(line.startsWith('Bea wants to play Chess'), 'the offer says who wants to play what: ' + line)
+  assert.equal(line.includes('both'), false, 'and does not claim both people were looking: ' + line)
+  assert.equal(/both looking|you are both/.test(words(tree)), false, 'nothing on the page says both were looking')
+  reset()
+  console.log('site: an offer says "<name> wants to play <Game>", not that both were looking: passed')
+}
