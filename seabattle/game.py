@@ -100,6 +100,16 @@ def show(move):
     return " ".join(move)
 
 
+def public_move(text):
+    """Only a shot is public. A placement is the fleet, so it stays with its owner.
+
+    The picture's move list reaches the other seat and anyone watching, and a
+    line like "place carrier b2 h" would hand them the fleet the boards keep
+    hidden. Firing is public in every sense: both people see the shot land.
+    """
+    return str(text).strip().lower().startswith("fire ")
+
+
 def _other(side):
     return "black" if side == "white" else "white"
 

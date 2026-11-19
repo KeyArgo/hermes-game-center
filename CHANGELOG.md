@@ -6,6 +6,16 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A Sea Battle fleet no longer leaks through the move list.** The boards were drawn per viewer, but
+  every ply is written down as its text, and the picture handed the whole list - plus the mover's own
+  legal list - to the other seat and to anybody watching. `place carrier b2 h` is a fleet, so the other
+  player could rebuild one from moves alone (huddle round 9, found in `kit.py` `Table.picture`). A game
+  can now define `public_move(text) -> bool` and the kit drops every ply it calls private from `moves`,
+  blanks `last` when it is private, drops a refusal record that names a private proposal, and gives a
+  named viewer who is not the seat to move only the public entries of `legal`. Sea Battle's answer is
+  `fire …` and nothing else. Games without the hook are unchanged. Guards:
+  `tests/test_seabattle_private_moves.py` (Black and a watcher hold no placement and no fleet hull
+  mid-placement, White still gets her own next placements, and both keep every shot).
 - **The over-chat slot rests when nothing is happening.** The status chip that feeds the see-through
   machine asked the shelf for `/jackpot` every 600 ms for as long as it was mounted - about a hundred
   reads a minute of a file that only changes while a turn runs, per view of the machine, whether or not
