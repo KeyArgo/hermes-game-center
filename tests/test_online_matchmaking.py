@@ -226,6 +226,31 @@ def test_nobody_free_keeps_looking_and_says_so(world):
     run(scenario())
 
 
+def test_a_search_that_turned_the_game_off_is_not_asked_for_it(world):
+    """Looking is not accepting: the switch is what decides who may be asked.
+
+    The search row outlives the twenty-minute accept it opened, so turning the game off
+    leaves it behind. A person in that state still has a search running, but they no
+    longer take the game, and an offer to them is an offer nobody can answer.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        played_at(store, bea, clock.now - 500)
+        here(hub, ada, bea)
+        assert (await look(service, bea, ["chessboard"]))["ok"]
+        assert (await service.handle(bea, {"t": "prefs", "games": {"chessboard": False}}))["ok"]
+        assert service.accepts(bea["id"], "chessboard") is False
+        assert service.looking(bea["id"]) == ["chessboard"], "the search row is still there"
+        hub.sent.clear()
+        assert (await look(service, ada, ["chessboard"]))["ok"]
+        assert not any(card["to"]["id"] == bea["id"] for _pid, card in offers(hub)), \
+            "someone whose search no longer accepts the game is not asked for it"
+
+    run(scenario())
+
+
 def test_only_the_person_asked_can_accept_a_match_offer(world):
     _store, _rooms, people, _clock, hub, service = world
 

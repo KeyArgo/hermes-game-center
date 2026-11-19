@@ -396,9 +396,11 @@ class Service:
         """The best person for this game right now, or None.
 
         A person also looking for this game is an accepter too, and is ordered by the
-        same rule. Nobody is asked twice in one search.
+        same rule. Nobody is asked twice in one search, and a search is not an accept: a
+        looker who turned the game off since is not a candidate.
         """
-        wanted = {pid for pid in looking if pid != looker and game in looking[pid]}
+        wanted = {pid for pid in looking if pid != looker and game in looking[pid]
+                  and self.accepts(pid, game)}
         wanted |= set(self._open_to(game, connected))
         wanted.discard(looker)
         behind = self.store.last_game_ends(wanted)
