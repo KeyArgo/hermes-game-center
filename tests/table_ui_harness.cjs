@@ -3912,7 +3912,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -4530,6 +4530,165 @@ async function onlineTableContract() {
   evaluate("rememberOnlineRoom('')")
   reset()
   console.log('online table in the plugin: the server board, one command route, the table chat on one route, no local move: passed')
+}
+
+// The online table draws what the local game draws. Both places go through the one stage switch
+// (tableStage), so a game with a renderer of its own is never handed to the chess-like grid, and a
+// view no stage knows says so in words instead of drawing an empty 8x8 board.
+async function onlineStageContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const draw = (expression, name, value) => {
+    sandbox[name] = value
+    cursor = 0
+    const tree = evaluate(expression)
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return tree
+  }
+  // A poll is a round trip: draw (which starts the read), let it settle, draw again.
+  const settle = async (expression, name, value) => {
+    draw(expression, name, value)
+    await tick()
+    return draw(expression, name, value)
+  }
+  const mounted = (tree, name) => nodes(tree)
+    .filter(node => typeof node.type === 'function' && node.type.name === name)
+  const gridOf = tree => mounted(tree, 'BoardSvg')
+  const cell = (rows, cols) => Array.from({ length: rows }, () => Array.from({ length: cols }, () => '.'))
+  const connect = cell(8, 8)
+  const live = (picture, side = 'white') => ({
+    room_id: 'r1', state: 'live', picture, room: 'r1', side,
+    opponent: { name: 'Bea' }, error: '', finished: false
+  })
+  const makeCtx = table => {
+    const asked = []
+    const ctx = {
+      storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+      os: { openExternal: () => true, notify() {} },
+      rest: async (path, options) => {
+        asked.push([path, options || null])
+        if (path === '/online/table') return { table }
+        if (path === '/online/table/cmd') {
+          const body = (options && options.body) || {}
+          return { ok: true, text: `Played ${body.action}.`, picture: table.picture }
+        }
+        return { ok: true }
+      }
+    }
+    return { ctx, asked }
+  }
+  const commands = run => run.asked.filter(item => item[0] === '/online/table/cmd').map(item => item[1].body)
+  const plays = (picture, game, side) => {
+    const run = makeCtx(live(picture, side))
+    const props = { game, ctx: run.ctx, roomId: 'r1', onBack: () => {} }
+    return { run, props }
+  }
+  const blackjack = { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true, solo: true }
+  const seabattle = { id: 'seabattle', title: 'Sea Battle', kind: 'table', installed: true, bots: true }
+
+  reset()
+  // 1. Blackjack: the card table, not a grid — and the header never says white or black.
+  const cards = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white', plies: 2,
+    legal: ['bet10'], bets: [10], chips: 10000, bet: 0, hand: [], dealer: [], dealer_kind: 'house',
+    player_hands: [], outcome: '', won: 0, hands: 1, permissions: { can_move: true }
+  }
+  let table = plays(cards, blackjack, '')
+  let tree = await settle('OnlineTable(onlineProps)', 'onlineProps', table.props)
+  assert.equal(mounted(tree, 'BlackjackTable').length, 1, 'an online blackjack table is the card table')
+  assert.equal(gridOf(tree).length, 0, 'and never the chess grid')
+  assert.ok(words(tree).includes('You and Bea vs the dealer'), 'the header says the table is both people against the dealer')
+  assert.ok(!words(tree).includes('you play white') && !words(tree).includes('you play black'),
+    'no white-versus-black line at a dealer table')
+  // The felt itself is the shared component's: it proves the mounted element really is the table.
+  sandbox.stageFelt = mounted(tree, 'BlackjackTable')[0].props
+  reset()
+  const felt = evaluate('BlackjackTable(stageFelt)')
+  assert.equal(nodes(felt).find(node => node.props && node.props['data-blackjack'] !== undefined).props['data-blackjack'],
+    'table', 'the mounted blackjack element draws the card table')
+
+  // 2. Sea Battle: the two fleets, not a grid.
+  const fleet = {
+    view: 'seabattle', game: 'seabattle', status: 'active', phase: 'place', turn: 'white', plies: 0,
+    your_side: 'white', own_cells: cell(10, 10), enemy_cells: cell(10, 10), tray: [{ name: 'carrier', size: 5 }],
+    own_ships: [], enemy_ships: [], enemy_fleet: [], cover: null, legal: ['random'],
+    permissions: { can_move: true }
+  }
+  table = plays(fleet, seabattle)
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', table.props)
+  assert.equal(mounted(tree, 'SeaBattleTable').length, 1, 'an online Sea Battle table is the two fleets')
+  assert.equal(gridOf(tree).length, 0, 'and never the chess grid')
+
+  // 3. Slots: the person's own machine, said out loud, and no white/black line anywhere.
+  const slots = { view: 'slots', game: 'slots', status: 'active', plies: 1, chips: 500, bet: 5, legal: ['spin'], permissions: { can_move: true } }
+  table = plays(slots, { id: 'slots', title: 'Slots', kind: 'table', installed: true, bots: true, solo: true }, '')
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', table.props)
+  assert.equal(mounted(tree, 'Jackpot2Full').length, 1, 'online slots opens the person\'s own machine')
+  assert.equal(gridOf(tree).length, 0, 'and never the chess grid')
+  assert.ok(words(tree).includes('Side-by-side Slots online is coming; this is your own machine.'),
+    'with one line saying side-by-side play is coming: ' + words(tree).slice(0, 400))
+  assert.ok(!words(tree).includes('you play '), 'a solo machine has no side to name')
+
+  // 4. A view no stage here knows: said in words, never an empty grid.
+  const unknown = { view: 'mafia', game: 'mafia', status: 'active', plies: 3, legal: [], permissions: { can_move: false } }
+  table = plays(unknown, { id: 'mafia', title: 'Mafia', kind: 'table', installed: true, bots: true }, '')
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', table.props)
+  assert.equal(gridOf(tree).length, 0, 'an unknown view is not drawn as an 8x8 grid')
+  assert.ok(words(tree).includes("This game can't be drawn online yet"),
+    'it says so instead: ' + words(tree).slice(0, 400))
+
+  // 5. A board game keeps the one board it always had.
+  const connectPicture = {
+    ...cards, view: 'connect4', game: 'connect4', status: 'active', plies: 2,
+    cells: connect, files: '1234567', ranks: [6, 5, 4, 3, 2, 1], legal: ['1', '2'], permissions: { can_move: true }
+  }
+  table = plays(connectPicture, { id: 'connect4', title: 'Connect Four', kind: 'table', installed: true, bots: true })
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', table.props)
+  assert.equal(gridOf(tree).length, 1, 'a grid game is still the one board')
+  assert.ok(!words(tree).includes("This game can't be drawn online yet"))
+  assert.ok(words(tree).includes('you play white'), 'and a two-sided game still says which side is yours')
+
+  // 6. Go: its Pass is on the online table too, and it goes out the same command route.
+  const goPicture = {
+    ...cards, view: 'gomoku', game: 'go', status: 'active', plies: 4,
+    cells: cell(9, 9), files: 'abcdefghi', ranks: [9, 8, 7, 6, 5, 4, 3, 2, 1],
+    legal: ['pass', 'a1'], permissions: { can_move: true }
+  }
+  table = plays(goPicture, { id: 'go', title: 'Go', kind: 'table', installed: true, bots: true })
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', table.props)
+  const pass = nodes(tree).find(node => node.type === 'button' && words(node) === 'Pass')
+  assert.ok(pass, 'Go offers Pass online: ' + JSON.stringify(nodes(tree).filter(node => node.type === 'button').map(words)))
+  await pass.props.onClick()
+  await tick()
+  assert.equal(JSON.stringify(commands(table.run).pop()), JSON.stringify({ action: 'move', args: ['pass'] }),
+    'and Pass is a move through the online command route')
+
+  // 7. The pane and the online table are one switch: every view resolves the same way.
+  reset()
+  const stageFor = (photo, extra) => {
+    sandbox.stagePicture = photo
+    sandbox.stageExtra = extra || {}
+    cursor = 0
+    return evaluate('tableStage(Object.assign({ picture: stagePicture, height: 300, ctx: {} }, stageExtra))')
+  }
+  const named = (element, name) => Boolean(element && typeof element.type === 'function' && element.type.name === name)
+  assert.ok(named(stageFor(cards), 'BlackjackTable'), 'the stage draws blackjack as the card table')
+  assert.ok(named(stageFor(fleet), 'SeaBattleTable'), 'the stage draws Sea Battle as the two fleets')
+  assert.ok(named(stageFor({ view: 'backgammon', points: [], bar: {} }), 'BackgammonSvg'),
+    'the stage draws backgammon as its own board')
+  assert.ok(named(stageFor(slots), 'Jackpot2Full'), 'the stage draws slots as the person\'s own machine')
+  assert.ok(named(stageFor(connectPicture), 'BoardSvg'), 'the stage draws a grid game on the one board')
+  assert.ok(words(stageFor(unknown)).includes("This game can't be drawn yet"),
+    'and says so for a view it does not know')
+  assert.ok(words(stageFor(unknown, { unknownText: "This game can't be drawn online yet" }))
+    .includes("This game can't be drawn online yet"), 'a caller can say it in its own words')
+
+  evaluate("rememberOnlineRoom('')")
+  reset()
+  console.log('online stage: every online game draws its own table, an unknown view says so, Pass is a move: passed')
 }
 
 // The lobby's chat column (#games) on the home page: the name and the message are drafts,

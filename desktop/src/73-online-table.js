@@ -12,9 +12,9 @@
 // {text, sent, at} when the server turned a message down: its own words, and the text it refused
 // (the last this seat sent, since a chat frame carries no id to match a refusal against).
 //
-// "picture" is this seat's own picture — the same schema BoardSvg already draws, including
-// permissions.can_move, legal, plies, turn and status — so this screen draws the very board the
-// local table draws; only where a move is sent changes.
+// "picture" is this seat's own picture — the same schema the game's own table draws (64b-table-stage.js
+// picks the renderer both places use), including permissions.can_move, legal, plies, turn and status
+// — so this screen draws the very table the local game draws; only where a move is sent changes.
 //
 // One rule above the rest: this is a table between people on the lobby server. Nothing here may
 // send a local game command, and nothing here may claim a Hermes model is thinking. The turn line
@@ -213,6 +213,18 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const atTable = state === 'live'
   const opponent = onlineOpponent(table)
   const mySide = String((table && table.side) || '')
+  // What this picture is, so the header and the stage can speak the game's language and not
+  // always chess's. A table with no picture yet falls back to the game the surface asked for.
+  const stageView = String((picture && (picture.view || picture.game)) || (game && game.id) || '')
+  // What is across the table, in this game's own words. Blackjack is not a white-versus-black
+  // duel: two people each play their own hand against the same dealer. Slots has no other
+  // person's board at all, so there is no side to name.
+  const opponentLine = stageView === 'blackjack'
+    ? `You and ${opponent} vs the dealer`
+    : stageView === 'slots' ? `${opponent} is at this table`
+    : `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}`
+  // Go offers Pass as a move; the local table carries it, so this one does too.
+  const passOffered = Boolean(picture && (picture.legal || []).includes('pass') && canMove)
   const winner = String((picture && picture.winner) || '')
   const iWon = Boolean(winner && mySide && winner === mySide)
   const resultLine = status === 'draw' ? 'It is a draw.'
@@ -232,7 +244,6 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     : myTurn ? 'Your turn'
     : `Waiting for ${opponent}`
   const dotColor = !picture || done ? '#7d8796' : picture.turn === 'black' ? '#20262e' : '#f0d0b0'
-  const shown = picture || { view: (game && game.id) || '', game: (game && game.id) || '', status: 'idle', legal: [] }
 
   // A new table, or a game that ends, brings the result card back even after it was put away by
   // hand — the same rule the local table uses.
@@ -291,7 +302,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         button('Back', () => onBack && onBack()),
         jsxs('div', { style: { minWidth: 0 }, children: [
           jsx('div', { style: { fontSize: 20, fontWeight: 700 }, children: (game && game.title) || (picture && picture.game) || 'Online table' }),
-          jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}` })
+          jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: opponentLine })
         ] })
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
@@ -348,12 +359,27 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     className: 'games-board-hero',
     style: { display: 'flex', flex: '0 0 auto', alignItems: 'center', justifyContent: 'center', padding: 4, position: 'relative' },
     children: [
-      jsx(shown && shown.view === 'backgammon' ? BackgammonSvg : BoardSvg, {
-        picture: shown,
+      // One switch, shared with the local pane (64b-table-stage.js): an online game draws the
+      // same table the game draws at home. A view with no renderer says so in words rather than
+      // drawing an empty grid, and slots opens the person's own machine until the shared floor
+      // is built.
+      picture ? tableStage({
+        picture,
+        ctx,
         height: height || PLAY_HEIGHT,
         flat: true,
         interactive: canMove,
-        onMove: token => { if (canMove) command('move', [token]) }
+        busy,
+        onMove: token => { if (canMove) command('move', [token]) },
+        against: stageView === 'blackjack'
+          ? { who: `You and ${opponent} vs the dealer`, kind: 'human', why: `${opponent} plays their own hand against the same dealer.` }
+          : null,
+        slotsNote: 'Side-by-side Slots online is coming; this is your own machine.',
+        unknownText: "This game can't be drawn online yet"
+      }) : jsx('div', {
+        role: 'status', 'aria-live': 'polite',
+        style: { fontSize: 13, color: text.secondary, border: `1px solid ${stroke}`, borderRadius: 12, padding: 14, background: card },
+        children: 'Waiting for the table\'s board…'
       }),
       resultCard
     ]
@@ -380,6 +406,15 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
           style: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', minWidth: 0 },
           children: [board, chatPanel]
         }),
+        // Go's Pass, in the same words as the local table and out the same command route.
+        passOffered ? jsxs('div', {
+          className: 'games-online-pass',
+          style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+          children: [
+            button('Pass', () => command('move', ['pass']), { disabled: !canMove }),
+            jsx('span', { style: { fontSize: 12, color: text.tertiary }, children: 'Nothing useful to place? Pass and let your opponent move.' })
+          ]
+        }) : null,
         table.error || state === 'error'
           ? jsx('div', { role: 'alert', style: { fontSize: 13, border: '1px solid #d76b65', borderRadius: 8, padding: '8px 10px' }, children: String(table.error || 'The table stopped.') })
           : null,
