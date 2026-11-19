@@ -1,6 +1,6 @@
 # Reference
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (3e1a0d4e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (94ad3259)_
 
 Every tool, command, hook, HTTP route and config key the plugin exposes, in tables. The prose for each setting is in [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -76,6 +76,7 @@ The hooks return no text, so the prompt is untouched. The win bonus is a kit sin
 | `GET` | `/api/setup` | `setup_state` |
 | `POST` | `/api/setup` | `setup_save` |
 | `POST` | `/api/settings` | `settings_save` |
+| `GET` | `/api/name/suggest` | `suggest_a_name` |
 | `GET` | `/api/alerts` | `alerts` |
 | `POST` | `/api/alerts/dismiss` | `alerts_dismiss` |
 | `GET` | `/api/about` | `about` |

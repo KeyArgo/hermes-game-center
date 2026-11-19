@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import re
 import unicodedata
 from pathlib import Path
@@ -112,6 +113,27 @@ def suggest_name(seed: str = "") -> str:
     """
     digest = hashlib.sha256(str(seed or "game-center").encode("utf-8")).digest()
     return _FIRST[digest[0] % len(_FIRST)] + _LAST[digest[1] % len(_LAST)]
+
+
+# The last name this process handed out, so two presses never offer the same one: "Suggest a name"
+# is a button the person presses until they see one they like.
+_LAST_SUGGESTION = [""]
+
+
+def random_name() -> str:
+    """A fresh, already-valid name - a new one every press.
+
+    There is no default player name any more (owner, 2026-11-18: "There should not be a default user,
+    but we can add a user name generator"). The old suggestion was derived from the local player id,
+    which is the same "local" on every computer, so every PC was offered the same name; this one is
+    drawn at random from the same word lists, and pressing again gives another.
+    """
+    for _ in range(8):
+        name = _FIRST[random.randrange(len(_FIRST))] + _LAST[random.randrange(len(_LAST))]
+        if name != _LAST_SUGGESTION[0] and not name_problem(name):
+            _LAST_SUGGESTION[0] = name
+            return name
+    return _FIRST[0] + _LAST[0]
 
 
 def _platform_name(platform: object, source: object) -> str:

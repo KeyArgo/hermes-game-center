@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **No default player name, and a Suggest a name button wherever a name is asked for.** The suggestion
+  came from the local player id, which is "local" on every computer, so every PC was offered the same
+  name and the welcome asked a question whose answer was already written in (owner, 2026-11-18:
+  "There should not be a default user, but we can add a user name generator"). The welcome, Settings
+  and the online sign-in open with an empty box now; each carries **Suggest a name**, and every press
+  asks the shelf for a fresh one (`GET /name/suggest`, `shelf.who.random_name`, drawn locally from the
+  same word lists and already passing `name_problem`). The setup payload's `suggested_name` stays for
+  an older desktop and is always `""`. Guards: `tests/test_name_generator.py` and
+  `tests/test_name_suggest_ui.py` (plus the welcome contract in `tests/table_ui_harness.cjs`).
 - **The Play pane always opens on the right of the chat.** The host adopts a contributed pane once and
   then remembers where the person put it, so a pane that had ever been dragged elsewhere - or that a
   host update re-homed into the wrong group - stayed wrong for good (owner, 2026-11-18: "#4 pane always

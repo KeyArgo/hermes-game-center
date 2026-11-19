@@ -969,6 +969,7 @@ function WaitPane({ ctx }) {
         jsx('div', { style: { fontSize: 12, color: text.secondary }, children: `Games with other people happen on ${onlineHost(online.url)}. Pick the name you will be known by there.` }),
         jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
           field(onlineName, setOnlineName, 'Your name online', () => onlineCall('/online/signup', { name: onlineName.trim() })),
+          suggestNameButton(setOnlineName, ctx),
           button('Create my player', () => onlineCall('/online/signup', { name: onlineName.trim() }), { primary: true, disabled: onlineBusy || !onlineName.trim() })
         ] }),
         jsxs('div', { style: { display: 'flex', gap: 6 }, children: [

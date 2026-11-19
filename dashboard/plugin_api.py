@@ -31,7 +31,7 @@ from shelf.catalog import Catalog, community_games, makers_shelf, plugin_roots  
 from shelf.commands import run  # noqa: E402
 from shelf.lobby import snapshot  # noqa: E402
 from shelf.setup import MAX_ROWS, RATE_SECONDS, Setup, apply_choice, looking_now  # noqa: E402
-from shelf.who import NameBook, identify, name_problem, suggest_name  # noqa: E402
+from shelf.who import NameBook, identify, name_problem, random_name  # noqa: E402
 from shelf import champions as champion_store  # noqa: E402
 from shelf import playbook, pet  # noqa: E402
 from shelf import tournament as tournaments  # noqa: E402
@@ -302,7 +302,10 @@ def _setup_payload(catalog: Catalog, player) -> dict:
     return {
         "welcome_needed": not saved["seen"],
         "name": player.name if player.named else "",
-        "suggested_name": suggest_name(getattr(player, "id", "")),
+        # There is no default name to hand the page any more: nothing is pre-filled, and the box
+        # offers "Suggest a name" (/name/suggest) instead. It stays in the payload - always empty -
+        # so an older desktop reads a blank field rather than crashing on a missing key.
+        "suggested_name": "",
         "watched": saved["watched"],
         "paused": saved["paused"],
         "ai_choice": saved["ai"],
@@ -329,6 +332,18 @@ def _alerts_payload(catalog: Catalog, player) -> dict:
         # Said the same way everywhere: this is not a search of the internet.
         "source": "this Hermes and the chats it shares",
     }
+
+
+@router.get("/name/suggest")
+def suggest_a_name() -> dict:
+    """A fresh player name for the box's **Suggest a name** button - a new one on every press.
+
+    No default name any more (owner, 2026-11-18): the welcome, Settings and the online sign-in all
+    open with an empty box, and this is what fills it when the person would rather not type. The name
+    is drawn locally from the shelf's own word lists and passes the same rules as a typed one, so
+    Continue can be pressed at once.
+    """
+    return {"ok": True, "name": random_name()}
 
 
 def _save_name(book: NameBook, player, raw: Any) -> tuple[bool, str]:

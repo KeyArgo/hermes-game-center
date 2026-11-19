@@ -1320,6 +1320,8 @@ async function firstRunContract() {
   const ctx = {
     rest: async (path, options) => {
       asked.push([path, options])
+      // The shelf's own name generator: a fresh name on every press (GET /name/suggest).
+      if (path === '/name/suggest') return { ok: true, name: 'QuietHeron' }
       return { ok: true, text: 'Saved.', setup: { ...view.setup, welcome_needed: false }, player: { name: 'Scout', named: true } }
     }
   }
@@ -1329,7 +1331,7 @@ async function firstRunContract() {
 
   // Values that crossed into the VM have that realm's prototypes, so compare their data.
   const plain = value => JSON.parse(JSON.stringify(value))
-  // --- the welcome: one line, a name already filled in, Continue and Skip.
+  // --- the welcome: one line, an empty name box with Suggest a name, Continue and Skip.
   reset()
   const welcome = { view, ctx, onDone: () => { asked.push(['done']) } }
   sandbox.welcome = welcome
@@ -1340,11 +1342,21 @@ async function firstRunContract() {
   assert.ok(/No account, no email/.test(said), 'it promises no account and no email')
   assert.ok(findButton(tree, 'Continue') && findButton(tree, 'Skip for now'), 'it can be finished or skipped')
   assert.ok(said.includes('About 20 seconds'), 'the time it takes is stated')
-  const nameInput = nodes(tree).find(node => node.type === 'input')
-  assert.equal(nameInput.props.value, 'AmberOtter', 'a valid name is suggested, so Continue works at once')
-  assert.equal(nameInput.props['aria-label'], 'Your name')
+  const nameBox = () => nodes(draw('WelcomePanel')).find(node => node.type === 'input')
+  assert.equal(nameBox().props.value, '', 'the box opens empty: there is no default name')
+  assert.equal(nameBox().props['aria-label'], 'Your name')
+
+  // Suggest a name asks the shelf and puts its answer in the box. No default is pre-filled, so the
+  // person either types or presses this once (owner, 2026-11-18).
+  asked.length = 0
+  tree = draw('WelcomePanel')
+  await findButton(tree, 'Suggest a name').props.onClick()
+  assert.equal(asked[0][0], '/name/suggest', 'the button asks the shelf for a name')
+  tree = draw('WelcomePanel')
+  assert.equal(nameBox().props.value, 'QuietHeron', 'the suggested name lands in the box')
 
   // Continue saves the name and the games chosen, then ends the welcome.
+  asked.length = 0
   findButton(tree, 'Connect Four').props.onClick()
   tree = draw('WelcomePanel')
   await findButton(tree, 'Continue').props.onClick()
@@ -1352,7 +1364,7 @@ async function firstRunContract() {
   assert.equal(first[0], '/setup')
   assert.equal(first[1].method, 'POST')
   assert.equal(first[1].body.done, true)
-  assert.equal(first[1].body.name, 'AmberOtter')
+  assert.equal(first[1].body.name, 'QuietHeron')
   assert.deepEqual(plain(first[1].body.games), ['connect4'])
   assert.deepEqual(asked.at(-1), ['done'], 'the page moves on once it is saved')
 

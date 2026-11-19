@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (c130dbdd)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (94ad3259)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -17,6 +17,10 @@ cabinet, the status bar or Settings, it reads **Start** again. A refused request
 in one line.
 
 The eleven Play cards are the curated list. **Experimental**, **Settings** and **Community creations** are side links above them. `/games` in chat lists the same shelf as text.
+
+## Put your name on it
+
+Game Center has no default player name. The welcome, Settings and the online sign-in all open with an empty name box, and each has **Suggest a name** beside it: one press fills the box with a fresh name (draw a new one by pressing again), or you type your own. Nothing is sent anywhere by picking a name; it is what the table and other players see.
 
 ## Start a game
 

@@ -15,6 +15,24 @@ const WELCOME_LINE = 'Game Center is where you play the board games that come wi
 const HERE_LINE = 'People in this Hermes and the chats it shares.'
 const MATCH_LINE = 'Tell me when someone wants a match'
 
+// No default name (owner, 2026-11-18: "There should not be a default user, but we can add a user name
+// generator"). Every box - the welcome, Settings and the online sign-in - opens empty, and this is the
+// button beside it: the shelf hands back a fresh name on every press (/name/suggest, drawn from the
+// shelf's own word lists and already passing its rules), so the person can cycle until they like one
+// instead of inventing a name from nothing.
+function suggestNameButton(setName, ctx) {
+  const pick = async () => {
+    try {
+      const answer = await ctx.rest('/name/suggest')
+      const chosen = String((answer && answer.name) || '')
+      if (chosen) setName(chosen)
+    } catch {
+      // The box keeps what it had: a name can still be typed.
+    }
+  }
+  return button('Suggest a name', pick, { title: 'Fill the box with a name. Press again and it suggests another.' })
+}
+
 // One switch: a title, a plain sentence, and On / Off. The whole row is not a
 // button, so a stray click next to it changes nothing.
 function toggleRow({ title, note, on, onToggle, name }) {
@@ -34,11 +52,11 @@ function toggleRow({ title, note, on, onToggle, name }) {
   })
 }
 
-// The welcome: what this is, a name that is already filled in, and the games a
+// The welcome: what this is, an empty name box with Suggest a name beside it, and the games a
 // person would play with someone. Continue and Skip both end it for good.
 function WelcomePanel({ view, ctx, onDone }) {
   const setup = view.setup || {}
-  const [name, setName] = useState(setup.name || setup.suggested_name || '')
+  const [name, setName] = useState(setup.name || '')
   const [games, setGames] = useState(() => Object.keys(setup.watched || {}))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -77,8 +95,8 @@ function WelcomePanel({ view, ctx, onDone }) {
           children: [
             jsx('div', { style: { fontSize: 13, fontWeight: 650 }, children: 'Pick a name' }),
             jsx('div', { style: { display: 'flex', gap: 8 }, children: [
-              field(name, setName, setup.suggested_name || 'Your name', () => {}, { label: 'Your name' }),
-              button('Use this', () => setName(setup.suggested_name || ''), { disabled: !setup.suggested_name, title: 'Use the name Game Center suggests' })
+              field(name, setName, 'Your name', () => {}, { label: 'Your name' }),
+              suggestNameButton(setName, ctx)
             ] }),
             jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: 'This is the name other players see. You can change it later in Settings.' })
           ]
@@ -118,7 +136,7 @@ function WelcomePanel({ view, ctx, onDone }) {
 // every switch, every route — is shared, so the two views cannot drift apart.
 function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, backLabel, backTitle, onCommunity }) {
   const setup = view.setup || {}
-  const [name, setName] = useState(setup.name || setup.suggested_name || '')
+  const [name, setName] = useState(setup.name || '')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const list = view.play || []
@@ -186,6 +204,7 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
             heading('Your name'),
             jsx('div', { style: { display: 'flex', gap: 8 }, children: [
               field(name, setName, 'Your name', () => save({ name: name.trim() }), { label: 'Your name' }),
+              suggestNameButton(setName, ctx),
               button('Save name', () => save({ name: name.trim() }), { primary: true, disabled: busy || !name.trim() })
             ] }),
             jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: player.named ? `You are ${player.name}. This is the name other players see.` : 'Other players see this name. Game Center does not ask for an account or an email.' })
