@@ -1,6 +1,6 @@
 # Game Center documentation
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (06ce6970)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (88f6dea9)_
 
 Index of every document. Start with the README if you just want to play; start with ARCHITECTURE if you are changing the code.
 
