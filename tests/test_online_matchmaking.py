@@ -270,6 +270,41 @@ def test_only_the_person_asked_can_accept_a_match_offer(world):
     run(scenario())
 
 
+def test_the_seeker_withdraws_their_own_offer_and_the_next_person_is_asked(world):
+    """Only the person asked may accept; the seeker's way out is to withdraw.
+
+    A match offer reaches both screens, so the seeker's card has an answer button too.
+    Saying no there is a withdrawal - it must not read as a decline of somebody else's
+    ask - and the search moves on to the next person at once.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea, eve = people["Ada"], people["Bea"], people["Eve"]
+        played_at(store, bea, clock.now - 500)
+        played_at(store, eve, clock.now - 100)
+        here(hub, ada, bea, eve)
+        await accepts(service, bea, "connect4")
+        await accepts(service, eve, "connect4")
+        hub.sent.clear()
+        assert (await look(service, ada, ["connect4"]))["ok"]
+        card = asked_card(hub)
+        assert card["to"]["id"] == bea["id"]
+        assert card["from_id"] == ada["id"] and card["to_id"] == bea["id"], \
+            "the offer says plainly who asked and who answers"
+        own = await service.handle(ada, {"t": "respond", "id": card["id"], "accept": True})
+        assert own["ok"] is False and own["text"] == "Only the other player can accept.", own
+        hub.sent.clear()
+        withdrawn = await service.handle(ada, {"t": "respond", "id": card["id"], "accept": False})
+        assert withdrawn["ok"], withdrawn
+        assert store.play_request(card["id"])["state"] == "cancelled", "a no from the seeker withdraws it"
+        told = {pid: frame for pid, frame in hub.sent if frame.get("t") == "request_update"}
+        assert told[bea["id"]]["request"]["state"] == "cancelled", "the person who was asked is told"
+        assert asked_card(hub)["to"]["id"] == eve["id"], "the next person is asked at once"
+
+    run(scenario())
+
+
 def test_a_person_is_not_asked_twice_in_the_same_search(world):
     store, _rooms, people, clock, hub, service = world
 

@@ -495,6 +495,13 @@ class Service:
         row = self._load(frame)
         if row is None:
             return self._ack(frame, False, "No such request."), []
+        if player["id"] == row["from_id"]:
+            # The asker saying no to their own ask is a withdrawal, not a decline: a match
+            # offer reaches both screens, and only the person asked may answer it.
+            if row["state"] != "pending":
+                return self._ack(frame, False, "That request is no longer open."), []
+            saved = self.store.set_play_state(row["id"], "cancelled")
+            return self._ack(frame, True, "Cancelled."), self._updates(self._card(saved or row))
         if not self._may_answer(player["id"], row):
             return self._ack(frame, False, "Only the other player can decline."), []
         if row["state"] != "pending":
@@ -506,7 +513,8 @@ class Service:
     def _may_answer(player_id: str, row: dict) -> bool:
         """Who may answer: the person asked, match offer or not.
 
-        A match offer is the seeker's ask too, so the seeker cannot accept their own.
+        A match offer is the seeker's ask too, so the seeker cannot accept their own. The
+        seeker's way out is cancel - or a no, which withdraws the offer.
         """
         return player_id == row["to_id"]
 
@@ -658,6 +666,9 @@ class Service:
             "id": row["id"],
             "from": self._who(row["from_id"]),
             "to": self._who(row["to_id"]),
+            # Flat, so a client never has to guess which side of an offer it is looking at.
+            "from_id": row["from_id"],
+            "to_id": row["to_id"],
             "game": row["game"],
             "state": row["state"],
             "created": row["created"],
