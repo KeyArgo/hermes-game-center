@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A Retry or a sign-in pressed while a connect is in flight is no longer dropped.** `start()`
+  refused to record the wake while `_dialling` was set, and that flag stayed true from the start of
+  a connect attempt until the wait after it — so a press landing in that window (the Hall had
+  already published `connecting`, or the attempt that follows a refused key) did nothing, and the
+  worker then sat out the whole backoff: up to 8 s on a drop, 60 s after a refused key. The flag is
+  gone rather than merely cleared: the wake is recorded whenever there is no live socket, and the
+  attempt in flight is left alone to finish. Guards: `tests/test_online_hall.py`
+  (`test_a_press_that_lands_mid_dial_is_not_lost` — fails against the old `start()`).
+
 - **Reading the Hall no longer dials the lobby.** `GET /online/hall` and `GET /view` are polls —
   the Games card and the Hall panel each run one every 3 s while they are open — and both used to
   call `start()`, which woke the worker out of its own wait. The deliberate 60-second pause after a

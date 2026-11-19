@@ -70,13 +70,12 @@ class Hall:
         self._lock = threading.RLock()
         self._lifecycle = threading.RLock()
         self._stop = threading.Event()
-        # Set by start() when someone asks for a dial now - a sign-in, the Games page opening,
-        # or Retry - so a worker that is waiting out a backoff (or a refused sign-in's long
-        # pause) dials at once instead of leaving the person on "Not connected".
+        # Set by start() when someone asks for a dial now - a sign-in, or Retry - so a worker that
+        # is waiting out a backoff (or a refused sign-in's long pause) dials at once instead of
+        # leaving the person on "Not connected". A read (a GET) never sets it, and a press that
+        # lands while a connect attempt is already open is recorded too: the attempt finishes and
+        # the wait after it returns at once, rather than the press being dropped on the floor.
         self._dial = threading.Event()
-        # True only while a connect attempt is in flight, so a request that arrives mid-dial
-        # does not queue a second one: the worker dials as fast as it can as it is.
-        self._dialling = False
         self._thread = None
         self._socket = None
         self._out: queue.Queue = queue.Queue()
@@ -142,13 +141,14 @@ class Hall:
                 return
             if self._thread is not None and self._thread.is_alive():
                 with self._lock:
-                    if wake and self._state != "live" and not self._dialling:
+                    if wake and self._state != "live":
+                        # Mid-dial included: the attempt in flight is left alone, and the wait
+                        # after it returns at once instead of the press being lost.
                         self._dial.set()
                 return
             with self._lock:
                 self._stop = threading.Event()
                 self._dial = threading.Event()
-                self._dialling = False
                 self._out = queue.Queue()
                 self._pending = {}
                 self._ref = 0
@@ -388,12 +388,9 @@ class Hall:
     def _wait(self, seconds: float) -> str:
         """Wait up to ``seconds``: 'stop', 'dial' (someone asked to dial now) or 'timeout'.
 
-        Every wait in the worker goes through here, so a sign-in, the Games page opening or
-        Retry reaches the worker that is sitting that wait out instead of leaving the person
-        to sit it out too.
+        Every wait in the worker goes through here, so a sign-in or Retry reaches the worker that
+        is sitting that wait out instead of leaving the person to sit it out too.
         """
-        with self._lock:
-            self._dialling = False
         end = time.monotonic() + seconds
         while not self._stop.is_set():
             left = end - time.monotonic()
@@ -415,7 +412,6 @@ class Hall:
                 # stale "live" left over from a dropped socket lets a page queue a request that
                 # then replays seconds later, and seats two people nobody asked to seat.
                 self._state = "connecting"
-                self._dialling = True
             sock = None
             try:
                 sock = wsmod.Socket(wsmod.socket_url(self.online.url, "/api/lobby/socket"), timeout=5)

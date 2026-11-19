@@ -857,3 +857,49 @@ def test_the_two_read_routes_ask_the_hall_without_nudging_it(monkeypatch):
     plugin_api.online_hall_view()
     plugin_api._online_payload_unsafe(refresh=False)
     assert calls == [("start", {"wake": False}), ("start", {"wake": False})], calls
+
+
+def test_a_press_that_lands_mid_dial_is_not_lost(monkeypatch):
+    """Retry, or a sign-in, pressed while a connect is in flight must dial again - not wait.
+
+    ``_dialling`` stayed true from the start of an attempt until the wait after it, and ``start()``
+    refused to record a wake while it was set, so a press in that window was dropped: the worker
+    then sat out the whole backoff (up to 8 s, or 60 s after a refused key) with the press spent.
+    """
+    import types
+
+    from shelf import online_hall as mod
+
+    dials = []
+    held = threading.Event()
+
+    class SlowConnect:
+        def __init__(self, url, timeout=5):
+            dials.append(url)
+            if len(dials) == 1:
+                held.wait(5)      # the first attempt is still inside its connect
+            raise mod.wsmod.SocketError("Could not connect: timed out")
+
+    monkeypatch.setattr(mod.wsmod, "Socket", SlowConnect)
+    online = types.SimpleNamespace(on=True, url="http://127.0.0.1:1", key=lambda: "k",
+                                   game=lambda: "connect4")
+    hall = mod.Hall(online)
+    hall.retry_first = 3.0
+    hall.retry_most = 3.0
+    hall.start()
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not dials:
+            time.sleep(0.01)
+        assert len(dials) == 1, dials
+
+        # The person presses Retry (or signs in again) while that connect is still open.
+        hall.start()
+        held.set()
+        deadline = time.monotonic() + 1.5
+        while time.monotonic() < deadline and len(dials) < 2:
+            time.sleep(0.01)
+        assert len(dials) == 2, "the press was dropped: the worker waited out the whole backoff"
+    finally:
+        held.set()
+        hall.stop()
