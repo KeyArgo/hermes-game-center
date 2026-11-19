@@ -275,6 +275,8 @@ function field(value, setValue, placeholder, onEnter, options = {}) {
     value,
     placeholder,
     'aria-label': options.label,
+    // A box that cannot be used says so by being closed, not by taking typing and refusing it later.
+    disabled: options.disabled,
     onChange: event => setValue(event.target.value),
     onKeyDown: event => {
       if (event.key === 'Enter' && value.trim()) onEnter()
@@ -4463,11 +4465,39 @@ let JP2_LAST = null
 // surface reports under, so it cannot clear the original machine's own flag (or be cleared by it).
 let JP2_VIEWERS = 0
 
+// Which chat the person is looking at, as the shelf's hooks name it. The hooks carry the RUNTIME
+// session id (focusedStoredSessionId is the durable one and would never match), so that is what is
+// read here. A draft has none - '' - and the shelf reads that as "no chat on screen": no spin.
+function gcFocusedChat() {
+  try {
+    const atom = host && host.state && host.state.focusedSessionId
+    const value = atom && typeof atom.get === 'function' ? atom.get() : atom
+    return typeof value === 'string' ? value : ''
+  } catch {
+    return ''
+  }
+}
+
+// Keep saying which chat is on screen while a machine is drawn: on every focus move, and every 20 s
+// because the shelf's stamp is only good for 60. Returns the one call that stops both.
+function gcRepeatFocus(again) {
+  const stops = []
+  try {
+    const atom = host && host.state && host.state.focusedSessionId
+    if (atom && typeof atom.subscribe === 'function') stops.push(atom.subscribe(() => { again() }))
+  } catch {
+    // An app without the atom: the beat below still refreshes the stamp.
+  }
+  const beat = setInterval(() => { again() }, 20000)
+  stops.push(() => clearInterval(beat))
+  return () => stops.forEach(stop => { try { stop() } catch { /* already gone */ } })
+}
+
 async function jp2Visible(delta, ctx) {
   JP2_VIEWERS = Math.max(0, JP2_VIEWERS + Number(delta || 0))
   try {
     if (ctx && typeof ctx.rest === 'function') {
-      await ctx.rest('/jackpot/visible', { method: 'POST', body: { on: JP2_VIEWERS > 0, source: 'jackpot2' } })
+      await ctx.rest('/jackpot/visible', { method: 'POST', body: { on: JP2_VIEWERS > 0, source: 'jackpot2', session_id: gcFocusedChat() } })
     }
   } catch (err) {
     // A report that did not arrive only means no automatic spin; nothing else waits on it.
@@ -4871,11 +4901,13 @@ function JackpotMachine(props) {
   }, [mode])
 
   // This cabinet is on screen for as long as it is mounted, and the shelf spins on the hook path
-  // while any surface says so. Without this report the automatic spin was refused on every reply and
-  // every tool call while the cabinet was the only machine drawn.
+  // while any surface says so - for the chat the person is looking at and no other. Without this
+  // report the automatic spin was refused on every reply and every tool call while the cabinet was
+  // the only machine drawn; without the repeat it went stale a minute after the page opened.
   useEffect(() => {
     jp2Visible(1, ctx)
-    return () => { jp2Visible(-1, ctx) }
+    const stillFocused = gcRepeatFocus(() => jp2Visible(0, ctx))
+    return () => { stillFocused(); jp2Visible(-1, ctx) }
   }, [ctx])
 
   // The full view measures the ELEMENT IT IS MOUNTED IN, not the window: the same cabinet is mounted
@@ -5478,8 +5510,13 @@ function JackpotMachine(props) {
 
   const windowBox = jsx('div', {
     'data-jp2-window': '1',
+    // The window's own height, as an attribute as well as a style: the three rows are a promise the
+    // browser-side fit test measures (window height === cell x rows), and the count has to travel
+    // with the drawing for it to be measurable at all.
+    'data-jp2-window-rows': String(rows),
     style: {
-      position: 'relative', width: windowW, height: windowH, margin: '0 auto', display: 'flex',
+      position: 'relative', width: windowW, height: windowH, minHeight: windowH, flexShrink: 0,
+      margin: '0 auto', display: 'flex',
       borderRadius: 12, overflow: 'hidden', background: JP2_NAVY,
       border: `1px solid rgba(62,224,197,${flash ? 0.55 : 0.24})`,
       boxShadow: `inset 0 10px 34px rgba(0,0,0,.78), 0 0 44px rgba(62,224,197,${flash ? 0.4 : 0.12})`,
@@ -5748,6 +5785,18 @@ function JackpotMachine(props) {
             ]
           }, 'header'),
           windowBox,
+          // The panel below the reels is what flexes and scrolls now. The cabinet's content column is
+          // a flex column inside a fixed 720 px machine, and it used to hand a taller panel its room by
+          // squeezing the reel window (measured: 271 px against a design 312, so the bottom row of the
+          // drum was cut off). The window does not shrink any more; this does. Nothing is hidden - it
+          // scrolls inside itself.
+          jsx('div', {
+            'data-jp2-panel': '1',
+            style: {
+              display: 'flex', flexDirection: 'column', gap: 10, flex: '1 1 auto', minHeight: 0,
+              overflowY: 'auto', overflowX: 'hidden'
+            },
+            children: [
           // Counters: the wallet, the stake, and what the last spin paid.
           jsx('div', {
             style: { display: 'flex', gap: 8 },
@@ -6005,6 +6054,8 @@ function JackpotMachine(props) {
               }, 'points-control')
             ]
           }, 'footer')
+            ]
+          }, 'panel')
         ]
       }, 'content'),
       leverEl,
@@ -7430,11 +7481,13 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
             children: jackpot ? 'JACKPOT!' : '\u00a0'
           }),
           jsxs('div', {
-            style: { display: 'flex', alignItems: 'center', gap: SM_px(4) },
+            // The reels keep their own height (owner, 2026-11-18: "always 3 rows"): this row and the
+            // window inside it never shrink, so a taller panel below cannot eat a reel row.
+            style: { display: 'flex', alignItems: 'center', gap: SM_px(4), flexShrink: 0 },
             children: [
               markers('left'),
               jsxs('div', {
-                style: { position: 'relative', display: 'flex', border: `${SM_px(4)}px solid ${smEdge()}`, borderRadius: SM_px(6), background: smShell(), boxShadow: smLook('windowShadow', `inset 0 ${SM_px(6)}px ${SM_px(12)}px rgba(0,0,0,0.6)`) },
+                style: { flexShrink: 0, position: 'relative', display: 'flex', border: `${SM_px(4)}px solid ${smEdge()}`, borderRadius: SM_px(6), background: smShell(), boxShadow: smLook('windowShadow', `inset 0 ${SM_px(6)}px ${SM_px(12)}px rgba(0,0,0,0.6)`) },
                 children: [
                   ...reelColumns,
                   paylineSvg,
@@ -8411,7 +8464,9 @@ async function jpVisible(delta, send) {
   JP_VIEWERS = Math.max(0, JP_VIEWERS + delta)
   const on = JP_VIEWERS > 0
   if (!send) return
-  try { await send('/jackpot/visible', { on }) } catch { /* a failed report just means no spin */ }
+  // The chat on screen rides along: the shelf only spins for that one, and a report without it (or a
+  // stale one) spins nothing. gcFocusedChat lives with the Jackpot cabinet's own report.
+  try { await send('/jackpot/visible', { on, session_id: gcFocusedChat() }) } catch { /* a failed report just means no spin */ }
 }
 
 function JackpotStatusItem({ ctx }) {
@@ -8725,7 +8780,8 @@ function JackpotOverlay({ ctx, onClose, data }) {
   // Opening this overlay puts the machine on screen; closing it takes it away.
   useEffect(() => {
     jpVisible(1, door)
-    return () => jpVisible(-1, door)
+    const stillFocused = gcRepeatFocus(() => jpVisible(0, door))
+    return () => { stillFocused(); jpVisible(-1, door) }
   }, [ctx])
   const close = () => { if (typeof onClose === 'function') onClose() }
   const closeButton = jsx('button', {
@@ -8892,12 +8948,14 @@ function SlotsOverChatCopy({ ctx, width, height }) {
     return () => { alive = false; clearTimeout(timer) }
   }, [ctx])
 
-  // While the machine is drawn it counts as visible for auto-spin, so a reply spins it even when the
-  // person is in another game. It is only mounted while it is shown, so being mounted IS being visible.
+  // While the machine is drawn it counts as visible for auto-spin, so a turn in this chat spins it even
+  // when the person is in another game. It is only mounted while it is shown, so being mounted IS
+  // being visible; the chat it belongs to is re-sent on every focus move and every 20 s.
   useEffect(() => {
     const door = (path, body) => ctx.rest(path, { method: 'POST', body })
     jpVisible(1, door)
-    return () => jpVisible(-1, door)
+    const stillFocused = gcRepeatFocus(() => jpVisible(0, door))
+    return () => { stillFocused(); jpVisible(-1, door) }
   }, [ctx])
 
   // The symbol art and the fonts settle after the first paint, and each of those changes the cabinet's
@@ -9672,13 +9730,19 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         tag('Backdrop size', 'size-tag'),
         slider('size', 'size', size, setSize),
         readout('size', `${Math.round(size * 100)}%`),
-        // The slider's own three stops, so the backdrop can be made big without dragging for it.
-        ...JP2L_SIZE_PRESETS.map(preset => button(
-          `size-${preset.id}`,
-          preset.label,
-          `Backdrop size: ${preset.label.toLowerCase()}, ${Math.round(preset.size * 100)}% of the size it has always been`,
-          () => setSize(preset.size)
-        ))
+        // The slider's own three stops, so the backdrop can be made big without dragging for it. They
+        // ride in one row of their own that never wraps: the size row wraps as a whole when the cabinet
+        // is narrow, and inside it the three pills used to split 2 + 1 (owner, 2026-11-18).
+        jsx('span', {
+          'data-jp2-oc': 'size-presets',
+          style: { display: 'inline-flex', flexWrap: 'nowrap', gap: dark ? 4 : 6, minWidth: 0 },
+          children: JP2L_SIZE_PRESETS.map(preset => button(
+            `size-${preset.id}`,
+            preset.label,
+            `Backdrop size: ${preset.label.toLowerCase()}, ${Math.round(preset.size * 100)}% of the size it has always been`,
+            () => setSize(preset.size)
+          ))
+        }, 'size-presets')
       ], dark ? 64 : 74),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.
@@ -18856,6 +18920,24 @@ const WELCOME_LINE = 'Game Center is where you play the board games that come wi
 const HERE_LINE = 'People in this Hermes and the chats it shares.'
 const MATCH_LINE = 'Tell me when someone wants a match'
 
+// No default name (owner, 2026-11-18: "There should not be a default user, but we can add a user name
+// generator"). Every box - the welcome, Settings and the online sign-in - opens empty, and this is the
+// button beside it: the shelf hands back a fresh name on every press (/name/suggest, drawn from the
+// shelf's own word lists and already passing its rules), so the person can cycle until they like one
+// instead of inventing a name from nothing.
+function suggestNameButton(setName, ctx) {
+  const pick = async () => {
+    try {
+      const answer = await ctx.rest('/name/suggest')
+      const chosen = String((answer && answer.name) || '')
+      if (chosen) setName(chosen)
+    } catch {
+      // The box keeps what it had: a name can still be typed.
+    }
+  }
+  return button('Suggest a name', pick, { title: 'Fill the box with a name. Press again and it suggests another.' })
+}
+
 // One switch: a title, a plain sentence, and On / Off. The whole row is not a
 // button, so a stray click next to it changes nothing.
 function toggleRow({ title, note, on, onToggle, name }) {
@@ -18875,11 +18957,11 @@ function toggleRow({ title, note, on, onToggle, name }) {
   })
 }
 
-// The welcome: what this is, a name that is already filled in, and the games a
+// The welcome: what this is, an empty name box with Suggest a name beside it, and the games a
 // person would play with someone. Continue and Skip both end it for good.
 function WelcomePanel({ view, ctx, onDone }) {
   const setup = view.setup || {}
-  const [name, setName] = useState(setup.name || setup.suggested_name || '')
+  const [name, setName] = useState(setup.name || '')
   const [games, setGames] = useState(() => Object.keys(setup.watched || {}))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -18918,8 +19000,8 @@ function WelcomePanel({ view, ctx, onDone }) {
           children: [
             jsx('div', { style: { fontSize: 13, fontWeight: 650 }, children: 'Pick a name' }),
             jsx('div', { style: { display: 'flex', gap: 8 }, children: [
-              field(name, setName, setup.suggested_name || 'Your name', () => {}, { label: 'Your name' }),
-              button('Use this', () => setName(setup.suggested_name || ''), { disabled: !setup.suggested_name, title: 'Use the name Game Center suggests' })
+              field(name, setName, 'Your name', () => {}, { label: 'Your name' }),
+              suggestNameButton(setName, ctx)
             ] }),
             jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: 'This is the name other players see. You can change it later in Settings.' })
           ]
@@ -18959,7 +19041,7 @@ function WelcomePanel({ view, ctx, onDone }) {
 // every switch, every route — is shared, so the two views cannot drift apart.
 function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, backLabel, backTitle, onCommunity }) {
   const setup = view.setup || {}
-  const [name, setName] = useState(setup.name || setup.suggested_name || '')
+  const [name, setName] = useState(setup.name || '')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const list = view.play || []
@@ -19027,6 +19109,7 @@ function SettingsPanel({ view, ctx, onBack, onSaved, onReopen, skin, onSkin, bac
             heading('Your name'),
             jsx('div', { style: { display: 'flex', gap: 8 }, children: [
               field(name, setName, 'Your name', () => save({ name: name.trim() }), { label: 'Your name' }),
+              suggestNameButton(setName, ctx),
               button('Save name', () => save({ name: name.trim() }), { primary: true, disabled: busy || !name.trim() })
             ] }),
             jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: player.named ? `You are ${player.name}. This is the name other players see.` : 'Other players see this name. Game Center does not ask for an account or an email.' })
@@ -19653,6 +19736,256 @@ function onlineLine(online, title) {
   return 'On. Nothing is sent until you press Find a match or Enter ladder.'
 }
 
+// ---- The online account: one set of steps, drawn by the pane and by the Games page -------
+//
+// Turning online play on, picking a name, signing in with a saved key, changing that name,
+// showing the key: the pane (65-wait-pane.js) and the Games page's Get online card
+// (70-home.js) ask the person the same things, so they draw the same steps from here. The
+// form's own state is the hook below and the markup is the block below it; each surface
+// passes its own door (its own ctx.rest wrapper, with its own busy and note lines) and the
+// online view it is already showing. Nothing here talks to the lobby server itself.
+
+function useOnlineFields() {
+  // '' until the person types: no name is ever filled in for them.
+  const [name, setName] = useState('')
+  const [key, setKey] = useState('')
+  // The key the server handed out once, and the saved key the person asked to see. Either
+  // one is put away again by a press, and neither is kept anywhere else.
+  const [shownKey, setShownKey] = useState('')
+  const [revealed, setRevealed] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [newName, setNewName] = useState('')
+  return {
+    name, setName, key, setKey, shownKey, setShownKey, revealed, setRevealed,
+    renaming, setRenaming, newName, setNewName
+  }
+}
+
+// "Suggest a name" is a route of its own (plugin_api.suggest_a_name). A build without it
+// answers with an error, so the button asks once, quietly, and stays off the screen when
+// there is nothing behind it: a button that cannot work is worse than no button.
+const SUGGEST_PATH = '/name/suggest'
+
+function useOnlineSuggest(ctx, wanted) {
+  const [can, setCan] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!wanted || !ctx || typeof ctx.rest !== 'function') return undefined
+    let alive = true
+    ctx.rest(SUGGEST_PATH).then(
+      answer => { if (alive) setCan(Boolean(answer && answer.ok !== false && (answer.name || answer.suggested_name))) },
+      () => { if (alive) setCan(false) }
+    )
+    return () => { alive = false }
+  }, [ctx, wanted])
+  const suggest = async () => {
+    if (!can || busy) return ''
+    setBusy(true)
+    try {
+      const answer = await ctx.rest(SUGGEST_PATH)
+      return String((answer && (answer.name || answer.suggested_name)) || '').trim()
+    } catch {
+      return ''
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { can, busy, suggest }
+}
+
+// The mask stands in for the key until the person asks to see it: what is on the screen is
+// not a credential until it has been asked for.
+const KEY_MASK = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
+
+function onlineAccountBlock({ online, fields, call, busy, note, problem, setNote, suggest }) {
+  const host = onlineHost(online.url)
+  const rows = []
+  const line = { fontSize: 12, color: text.secondary }
+  const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }
+  const mono = { fontFamily: 'var(--font-mono, ui-monospace, monospace)', fontSize: 12, overflowWrap: 'anywhere' }
+  const row = (key, children, style) => jsx('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', ...(style || {}) }, children }, key)
+
+  if (!online.on) {
+    rows.push(jsx('div', {
+      'data-online-disclosure': '1',
+      style: { ...muted, border: `1px solid ${stroke}`, borderRadius: 6, padding: '6px 8px' },
+      children: online.disclosure || `Online play talks to ${online.url} and nothing else.`
+    }, 'disclosure'))
+    rows.push(row('turn-on', [
+      button('Turn on online play', () => call('/online/on'), { primary: true, disabled: busy }),
+      button('Not now', () => setNote('Online stays off. Everything here still plays on this computer.'), { disabled: busy })
+    ]))
+  } else {
+    if (!online.linked) {
+      rows.push(jsx('div', {
+        style: line,
+        children: `Games with other people happen on ${host}. Pick the name you will be known by there.`
+      }, 'where'))
+      rows.push(row('pick-name', [
+        field(fields.name, fields.setName, 'Your name online', () => fields.setName(fields.name.trim()), { label: 'Your name online' }),
+        suggest.can
+          ? button('Suggest a name', async () => {
+              const name = await suggest.suggest()
+              if (name) fields.setName(name)
+            }, { disabled: busy || suggest.busy, title: 'Gives you a name nobody has taken yet. Press it again for another.' })
+          : null
+      ], { alignItems: 'stretch' }))
+      rows.push(row('create', [
+        button('Create my player', () => {
+          // A press on a disabled button must still post nothing: the guard is here, not only
+          // in the disabled flag.
+          if (!fields.name.trim()) return undefined
+          return call('/online/signup', { name: fields.name.trim() })
+        }, {
+          primary: true,
+          disabled: busy || !fields.name.trim(),
+          title: 'Makes this name yours on the lobby server and shows the key that signs you in on another computer.'
+        })
+      ]))
+      rows.push(row('saved-key', [
+        field(fields.key, fields.setKey, 'Recovery key you saved', () => signIn(), { label: 'Recovery key you saved' }),
+        button('I have a player', () => signIn(), {
+          disabled: busy || !fields.name.trim() || !fields.key.trim(),
+          title: 'Signs in as the player you already have, with the name and key you saved.'
+        })
+      ], { alignItems: 'stretch' }))
+    } else {
+      rows.push(row('me', [
+        jsx('span', { style: line, children: `You are ${online.name} online` }, 'name'),
+        textLink('Change my name', () => {
+          fields.setRenaming(!fields.renaming)
+          fields.setNewName(fields.renaming ? '' : online.name)
+          setNote('')
+        }, 'Change the name other people see, once every 30 days'),
+        textLink('Sign out', () => call('/online/forget'), 'Stop using this computer’s key. The account stays.', 'sign-out')
+      ]))
+      if (fields.renaming) {
+        rows.push(row('rename', [
+          field(fields.newName, fields.setNewName, 'New name', () => saveName(), { label: 'The name you want instead' }),
+          button('Save name', () => saveName(), { primary: true, disabled: busy || !fields.newName.trim() }),
+          textLink('Cancel', () => { fields.setRenaming(false); fields.setNewName('') }, 'Keep the name you have')
+        ], { alignItems: 'stretch' }))
+      }
+      // The key the server handed out is on screen once, until it is put away.
+      if (fields.shownKey) {
+        rows.push(jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
+          jsx('div', { style: muted, children: 'This is your recovery key. It is shown once, and it is what signs you in on another computer. It is kept with your other Hermes credentials.' }),
+          jsx('div', { 'data-online-new-key': '1', style: mono, children: fields.shownKey }),
+          row('copy-new', [
+            button('Copy recovery key', () => copyText(fields.shownKey, () => setNote('Copied to the clipboard.')), { primary: true }),
+            textLink('Hide this key', () => fields.setShownKey(''))
+          ])
+        ] }, 'fresh-key'))
+      }
+      rows.push(row('show-key', [
+        jsx('span', { style: muted, children: fields.revealed ? 'Your key:' : `Your key: ${KEY_MASK}` }, 'mask'),
+        fields.revealed
+          ? button('Copy my key', () => copyText(fields.revealed, () => setNote('Copied to the clipboard.')))
+          : null,
+        textLink(fields.revealed ? 'Hide my key' : 'Show my key', async () => {
+          if (fields.revealed) { fields.setRevealed(''); setNote(''); return }
+          const answer = await call('/online/key', undefined, 'GET')
+          if (answer && answer.ok && answer.key) fields.setRevealed(String(answer.key))
+        }, 'Show the key saved in Hermes’s credentials on this computer')
+      ]))
+      rows.push(jsx('div', {
+        'data-online-revealed': fields.revealed ? 'shown' : 'masked',
+        style: fields.revealed ? mono : { display: 'none' },
+        children: fields.revealed
+      }, 'revealed'))
+      rows.push(row('save-file', [
+        textLink('Save my account file', async () => {
+          const answer = await call('/online/account-file')
+          if (answer && answer.ok && answer.path) setNote(`Saved in ${answer.path}`)
+        }, 'Write your name, key and server to a file in your Downloads folder')
+      ]))
+    }
+    // Whoever turned it on can turn it off, signed in or not: a person who never got as far as
+    // a name must not be stuck with online play on.
+    rows.push(row('turn-off', [
+      textLink('Turn online play off', () => call('/online/off'), 'Stops everything online. Local play is untouched.')
+    ], { marginTop: 6 }))
+  }
+  if (problem) {
+    rows.push(jsx('div', {
+      role: 'alert', 'data-online-problem': '1',
+      style: { ...line, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
+      children: problem
+    }, 'problem'))
+  } else if (note) {
+    rows.push(jsx('div', {
+      role: 'status', 'aria-live': 'polite', 'data-online-note': '1',
+      style: { ...line, color: text.secondary },
+      children: note
+    }, 'note'))
+  }
+  return jsxs('div', {
+    'data-online-account': online.linked ? 'linked' : online.on ? 'named-not-yet' : 'off',
+    style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 },
+    children: rows
+  })
+
+  // Change my name is the server's decision, so its own sentence is what comes back.
+  async function saveName() {
+    const wanted = fields.newName.trim()
+    if (!wanted) return
+    const answer = await call('/online/rename', { name: wanted })
+    if (answer && answer.ok) { fields.setRenaming(false); fields.setNewName('') }
+  }
+
+  // Signing in needs both halves; a press with either one missing posts nothing.
+  function signIn() {
+    const name = fields.name.trim()
+    const key = fields.key.trim()
+    if (!name || !key) return
+    return call('/online/signin', { name, key })
+  }
+}
+
+// Check online: each step from this computer to the lobby, in the server's own words where
+// it refuses. The Hall shows it under its roster and the Get online card shows it in place,
+// so the run and the rows are here and both surfaces mount them.
+function useOnlineCheck(ctx) {
+  const [checked, setChecked] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const runCheck = async () => {
+    if (checking || !ctx || typeof ctx.rest !== 'function') return
+    setChecking(true)
+    try {
+      const answer = await ctx.rest('/online/check')
+      if (alive.current) setChecked(answer && typeof answer === 'object' ? answer : { ok: false, steps: [] })
+    } catch {
+      if (alive.current) setChecked({ ok: false, steps: [{ name: 'Game Center', ok: false, text: 'Game Center did not answer. Reopen Hermes and try again.' }] })
+    } finally {
+      if (alive.current) setChecking(false)
+    }
+  }
+  return { checked, checking, runCheck }
+}
+
+function onlineCheckBlock({ checked, checking, runCheck }) {
+  return jsxs('div', { 'data-hall-check': '1', style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
+    jsxs('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }, children: [
+      button(checking ? 'Checking…' : 'Check online', runCheck, {
+        disabled: checking,
+        title: 'Checks each step from this computer to the lobby and says which one is not working.'
+      })
+    ] }),
+    checked ? jsxs('div', { role: 'status', 'aria-live': 'polite', style: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }, children: [
+      ...(Array.isArray(checked.steps) ? checked.steps : []).map((row, index) => jsxs('div', {
+        'data-hall-check-row': row.ok ? 'ok' : 'fix',
+        children: [
+          jsx('span', { style: { fontWeight: 650, color: row.ok ? text.secondary : accent }, children: `${row.ok ? 'OK' : 'Fix'} · ${row.name}: ` }),
+          jsx('span', { style: { color: text.secondary }, children: String(row.text || '') })
+        ]
+      }, index)),
+      checked.ok ? jsx('div', { style: { color: text.tertiary }, children: 'Every step works.' }) : null
+    ] }) : null
+  ] })
+}
+
 function ladderLine(ladder) {
   const state = String((ladder && ladder.state) || 'idle')
   if (state === 'idle') return ''
@@ -20198,6 +20531,80 @@ function BotsLeagues({ online, busy, call, ctx, setNote }) {
   })
 }
 
+// ---- 64b-table-stage.js: the one switch from a picture to the component that draws it
+//
+// A picture says which game it is (`view`). One table draws blackjack as the card table, Sea Battle
+// as the two fleets, Backgammon as its own points, Slots as the person's own machine, and every grid
+// game on the one board. The local pane (65-wait-pane.js) and the online table (73-online-table.js)
+// both come through here, so the two can never drift: a game online draws exactly what the same game
+// draws at home, and there is only one place to teach a new renderer.
+//
+// A view no stage here knows says so in words. It is never handed to the grid renderer: an empty
+// 8x8 chess board under a table that is not chess is a lie about what the person is looking at.
+const BOARD_VIEWS = new Set([
+  'connect4', 'checkers', 'chess', 'gomoku', 'tictactoe', 'hex', 'reversi',
+  'kalah', 'mancala', 'go', 'breakthrough', 'dame'
+])
+
+// Everything a stage may need, one argument: the picture, the box it is drawn in, who may press,
+// and where a press goes. A caller passes only what it has; nothing here reads the host app.
+function tableStage(options) {
+  const opts = options || {}
+  const pictured = opts.picture || null
+  const view = String((pictured && pictured.view) || '')
+  if (view === 'blackjack') {
+    return jsx(BlackjackTable, {
+      picture: pictured, against: opts.against, dealer: opts.dealer,
+      interactive: Boolean(opts.interactive), busy: Boolean(opts.busy), onMove: opts.onMove
+    })
+  }
+  if (view === 'seabattle') {
+    return jsx(SeaBattleTable, {
+      picture: pictured, interactive: Boolean(opts.interactive), busy: Boolean(opts.busy), onMove: opts.onMove
+    })
+  }
+  if (view === 'backgammon') {
+    return jsx(BackgammonSvg, {
+      picture: pictured, height: opts.height, interactive: Boolean(opts.interactive),
+      onMove: opts.onMove, onPhase: opts.onPhase
+    })
+  }
+  if (view === 'slots') {
+    const machine = jsx(Jackpot2Full, { ctx: opts.ctx })
+    if (!opts.slotsNote) return machine
+    // One line under the machine, for a table where the side-by-side floor is not built yet.
+    return jsxs('div', {
+      className: 'games-stage-slots',
+      style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 },
+      children: [
+        machine,
+        jsx('div', {
+          className: 'games-stage-note',
+          style: { fontSize: 12, color: text.tertiary, textAlign: 'center' },
+          children: opts.slotsNote
+        })
+      ]
+    })
+  }
+  // A grid game carries its cells; the views in BOARD_VIEWS are the ones the board draws even
+  // when a picture arrives without them, exactly as the local pane always drew them.
+  if (BOARD_VIEWS.has(view) || Array.isArray(pictured && pictured.cells)) {
+    return jsx(BoardSvg, {
+      picture: pictured, height: opts.height, flat: opts.flat === undefined ? true : Boolean(opts.flat),
+      interactive: Boolean(opts.interactive), onMove: opts.onMove,
+      pending: opts.pending, onPending: opts.onPending, coachArrows: opts.coachArrows
+    })
+  }
+  return jsx('div', {
+    role: 'status', className: 'games-stage-unknown',
+    style: {
+      padding: 18, border: `1px solid ${stroke}`, borderRadius: 12, background: card,
+      fontSize: 13, color: text.secondary, maxWidth: 420, textAlign: 'center'
+    },
+    children: opts.unknownText || "This game can't be drawn yet."
+  })
+}
+
 // ---- 65-wait-pane.js: the pane itself, and the status-bar badge that opens it
 
 // FUTURE(2026-11-11): the bot ladder on the pane — remove if never built.
@@ -20267,9 +20674,11 @@ function WaitPane({ ctx }) {
   const [onlineBusy, setOnlineBusy] = useState(false)
   const [onlineNote, setOnlineNote] = useState('')
   const [onlineProblem, setOnlineProblem] = useState('')
-  const [keyToCopy, setKeyToCopy] = useState('')
-  const [onlineName, setOnlineName] = useState('')
-  const [onlineKey, setOnlineKey] = useState('')
+  // The account form (name, saved key, the key shown once) is the Games page's card's own
+  // state too: one hook, in 62-pane-state.js, so the two surfaces ask for the same things.
+  const onlineFields = useOnlineFields()
+  // "Suggest a name" asks its route only while the sign-in form is what is on screen.
+  const onlineSuggest = useOnlineSuggest(ctx, onlineView(view).on && !onlineView(view).linked)
   const [ladderAsk, setLadderAsk] = useState(null)
   const [ladderChampion, setLadderChampion] = useState('')
   // "Play here": the room of a match the lobby handed over, played in this pane on the server
@@ -20491,7 +20900,7 @@ function WaitPane({ ctx }) {
       if (answer && answer.online) {
         setView(current => ({ ...(current || {}), online: answer.online }))
       }
-      if (answer && answer.key_to_copy) setKeyToCopy(String(answer.key_to_copy))
+      if (answer && answer.key_to_copy) onlineFields.setShownKey(String(answer.key_to_copy))
       setOnlineNote((answer && answer.text) || '')
       if (answer && answer.ok === false) setOnlineProblem(String(answer.text || 'That did not work.'))
       return answer || {}
@@ -20938,35 +21347,24 @@ function WaitPane({ ctx }) {
             className: 'games-pane-board-main',
             ref: boardBox,
             style: { gridArea: 'board', minWidth: 0 },
-            children: pictured.view === 'slots' ? jsx(Jackpot2Full, { ctx }) : pictured.view === 'blackjack'
-              ? jsx(BlackjackTable, {
-                  picture: pictured,
-                  against: opponentWords(pictured, view, soloGame),
-                  interactive: Boolean(current && access.can_move && !working),
-                  busy: working,
-                  onMove: token => move(current, token),
-                  onSetting: (path, body) => ctx.rest(path, { method: 'POST', body })
-                })
-              : pictured.view === 'seabattle'
-                ? jsx(SeaBattleTable, {
-                    picture: pictured,
-                    interactive: Boolean(current && access.can_move && !working),
-                    busy: working,
-                    onMove: token => move(current, token)
-                  })
-                : jsx(pictured && pictured.view === 'backgammon' ? BackgammonSvg : BoardSvg, {
-                    picture: pictured,
-                    height: boardH,
-                    flat: true,
-                    onPhase: setBgPhase,
-                    interactive: Boolean(current && access.can_move && !working),
-                    // The person's own move is drawn the moment they make it, while the
-                    // table's answer is still on its way: a search or a model takes its time,
-                    // and a board that sits still reads as a board that did not hear the click.
-                    pending: preview,
-                    onPending: mv => { if (access.can_move && !working) setPreview(mv) },
-                    onMove: token => move(current, token)
-                  })
+            // One switch for every table (64b-table-stage.js): the online table comes through
+            // here too, so a game draws the same picture wherever it is being played.
+            children: tableStage({
+              picture: pictured,
+              ctx,
+              height: boardH,
+              flat: true,
+              interactive: Boolean(current && access.can_move && !working),
+              busy: working,
+              against: opponentWords(pictured, view, soloGame),
+              onPhase: setBgPhase,
+              // The person's own move is drawn the moment they make it, while the
+              // table's answer is still on its way: a search or a model takes its time,
+              // and a board that sits still reads as a board that did not hear the click.
+              pending: preview,
+              onPending: mv => { if (access.can_move && !working) setPreview(mv) },
+              onMove: token => move(current, token)
+            })
           }),
           pictured.view === 'slots' ? null : jsxs('div', {
             role: 'status', 'aria-live': 'polite', className: 'games-status games-pane-board-status',
@@ -21155,40 +21553,14 @@ function WaitPane({ ctx }) {
     children: [
       jsx('div', { style: { fontWeight: 650, fontSize: 13 }, children: 'Play with people online' }),
       jsx('div', { style: { fontSize: 12, color: onlineOffline ? text.tertiary : text.secondary }, children: onlineLine(online, title) }),
-      !online.on ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-        jsx('div', {
-          style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45, border: `1px solid ${stroke}`, borderRadius: 6, padding: '6px 8px' },
-          children: online.disclosure || `Online play talks to ${online.url} and nothing else.`
-        }),
-        jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
-          button('Turn on online play', () => onlineCall('/online/on'), { primary: true, disabled: onlineBusy }),
-          button('Not now', () => setOnlineNote('Online stays off. Everything here still plays on this computer.'), { disabled: onlineBusy })
-        ] })
-      ] }) : null,
-      online.on && !online.linked ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-        jsx('div', { style: { fontSize: 12, color: text.secondary }, children: `Games with other people happen on ${onlineHost(online.url)}. Pick the name you will be known by there.` }),
-        jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
-          field(onlineName, setOnlineName, 'Your name online', () => onlineCall('/online/signup', { name: onlineName.trim() })),
-          button('Create my player', () => onlineCall('/online/signup', { name: onlineName.trim() }), { primary: true, disabled: onlineBusy || !onlineName.trim() })
-        ] }),
-        jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
-          field(onlineKey, setOnlineKey, 'Recovery key you saved', () => onlineCall('/online/signin', { name: onlineName.trim(), key: onlineKey.trim() })),
-          button('I have a key', () => onlineCall('/online/signin', { name: onlineName.trim(), key: onlineKey.trim() }), { disabled: onlineBusy || !onlineName.trim() || !onlineKey.trim() })
-        ] }),
-      ] }) : null,
-      keyToCopy ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
-        jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: 'This is your recovery key. It is shown once, and it is what signs you in on another computer. It is kept with your other Hermes credentials.' }),
-        jsx('div', { style: { fontFamily: 'var(--font-mono, ui-monospace, monospace)', fontSize: 12, overflowWrap: 'anywhere' }, children: keyToCopy }),
-        jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center' }, children: [
-          button('Copy recovery key', () => copyText(keyToCopy, setOnlineNote), { primary: true }),
-          textLink('Hide this key', () => setKeyToCopy(''))
-        ] })
-      ] }) : null,
+      // The account steps (turn on, pick a name, sign in, change the name, the key) are the
+      // same ones the Games page's Get online card draws, from the same block: one piece of
+      // markup and one piece of state, so the two surfaces cannot drift apart.
+      onlineAccountBlock({
+        online, fields: onlineFields, call: onlineCall, busy: onlineBusy,
+        note: onlineNote, problem: onlineProblem, setNote: setOnlineNote, suggest: onlineSuggest
+      }),
       online.on && online.linked ? jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-        jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: text.secondary }, children: [
-          jsx('span', { children: `You are ${online.name} online.` }),
-          textLink('Sign out here', () => onlineCall('/online/forget'))
-        ] }),
         onlineAlert ? jsx('div', {
           role: 'status', 'aria-live': 'polite',
           style: { fontSize: 12, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
@@ -21233,10 +21605,7 @@ function WaitPane({ ctx }) {
             jsx('span', { children: 'Tell me when someone online wants this game (at most once every ten minutes, never during a match)' })
           ] })
         ] })
-      ] }) : null,
-      // Whoever turned it on can turn it off, signed in or not: an unlinked person
-      // must not be stuck with online play on.
-      online.on ? jsx('div', { style: { display: 'flex', marginTop: 6 }, children: textLink('Turn online play off', () => onlineCall('/online/off')) }) : null
+      ] }) : null
     ]
   })
 
@@ -21343,13 +21712,7 @@ function WaitPane({ ctx }) {
           jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
             field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
             button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
-          ] }),
-          onlineProblem
-            ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' }, children: onlineProblem })
-            : null,
-          onlineNote
-            ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: onlineNote })
-            : null
+          ] })
         ]
       }),
       jsxs('div', {
@@ -22064,6 +22427,148 @@ function InferenceAutoPlayButton({ ctx }) {
   })
 }
 
+// ---- Get online: the one card at the top of the Games page ---------------------------------
+//
+// Everything a person needs to start playing with other people, in the order they meet it:
+// which Game Center this window is on, turning online play on, a name (or the player they
+// already have), the name they are known by, their key, and Check online. The steps are the
+// pane's own (onlineAccountBlock, 62-pane-state.js), so the two surfaces cannot drift. Once
+// there is nothing left to do, the card is one line, and Manage opens it again.
+const ONLINE_SETTINGS_ROUTE = '/settings?tab=gateway'
+
+function OnlineGetOnlineCard({ ctx, view }) {
+  const fresh = onlineView(view)
+  // The last answer to one of the card's own presses, painted at once. The page's own poll
+  // replaces it on its next turn, so the card never shows something the gateway has moved on
+  // from: a stale answer would be a card that disagrees with the rest of the page.
+  const [live, setLive] = useState(null)
+  const online = live || fresh
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const [problem, setProblem] = useState('')
+  const [managed, setManaged] = useState(false)
+  // The Hermes connection this window is using: '' or 'local' is this computer, anything else
+  // is another machine's Hermes (the desktop's registered gateways).
+  const [where, setWhere] = useState(null)
+  const fields = useOnlineFields()
+  const suggest = useOnlineSuggest(ctx, online.on && !online.linked)
+  const check = useOnlineCheck(ctx)
+
+  useEffect(() => { setLive(null) }, [view])
+
+  useEffect(() => {
+    let alive = true
+    async function read() {
+      try {
+        if (typeof host === 'undefined' || !host || typeof host.connections !== 'function') return
+        const answer = await host.connections()
+        const rows = Array.isArray(answer) ? answer : (answer && Array.isArray(answer.connections) ? answer.connections : [])
+        const active = typeof host.activeConnectionId === 'function' ? String(host.activeConnectionId() || '') : ''
+        const mine = rows.find(row => row && String(row.id) === active) || null
+        if (alive) {
+          setWhere({
+            active,
+            label: mine ? String(mine.label || mine.id || '') : active,
+            canOpen: typeof host.navigate === 'function'
+          })
+        }
+      } catch {
+        // An older desktop has no registry: the card then says what it does know.
+        if (alive) setWhere({ active: '', label: '', canOpen: false })
+      }
+    }
+    read()
+    return () => { alive = false }
+  }, [ctx])
+
+  // One door for every online action, the same shape the pane uses: the answer carries the
+  // new online view, so what is painted is the server's own answer and not a guess.
+  const call = async (path, body, method) => {
+    if (!ctx || typeof ctx.rest !== 'function') return { ok: false, text: 'Game Center cannot be reached.' }
+    setBusy(true)
+    setProblem('')
+    try {
+      const options = body === undefined ? { method: method || 'POST' } : { method: 'POST', body }
+      const answer = await ctx.rest(path, options)
+      if (answer && answer.online) setLive(answer.online)
+      if (answer && answer.key_to_copy) fields.setShownKey(String(answer.key_to_copy))
+      setNote((answer && answer.text) || '')
+      if (answer && answer.ok === false) setProblem(String(answer.text || 'That did not work.'))
+      return answer || {}
+    } catch {
+      setProblem('That did not reach Game Center. Try again.')
+      return { ok: false }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const hostWord = onlineHost(online.url)
+  const remote = Boolean(where && where.active && where.active !== 'local')
+  const settled = online.on && online.linked && !online.offline
+
+  if (settled && !managed) {
+    return jsxs('div', {
+      'data-online-card': 'collapsed',
+      style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: text.secondary },
+      children: [
+        jsx('span', { 'data-online-card-line': '1', children: `Online as ${online.name} on ${hostWord} ✓` }),
+        jsx('span', { 'aria-hidden': true, children: '·' }),
+        textLink('Manage', () => setManaged(true), 'Open the online steps again')
+      ]
+    })
+  }
+
+  const whereBlock = jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }, children: [
+    jsx('div', {
+      'data-online-card-host': '1',
+      style: { fontSize: 13, fontWeight: 650 },
+      children: `Game Center on ${hostWord}`
+    }),
+    remote
+      ? jsxs('div', { 'data-online-card-connection': 'remote', style: { fontSize: 12, color: text.secondary, lineHeight: 1.5 }, children: [
+          jsx('span', { children: `This window runs Game Center on ${where.label || where.active}. To use this computer’s, switch the connection to This device in the status bar` }),
+          where.canOpen
+            ? jsx('span', { children: ', or press ' })
+            : jsx('span', { children: ', in Settings → Gateways.' }),
+          where.canOpen
+            ? jsx('button', {
+                type: 'button',
+                'data-online-card-settings': '1',
+                onClick: () => {
+                  try { host.navigate(ONLINE_SETTINGS_ROUTE) } catch { /* an older desktop has no router */ }
+                },
+                style: { background: 'transparent', border: 0, padding: 0, font: 'inherit', color: accent, cursor: 'pointer', textDecoration: 'underline' },
+                children: 'Open connection settings'
+              })
+            : null
+        ] })
+      : jsx('div', {
+          'data-online-card-connection': 'this-device',
+          style: { fontSize: 12, color: text.secondary, lineHeight: 1.5 },
+          children: 'This window runs Game Center on this computer.'
+        })
+  ] })
+
+  return jsxs('section', {
+    'data-online-card': 'open',
+    'aria-label': 'Get online',
+    style: {
+      display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0,
+      border: `1px solid ${stroke}`, borderRadius: 10, background: card, padding: '10px 12px'
+    },
+    children: [
+      jsxs('div', { style: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }, children: [
+        jsx('div', { style: { fontSize: 15, fontWeight: 700 }, children: 'Get online' }),
+        settled ? textLink('Hide', () => setManaged(false), 'Fold the card back to one line') : null
+      ] }),
+      whereBlock,
+      onlineAccountBlock({ online, fields, call, busy, note, problem, setNote, suggest }),
+      onlineCheckBlock(check)
+    ]
+  })
+}
+
 function GameCenterPage({ ctx, onArea }) {
   const [skin, setSkin] = useSkin(ctx)
   const [view, setView] = useState(null)
@@ -22558,6 +23063,9 @@ function GameCenterPage({ ctx, onArea }) {
     style: { display: 'flex', flexDirection: 'column', gap: 18, padding: 18, paddingBottom: 96, minWidth: 0, overflow: 'auto', background: paper },
     children: [
       tabs,
+      // Get online: the first thing on the page, because playing with another person starts
+      // here - which Game Center this window is on, and the four steps that sign you in.
+      jsx(OnlineGetOnlineCard, { ctx, view }),
       jsxs('div', {
         style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'end', flexWrap: 'wrap' },
         children: [
@@ -22800,9 +23308,9 @@ const LOBBY_GAME_IDS = LOBBY_GAMES.map(item => item[0])
 const LOBBY_TITLES = Object.fromEntries(LOBBY_GAMES)
 const lobbyTitle = id => LOBBY_TITLES[id] || id
 
-// A lobby post is a day old at most: the server deletes the rest, and this screen
-// never draws anything older even in the moment before that sweep.
-const LOBBY_POST_MS = 24 * 3600 * 1000
+// A lobby post stays readable for 30 days: that is how long the server keeps the #games chat
+// (online/server.py CHAT_DAYS), so this screen never hides a line the server still has.
+const LOBBY_POST_MS = 30 * 24 * 3600 * 1000
 
 // "08-04 21:35" - the date and the time on every post, in this computer's own clock.
 function lobbyStamp(at) {
@@ -23005,9 +23513,9 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const [seatProblem, setSeatProblem] = useState(null)
   const [seatAttempt, setSeatAttempt] = useState(0)
   // Check online: each step to the lobby with what went wrong, for when two computers cannot see
-  // each other (owner, 2026-11-18). null until the person asks.
-  const [checked, setChecked] = useState(null)
-  const [checking, setChecking] = useState(false)
+  // each other (owner, 2026-11-18). The run and the rows live in 62-pane-state.js, so the Get
+  // online card on the Games page shows exactly the same answer.
+  const check = useOnlineCheck(ctx)
   // Rooms already opened, so a seat the server keeps reporting opens the table once.
   const handled = useRef(new Set())
   const alive = useRef(true)
@@ -23096,34 +23604,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // Every control on this panel posts through the one pending slot, so every control wears the
   // same lock and the same reason while anything is out.
   const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
-  const runCheck = async () => {
-    if (checking || !ctx || typeof ctx.rest !== 'function') return
-    setChecking(true)
-    try {
-      const answer = await ctx.rest('/online/check')
-      if (alive.current) setChecked(answer && typeof answer === 'object' ? answer : { ok: false, steps: [] })
-    } catch (error) {
-      if (alive.current) setChecked({ ok: false, steps: [{ name: 'Game Center', ok: false, text: 'Game Center did not answer. Reopen Hermes and try again.' }] })
-    } finally {
-      if (alive.current) setChecking(false)
-    }
-  }
-  const checkPanel = jsxs('div', { 'data-hall-check': '1', style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
-    button(checking ? 'Checking…' : 'Check online', runCheck, {
-      disabled: checking,
-      title: 'Checks each step from this computer to the lobby and says which one is not working.'
-    }),
-    checked ? jsxs('div', { role: 'status', 'aria-live': 'polite', style: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }, children: [
-      ...(Array.isArray(checked.steps) ? checked.steps : []).map((row, index) => jsxs('div', {
-        'data-hall-check-row': row.ok ? 'ok' : 'fix',
-        children: [
-          jsx('span', { style: { fontWeight: 650, color: row.ok ? text.secondary : accent }, children: `${row.ok ? 'OK' : 'Fix'} · ${row.name}: ` }),
-          jsx('span', { style: { color: text.secondary }, children: String(row.text || '') })
-        ]
-      }, index)),
-      checked.ok ? jsx('div', { style: { color: text.tertiary }, children: 'Every step works.' }) : null
-    ] }) : null
-  ] })
+  const checkPanel = onlineCheckBlock(check)
   const shell = children => jsxs('div', {
     'data-hall': '1', 'data-hall-state': state,
     style: { borderTop: `1px solid ${stroke}`, paddingTop: 10, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 },
@@ -23135,7 +23616,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // the way back; "turn online play on" would send them to a switch that is already on.
   const refused = snap && typeof snap.error === 'string' ? snap.error.trim() : ''
   if (state === 'off' && refused) {
-    return note(`${refused} Until you sign in again, nobody can see you and you cannot see anyone. Sign in again with your name and the recovery key you saved (I have a key).`)
+    return note(`${refused} Until you sign in again, nobody can see you and you cannot see anyone. Sign in again with your name and the recovery key you saved (I have a player).`)
   }
   if (state === 'off') return note('Turn online play on to see who is here.')
   if (state === 'old-server') return note('This lobby server has no Hall yet. Find a match still works.')
@@ -23347,10 +23828,14 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
     }
   }
   const lobby = view.lobby || { lines: [], looking: [] }
-  const match = onlineView(view).match
+  const online = onlineView(view)
+  const match = online.match
+  // The #games box is the lobby's chat and nothing else (owner, 2026-11-18): signed in it goes to
+  // the server, and signed out it is closed with one sentence rather than saving the line here.
+  const signedIn = Boolean(online.on && online.linked)
   const looking = lobby.looking || []
-  // Posts from the last day only, each with its own date and time beside it.
-  const posts = freshLobbyLines(lobby.lines)
+  // Posts from the last 30 days only — the window the server keeps — each with its own date and time.
+  const posts = lobby.shared ? freshLobbyLines(lobby.lines) : []
   const lookingLine = looking.length
     ? `Looking: ${looking.map(item => (item.address ? `${item.name} (${item.game}) @ ${item.address}` : `${item.name} (${item.game})`)).join(', ')}`
     : 'Nobody is looking yet.'
@@ -23371,6 +23856,7 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
     setName('')
   }
   const sendChat = async () => {
+    if (!signedIn) return
     const said = chat.trim()
     if (!said) return
     setSayProblem('')
@@ -23402,24 +23888,25 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
       jsxs('div', {
         style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }, children: [
           jsx('div', { style: { fontWeight: 650, fontSize: 12 }, children: '#games' }),
-          // Whose chat this is. Signed in online it is the lobby's, read by everyone online; otherwise
-          // it never leaves this computer (owner, 2026-11-18: two PCs said hi and neither saw the other).
-          jsx('div', { 'data-lobby-chat-where': lobby.shared ? 'online' : 'local', style: muted, children: lobby.shared
+          // Whose chat this is. Signed in online it is the lobby's, read by everyone online; signed
+          // out there is no chat here at all (owner, 2026-11-18: two PCs said hi and neither saw
+          // the other - a local column was the reason), and nothing typed is kept on this computer.
+          jsx('div', { 'data-lobby-chat-where': lobby.shared ? 'online' : 'signed-out', style: muted, children: lobby.shared
             ? (lobby.reached === false ? 'Everyone online reads this. The lobby could not be read just now; trying again.' : 'Everyone online reads this.')
-            : 'Only this computer. Sign in to online play to talk with everyone online.' }),
+            : 'Sign in to online play to chat.' }),
           view.player.named ? null : jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
             jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }) }), button('Set', setPlayerName, { disabled: !name.trim() })
           ] }),
           jsx('div', { style: muted, children: lookingLine }),
-          jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
+          lobby.shared ? jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
             ? posts.map((item, index) => jsxs('div', { 'data-lobby-post': String(index), children: [
               jsx('span', { style: { fontWeight: 650 }, children: `${item.name}: ` }),
               jsx('span', { style: { color: text.secondary }, children: item.text }),
               jsx('span', { style: { color: text.tertiary, marginLeft: 4, whiteSpace: 'nowrap' }, children: lobbyStamp(item.at) })
-            ] }, index)) : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' }) }),
+            ] }, index)) : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' }) }) : null,
           jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
-            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(chat, setChat, view.player.named ? 'Say something' : 'Set a name first', sendChat, { label: 'Say something in the lobby chat' }) }),
-            button('Send', sendChat, { disabled: !chat.trim() || !view.player.named })
+            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(chat, setChat, signedIn ? 'Say something' : 'Sign in to online play to chat', sendChat, { label: 'Say something in the lobby chat', disabled: !signedIn }) }),
+            button('Send', sendChat, { disabled: !signedIn || !chat.trim() })
           ] }),
           sayProblem ? jsx('div', {
             role: 'alert', 'data-lobby-say-note': '1',
@@ -23446,9 +23933,9 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
 // {text, sent, at} when the server turned a message down: its own words, and the text it refused
 // (the last this seat sent, since a chat frame carries no id to match a refusal against).
 //
-// "picture" is this seat's own picture — the same schema BoardSvg already draws, including
-// permissions.can_move, legal, plies, turn and status — so this screen draws the very board the
-// local table draws; only where a move is sent changes.
+// "picture" is this seat's own picture — the same schema the game's own table draws (64b-table-stage.js
+// picks the renderer both places use), including permissions.can_move, legal, plies, turn and status
+// — so this screen draws the very table the local game draws; only where a move is sent changes.
 //
 // One rule above the rest: this is a table between people on the lobby server. Nothing here may
 // send a local game command, and nothing here may claim a Hermes model is thinking. The turn line
@@ -23647,6 +24134,21 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const atTable = state === 'live'
   const opponent = onlineOpponent(table)
   const mySide = String((table && table.side) || '')
+  // What this picture is, so the header and the stage can speak the game's language and not
+  // always chess's. A table with no picture yet falls back to the game the surface asked for.
+  const stageView = String((picture && (picture.view || picture.game)) || (game && game.id) || '')
+  // What is across the table, in this game's own words. Blackjack is not a white-versus-black
+  // duel: two people each play their own hand against the same dealer. Slots has no other
+  // person's board at all, so there is no side to name.
+  const opponentLine = stageView === 'blackjack'
+    ? `You and ${opponent} vs the dealer`
+    : stageView === 'slots' ? `${opponent} is at this table`
+    : `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}`
+  // Go offers Pass as a move; the local table carries it, so this one does too.
+  const passOffered = Boolean(picture && (picture.legal || []).includes('pass') && canMove)
+  // A session table (blackjack, slots) has no match to resign: the felt is one hand after
+  // another, so the only way out is putting the table away.
+  const sessionTable = stageView === 'blackjack' || stageView === 'slots'
   const winner = String((picture && picture.winner) || '')
   const iWon = Boolean(winner && mySide && winner === mySide)
   const resultLine = status === 'draw' ? 'It is a draw.'
@@ -23666,7 +24168,6 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     : myTurn ? 'Your turn'
     : `Waiting for ${opponent}`
   const dotColor = !picture || done ? '#7d8796' : picture.turn === 'black' ? '#20262e' : '#f0d0b0'
-  const shown = picture || { view: (game && game.id) || '', game: (game && game.id) || '', status: 'idle', legal: [] }
 
   // A new table, or a game that ends, brings the result card back even after it was put away by
   // hand — the same rule the local table uses.
@@ -23725,11 +24226,11 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         button('Back', () => onBack && onBack()),
         jsxs('div', { style: { minWidth: 0 }, children: [
           jsx('div', { style: { fontSize: 20, fontWeight: 700 }, children: (game && game.title) || (picture && picture.game) || 'Online table' }),
-          jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}` })
+          jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: opponentLine })
         ] })
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
-        status === 'active' && !done ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
+        status === 'active' && !done && !sessionTable ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
         button('Close table', putAway, { disabled: busy, title: 'Puts this table away here. The match stays on the lobby server.' })
       ] })
     ]
@@ -23782,12 +24283,27 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     className: 'games-board-hero',
     style: { display: 'flex', flex: '0 0 auto', alignItems: 'center', justifyContent: 'center', padding: 4, position: 'relative' },
     children: [
-      jsx(shown && shown.view === 'backgammon' ? BackgammonSvg : BoardSvg, {
-        picture: shown,
+      // One switch, shared with the local pane (64b-table-stage.js): an online game draws the
+      // same table the game draws at home. A view with no renderer says so in words rather than
+      // drawing an empty grid, and slots opens the person's own machine until the shared floor
+      // is built.
+      picture ? tableStage({
+        picture,
+        ctx,
         height: height || PLAY_HEIGHT,
         flat: true,
         interactive: canMove,
-        onMove: token => { if (canMove) command('move', [token]) }
+        busy,
+        onMove: token => { if (canMove) command('move', [token]) },
+        against: stageView === 'blackjack'
+          ? { who: `You and ${opponent} vs the dealer`, kind: 'human', why: `${opponent} plays their own hand against the same dealer.` }
+          : null,
+        slotsNote: 'Side-by-side Slots online is coming; this is your own machine.',
+        unknownText: "This game can't be drawn online yet"
+      }) : jsx('div', {
+        role: 'status', 'aria-live': 'polite',
+        style: { fontSize: 13, color: text.secondary, border: `1px solid ${stroke}`, borderRadius: 12, padding: 14, background: card },
+        children: 'Waiting for the table\'s board…'
       }),
       resultCard
     ]
@@ -23814,6 +24330,15 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
           style: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', minWidth: 0 },
           children: [board, chatPanel]
         }),
+        // Go's Pass, in the same words as the local table and out the same command route.
+        passOffered ? jsxs('div', {
+          className: 'games-online-pass',
+          style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+          children: [
+            button('Pass', () => command('move', ['pass']), { disabled: !canMove }),
+            jsx('span', { style: { fontSize: 12, color: text.tertiary }, children: 'Nothing useful to place? Pass and let your opponent move.' })
+          ]
+        }) : null,
         table.error || state === 'error'
           ? jsx('div', { role: 'alert', style: { fontSize: 13, border: '1px solid #d76b65', borderRadius: 8, padding: '8px 10px' }, children: String(table.error || 'The table stopped.') })
           : null,
@@ -24423,7 +24948,13 @@ export default {
       // its own Close (that would disable the whole plugin); our × unregisters it.
       data: {
         placement: 'right',
-        dock: { pane: 'workspace', pos: 'right' },
+        // `enforce` is the host's standing invariant, not a one-time migration: it re-homes the pane
+        // onto this anchor at every boot's first adoption pass when it is anywhere else, with no user
+        // exemption (apps/desktop/src/components/pane-shell/tree/store.ts, enforceDockedPanes). The
+        // pane stayed wrong for good otherwise - the host adopts a contributed pane once and then
+        // remembers where it was, so one drag, or one host update, was permanent (owner, 2026-11-18:
+        // "pane always right").
+        dock: { pane: 'workspace', pos: 'right', enforce: true },
         width: PANE_WIDTH,
         minWidth: '300px',
         maxWidth: '1200px',

@@ -42,6 +42,11 @@ def test_the_button_asks_the_shelf_for_a_fresh_name() -> None:
 
 
 def test_the_online_sign_in_offers_it_too() -> None:
-    source = PANE.read_text(encoding="utf-8")
-    assert "suggestNameButton(setOnlineName, ctx)" in source, \
+    # The online sign-in is the shared account block (62-pane-state.js), drawn by the pane and by
+    # the Get online card alike; it carries its own Suggest a name, asking the same shelf route.
+    pane = PANE.read_text(encoding="utf-8")
+    block = (PANE.parent / "62-pane-state.js").read_text(encoding="utf-8")
+    assert "onlineAccountBlock(" in pane and "suggest: onlineSuggest" in pane, \
         "the online sign-in still asks the person to invent a name from nothing"
+    assert "const SUGGEST_PATH = '/name/suggest'" in block, "the online button asks a route the shelf does not serve"
+    assert "button('Suggest a name'" in block
