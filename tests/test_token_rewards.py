@@ -137,7 +137,10 @@ def _reply_hook(tmp_path: Path):
         register_tool=lambda *args, **kwargs: None,
     )
     plugin.register(ctx, data_root=tmp_path)
-    return hooks["post_api_request"][0]
+    # Points are paid only to the chat on screen (T1), so these replies come from that chat.
+    Wallet(wallet_path(tmp_path)).set_visible(True, "jackpot2", session_id="chat-on-screen")
+    hook = hooks["post_api_request"][0]
+    return lambda **kwargs: hook(session_id="chat-on-screen", **kwargs)
 
 
 def test_the_reply_hook_makes_a_million_tokens_ten_points(tmp_path: Path) -> None:
