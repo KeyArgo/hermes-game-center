@@ -428,9 +428,9 @@ def test_requests_from_the_switches_still_work_as_before(world):
     run(scenario())
 
 
-# --- lobby posts: date, time and a one-day shelf life ----------------------------
+# --- lobby posts: date, time and a thirty-day shelf life --------------------------
 
-def test_lobby_posts_are_stamped_and_a_day_old_posts_are_purged(tmp_path):
+def test_lobby_posts_are_stamped_and_a_month_old_post_is_purged(tmp_path):
     async def scenario():
         server, client = await started(tmp_path)
         try:
@@ -442,17 +442,20 @@ def test_lobby_posts_are_stamped_and_a_day_old_posts_are_purged(tmp_path):
             old = server.store.add_chat("__lobby__", ada["id"], "Ada", "player", "yesterday's news")
             server.store.db.execute("UPDATE chat SET at = ? WHERE id = ?", (time.time() - 25 * 3600, old["id"]))
             listed = (await (await client.get("/api/lobby/chat")).json())["messages"]
-            assert [row["text"] for row in listed] == ["anyone for connect4?"], listed
+            assert [row["text"] for row in listed] == ["anyone for connect4?", "yesterday's news"], \
+                "chat is kept for thirty days, so yesterday's line is still there"
 
-            # The janitor deletes the old post rather than only hiding it.
+            # A post a month old is deleted by the janitor, not only hidden.
+            server.store.db.execute("UPDATE chat SET at = ? WHERE id = ?",
+                                    (time.time() - 31 * 86400, old["id"]))
             task = asyncio.create_task(server.janitor(server.build()))
             await asyncio.sleep(0.2)
             task.cancel()
             left = [dict(row) for row in server.store.db.execute("SELECT text FROM chat WHERE room_id = '__lobby__'")]
             assert [row["text"] for row in left] == ["anyone for connect4?"], left
-            # A post older than the day but there in the database is gone from the answer too.
+            # And a post older than the month is gone from the answer even before the sweep.
             server.store.db.execute("UPDATE chat SET at = ? WHERE room_id = '__lobby__'",
-                                    (time.time() - 25 * 3600,))
+                                    (time.time() - 31 * 86400,))
             assert (await (await client.get("/api/lobby/chat")).json())["messages"] == []
         finally:
             await client.close()

@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (bfcbdca0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (431bd033)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -136,6 +136,25 @@ Chat is the one thing here **you** write that leaves this computer. It goes to t
 your moves, only while you are at a table, and only when you press Send or Enter.
 
 
+## What each game draws online
+
+The online table draws **the same table the game draws on this computer**, from one switch: blackjack is
+the card felt, Sea Battle is the two fleets, backgammon is its own points and bar, and every grid game is
+the one board. A game with no online renderer yet says *"This game can't be drawn online yet"* rather than
+drawing an empty board, and Go keeps its **Pass**.
+
+**Blackjack online is two people each playing their own hand against the dealer** — not a white-versus-
+black match. The host sits in the first seat, the second person takes the seat beside it (between hands,
+never mid-hand), and each keeps **10,000 chips of their own inside the table**. That stack is nobody's
+Jackpot wallet: an online table never spends, wins, refills or even opens a wallet file, so a stranger at a
+lobby table cannot touch the chips on this computer. The move on offer belongs to one person at a time —
+the table refuses a press from the other seat and from a watcher — and a finished hand settles back to
+betting with the table still open. There is no resign at a session table: **Close table** puts it away.
+
+**Slots online opens your own machine** and says so in one line (*"Side-by-side Slots online is coming;
+this is your own machine."*); playing the machines side by side is not built yet.
+
+
 ## Alerts
 
 Per game, off by default: *"Tell me when someone online wants this game"*.
@@ -254,11 +273,14 @@ Nothing is retried in a tight loop; the backoff above applies.
 
 ## The lobby posts
 
-Lobby chat (the website's **rail**, and the **#games** column in Hermes while you are signed in online) keeps **one day**. Signed out, the #games column is this computer's own and says so. When two computers cannot see each other, **Check online** on The Hall (or `/games online check`) shows each step to the lobby and which one needs fixing. Every line
-shows the date and time it was written, and nothing older than 24 hours is drawn — not on the website and
-not in Hermes. The server's own housekeeping **deletes** the old posts rather than only hiding them (the
-same janitor that expires requests and closes idle tables sweeps them), and a post read back by the client
-is dropped if it is older than the day or carries no time at all.
+Lobby chat (the website's **rail**, and the **#games** column in Hermes while you are signed in online) is kept
+for **thirty days**, the same as a table's chat. Signed out, the #games column is this computer's own and says
+so. When two computers cannot see each other, **Check online** on The Hall (or `/games online check`) shows
+each step to the lobby and which one needs fixing. Every line
+shows the date and time it was written. The server's own housekeeping **deletes** a line older than thirty
+days rather than only hiding it (the same janitor that expires requests and closes idle tables sweeps them),
+and a line read back by the client is dropped if it is older than that or carries no time at all. Keeping
+chat and listing tables are separate: an open table is still only in the lobby for a day.
 
 ## What is never sent
 
