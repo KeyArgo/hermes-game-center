@@ -1,6 +1,6 @@
 # Architecture
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 What the pieces are, how a move travels through them, and where the data lives.
 
@@ -54,7 +54,7 @@ The page never judges a move. The same `kit.py` referee answers a click, a typed
 
 ## Where data lives
 
-`__init__.py` asks Hermes for the plugin data directory (`plugins.plugin_storage.plugin_data_dir("hermes-gameshelf")`). Under that folder:
+`__init__.py` asks Hermes for the plugin data directory (`plugins.plugin_storage.plugin_data_dir("hermes-gameshelf")`). That is `<Hermes home>/plugin-data/hermes-gameshelf/` — `~/.hermes/plugin-data/hermes-gameshelf/` on Linux and macOS, `%LOCALAPPDATA%\hermes\plugin-data\hermes-gameshelf\` on Windows (`%USERPROFILE%\AppData\Local\hermes\...` when `LOCALAPPDATA` is unset); a profile or `HERMES_HOME` changes the home. Under that folder:
 
 | Path | What it holds |
 |---|---|
@@ -69,8 +69,9 @@ The page never judges a move. The same `kit.py` referee answers a click, a typed
 | `online.json` | Online-play preference and non-secret session state (`shelf/online_source.py`); the recovery key is not here. |
 | `installed.json` | Which catalogue titles this profile added (`shelf/library.py`). |
 | `directory.json` | Live/stopped vendor worlds for World games (`shelf/directory.py`). |
+| `game-center.log` (`.1` … `.3`) | The diagnostic log: 1 MB per file, three older files kept, keys and tokens masked as `***`. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md). |
 
-The online recovery key lives in Hermes's credential store under `HERMES_GAMESHELF_LOBBY_KEY`, never in a file of the plugin's own. The online server keeps its own `online.sqlite3` under the `--data` folder you give it.
+The online recovery key lives in Hermes's credential store under `HERMES_GAMESHELF_LOBBY_KEY`, never in the plugin's data folder. The one file that can hold it is the account file a person saves with **Save my account file**, which goes to Downloads. The online server keeps its own `online.sqlite3` under the `--data` folder you give it.
 
 ## Key files
 

@@ -1,6 +1,6 @@
 # Configuration
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-19 (bfdbefff)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-19 (16903a5c)_
 
 Every setting, environment variable and stored preference the code reads, with the default it uses.
 
@@ -33,9 +33,9 @@ All three credential fields are `type: secret`: Hermes shows them in Settings as
 | `setup.json` | `ai` | `null` | `true`/`false` pins the AI-seat choice; `null` follows `allow_ai`. |
 | `wallet.json` | `bet` | `25` | The last slot bet (minimum 25 chips). |
 | `wallet.json` | `overchat` | `false` | Whether the see-through slot cabinet is shown over the conversation, anchored to the composer's underside slot and drawn at the top of the chat column. |
-| `wallet.json` | `overchat_alpha` | `0.2` | Backdrop opacity; accepted values are 0.05–0.6. |
-| `wallet.json` | `overchat_scale` | `1.0` | Backdrop size; accepted values are 0.1–3.0. 1.0 is the size the copy has always been; above that it grows up to 60% of the window's height. |
-| `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or the Olympus machine. |
+| `wallet.json` | `overchat_alpha` | `0.5` | Backdrop opacity; accepted values are 0.05–1.0 (5–100%), 0.5 by default. |
+| `wallet.json` | `overchat_scale` | `1.0` | Backdrop size; accepted values are 0.1–3.0. 1.0 draws the 640 px-tall copy (twice the original size); above 1.0 it may grow past the usual 60% of the window, up to 95%. |
+| `wallet.json` | `machine` | `fruit9` | The machine auto-spin plays: `fruit9` (Classic) or `robot3` (Hermes Olympus). |
 | `online.json` | `on` | `false` | Whether online play is on. |
 
 The rest of `wallet.json` is bookkeeping: chips, points under `bonus`, token counters, spins, streaks, the recent spin feed, which surfaces currently show a machine, and which chat the desktop last reported as the one on screen (`focus_session` with the `focus_at` stamp; older than 60 seconds, the automatic spin stops).
