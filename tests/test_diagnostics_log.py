@@ -32,6 +32,7 @@ def _clean_logger():
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
         handler.close()
+    diagnostics.stop_health()
 
 
 def _file(tmp_path: Path) -> Path:

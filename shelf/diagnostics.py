@@ -13,11 +13,14 @@ Stdlib only. The health sampler that shares this file lives here too (see
 
 from __future__ import annotations
 
+import atexit
 import functools
 import logging
 import re
+import sys
 import threading
 import time
+from collections import deque
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Callable
@@ -130,3 +133,172 @@ def lobby_closed(sock: Any) -> None:
 def lobby_socket_count() -> int:
     with _LOBBY_LOCK:
         return len(_LOBBY_SOCKETS)
+
+
+# Health ---------------------------------------------------------------------
+# One line every five minutes: the process's resident memory, its thread count and
+# the lobby sockets it holds. Six samples in a row that each grow, more than 50 MB
+# together, mean something is leaking and the log says so once.
+
+HEALTH_INTERVAL = 300.0
+GROWTH_SAMPLES = 6
+GROWTH_BYTES = 50 * 1024 * 1024
+_MB = 1024 * 1024
+
+
+def parse_proc_status(text: str) -> int | None:
+    """VmRSS from /proc/self/status, in bytes, or None when the line is not there."""
+    for line in text.splitlines():
+        if line.startswith("VmRSS:"):
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                return int(parts[1]) * 1024  # the kernel says kB
+    return None
+
+
+def _windows_rss() -> int | None:
+    """GetProcessMemoryInfo's WorkingSetSize, without psutil."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+        handle = ctypes.windll.kernel32.GetCurrentProcess()  # type: ignore[attr-defined]
+        ok = ctypes.windll.psapi.GetProcessMemoryInfo(  # type: ignore[attr-defined]
+            handle, ctypes.byref(counters), counters.cb
+        )
+        return int(counters.WorkingSetSize) if ok else None
+    except Exception:
+        return None
+
+
+def rss_bytes() -> int | None:
+    """The process's current resident memory, stdlib only. /proc on Linux,
+    GetProcessMemoryInfo on Windows, resource's peak as the last resort."""
+    try:
+        return parse_proc_status(Path("/proc/self/status").read_text(encoding="ascii"))
+    except OSError:
+        pass
+    if sys.platform == "win32":
+        return _windows_rss()
+    try:
+        import resource
+
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return int(peak) if sys.platform == "darwin" else int(peak) * 1024
+    except Exception:
+        return None
+
+
+class HealthSampler:
+    """One daemon thread, one line per interval. Between samples it waits on an
+    event — no busy loop — and ``stop()`` ends it. Every input is injectable so a
+    test can drive it with a fake RSS and a fake clock."""
+
+    def __init__(
+        self,
+        interval: float = HEALTH_INTERVAL,
+        *,
+        rss: Callable[[], int | None] = rss_bytes,
+        threads: Callable[[], int] = threading.active_count,
+        sockets: Callable[[], int] = lobby_socket_count,
+        logger: logging.Logger = log,
+    ) -> None:
+        self.interval = interval
+        self.rss = rss
+        self.threads = threads
+        self.sockets = sockets
+        self.logger = logger
+        self._history: deque = deque(maxlen=GROWTH_SAMPLES)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def sample_once(self) -> str:
+        try:
+            rss = self.rss()
+        except Exception:
+            rss = None
+        if rss is None:
+            line = f"health rss=? threads={self.threads()} lobby_sockets={self.sockets()}"
+        else:
+            line = f"health rss={rss / _MB:.1f}MB threads={self.threads()} lobby_sockets={self.sockets()}"
+            self._history.append(rss)
+            if len(self._history) == GROWTH_SAMPLES:
+                grew = all(b > a for a, b in zip(self._history, list(self._history)[1:]))
+                total = self._history[-1] - self._history[0]
+                if grew and total > GROWTH_BYTES:
+                    self.logger.warning(
+                        "memory keeps growing (+%.0fMB over %d samples)",
+                        total / _MB, GROWTH_SAMPLES,
+                    )
+                    self._history.clear()
+        self.logger.info(line)
+        return line
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.interval):
+            try:
+                self.sample_once()
+            except Exception:
+                self.logger.debug("the health sample did not run", exc_info=True)
+
+    def start(self) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="gameshelf-health")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=2)
+        self._thread = None
+
+    @property
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+
+_HEALTH: HealthSampler | None = None
+_HEALTH_LOCK = threading.Lock()
+
+
+def start_health(interval: float = HEALTH_INTERVAL) -> HealthSampler:
+    """The one sampler for the running plugin. Idempotent; stops at process exit."""
+    global _HEALTH
+    with _HEALTH_LOCK:
+        if _HEALTH is None:
+            _HEALTH = HealthSampler(interval)
+            atexit.register(_HEALTH.stop)
+        _HEALTH.start()
+        return _HEALTH
+
+
+def stop_health() -> None:
+    global _HEALTH
+    with _HEALTH_LOCK:
+        if _HEALTH is not None:
+            _HEALTH.stop()
+            _HEALTH = None
+
+
+def health_running() -> bool:
+    with _HEALTH_LOCK:
+        return _HEALTH is not None and _HEALTH.running

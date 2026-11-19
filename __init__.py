@@ -67,6 +67,7 @@ def register(ctx: Any, *, data_root: Path | None = None, roots: list[Path] | Non
     # Opening it must never stop the plugin from loading.
     try:
         diagnostics.attach(root())
+        diagnostics.start_health()
     except Exception:
         log.debug("the diagnostic log could not be opened", exc_info=True)
 
