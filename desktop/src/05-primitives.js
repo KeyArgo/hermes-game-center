@@ -30,6 +30,8 @@ function field(value, setValue, placeholder, onEnter, options = {}) {
     value,
     placeholder,
     'aria-label': options.label,
+    // A box that cannot be used says so by being closed, not by taking typing and refusing it later.
+    disabled: options.disabled,
     onChange: event => setValue(event.target.value),
     onKeyDown: event => {
       if (event.key === 'Enter' && value.trim()) onEnter()

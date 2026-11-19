@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (bfcbdca0)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (0d247897)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -22,6 +22,33 @@ turn it on**, and this page explains exactly what happens when you do.
 > computer and keeps working when the server is down.
 
 That paragraph is generated from the `lobby_url` setting, so it always names the address actually used.
+
+## Get online: the card at the top of the Games page
+
+The first thing on the Games page is **Get online**, and it is the whole way in, in the order a person
+meets it:
+
+1. **Which Game Center this is.** The card names the lobby it will talk to (`Game Center on
+   games.hermesnet.xyz`) and which Hermes connection this window is using. A window on another machine's
+   Hermes says **“This window runs Game Center on <name>”** and offers **Open connection settings**
+   (Settings → Gateways, where the connections are listed): to play as this computer, switch the
+   connection to **This device**.
+2. **Turn online play on** — the same switch as the dock's Lobby tab, and the same disclosure first.
+3. **A name**, or the player you already have: **Create my player** (the name box starts empty; **Suggest
+   a name** fills it with one nobody has taken, when this build has the generator), or **I have a player**
+   with the name and key you saved.
+4. Once signed in: **You are &lt;name&gt; online**, with **Change my name** and **Sign out**.
+5. **Show my key** — masked until you press it, then **Copy my key** — and **Save my account file**, which
+   writes `GameCenter-<name>.json` (`name`, `key`, `server`, `saved_at`) to your **Downloads** folder and
+   says where it went.
+6. **Check online**, the same walk the Hall runs.
+
+When everything works the card folds to one line — **Online as &lt;name&gt; on &lt;host&gt; ✓ · Manage** — and
+**Manage** opens it again. The steps are the dock's own: the card and the pane draw the same block
+(`onlineAccountBlock`), so the two can never disagree about what sign-in asks for.
+
+The pane and the card both show **Change my name** and **Sign out**, and neither is allowed to invent a
+name: an empty box creates nothing, and nothing is ever auto-created on the server.
 
 ## Turning it on, and the address
 
@@ -94,14 +121,20 @@ account works in both places.
 
 - **Create my player** picks a new name and shows the key once, with **Copy recovery key**. Save it
   somewhere safe: it is what signs you in on another computer or in a browser.
-- **I have a key** signs in with a name and a key you already have.
+- **I have a player** signs in with a name and a key you already have.
+- **Change my name** renames the account on the server (one rename every 30 days). A name someone else
+  holds, or one changed too recently, is refused — and the card shows the server's own sentence, word for
+  word, rather than a re-worded copy of it.
+- **Show my key** reads the key back out of Hermes's credentials, masked until you press it, on **this**
+  computer only: another computer asking the same Hermes gets a sentence, never the key. **Save my account
+  file** writes `GameCenter-<name>.json` with `name`, `key`, `server` and `saved_at` into your Downloads
+  folder and tells you the path.
 - The key is stored through **Hermes's own credential route** — the same `.env` store and secret scope a
   provider API key uses, as `HERMES_GAMESHELF_LOBBY_KEY`. It is never written to Game Center's own files,
-  never put in a log, and never sent to the page again after that first copy (the view reports only
-  whether a key is present).
+  never put in a log, and never part of the page's state (the view reports only whether a key is present).
 - If a Hermes build has no credential route, the key is not kept at all: the dock says so and asks you to
   paste it into **Plugins → Game Center → Online recovery key** (a `secret` field in the manifest).
-- **Sign out here** removes the key from this computer. It does not delete the account.
+- **Sign out** removes the key from this computer. It does not delete the account.
 
 ## Find a match online: the rated queue
 
@@ -254,11 +287,11 @@ Nothing is retried in a tight loop; the backoff above applies.
 
 ## The lobby posts
 
-Lobby chat (the website's **rail**, and the **#games** column in Hermes while you are signed in online) keeps **one day**. Signed out, the #games column is this computer's own and says so. When two computers cannot see each other, **Check online** on The Hall (or `/games online check`) shows each step to the lobby and which one needs fixing. Every line
-shows the date and time it was written, and nothing older than 24 hours is drawn — not on the website and
+Lobby chat (the website's **rail**, and the **#games** column in Hermes) keeps **30 days**, and in Hermes the column is the lobby's chat and nothing else: signed in it goes to the server, and signed out the box says **“Sign in to online play to chat”** and takes no line at all — nothing is written to this computer's own lobby. When two computers cannot see each other, **Check online** on The Hall, in the Get online card (or `/games online check`) shows each step to the lobby and which one needs fixing. Every line
+shows the date and time it was written, and nothing older than 30 days is drawn — not on the website and
 not in Hermes. The server's own housekeeping **deletes** the old posts rather than only hiding them (the
 same janitor that expires requests and closes idle tables sweeps them), and a post read back by the client
-is dropped if it is older than the day or carries no time at all.
+is dropped if it is older than the 30 days or carries no time at all.
 
 ## What is never sent
 

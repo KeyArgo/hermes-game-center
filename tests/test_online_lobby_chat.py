@@ -1,9 +1,11 @@
 """The #games chat on the Games page, shared online (owner, 2026-11-18: "I cannot see what the
 other types in the room"). Two PCs, each signed in, against a real local lobby server: what one
-types, the other reads. Signed out, the chat stays on this computer and says so."""
+types, the other reads. Signed out, the box says so and takes no line at all - it is the lobby's
+chat, never this computer's own."""
 import asyncio
 import time
 
+from shelf import online_source
 from shelf.online_source import Online
 from test_online_server import started, sign_in, run
 
@@ -51,7 +53,7 @@ def test_a_refused_or_unsent_lobby_line_says_why(tmp_path):
         finally:
             await client.close()
         gone = await asyncio.to_thread(one.say_lobby, "anyone?")
-        assert gone["ok"] is False and "not answering" in gone["text"], gone
+        assert gone["ok"] is False and gone["text"] == "The online server isn't answering; your message wasn't sent.", gone
     run(scenario())
 
 
@@ -97,7 +99,8 @@ def test_the_games_page_chat_goes_to_the_lobby_when_signed_in(monkeypatch, tmp_p
 
     local = FakeSource(False)
     monkeypatch.setattr(plugin_api, "_online_pair", lambda: (local, None))
-    assert plugin_api._lobby_say("chat say hello") is None, "signed out, the line stays on this computer"
+    refused = plugin_api._lobby_say("chat say hello")
+    assert refused == {"ok": False, "text": "Sign in to online play to chat."}, refused
     assert plugin_api._lobby_payload(tmp_path)["shared"] is False
     assert local.said == []
 
@@ -124,7 +127,7 @@ def test_check_online_walks_every_step_and_names_who_the_hall_lists(tmp_path):
             stranger = _pc(tmp_path / "pc-two", base, "not-a-real-key")
             steps = await asyncio.to_thread(stranger.check)
             assert steps[-1]["name"] == "Account" and steps[-1]["ok"] is False, steps
-            assert "I have a key" in steps[-1]["text"], steps
+            assert "I have a player" in steps[-1]["text"], steps
         finally:
             await client.close()
         steps = await asyncio.to_thread(one.check)
@@ -156,3 +159,45 @@ def test_check_online_route_adds_the_hall_and_who_is_there(monkeypatch):
     answer = plugin_api.command({"line": "online check"})
     assert answer["ok"] is True, answer
     assert "OK   The Hall: Connected as bluewren. Also here: Locutus." in answer["text"], answer
+
+
+# ---- T6: the #games chat is the lobby's, never this computer's own -------------------------
+
+
+def test_signed_out_the_games_chat_takes_no_line_and_saves_nothing(monkeypatch, tmp_path):
+    """The Games page's #games box is the lobby's chat. Signed out it refuses, out loud, and not
+    one line is written to this computer's own lobby file (owner, 2026-11-18)."""
+    from dashboard import plugin_api
+
+    class SignedOut:
+        def chat_shared(self):
+            return False
+
+        def say_lobby(self, _text):  # never reached: there is nobody to say it to
+            raise AssertionError("signed out, nothing may be sent to the lobby")
+
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (SignedOut(), None))
+    monkeypatch.setattr(plugin_api, "_data_root", lambda: tmp_path / "data")
+    answer = plugin_api._lobby_say("chat say hello")
+    assert answer is not None, "signed out there is no local chat to fall back on"
+    assert answer["ok"] is False and answer["text"] == "Sign in to online play to chat.", answer
+
+    said = plugin_api.command({"line": "chat say hello"})
+    assert said["ok"] is False and said["text"] == "Sign in to online play to chat.", said
+    assert plugin_api._lobby_payload(tmp_path / "data")["lines"] == [], "nothing was saved locally"
+
+
+def test_a_message_the_server_never_got_says_it_was_not_sent(monkeypatch):
+    from dashboard import plugin_api
+
+    class Down:
+        def chat_shared(self):
+            return True
+
+        def say_lobby(self, _text):
+            return {"ok": False, "text": online_source.CHAT_DOWN}
+
+    monkeypatch.setattr(plugin_api, "_online_pair", lambda: (Down(), None))
+    answer = plugin_api._lobby_say("chat say anyone?")
+    assert answer["ok"] is False, answer
+    assert answer["text"] == "The online server isn't answering; your message wasn't sent.", answer

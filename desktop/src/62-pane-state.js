@@ -495,6 +495,256 @@ function onlineLine(online, title) {
   return 'On. Nothing is sent until you press Find a match or Enter ladder.'
 }
 
+// ---- The online account: one set of steps, drawn by the pane and by the Games page -------
+//
+// Turning online play on, picking a name, signing in with a saved key, changing that name,
+// showing the key: the pane (65-wait-pane.js) and the Games page's Get online card
+// (70-home.js) ask the person the same things, so they draw the same steps from here. The
+// form's own state is the hook below and the markup is the block below it; each surface
+// passes its own door (its own ctx.rest wrapper, with its own busy and note lines) and the
+// online view it is already showing. Nothing here talks to the lobby server itself.
+
+function useOnlineFields() {
+  // '' until the person types: no name is ever filled in for them.
+  const [name, setName] = useState('')
+  const [key, setKey] = useState('')
+  // The key the server handed out once, and the saved key the person asked to see. Either
+  // one is put away again by a press, and neither is kept anywhere else.
+  const [shownKey, setShownKey] = useState('')
+  const [revealed, setRevealed] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [newName, setNewName] = useState('')
+  return {
+    name, setName, key, setKey, shownKey, setShownKey, revealed, setRevealed,
+    renaming, setRenaming, newName, setNewName
+  }
+}
+
+// "Suggest a name" is a route of its own (plugin_api.suggest_a_name). A build without it
+// answers with an error, so the button asks once, quietly, and stays off the screen when
+// there is nothing behind it: a button that cannot work is worse than no button.
+const SUGGEST_PATH = '/name/suggest'
+
+function useOnlineSuggest(ctx, wanted) {
+  const [can, setCan] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!wanted || !ctx || typeof ctx.rest !== 'function') return undefined
+    let alive = true
+    ctx.rest(SUGGEST_PATH).then(
+      answer => { if (alive) setCan(Boolean(answer && answer.ok !== false && (answer.name || answer.suggested_name))) },
+      () => { if (alive) setCan(false) }
+    )
+    return () => { alive = false }
+  }, [ctx, wanted])
+  const suggest = async () => {
+    if (!can || busy) return ''
+    setBusy(true)
+    try {
+      const answer = await ctx.rest(SUGGEST_PATH)
+      return String((answer && (answer.name || answer.suggested_name)) || '').trim()
+    } catch {
+      return ''
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { can, busy, suggest }
+}
+
+// The mask stands in for the key until the person asks to see it: what is on the screen is
+// not a credential until it has been asked for.
+const KEY_MASK = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
+
+function onlineAccountBlock({ online, fields, call, busy, note, problem, setNote, suggest }) {
+  const host = onlineHost(online.url)
+  const rows = []
+  const line = { fontSize: 12, color: text.secondary }
+  const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }
+  const mono = { fontFamily: 'var(--font-mono, ui-monospace, monospace)', fontSize: 12, overflowWrap: 'anywhere' }
+  const row = (key, children, style) => jsx('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', ...(style || {}) }, children }, key)
+
+  if (!online.on) {
+    rows.push(jsx('div', {
+      'data-online-disclosure': '1',
+      style: { ...muted, border: `1px solid ${stroke}`, borderRadius: 6, padding: '6px 8px' },
+      children: online.disclosure || `Online play talks to ${online.url} and nothing else.`
+    }, 'disclosure'))
+    rows.push(row('turn-on', [
+      button('Turn on online play', () => call('/online/on'), { primary: true, disabled: busy }),
+      button('Not now', () => setNote('Online stays off. Everything here still plays on this computer.'), { disabled: busy })
+    ]))
+  } else {
+    if (!online.linked) {
+      rows.push(jsx('div', {
+        style: line,
+        children: `Games with other people happen on ${host}. Pick the name you will be known by there.`
+      }, 'where'))
+      rows.push(row('pick-name', [
+        field(fields.name, fields.setName, 'Your name online', () => fields.setName(fields.name.trim()), { label: 'Your name online' }),
+        suggest.can
+          ? button('Suggest a name', async () => {
+              const name = await suggest.suggest()
+              if (name) fields.setName(name)
+            }, { disabled: busy || suggest.busy, title: 'Gives you a name nobody has taken yet. Press it again for another.' })
+          : null
+      ], { alignItems: 'stretch' }))
+      rows.push(row('create', [
+        button('Create my player', () => {
+          // A press on a disabled button must still post nothing: the guard is here, not only
+          // in the disabled flag.
+          if (!fields.name.trim()) return undefined
+          return call('/online/signup', { name: fields.name.trim() })
+        }, {
+          primary: true,
+          disabled: busy || !fields.name.trim(),
+          title: 'Makes this name yours on the lobby server and shows the key that signs you in on another computer.'
+        })
+      ]))
+      rows.push(row('saved-key', [
+        field(fields.key, fields.setKey, 'Recovery key you saved', () => signIn(), { label: 'Recovery key you saved' }),
+        button('I have a player', () => signIn(), {
+          disabled: busy || !fields.name.trim() || !fields.key.trim(),
+          title: 'Signs in as the player you already have, with the name and key you saved.'
+        })
+      ], { alignItems: 'stretch' }))
+    } else {
+      rows.push(row('me', [
+        jsx('span', { style: line, children: `You are ${online.name} online` }, 'name'),
+        textLink('Change my name', () => {
+          fields.setRenaming(!fields.renaming)
+          fields.setNewName(fields.renaming ? '' : online.name)
+          setNote('')
+        }, 'Change the name other people see, once every 30 days'),
+        textLink('Sign out', () => call('/online/forget'), 'Stop using this computer’s key. The account stays.', 'sign-out')
+      ]))
+      if (fields.renaming) {
+        rows.push(row('rename', [
+          field(fields.newName, fields.setNewName, 'New name', () => saveName(), { label: 'The name you want instead' }),
+          button('Save name', () => saveName(), { primary: true, disabled: busy || !fields.newName.trim() }),
+          textLink('Cancel', () => { fields.setRenaming(false); fields.setNewName('') }, 'Keep the name you have')
+        ], { alignItems: 'stretch' }))
+      }
+      // The key the server handed out is on screen once, until it is put away.
+      if (fields.shownKey) {
+        rows.push(jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
+          jsx('div', { style: muted, children: 'This is your recovery key. It is shown once, and it is what signs you in on another computer. It is kept with your other Hermes credentials.' }),
+          jsx('div', { 'data-online-new-key': '1', style: mono, children: fields.shownKey }),
+          row('copy-new', [
+            button('Copy recovery key', () => copyText(fields.shownKey, () => setNote('Copied to the clipboard.')), { primary: true }),
+            textLink('Hide this key', () => fields.setShownKey(''))
+          ])
+        ] }, 'fresh-key'))
+      }
+      rows.push(row('show-key', [
+        jsx('span', { style: muted, children: fields.revealed ? 'Your key:' : `Your key: ${KEY_MASK}` }, 'mask'),
+        fields.revealed
+          ? button('Copy my key', () => copyText(fields.revealed, () => setNote('Copied to the clipboard.')))
+          : null,
+        textLink(fields.revealed ? 'Hide my key' : 'Show my key', async () => {
+          if (fields.revealed) { fields.setRevealed(''); setNote(''); return }
+          const answer = await call('/online/key', undefined, 'GET')
+          if (answer && answer.ok && answer.key) fields.setRevealed(String(answer.key))
+        }, 'Show the key saved in Hermes’s credentials on this computer')
+      ]))
+      rows.push(jsx('div', {
+        'data-online-revealed': fields.revealed ? 'shown' : 'masked',
+        style: fields.revealed ? mono : { display: 'none' },
+        children: fields.revealed
+      }, 'revealed'))
+      rows.push(row('save-file', [
+        textLink('Save my account file', async () => {
+          const answer = await call('/online/account-file')
+          if (answer && answer.ok && answer.path) setNote(`Saved in ${answer.path}`)
+        }, 'Write your name, key and server to a file in your Downloads folder')
+      ]))
+    }
+    // Whoever turned it on can turn it off, signed in or not: a person who never got as far as
+    // a name must not be stuck with online play on.
+    rows.push(row('turn-off', [
+      textLink('Turn online play off', () => call('/online/off'), 'Stops everything online. Local play is untouched.')
+    ], { marginTop: 6 }))
+  }
+  if (problem) {
+    rows.push(jsx('div', {
+      role: 'alert', 'data-online-problem': '1',
+      style: { ...line, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
+      children: problem
+    }, 'problem'))
+  } else if (note) {
+    rows.push(jsx('div', {
+      role: 'status', 'aria-live': 'polite', 'data-online-note': '1',
+      style: { ...line, color: text.secondary },
+      children: note
+    }, 'note'))
+  }
+  return jsxs('div', {
+    'data-online-account': online.linked ? 'linked' : online.on ? 'named-not-yet' : 'off',
+    style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 },
+    children: rows
+  })
+
+  // Change my name is the server's decision, so its own sentence is what comes back.
+  async function saveName() {
+    const wanted = fields.newName.trim()
+    if (!wanted) return
+    const answer = await call('/online/rename', { name: wanted })
+    if (answer && answer.ok) { fields.setRenaming(false); fields.setNewName('') }
+  }
+
+  // Signing in needs both halves; a press with either one missing posts nothing.
+  function signIn() {
+    const name = fields.name.trim()
+    const key = fields.key.trim()
+    if (!name || !key) return
+    return call('/online/signin', { name, key })
+  }
+}
+
+// Check online: each step from this computer to the lobby, in the server's own words where
+// it refuses. The Hall shows it under its roster and the Get online card shows it in place,
+// so the run and the rows are here and both surfaces mount them.
+function useOnlineCheck(ctx) {
+  const [checked, setChecked] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const runCheck = async () => {
+    if (checking || !ctx || typeof ctx.rest !== 'function') return
+    setChecking(true)
+    try {
+      const answer = await ctx.rest('/online/check')
+      if (alive.current) setChecked(answer && typeof answer === 'object' ? answer : { ok: false, steps: [] })
+    } catch {
+      if (alive.current) setChecked({ ok: false, steps: [{ name: 'Game Center', ok: false, text: 'Game Center did not answer. Reopen Hermes and try again.' }] })
+    } finally {
+      if (alive.current) setChecking(false)
+    }
+  }
+  return { checked, checking, runCheck }
+}
+
+function onlineCheckBlock({ checked, checking, runCheck }) {
+  return jsxs('div', { 'data-hall-check': '1', style: { display: 'flex', flexDirection: 'column', gap: 4 }, children: [
+    jsxs('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }, children: [
+      button(checking ? 'Checking…' : 'Check online', runCheck, {
+        disabled: checking,
+        title: 'Checks each step from this computer to the lobby and says which one is not working.'
+      })
+    ] }),
+    checked ? jsxs('div', { role: 'status', 'aria-live': 'polite', style: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }, children: [
+      ...(Array.isArray(checked.steps) ? checked.steps : []).map((row, index) => jsxs('div', {
+        'data-hall-check-row': row.ok ? 'ok' : 'fix',
+        children: [
+          jsx('span', { style: { fontWeight: 650, color: row.ok ? text.secondary : accent }, children: `${row.ok ? 'OK' : 'Fix'} · ${row.name}: ` }),
+          jsx('span', { style: { color: text.secondary }, children: String(row.text || '') })
+        ]
+      }, index)),
+      checked.ok ? jsx('div', { style: { color: text.tertiary }, children: 'Every step works.' }) : null
+    ] }) : null
+  ] })
+}
+
 function ladderLine(ladder) {
   const state = String((ladder && ladder.state) || 'idle')
   if (state === 'idle') return ''

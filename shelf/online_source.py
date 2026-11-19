@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -46,7 +47,7 @@ STATE_FILE = "online.json"
 POLL_SECONDS = 15
 # The #games chat on the Games page is read from the lobby at most this often.
 CHAT_SECONDS = 3
-CHAT_DOWN = "The online server is not answering right now. Your message was not sent."
+CHAT_DOWN = "The online server isn't answering; your message wasn't sent."
 LEAGUE_SECONDS = 20
 BACKOFF_SECONDS = (15, 30, 60, 120)
 ALERT_EVERY_SECONDS = 600
@@ -98,6 +99,36 @@ def plain_url(raw: Any) -> str:
     if parts.scheme.lower() not in {"http", "https"} or not parts.hostname or "@" in parts.netloc:
         return DEFAULT_URL
     return value.rstrip("/")
+
+
+def downloads_folder() -> Path:
+    """The folder this person's browser calls Downloads, on Windows and on Linux.
+
+    Both systems let the folder move (the desktop's own user-dirs on Linux, a redirected
+    profile on Windows), so the setting is read where there is one and the plain home
+    folder is the answer when there is not. A folder that is not there yet is made: the
+    person asked for a file, not for a lesson about folders.
+    """
+    home = Path.home()
+    candidate = home / "Downloads"
+    if os.name != "nt":
+        setting = Path(os.environ.get("XDG_CONFIG_HOME") or (home / ".config")) / "user-dirs.dirs"
+        try:
+            for line in setting.read_text(encoding="utf-8").splitlines():
+                key, _, value = line.partition("=")
+                if key.strip() != "XDG_DOWNLOAD_DIR":
+                    continue
+                chosen = value.strip().strip('"').replace("$HOME", str(home))
+                if chosen and Path(chosen).is_absolute():
+                    candidate = Path(chosen)
+                break
+        except OSError:
+            pass
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        log.debug("the Downloads folder could not be made", exc_info=True)
+    return candidate
 
 
 def wallet_totals(folder: Path | str) -> tuple[int, int]:
@@ -369,6 +400,59 @@ class Online:
         if status == 0:
             return {"ok": False, "offline": True, "text": self.offline_text}
         return {"ok": False, "text": str(body.get("error") or "That did not work.")}
+
+    def rename(self, name: str) -> dict:
+        """Change the name this account plays under, in the lobby's own words when refused.
+
+        Everything that can go wrong here is the server's to decide - a name someone else
+        holds, or one changed too recently - and each of those is already a sentence written
+        for the person, so it comes back unchanged instead of being re-worded here.
+        """
+        chosen = " ".join(str(name or "").split())[:24]
+        if not self.on:
+            return {"ok": False, "text": "Turn online play on first.", "online": self.snapshot()}
+        if not self.linked:
+            return {"ok": False, "text": "Sign in to online play first.", "online": self.snapshot()}
+        if not chosen:
+            return {"ok": False, "text": "Type the name you want to be known by.", "online": self.snapshot()}
+        status, body = self._call("POST", "/api/me", {"name": chosen}, key=self.key())
+        if status == 200:
+            player = body.get("player") if isinstance(body.get("player"), dict) else {}
+            self._remember(player, chosen)
+            name_now = str(self._state.get("name") or chosen)
+            return {"ok": True, "name": name_now, "text": f"You are {name_now} online.",
+                    "online": self.snapshot()}
+        if status == 0:
+            return {"ok": False, "offline": True, "text": self.offline_text, "online": self.snapshot()}
+        return {"ok": False, "text": str(body.get("error") or "The lobby did not take that name."),
+                "online": self.snapshot()}
+
+    def account_file(self, folder: Path | str) -> dict:
+        """Write this account's name, key and server to one file, and say where it went.
+
+        The person asks for this because the key is the one thing that signs them in on
+        another computer. It is written where they asked and nowhere else, the answer
+        carries the path back for the page to show, and the key never reaches a log line.
+        """
+        if not self.on or not self.linked:
+            return {"ok": False, "text": "Turn online play on and sign in first; then there is an account to save."}
+        name = str(self._state.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "text": "Sign in first, so the file knows whose account it is."}
+        folder = Path(folder)
+        path = folder / f"GameCenter-{_file_safe(name)}.json"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps({"name": name, "key": self.key(), "server": self.url,
+                                             "saved_at": int(self.clock())}), encoding="utf-8")
+            filelock.replace(temporary, path)
+        except OSError:
+            log.warning("the account file could not be written", exc_info=True)
+            return {"ok": False,
+                    "text": f"Your account file could not be written to {folder}. Show my key still works; "
+                            "copy it somewhere safe."}
+        return {"ok": True, "path": str(path), "text": f"Saved in {folder} as {path.name}."}
 
     def ensure_account(self, seed: str = "") -> dict:
         """Auto-create a guest account with a suggested name if not already signed in. Key is stored silently, never exposed."""
@@ -1071,7 +1155,7 @@ class Online:
         name = str(player.get("name") or "")
         if not step("Account", bool(name), f"The lobby knows you as {name}." if name else
                     "The lobby did not accept this computer's key. Sign in again with your name "
-                    "and the recovery key you saved (I have a key)."):
+                    "and the recovery key you saved (I have a player)."):
             return steps
         lines = self.lobby_lines(force=True)
         if self.chat_reached():
@@ -1147,6 +1231,17 @@ class Online:
             return int(exc.code or 0), _json(raw)
         except (urlerror.URLError, OSError, ValueError):
             return 0, {}
+
+
+def _file_safe(name: str) -> str:
+    """A player name made safe to sit inside a file name on Windows and on Linux.
+
+    Only letters, digits, spaces, dashes and underscores survive; every other character
+    becomes a dash, so a name can never walk the file out of the folder it was given.
+    """
+    kept = "".join(char if (char.isalnum() or char in " -_") else "-" for char in str(name or ""))
+    words = "-".join(kept.split())
+    return words[:40] or "player"
 
 
 def _json(raw: bytes) -> dict:

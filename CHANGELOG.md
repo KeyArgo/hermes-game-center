@@ -44,6 +44,33 @@ top of Game Center's Settings and at `GET /v1/version`.
   double the smallest and sized by what the turn before it cost, and an intermediate model reply pays
   points instead of spinning. A skip is logged once at debug so the match can be proved live. Guards:
   `tests/test_focused_chat_spins.py`.
+- **The #games chat is the lobby's, or it takes no line at all.** The owner (2026-11-18): two PCs said
+  hi and neither saw the other, because the column quietly wrote to this computer's own lobby whenever
+  nobody was signed in. Signed out the box now reads *“Sign in to online play to chat”*, is closed, and
+  posts nothing — no silent local save — and a server that does not answer says *“The online server isn't
+  answering; your message wasn't sent.”* (`shelf/online_source.py` CHAT_DOWN). The column also stops
+  drawing a chat it is not reading. Guards: `tests/test_online_lobby_chat.py`
+  (`test_signed_out_the_games_chat_takes_no_line_and_saves_nothing`) and the signed-out case in *lobby
+  chat column* in `tests/table_ui_harness.cjs`.
+
+- **A #games post stays on the screen for 30 days, the same as the server keeps it.** The owner (2026-11-18):
+  the chat is worth reading back. `LOBBY_POST_MS` is 30 days instead of one, so a three-week-old post is
+  still drawn and only a line past the server's own window is dropped. Guard: the chat-window check at the
+  top of *lobby chat column* in `tests/table_ui_harness.cjs`.
+
+- **Get online: one card at the top of the Games page does the whole sign-in.** The owner (2026-11-18):
+  the online steps were spread between the dock's Lobby tab and Settings and nobody could find the start
+  of them. The card names the lobby it talks to and which Hermes connection this window is on (with
+  **Open connection settings** when it is another machine), then the switch, the name (**Create my
+  player** / **I have a player**, with **Suggest a name** when the build has the generator), **You are
+  &lt;name&gt; online · Change my name · Sign out**, **Show my key** (masked until pressed, this computer
+  only), **Save my account file** (a `GameCenter-<name>.json` in Downloads), and **Check online**. It
+  folds to one line — *Online as &lt;name&gt; on &lt;host&gt; ✓ · Manage* — once everything works. The
+  steps are one block (`onlineAccountBlock`, `62-pane-state.js`) drawn by the card and the pane, so the
+  two cannot drift; **Change my name** posts to the lobby and repeats its own refusal (the 30-day rule)
+  word for word, and the key has a local-only route (`GET /online/key`) that never appears in a snapshot.
+  Guards: `tests/test_online_account.py` and the *get online card* contract in `tests/table_ui_harness.cjs`.
+
 - **The Games page no longer carries backdrop Size and Visibility, and the side pane opens at 368 px.**
   The owner (2026-11-18): the slot machine settings on the Game Center main page "don't seem to work,
   maybe we should remove those", and "the right pane for the game center should default where it is

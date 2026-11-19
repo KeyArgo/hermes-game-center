@@ -3924,7 +3924,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -4010,7 +4010,7 @@ async function onlineContract() {
   const named = makeCtx({ on: true })
   tree = await open(named)
   assert.ok(findButton(tree, 'Create my player'), 'a new person can pick a name')
-  assert.ok(findButton(tree, 'I have a key'), 'and a returning person can paste their key')
+  assert.ok(findButton(tree, 'I have a player'), 'and a returning person can paste their key')
   const offSwitch = findButton(tree, 'Turn online play off')
   assert.ok(offSwitch, 'someone with no account can still turn online play off')
   await offSwitch.props.onClick()
@@ -4026,12 +4026,16 @@ async function onlineContract() {
   // A new recovery key is shown once, with a copy button, and never in the view.
   const fresh = makeCtx({ on: true }, { answers: { '/online/signup': { ok: true, text: 'You are Ada online.', key_to_copy: 'KEY-123', onlinePatch: { linked: true, name: 'Ada' } } } })
   tree = await open(fresh)
+  // The name box starts empty and Create posts nothing from it: the person types the name.
+  nodes(tree).find(node => node.type === 'input' && node.props.placeholder === 'Your name online')
+    .props.onChange({ target: { value: 'Ada' } })
+  tree = draw('WaitPane(paneProps)', { ctx: fresh.ctx })
   await findButton(tree, 'Create my player').props.onClick()
   tree = draw('WaitPane(paneProps)', { ctx: fresh.ctx })
   assert.ok(words(tree).includes('KEY-123'), 'the recovery key is shown once so it can be copied')
   assert.ok(findButton(tree, 'Copy recovery key'), 'with a copy button')
   assert.ok(findButton(tree, 'Hide this key'), 'and a way to put it away')
-  assert.ok(words(tree).includes('You are Ada online.'), 'the person is signed in in the same breath')
+  assert.ok(words(tree).includes('You are Ada online'), 'the person is signed in in the same breath')
 
   // 3. Linked: Find a match online asks the queue for this game. The online-alert switch is NOT
   //    offered on the pane: it saves a flag, but the notification behind
@@ -4551,11 +4555,20 @@ async function lobbyColumnContract() {
   sandbox.setInterval = () => 1
   sandbox.clearInterval = () => {}
   const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  // A lobby post is kept for 30 days on the server, so this screen shows the same 30 days: a
+  // three-week-old post is still there, a post from last month is not.
+  assert.equal(evaluate('LOBBY_POST_MS'), 30 * 24 * 3600 * 1000, 'the chat window matches the server’s 30 days')
+  assert.equal(evaluate('freshLobbyLines([{ at: Math.floor(Date.now() / 1000) - 21 * 24 * 3600, name: "Ada", text: "still here" }]).length'), 1,
+    'a three-week-old post is still on the screen')
+  assert.equal(evaluate('freshLobbyLines([{ at: Math.floor(Date.now() / 1000) - 31 * 24 * 3600, name: "Ada", text: "gone" }]).length'), 0,
+    'a post from last month is not')
   const drafts = { chat: '', name: '' }
   const sends = []
   let sender = async line => { sends.push(line); return { ok: true, text: 'OK' } }
-  const named = { player: { id: 'me', name: 'Ada', named: true }, lobby: { lines: [], looking: [] }, online: { on: true, url: 'https://games.hermesnet.xyz' } }
-  const unnamed = { player: { id: 'me', name: '', named: false }, lobby: { lines: [], looking: [] }, online: { on: true, url: 'https://games.hermesnet.xyz' } }
+  const onlineSignedIn = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada' }
+  const named = { player: { id: 'me', name: 'Ada', named: true }, lobby: { lines: [], looking: [] }, online: onlineSignedIn }
+  const signedOut = { ...named, online: { on: true, url: 'https://games.hermesnet.xyz', linked: false } }
+  const unnamed = { player: { id: 'me', name: '', named: false }, lobby: { lines: [], looking: [] }, online: onlineSignedIn }
   const paint = (extra = {}) => {
     sandbox.lobbyProps = {
       view: named, ctx: { os: { openExternal: () => false } }, current: 'connect4', onPlayHere: () => {},
@@ -4586,8 +4599,12 @@ async function lobbyColumnContract() {
     effects = []
     return drawn
   }
-  tree = whereOf(named)
-  assert.ok(words(tree).includes('Only this computer.'), 'a chat that is not shared says it stays on this computer')
+  tree = whereOf(signedOut)
+  assert.ok(words(tree).includes('Sign in to online play to chat.'), 'a chat with no online sign-in says what it needs')
+  assert.ok(!words(tree).includes('Only this computer'), 'and never offers a local chat instead')
+  const offSend = whereOf(signedOut)
+  assert.ok(findButton(offSend, 'Send').props.disabled, 'with nothing to press: no line is kept on this computer')
+  assert.equal(inputFor(offSend, 'Say something in the lobby chat').props.disabled, true, 'and the box is closed')
   tree = whereOf({ ...named, lobby: { lines: [], looking: [], shared: true, reached: true } })
   assert.ok(words(tree).includes('Everyone online reads this.'), 'a shared chat says everyone online reads it')
   assert.ok(!words(tree).includes('Only this computer'), 'and never also says it is local')
@@ -4728,7 +4745,7 @@ async function hallContract() {
   tree = await settle(props({ ctx: run.ctx }))
   assert.ok(words(tree).includes('The lobby did not accept your sign-in.'), 'a refused sign-in is said, not hidden')
   assert.ok(words(tree).includes('nobody can see you'), 'and it says what that means: nobody sees you')
-  assert.ok(words(tree).includes('I have a key'), 'and how to fix it: sign in again with the saved key')
+  assert.ok(words(tree).includes('I have a player'), 'and how to fix it: sign in again with the saved key')
   assert.ok(!words(tree).includes('Turn online play on'), 'never "turn online play on" when it is already on')
   reset()
   run = makeCtx({ state: 'connecting', you, prefs: {}, roster: [], requests: [], seated: null })
@@ -6766,19 +6783,19 @@ async function lobbyAsksContract() {
   }
   const withPosts = paints({
     view: { player: { id: 'me', name: 'Ada', named: true },
-      lobby: { looking: [], lines: [
+      lobby: { shared: true, reached: true, looking: [], lines: [
         { id: 'p1', name: 'Bea', text: 'anyone for connect4?', at: seconds - 60 },
-        { id: 'p2', name: 'Cole', text: 'yesterday\u2019s news', at: seconds - 25 * 3600 },
+        { id: 'p2', name: 'Cole', text: 'last month\u2019s news', at: seconds - 31 * 24 * 3600 },
         { id: 'p3', name: 'Dot', text: 'no stamp at all' }
       ] },
-      online: { on: true, url: '' } },
+      online: { on: true, url: '', linked: true, name: 'Ada' } },
     ctx: { os: { openExternal: () => false } }, current: 'connect4', onPlayHere: () => {},
     chat: '', setChat: () => {}, name: '', setName: () => {}, send: async () => ({ ok: true })
   })
   const printed = words(withPosts)
   assert.ok(printed.includes('anyone for connect4?'), 'a fresh post is drawn')
   assert.ok(printed.includes(stamp(seconds - 60)), 'with its own date and time: ' + printed.slice(-160))
-  assert.ok(!printed.includes('yesterday'), 'a post older than a day is never drawn')
+  assert.ok(!printed.includes('last month'), 'a post older than the server keeps is never drawn')
   assert.ok(!printed.includes('Cole'), 'nor is the person who wrote it')
   assert.ok(!printed.includes('no stamp at all'), 'nor is a post this screen cannot date')
   reset()
@@ -7329,4 +7346,196 @@ function blackjackTwoPlayersContract() {
   assert.ok(words(settledFelt).includes('Round settled · Player 1 +10 · Player 2 -10'),
     'each person’s round is their own: ' + words(settledFelt).slice(0, 300))
   console.log('blackjack two players: two named seats, the active one highlighted, table-only guest chips: passed')
+}
+
+// ---- Get online: the card at the top of the Games page, in every state it can be in ------
+// The card is the way in for a person who has never played online: which Game Center this
+// window is on, the switch, a name (or the player they already have), the name they are
+// known by, their key, and Check online. Every step goes through one of the /online doors and
+// the lobby's own words are what the person reads back.
+async function getOnlineCardContract() {
+  const baseOnline = {
+    on: false, url: 'https://games.hermesnet.xyz', linked: false, name: '', offline: false,
+    offline_text: '', game: '', looking: {}, waiting_names: [], match: null, alerts: {},
+    ladder: {}, bot: {}, staff: { role: '', name: '', key: false, powers: [] },
+    disclosure: 'Online play is off until you turn them on here. The key is kept in Hermes credentials.'
+  }
+  const calls = []
+  const answers = {}
+  const cardCtx = {
+    rest: async (path, options) => {
+      calls.push([path, options || null])
+      const answer = answers[path]
+      if (typeof answer === 'function') return answer()
+      if (answer) return answer
+      // The name generator lives in another lane's route: this build has no such door.
+      if (path === '/name/suggest') throw new Error('Not Found')
+      return { ok: true, text: 'Done.' }
+    }
+  }
+  const paintCard = async online => {
+    sandbox.cardProps = { ctx: cardCtx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    // Two passes: the first queues the card's own reads (the connection list, the name
+    // generator), the second paints what they answered.
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('OnlineGetOnlineCard(cardProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+    return tree
+  }
+  const said = path => calls.filter(item => item[0] === path).pop()
+  const inputIn = (tree, label) => nodes(tree).find(node => node.type === 'input' && node.props['aria-label'] === label)
+  // A signed-in card that works folds itself to one line: opening it is one press, exactly the
+  // press a person would make before changing anything.
+  const openCard = async online => {
+    let drawn = await paintCard(online)
+    if (drawn.props && drawn.props['data-online-card'] === 'collapsed') {
+      findButton(drawn, 'Manage').props.onClick()
+      drawn = await paintCard(online)
+    }
+    return drawn
+  }
+
+  // 1. Off: which Game Center this window is on, and the disclosure that has to come first.
+  reset()
+  let tree = await paintCard({ ...baseOnline })
+  assert.equal(tree.props['data-online-card'], 'open')
+  assert.ok(words(tree).includes('Get online'), 'the card names itself')
+  assert.ok(words(tree).includes('Game Center on games.hermesnet.xyz'), 'and says which Game Center this is')
+  assert.ok(words(tree).includes('This window runs Game Center on this computer.'), 'and which computer it runs on')
+  assert.ok(words(tree).includes('off until you turn them on'), 'the disclosure is shown before the switch')
+  assert.equal(calls.filter(item => item[0] === '/online/signup').length, 0, 'nothing is created behind the person’s back')
+  await findButton(tree, 'Turn on online play').props.onClick()
+  assert.ok(said('/online/on'), 'one press turns it on, through the one door')
+
+  // 2. On, no player yet: an EMPTY name box, Create my player, and the key a returning
+  //    person already saved. The suggestion button is there only when its route is.
+  reset()
+  calls.length = 0
+  const named = await paintCard({ ...baseOnline, on: true })
+  const nameBox = inputIn(named, 'Your name online')
+  assert.ok(nameBox, 'the name field is there')
+  assert.equal(nameBox.props.value, '', 'and it starts empty: no name is filled in for anyone')
+  assert.equal(findButton(named, 'Suggest a name'), undefined,
+    'a build with no name generator offers no button that would not work')
+  assert.ok(findButton(named, 'Create my player').props.disabled, 'nothing is created from an empty box')
+  assert.ok(findButton(named, 'I have a player'), 'a returning person signs in with the key they saved')
+  assert.ok(findButton(named, 'I have a player').props.disabled, 'and needs both parts before it will post')
+  await findButton(named, 'Create my player').props.onClick()
+  assert.equal(calls.filter(item => item[0] === '/online/signup').length, 0, 'an empty box posts nothing at all')
+
+  reset()
+  calls.length = 0
+  answers['/name/suggest'] = { ok: true, name: 'Swift Magpie' }
+  tree = await paintCard({ ...baseOnline, on: true })
+  assert.ok(findButton(tree, 'Suggest a name'), 'the generator is offered when its route answers')
+  await findButton(tree, 'Suggest a name').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true })
+  assert.equal(inputIn(tree, 'Your name online').props.value, 'Swift Magpie', 'a press puts a name in the box')
+  inputIn(tree, 'Your name online').props.onChange({ target: { value: 'Ada' } })
+  tree = await paintCard({ ...baseOnline, on: true })
+  await findButton(tree, 'Create my player').props.onClick()
+  assert.equal(said('/online/signup')[1].body.name, 'Ada', 'the typed name is what is sent')
+
+  // 3. A saved key signs the person in, with both halves.
+  reset()
+  calls.length = 0
+  tree = await paintCard({ ...baseOnline, on: true })
+  inputIn(tree, 'Your name online').props.onChange({ target: { value: 'Locutus' } })
+  tree = await paintCard({ ...baseOnline, on: true })
+  inputIn(tree, 'Recovery key you saved').props.onChange({ target: { value: 'KEY-SAVED' } })
+  tree = await paintCard({ ...baseOnline, on: true })
+  await findButton(tree, 'I have a player').props.onClick()
+  // JSON, not deepEqual: the object was built inside the bundle's own realm.
+  assert.equal(JSON.stringify(said('/online/signin')[1].body), JSON.stringify({ name: 'Locutus', key: 'KEY-SAVED' }))
+
+  // 4. Signed in: who you are, the way to change it, and the way out. A rename refused by
+  //    the lobby shows the lobby's own sentence, and the box stays open to try another name.
+  reset()
+  calls.length = 0
+  answers['/online/rename'] = { ok: false, text: 'Names stick for 30 days. You can rename again in 30 days.',
+    online: { ...baseOnline, on: true, linked: true, name: 'Ada' } }
+  tree = await openCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.ok(words(tree).includes('You are Ada online'), 'the card says who you are')
+  assert.ok(findButton(tree, 'Change my name'), 'and offers the one rename the lobby allows')
+  assert.ok(findButton(tree, 'Sign out'), 'and a way out that leaves the account alone')
+  findButton(tree, 'Change my name').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  inputIn(tree, 'The name you want instead').props.onChange({ target: { value: 'greyheron' } })
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  await findButton(tree, 'Save name').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.equal(JSON.stringify(said('/online/rename')[1].body), JSON.stringify({ name: 'greyheron' }))
+  assert.ok(words(tree).includes('Names stick for 30 days. You can rename again in 30 days.'),
+    'the lobby’s own sentence, word for word: ' + words(tree).slice(-240))
+  assert.ok(inputIn(tree, 'The name you want instead'), 'a refused name leaves the box open')
+  await findButton(tree, 'Sign out').props.onClick()
+  assert.ok(said('/online/forget'), 'Sign out is the forget door')
+
+  // 5. The key: masked until it is asked for, then copied without the key ever reaching the
+  //    note line. Save my account file says where the file went.
+  reset()
+  calls.length = 0
+  answers['/online/key'] = { ok: true, key: 'KEY-SECRET-9', text: 'Your key is shown below. Do not share it.' }
+  answers['/online/account-file'] = { ok: true, path: '/home/ada/Downloads/GameCenter-Ada.json', text: 'Saved.' }
+  tree = await openCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.ok(words(tree).includes('Show my key'), 'the key has its own press')
+  assert.ok(!words(tree).includes('KEY-SECRET-9'), 'and is not on the screen before that press')
+  assert.ok(words(tree).includes('\u2022\u2022\u2022\u2022'), 'a mask stands where the key is')
+  await findButton(tree, 'Show my key').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.equal(said('/online/key')[1].method, 'GET', 'reading the key is a read')
+  assert.ok(words(tree).includes('KEY-SECRET-9'), 'the press is what shows it')
+  assert.ok(findButton(tree, 'Copy my key'), 'with a copy button')
+  assert.ok(findButton(tree, 'Hide my key'), 'and a way to put it away')
+  await findButton(tree, 'Save my account file').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.ok(said('/online/account-file'), 'Save my account file is its own door')
+  assert.ok(words(tree).includes('/home/ada/Downloads/GameCenter-Ada.json'), 'and it says where the file went')
+
+  // 6. Check online, inside the card.
+  reset()
+  calls.length = 0
+  answers['/online/check'] = { ok: false, steps: [
+    { name: 'Online play', ok: true, text: 'On.' },
+    { name: 'Account', ok: false, text: 'The lobby did not accept this computer’s key.' }
+  ] }
+  tree = await openCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  await findButton(tree, 'Check online').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.ok(words(tree).includes('Fix · Account:'), 'the step that failed is named in place: ' + words(tree).slice(-200))
+  assert.ok(words(tree).includes('The lobby did not accept this computer’s key.'), 'with its own sentence')
+
+  // 7. When everything works the whole card is one line, and Manage opens it again.
+  reset()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.equal(tree.props['data-online-card'], 'collapsed')
+  assert.ok(words(tree).includes('Online as Ada on games.hermesnet.xyz ✓'), 'one line says it works')
+  findButton(tree, 'Manage').props.onClick()
+  tree = await paintCard({ ...baseOnline, on: true, linked: true, name: 'Ada' })
+  assert.equal(tree.props['data-online-card'], 'open', 'Manage opens the steps again')
+
+  // 8. A window on another machine's Hermes says so, and opens the connection list.
+  reset()
+  const savedHost = sandbox.host
+  const navved = []
+  sandbox.host = {
+    ...savedHost,
+    connections: async () => [{ id: 'local', label: 'This device' }, { id: 'homelab', label: 'Homelab' }],
+    activeConnectionId: () => 'homelab',
+    navigate: route => navved.push(route)
+  }
+  tree = await paintCard({ ...baseOnline, on: true })
+  assert.equal(tree.props['data-online-card'], 'open')
+  assert.ok(words(tree).includes('This window runs Game Center on Homelab.'), 'the card names the machine: ' + words(tree).slice(0, 300))
+  assert.ok(words(tree).includes('This device'), 'and says where this computer’s own Game Center is')
+  findButton(tree, 'Open connection settings').props.onClick()
+  assert.deepEqual(navved, ['/settings?tab=gateway'], 'the connection list is one press away')
+  sandbox.host = savedHost
+  console.log('get online card: connection, switch, name, rename, key, check: passed')
 }
