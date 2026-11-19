@@ -100,6 +100,63 @@ def test_missing_rss_still_writes_the_line(tmp_path):
     assert "lobby_sockets=0" in text
 
 
+def test_windows_working_set_fills_the_health_line(monkeypatch, tmp_path):
+    """No Windows box here: a fake kernel32 answers K32GetProcessMemoryInfo.
+
+    psapi is missing on purpose. The old call only asked psapi, so the line was
+    ``rss=?`` whenever that name was not there.
+    """
+    import sys
+    import types
+
+    import ctypes as real_ctypes
+
+    monkeypatch.setattr(diagnostics.sys, "platform", "win32")
+
+    class Kernel:
+        def GetCurrentProcess(self):
+            return 7
+
+        def K32GetProcessMemoryInfo(self, handle, ref, cb):
+            assert handle == 7
+            ref._obj.WorkingSetSize = 80 * MB
+            return 1
+
+    class Psapi:
+        def __getattr__(self, name):
+            raise AttributeError(name)
+
+    class Windll:
+        kernel32 = Kernel()
+        psapi = Psapi()
+
+    fake = types.ModuleType("ctypes")
+    fake.Structure = real_ctypes.Structure
+    fake.sizeof = real_ctypes.sizeof
+    fake.byref = real_ctypes.byref
+    fake.c_size_t = real_ctypes.c_size_t
+    fake.POINTER = real_ctypes.POINTER
+    fake.windll = Windll()
+    wintypes = types.ModuleType("ctypes.wintypes")
+    wintypes.DWORD = real_ctypes.c_uint32
+    wintypes.BOOL = real_ctypes.c_int
+    wintypes.HANDLE = real_ctypes.c_void_p
+    fake.wintypes = wintypes
+    monkeypatch.setitem(sys.modules, "ctypes", fake)
+    monkeypatch.setitem(sys.modules, "ctypes.wintypes", wintypes)
+
+    def no_proc(self, *args, **kwargs):
+        raise OSError("no proc")
+
+    monkeypatch.setattr(diagnostics.Path, "read_text", no_proc)
+
+    assert diagnostics.rss_bytes() == 80 * MB
+    diagnostics.attach(tmp_path)
+    line = diagnostics.HealthSampler(threads=lambda: 4, sockets=lambda: 1).sample_once()
+    assert "rss=80.0MB" in line
+    assert "rss=?" not in line
+
+
 def test_the_proc_parser_reads_vmrss():
     text = "Name:\tpython3\nVmPeak:\t 999999 kB\nVmRSS:\t  123456 kB\nThreads:\t4\n"
     assert diagnostics.parse_proc_status(text) == 123456 * 1024

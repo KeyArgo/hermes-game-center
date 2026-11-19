@@ -183,7 +183,14 @@ def parse_proc_status(text: str) -> int | None:
 
 
 def _windows_rss() -> int | None:
-    """GetProcessMemoryInfo's WorkingSetSize, without psutil."""
+    """The working set, stdlib only.
+
+    ``K32GetProcessMemoryInfo`` lives on kernel32 and is the call that works when
+    psapi was never loaded. ``GetProcessMemoryInfo`` is the same function under the
+    older name. The argument types have to be declared: a process handle is a
+    pointer, and passing it as a plain integer truncates it, so the call fails and
+    the health line would say ``rss=?``.
+    """
     try:
         import ctypes
         from ctypes import wintypes
@@ -204,10 +211,15 @@ def _windows_rss() -> int | None:
 
         counters = PROCESS_MEMORY_COUNTERS()
         counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
-        handle = ctypes.windll.kernel32.GetCurrentProcess()  # type: ignore[attr-defined]
-        ok = ctypes.windll.psapi.GetProcessMemoryInfo(  # type: ignore[attr-defined]
-            handle, ctypes.byref(counters), counters.cb
-        )
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = kernel32.GetCurrentProcess()
+        fn = getattr(kernel32, "K32GetProcessMemoryInfo", None)
+        if fn is None:
+            fn = ctypes.windll.psapi.GetProcessMemoryInfo  # type: ignore[attr-defined]
+        if hasattr(fn, "argtypes"):
+            fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]
+            fn.restype = wintypes.BOOL
+        ok = fn(handle, ctypes.byref(counters), counters.cb)
         return int(counters.WorkingSetSize) if ok else None
     except Exception:
         return None
