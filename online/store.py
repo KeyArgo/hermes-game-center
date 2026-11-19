@@ -248,6 +248,9 @@ LATE_COLUMNS = (
     # A game played but not accepted is accepted until this moment (owner: twenty minutes).
     # 0 means a standing choice, which is what the old rows are.
     ("availability_games", "until", "REAL NOT NULL DEFAULT 0"),
+    # A game chosen by hand, with no twenty-minute window. Kept apart from `until` so that
+    # playing a game already chosen puts a window beside the choice instead of over it.
+    ("availability_games", "standing", "INTEGER NOT NULL DEFAULT 0"),
 )
 BOTS_PER_OWNER = 3
 PLAYER_COLUMNS = "id, name, public, created, bot, owner_id, renamed"
@@ -340,6 +343,10 @@ class Store:
             WHERE last_game_end = 0
         """
         self.db.execute(backfill_last_game)
+        # Rows from before the column: a game turned on with no window is a standing choice.
+        self.db.execute(
+            "UPDATE availability_games SET standing = 1 "
+            "WHERE standing = 0 AND enabled = 1 AND until = 0")
         used = {r[0] for r in self.db.execute("SELECT name_key FROM players WHERE name_key != ''")}
         for row in self.db.execute("SELECT id, name FROM players WHERE name_key = '' ORDER BY rowid").fetchall():
             key = guard.skeleton(row['name'])
@@ -1279,21 +1286,40 @@ class Store:
             for game, enabled in games.items():
                 if not enabled:
                     self.db.execute(
-                        "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 0, 0) "
-                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 0, until = 0",
+                        "INSERT INTO availability_games (player_id, game, enabled, until, standing) "
+                        "VALUES (?, ?, 0, 0, 0) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 0, until = 0, standing = 0",
                         (player_id, game),
+                    )
+                elif game in windows and float(windows[game] or 0) > 0:
+                    # A window rides on top of a choice; it does not delete it.
+                    self.db.execute(
+                        "INSERT INTO availability_games (player_id, game, enabled, until, standing) "
+                        "VALUES (?, ?, 1, ?, 0) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
+                        (player_id, game, float(windows[game])),
                     )
                 elif game in windows:
+                    # Always: the choice, with no window at all.
                     self.db.execute(
-                        "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 1, ?) "
-                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
-                        (player_id, game, float(windows[game] or 0)),
+                        "INSERT INTO availability_games (player_id, game, enabled, until, standing) "
+                        "VALUES (?, ?, 1, 0, 1) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = 0, standing = 1",
+                        (player_id, game),
                     )
                 else:
+                    # Turned on by hand: a standing choice. A window still running stays as
+                    # it is; one that has run out is replaced by the choice.
                     self.db.execute(
-                        "INSERT INTO availability_games (player_id, game, enabled) VALUES (?, ?, 1) "
-                        "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1",
-                        (player_id, game),
+                        "INSERT INTO availability_games (player_id, game, enabled, until, standing) "
+                        "VALUES (?, ?, 1, 0, 1) "
+                        "ON CONFLICT(player_id, game) DO UPDATE SET "
+                        "enabled = 1, "
+                        "standing = CASE WHEN availability_games.until > ? "
+                        "THEN availability_games.standing ELSE 1 END, "
+                        "until = CASE WHEN availability_games.until > ? "
+                        "THEN availability_games.until ELSE 0 END",
+                        (player_id, game, float(now), float(now)),
                     )
             self.db.execute("COMMIT")
         except BaseException:
@@ -1308,23 +1334,38 @@ class Store:
                 "SELECT game, until FROM availability_games WHERE player_id = ? AND until > 0", (player_id,))
         }
 
+    def availability_standing(self, player_id: str) -> dict[str, bool]:
+        """{game: True} for the games chosen by hand, with no twenty-minute window."""
+        return {
+            str(row["game"]): True
+            for row in self.db.execute(
+                "SELECT game FROM availability_games WHERE player_id = ? AND standing = 1", (player_id,))
+        }
+
     def set_game_window(self, player_id: str, game: str, until: float, now: float) -> None:
-        """A game played but not accepted: accepted until `until` (0 = permanent)."""
+        """A game played but not accepted: accepted until `until` (0 = permanent).
+
+        A choice already made by hand stays: the window is kept beside it, so when the
+        twenty minutes are over the standing choice is still there.
+        """
         self.db.execute(
             "INSERT INTO availability (player_id, open, updated) VALUES (?, 0, ?) "
             "ON CONFLICT(player_id) DO UPDATE SET updated = excluded.updated",
             (player_id, float(now)),
         )
         self.db.execute(
-            "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, ?, 1, ?) "
+            "INSERT INTO availability_games (player_id, game, enabled, until, standing) VALUES (?, ?, 1, ?, 0) "
             "ON CONFLICT(player_id, game) DO UPDATE SET enabled = 1, until = excluded.until",
             (player_id, game, float(until)),
         )
 
     def clear_expired_windows(self, now: float) -> int:
-        """A twenty-minute window that has run out counts as off."""
+        """A twenty-minute window that has run out counts as off.
+
+        A game chosen by hand was only on a window as well, so it comes back on.
+        """
         return self.db.execute(
-            "UPDATE availability_games SET enabled = 0, until = 0 WHERE until > 0 AND until <= ?",
+            "UPDATE availability_games SET enabled = standing, until = 0 WHERE until > 0 AND until <= ?",
             (float(now),),
         ).rowcount
 

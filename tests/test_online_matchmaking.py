@@ -420,6 +420,43 @@ def test_the_window_is_over_at_twenty_one_minutes(world):
     run(scenario())
 
 
+def test_a_standing_choice_survives_playing_it_with_the_switch_off(world):
+    """Twenty minutes over a choice already made does not replace the choice.
+
+    The chip was on and the master switch was off, and then the game was played: that is
+    a twenty-minute accept on top of a standing one. When the twenty minutes are over the
+    chip is still on, exactly as it was.
+    """
+    store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        bea = people["Bea"]
+        here(hub, bea)
+        assert (await service.handle(bea, {"t": "prefs", "open": True,
+                                           "games": {"chessboard": True}}))["ok"]
+        assert (await service.handle(bea, {"t": "prefs", "open": False}))["ok"]
+        assert service.standing(bea["id"], "chessboard") is False, "the switch is off"
+        started = await look(service, bea, ["chessboard"])
+        assert started["ok"], started
+        assert started.get("ask_always") is True
+        assert service.prefs(bea["id"])["until"]["chessboard"] == pytest.approx(clock.now + TEMP_SECONDS)
+        clock.now += TEMP_SECONDS + 1
+        prefs = service.prefs(bea["id"])
+        assert prefs["games"]["chessboard"] is True, "the standing choice is still there"
+        assert prefs["until"] == {}
+        assert service.accepts(bea["id"], "chessboard") is False, "the master switch is still off"
+        # The sweep makes the stored row honest again: the choice, not the window.
+        store.clear_expired_windows(clock.now)
+        row = store.db.execute(
+            "SELECT enabled, until FROM availability_games WHERE player_id = ? AND game = 'chessboard'",
+            (bea["id"],)).fetchone()
+        assert (row["enabled"], row["until"]) == (1, 0.0)
+        assert (await service.handle(bea, {"t": "prefs", "open": True}))["ok"]
+        assert service.accepts(bea["id"], "chessboard") is True
+
+    run(scenario())
+
+
 def test_always_makes_it_permanent(world):
     _store, _rooms, people, clock, hub, service = world
 
@@ -517,6 +554,10 @@ def test_an_old_database_gains_the_new_columns_and_its_last_game(world, tmp_path
             "white_kind, black_kind, winner, reason, plies, moves, rated, finished) "
             "VALUES ('r1', 1, 'connect4', ?, ?, 'Ada', 'Bea', 'human', 'human', '', '', 6, '[]', 0, ?)",
             (ada["id"], bea["id"], _clock.now - 300))
+        # A row from before the standing column: on, with no window, which is a choice.
+        store.db.execute(
+            "INSERT INTO availability_games (player_id, game, enabled, until) VALUES (?, 'chessboard', 1, 0)",
+            (ada["id"],))
         store.close()
         # Opening the same file again is what an upgrade does.
         reopened = Store(store.path)
@@ -525,7 +566,8 @@ def test_an_old_database_gains_the_new_columns_and_its_last_game(world, tmp_path
             assert ends[ada["id"]] == pytest.approx(_clock.now - 300), "the wait is backfilled from matches"
             assert ends[bea["id"]] == pytest.approx(_clock.now - 300)
             columns = {row[1] for row in reopened.db.execute("PRAGMA table_info(availability_games)")}
-            assert "until" in columns
+            assert "until" in columns and "standing" in columns
+            assert reopened.availability_standing(ada["id"]) == {"chessboard": True}
         finally:
             reopened.close()
 

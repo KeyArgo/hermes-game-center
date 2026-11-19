@@ -110,8 +110,9 @@ class Service:
         games with a window, and when each ends.
         """
         now = float(self.clock())
-        open_flag, stored = self.store.availability(player_id)
+        open_flag = bool(self.store.availability(player_id)[0])
         windows = self.store.availability_until(player_id)
+        chosen = self.store.availability_standing(player_id)
         games: dict[str, bool] = {}
         until: dict[str, float] = {}
         for game in REQUESTABLE:
@@ -119,11 +120,9 @@ class Service:
             if end > now:
                 games[game] = True
                 until[game] = end
-            elif end:
-                # The twenty minutes are over, so the game counts as off again.
-                games[game] = False
             else:
-                games[game] = bool(stored.get(game, False))
+                # A window that has run out leaves the choice made by hand, if there was one.
+                games[game] = bool(chosen.get(game))
         return {"open": open_flag, "games": games, "until": until}
 
     def accepts(self, player_id: str, game: str, now: float | None = None) -> bool:
@@ -139,10 +138,8 @@ class Service:
 
     def standing(self, player_id: str, game: str) -> bool:
         """A choice made by hand, with no window: always, not just for twenty minutes."""
-        open_flag, stored = self.store.availability(player_id)
-        if float(self.store.availability_until(player_id).get(game) or 0):
-            return False
-        return bool(open_flag and stored.get(game))
+        open_flag = bool(self.store.availability(player_id)[0])
+        return bool(open_flag and self.store.availability_standing(player_id).get(game))
 
     def invisible(self, player_id: str) -> bool:
         """Appearing offline: in nobody's roster, and no requests either way."""
