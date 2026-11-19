@@ -6,6 +6,16 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A malformed server address is a dial that failed, not a worker that dies.** With the online
+  address set to something like `http://host:99999` (a port typo, or a bad IPv6 literal),
+  `urlsplit(...).port` raises `ValueError` inside the connect. The worker caught only `SocketError`
+  and `OSError`, so the thread died with the state stuck on `connecting`: the Hall showed "Joining
+  the Hall…" indefinitely, every 3-second poll spawned another doomed thread, and no line in any log
+  said why. Anything the connect raises is now a failed dial — the reason is logged, the backoff
+  applies, and the state moves. Guards: `tests/test_online_hall.py`
+  (`test_a_malformed_server_address_is_a_failed_dial_not_a_dead_worker` — fails with an unhandled
+  thread exception against the old `_run`).
+
 - **A Retry or a sign-in pressed while a connect is in flight is no longer dropped.** `start()`
   refused to record the wake while `_dialling` was set, and that flag stayed true from the start of
   a connect attempt until the wait after it — so a press landing in that window (the Hall had

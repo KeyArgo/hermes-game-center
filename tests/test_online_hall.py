@@ -903,3 +903,31 @@ def test_a_press_that_lands_mid_dial_is_not_lost(monkeypatch):
     finally:
         held.set()
         hall.stop()
+
+
+def test_a_malformed_server_address_is_a_failed_dial_not_a_dead_worker(tmp_path, caplog):
+    """A port typo must be a dial that failed, with a reason - not a worker that dies silently.
+
+    ``urlsplit(...).port`` raises ValueError for "http://host:99999", and the worker caught only
+    SocketError and OSError around the connect. The thread died with the state stuck on
+    "connecting", every poll spawned another doomed thread, and the Hall said "Joining the Hall…"
+    for as long as the person was willing to look at it.
+    """
+    source = Online(tmp_path, url="http://host:99999", secret=lambda _name: "k")
+    source.turn_on()
+    hall = Hall(source)
+    hall.retry_first = 0.05
+    hall.retry_most = 0.1
+    with caplog.at_level("INFO", logger="shelf.online_hall"):
+        hall.start()
+        try:
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline and hall._misses < 2:
+                time.sleep(0.02)
+            assert hall._misses >= 2, "the worker died on the bad address instead of backing off"
+            assert hall._thread is not None and hall._thread.is_alive(), "the worker thread stayed up"
+            assert hall.snapshot()["state"] == "connecting", hall.snapshot()
+        finally:
+            hall.stop()
+    said = " ".join(record.getMessage() for record in caplog.records)
+    assert "99999" in said or "Port out of range" in said, said

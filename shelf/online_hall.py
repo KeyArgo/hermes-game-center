@@ -452,6 +452,25 @@ class Hall:
                     continue
                 self._delay = min(self._delay * 2, self.retry_most)
                 continue
+            except Exception as exc:
+                # Everything else the connect can raise is a dial that failed, not a worker that
+                # dies: urlsplit's port check raises ValueError for "http://host:99999", and a
+                # thread that dies here leaves the Hall on "Joining the Hall…" for good, with one
+                # more doomed thread spawned by every poll. Say why, back off, try again.
+                with self._lock:
+                    self._socket = None
+                    self._state = "connecting"
+                    self._missed()
+                self._say(f"could not open the socket at {self.online.url}: {exc}")
+                verdict = self._wait(self._delay)
+                if verdict == "stop":
+                    break
+                if verdict == "dial":
+                    self._dial.clear()
+                    self._delay = self.retry_first
+                    continue
+                self._delay = min(self._delay * 2, self.retry_most)
+                continue
             diagnostics.log.info("lobby connect %s", self.online.url)
             diagnostics.lobby_opened(sock)
             outcome = self._session(sock, key)
