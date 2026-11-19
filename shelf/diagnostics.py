@@ -21,9 +21,10 @@ import sys
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 LOGGER_NAME = "gameshelf"
 LOG_NAME = "game-center.log"
@@ -88,7 +89,7 @@ def wrap_rest(endpoint: Callable, *, clock: Callable[[], float] = time.monotonic
         try:
             return endpoint(*args, **kwargs)
         except Exception:
-            log.error("REST handler %s failed", endpoint.__name__, exc_info=True)
+            log.exception("REST handler %s failed", endpoint.__name__)
             raise
         finally:
             took = clock() - start
