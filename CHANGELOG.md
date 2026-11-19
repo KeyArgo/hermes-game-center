@@ -6,6 +6,11 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A #games post stays on the screen for 30 days, the same as the server keeps it.** The owner (2026-11-18):
+  the chat is worth reading back. `LOBBY_POST_MS` is 30 days instead of one, so a three-week-old post is
+  still drawn and only a line past the server's own window is dropped. Guard: the chat-window check at the
+  top of *lobby chat column* in `tests/table_ui_harness.cjs`.
+
 - **Get online: one card at the top of the Games page does the whole sign-in.** The owner (2026-11-18):
   the online steps were spread between the dock's Lobby tab and Settings and nobody could find the start
   of them. The card names the lobby it talks to and which Hermes connection this window is on (with

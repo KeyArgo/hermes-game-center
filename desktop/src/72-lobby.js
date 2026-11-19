@@ -18,9 +18,9 @@ const LOBBY_GAME_IDS = LOBBY_GAMES.map(item => item[0])
 const LOBBY_TITLES = Object.fromEntries(LOBBY_GAMES)
 const lobbyTitle = id => LOBBY_TITLES[id] || id
 
-// A lobby post is a day old at most: the server deletes the rest, and this screen
-// never draws anything older even in the moment before that sweep.
-const LOBBY_POST_MS = 24 * 3600 * 1000
+// A lobby post stays readable for 30 days: that is how long the server keeps the #games chat
+// (online/server.py CHAT_DAYS), so this screen never hides a line the server still has.
+const LOBBY_POST_MS = 30 * 24 * 3600 * 1000
 
 // "08-04 21:35" - the date and the time on every post, in this computer's own clock.
 function lobbyStamp(at) {

@@ -4543,6 +4543,13 @@ async function lobbyColumnContract() {
   sandbox.setInterval = () => 1
   sandbox.clearInterval = () => {}
   const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  // A lobby post is kept for 30 days on the server, so this screen shows the same 30 days: a
+  // three-week-old post is still there, a post from last month is not.
+  assert.equal(evaluate('LOBBY_POST_MS'), 30 * 24 * 3600 * 1000, 'the chat window matches the server’s 30 days')
+  assert.equal(evaluate('freshLobbyLines([{ at: Math.floor(Date.now() / 1000) - 21 * 24 * 3600, name: "Ada", text: "still here" }]).length'), 1,
+    'a three-week-old post is still on the screen')
+  assert.equal(evaluate('freshLobbyLines([{ at: Math.floor(Date.now() / 1000) - 31 * 24 * 3600, name: "Ada", text: "gone" }]).length'), 0,
+    'a post from last month is not')
   const drafts = { chat: '', name: '' }
   const sends = []
   let sender = async line => { sends.push(line); return { ok: true, text: 'OK' } }
@@ -6760,7 +6767,7 @@ async function lobbyAsksContract() {
     view: { player: { id: 'me', name: 'Ada', named: true },
       lobby: { looking: [], lines: [
         { id: 'p1', name: 'Bea', text: 'anyone for connect4?', at: seconds - 60 },
-        { id: 'p2', name: 'Cole', text: 'yesterday\u2019s news', at: seconds - 25 * 3600 },
+        { id: 'p2', name: 'Cole', text: 'last month\u2019s news', at: seconds - 31 * 24 * 3600 },
         { id: 'p3', name: 'Dot', text: 'no stamp at all' }
       ] },
       online: { on: true, url: '' } },
@@ -6770,7 +6777,7 @@ async function lobbyAsksContract() {
   const printed = words(withPosts)
   assert.ok(printed.includes('anyone for connect4?'), 'a fresh post is drawn')
   assert.ok(printed.includes(stamp(seconds - 60)), 'with its own date and time: ' + printed.slice(-160))
-  assert.ok(!printed.includes('yesterday'), 'a post older than a day is never drawn')
+  assert.ok(!printed.includes('last month'), 'a post older than the server keeps is never drawn')
   assert.ok(!printed.includes('Cole'), 'nor is the person who wrote it')
   assert.ok(!printed.includes('no stamp at all'), 'nor is a post this screen cannot date')
   reset()

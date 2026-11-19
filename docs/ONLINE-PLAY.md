@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (3e1a0d4e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (effd9287)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -287,11 +287,11 @@ Nothing is retried in a tight loop; the backoff above applies.
 
 ## The lobby posts
 
-Lobby chat (the website's **rail**, and the **#games** column in Hermes while you are signed in online) keeps **one day**. Signed out, the #games column is this computer's own and says so. When two computers cannot see each other, **Check online** on The Hall (or `/games online check`) shows each step to the lobby and which one needs fixing. Every line
-shows the date and time it was written, and nothing older than 24 hours is drawn — not on the website and
+Lobby chat (the website's **rail**, and the **#games** column in Hermes while you are signed in online) keeps **30 days**. Signed out, the #games column is this computer's own and says so. When two computers cannot see each other, **Check online** on The Hall, in the Get online card (or `/games online check`) shows each step to the lobby and which one needs fixing. Every line
+shows the date and time it was written, and nothing older than 30 days is drawn — not on the website and
 not in Hermes. The server's own housekeeping **deletes** the old posts rather than only hiding them (the
 same janitor that expires requests and closes idle tables sweeps them), and a post read back by the client
-is dropped if it is older than the day or carries no time at all.
+is dropped if it is older than the 30 days or carries no time at all.
 
 ## What is never sent
 

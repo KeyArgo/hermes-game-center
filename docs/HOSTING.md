@@ -1,5 +1,5 @@
 # HOSTING
-_Applies to Game Center 1.0.0 · last revised 2026-11-18 (3e1a0d4e)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-18 (effd9287)_
 
 How to run Game Center's online lobby on a server, and what you are taking on when you do.
 
