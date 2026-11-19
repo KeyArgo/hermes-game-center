@@ -4579,14 +4579,15 @@ async function onlineTableContract() {
   assert.ok(onlineSource.includes("'data-turn-line': turnKind"), 'the turn line uses the existing attribute')
   assert.ok(onlineSource.includes("? 'Your turn'"), 'and says your turn in words')
 
-  // 13. Regression test: A table that finishes forgets the room so the local table comes back.
+  // 13. A finished table keeps its room, so the online result stays up.
   evaluate("rememberOnlineRoom('r1', 'connect4')")
   const finishedPicture = { ...minePicture, status: 'win', winner: 'white' }
   const finishedCtx = makeCtx(live(finishedPicture, { room_id: 'r1', finished: true }))
   const finishedProps = { game, ctx: finishedCtx.ctx, roomId: 'r1', onBack: () => {} }
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', finishedProps)
-  assert.equal(evaluate("ONLINE_ROOM.roomId"), '', 'a finished table forgets the online room so the local table comes back')
-  assert.equal(evaluate("onlineRoomFor({}, 'connect4')"), '', 'onlineRoomFor returns empty once the table finishes')
+  assert.equal(evaluate("ONLINE_ROOM.roomId"), 'r1', 'a finished table keeps the online room')
+  assert.equal(evaluate("onlineRoomFor({}, 'connect4')"), 'r1', 'so the online table is what the next paint draws')
+  assert.ok(nodes(tree).some(node => node.props && node.props['data-rematch'] === '1'), 'and the result asks about a rematch')
 
   // 14. A slow read must never paint over a newer one: the 400 ms poll is not a race.
   reset()
@@ -4668,6 +4669,53 @@ async function onlineTableContract() {
   assert.equal(replayed.filter(item => item[0] === '/online/table/open').length, 0,
     'a Hall remount does not open a room this person already left')
   assert.equal(replayed.filter(item => item[0] === 'play').length, 0, 'and does not hand that room back to the page')
+
+  // 14. A finished online game stays the online table — the local computer board does not
+  // take its place — and the result asks both people about a rematch. Two games, not one.
+  reset()
+  const computerSeats = [
+    { side: 'white', kind: 'human', id: 'me', name: 'Ada', open: false },
+    { side: 'black', kind: 'local', id: 'local', name: 'Computer', open: false }
+  ]
+  const stuck = makeCtx(live(wonPicture, { finished: true, opponent: { name: 'Locutus' } }))
+  evaluate("rememberOnlineRoom('r1', 'connect4')")
+  const stuckProps = {
+    game,
+    view: { player: { id: 'me' }, allow_ai: true, online: { on: true, table: null } },
+    board: { picture: { ...localPicture, seats: computerSeats } },
+    send: async () => ({ text: '' }),
+    playMove: async () => ({ ok: true, text: '' }),
+    ctx: stuck.ctx,
+    onBack: () => {}
+  }
+  tree = await settle('PlayTable(stuckProps)', 'stuckProps', stuckProps)
+  assert.ok(onlineNode(tree), 'a finished online game stays on the online table')
+  assert.equal(findButton(tree, 'Offer draw'), undefined, 'the local match controls are not drawn over it')
+  assert.equal(findButton(tree, 'New game (Intermediate)'), undefined, 'and not the local computer result')
+  assert.equal(evaluate('ONLINE_ROOM.roomId'), 'r1', 'the finished room is still the one on screen')
+  tree = await settle('PlayTable(stuckProps)', 'stuckProps', stuckProps)
+  assert.ok(onlineNode(tree), 'the next paint is still that online table')
+  assert.equal(evaluate('ONLINE_ROOM.roomId'), 'r1', 'a later paint does not forget it')
+  reset()
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: stuck.ctx, roomId: 'r1', onBack: () => {} })
+  assert.ok(words(tree).includes('You win!'), 'the online result is what is on screen: ' + words(tree).slice(0, 240))
+  assert.ok(words(tree).includes('Rematch?'), 'and it asks about a rematch')
+  assert.ok(findButton(tree, 'Yes') && findButton(tree, 'No'), 'with yes and no')
+  assert.equal(words(tree).includes('You vs Computer'), false, 'not the local computer board')
+  findButton(tree, 'No').props.onClick()
+  await tick()
+  assert.equal(commands(stuck).pop()[1].body.action, 'decline', 'No posts a decline')
+  reset()
+  const reversiGame = { id: 'reversi', title: 'Reversi', kind: 'table', installed: true, bots: true }
+  const reversiWon = { ...wonPicture, view: 'reversi', game: 'reversi' }
+  const reversiRun = makeCtx(live(reversiWon, { room_id: 'r2', finished: true, opponent: { name: 'Bea' } }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game: reversiGame, ctx: reversiRun.ctx, roomId: 'r2', onBack: () => {} })
+  assert.ok(nodes(tree).some(node => node.props && node.props['data-rematch'] === '1'),
+    'Reversi asks about a rematch too, not only Connect Four')
+  assert.ok(words(tree).includes('You win!'), 'and shows its own online result')
+  const noted = makeCtx(live({ ...wonPicture, rematch_note: 'Bea declined a rematch.' }, { finished: true }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: noted.ctx, roomId: 'r1', onBack: () => {} })
+  assert.ok(words(tree).includes('Bea declined a rematch.'), 'a decline is said on the result')
 
   evaluate("rememberOnlineRoom('')")
   reset()

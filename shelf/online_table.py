@@ -9,7 +9,7 @@ import time
 
 from shelf import ws as wsmod
 
-_ACTIONS = {"new", "join", "sit", "move", "draw", "leave", "resign", "rematch", "step", "hint", "lesson"}
+_ACTIONS = {"new", "join", "sit", "move", "draw", "leave", "resign", "rematch", "decline", "step", "hint", "lesson"}
 
 # The table's chat, as the socket carries it: the hello frame lists the last messages and every
 # later one arrives on its own. The panel shows the last _CHAT_KEEP of them, and a message is

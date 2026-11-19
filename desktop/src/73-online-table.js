@@ -110,6 +110,9 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   // Whether this person has ever seen the table. One that is gone after being seen is closed for
   // good; one that has never arrived is still being opened, so the room is not forgotten yet.
   const seen = useRef(false)
+  // The last board the server sent. A later read that comes back empty keeps a finished
+  // one on screen instead of dropping through to the local computer game.
+  const held = useRef(null)
   const latest = useRef({ roomId: '' })
   latest.current = { roomId: roomId || '' }
 
@@ -137,9 +140,29 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         // A newer read has started while this one was out: its answer is the one that counts.
         if (seq !== readSeq.current) return
         const next = (answer && answer.table) || null
-        if (next) seen.current = true
-        else if (seen.current) rememberOnlineRoom('')
-        setTable(next)
+        if (next) {
+          seen.current = true
+          held.current = next
+          setTable(next)
+        } else if (seen.current) {
+          // A finished game that the server has closed stays on this screen. Forgetting
+          // the room here is what put the local computer board underneath it.
+          const previous = held.current
+          const previousStatus = String((previous && previous.picture && previous.picture.status) || '')
+          const finished = ['win', 'draw', 'resigned', 'abandoned', 'done'].includes(previousStatus)
+            || Boolean(previous && previous.finished)
+          if (finished && previous) {
+            const closed = { ...previous, state: 'closed' }
+            held.current = closed
+            setTable(closed)
+          } else {
+            rememberOnlineRoom('')
+            held.current = null
+            setTable(null)
+          }
+        } else {
+          setTable(null)
+        }
         setProblem('')
         setRead(true)
       } catch (error) {
@@ -228,6 +251,10 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   // A session table (blackjack, slots) has no match to resign: the felt is one hand after
   // another, so the only way out is putting the table away.
   const sessionTable = stageView === 'blackjack' || stageView === 'slots'
+  const rematchRequests = (picture && picture.rematch && picture.rematch.requested_by) || []
+  const viewerId = String((picture && picture.viewer_id) || '')
+  const iAsked = rematchRequests.some(id => id === viewerId)
+  const rematchNote = String((picture && picture.rematch_note) || '')
   const winner = String((picture && picture.winner) || '')
   const iWon = Boolean(winner && mySide && winner === mySide)
   const resultLine = status === 'draw' ? 'It is a draw.'
@@ -251,8 +278,6 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   // A new table, or a game that ends, brings the result card back even after it was put away by
   // hand — the same rule the local table uses.
   useEffect(() => { setResultShown(true) }, [table && table.room_id, status, done])
-  // A table that finishes forgets the room so the game's own local table comes back.
-  useEffect(() => { if (done) rememberOnlineRoom('') }, [done])
   // A new position leaves no stale question behind: a resign dialog belongs to the position it
   // was opened on. A refusal is deliberately not cleared here — the table's own words stay until
   // the next move, so a refused move can never look like it did nothing.
@@ -371,9 +396,24 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         jsx('div', { className: 'games-result-title', style: { fontSize: 30, fontWeight: 800, lineHeight: 1.1 }, children: headline }),
         jsx('div', { className: 'games-result-why', style: { fontSize: 13, color: text.secondary }, children: `You vs ${opponent}, on the lobby server` }),
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
-          // One name per control on this screen: the header already carries Close table.
-          button('Back to games', stepAway, { primary: true })
+          // Blackjack deals the next hand itself. Every other online game asks both people.
+          stageView === 'blackjack' ? null : jsx('div', {
+            'data-rematch': '1', style: { width: '100%', fontSize: 16, fontWeight: 750 },
+            children: 'Rematch?'
+          }),
+          stageView === 'blackjack' ? null : button(
+            iAsked ? 'Rematch requested' : 'Yes',
+            () => command('rematch'),
+            { primary: true, disabled: busy || iAsked, title: 'Ask for another game with the same seats. It starts when you have both said yes.' }
+          ),
+          stageView === 'blackjack' ? null : button('No', () => command('decline'), {
+            disabled: busy, title: 'Decline the rematch. The other person is told, and the table closes.'
+          }),
+          button('Back to games', stepAway, { primary: stageView === 'blackjack' })
         ] }),
+        rematchNote ? jsx('div', {
+          'data-rematch-note': '1', style: { fontSize: 13, color: text.secondary }, children: rematchNote
+        }) : null,
         textLink('Look at the board', () => setResultShown(false))
       ]
     })
