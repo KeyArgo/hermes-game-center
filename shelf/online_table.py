@@ -187,13 +187,25 @@ class OnlineTable:
                             delay = 1
                         elif kind == "state":
                             picture = message.get("picture") or {}
+                            room_info = message.get("room") if isinstance(message.get("room"), dict) else {}
+                            if room_info.get("closed"):
+                                self._data.update(
+                                    picture=picture or self._data.get("picture"), room=room_info,
+                                    state="closed", error="",
+                                    closed_text=str(self._data.get("closed_text") or "This table is closed."))
+                                self._opened.set()
+                                return
                             self._data.update(picture=picture, room=message.get("room"))
                             seats = picture.get("seats") or []
                             own = next((s for s in seats if s.get("id") == self._me), {})
                             other = next((s for s in seats if s.get("id") and s.get("id") != self._me), {})
                             self._data["side"] = own.get("side", "")
                             self._data["opponent"] = {"name": other.get("name", "")} if other else None
-                            if picture.get("status") in {"win", "draw", "resigned", "abandoned"}:
+                            # A rematch is a new game. The last game's finished flag must not
+                            # stay stuck over a board whose status is active again.
+                            if picture.get("status") == "active":
+                                self._data["finished"] = None
+                            elif picture.get("status") in {"win", "draw", "resigned", "abandoned"}:
                                 self._data["finished"] = self._data["finished"] or {"status": picture["status"]}
                         elif kind in self._feeds:
                             self._feeds[kind](message)
@@ -217,8 +229,11 @@ class OnlineTable:
                                     "sent": self._saying, "at": time.time()}
                         elif kind in {"error", "closed"}:
                             text = str(message.get("text") or "The table closed.")
-                            self._data.update(state="error" if kind == "error" else "closed",
-                                              error=text, closed_text=text)
+                            if kind == "closed":
+                                # The sentence is the reason the room ended, not a fault.
+                                self._data.update(state="closed", error="", closed_text=text)
+                            else:
+                                self._data.update(state="error", error=text)
                             self._opened.set()
                             return
             except (OSError, wsmod.SocketError):

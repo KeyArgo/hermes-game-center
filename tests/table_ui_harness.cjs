@@ -4820,6 +4820,31 @@ async function onlineTableContract() {
   evaluate("rememberOnlineRoom('')")
   reset()
 
+  // A live rematch is not stuck under the last game's result, and a closed table
+  // stops offering Yes and No.
+  const resumed = makeCtx(live(minePicture, { finished: { status: 'win' } }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: resumed.ctx, roomId: 'r1', onBack: () => {} })
+  assert.equal(nodes(tree).some(node => node.props && node.props.className === 'games-result'), false,
+    'an active board ignores a stale finished flag')
+  assert.equal(boardNode(tree).props.interactive, true, 'and the fresh game can be played')
+  const resignedPic = { ...wonPicture, status: 'resigned', winner: 'black' }
+  const resignedRun = makeCtx(live(resignedPic, { finished: false }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: resignedRun.ctx, roomId: 'r1', onBack: () => {} })
+  assert.ok(nodes(tree).some(node => node.props && node.props['aria-label'] === 'Game over'), 'resigned counts as over')
+  const askedPic = { ...wonPicture, viewer_id: 'me', rematch: { requested_by: ['bea'] } }
+  const askedRun = makeCtx(live(askedPic, { finished: true }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: askedRun.ctx, roomId: 'r1', onBack: () => {} })
+  assert.ok(words(tree).includes('Bea wants a rematch.'), 'the card names who asked: ' + words(tree).slice(0, 240))
+  const endedPic = live(wonPicture, { state: 'closed', finished: true, error: '', closed_text: 'Ada declined a rematch.' })
+  const endedRun = makeCtx(endedPic)
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: endedRun.ctx, roomId: 'r1', onBack: () => {} })
+  assert.equal(findButton(tree, 'Yes'), undefined, 'a closed table hides Yes')
+  assert.equal(findButton(tree, 'No'), undefined, 'and No')
+  assert.ok(words(tree).includes('Ada declined a rematch.'), 'and shows the closing sentence')
+  assert.ok(findButton(tree, 'Back to games'), 'Back to games is the way out')
+
+  reset()
+
   // A room the server refuses is not opened, and the next Hall read does not ask again.
   const missed = []
   const missedCtx = {

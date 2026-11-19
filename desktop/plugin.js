@@ -25178,8 +25178,9 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const picture = (table && table.picture) || null
   const state = String((table && table.state) || '')
   const status = String((picture && picture.status) || '')
-  const over = ['win', 'draw', 'abandoned', 'done'].includes(status)
-  const done = Boolean(over || (table && table.finished && picture))
+  const over = ['win', 'draw', 'resigned', 'abandoned', 'done'].includes(status)
+  // A live rematch has status active. A leftover finished flag must not freeze it.
+  const done = Boolean(over || (status !== 'active' && table && table.finished && picture))
   const canMove = Boolean(!busy && !confirming && !done && state !== 'reconnecting' && onlineCanMove(picture, view))
   const myTurn = onlineCanMove(picture, view)
   // The chat is open while the table is: the same condition the server's own room uses.
@@ -25204,7 +25205,10 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const rematchRequests = (picture && picture.rematch && picture.rematch.requested_by) || []
   const viewerId = String((picture && picture.viewer_id) || '')
   const iAsked = rematchRequests.some(id => id === viewerId)
-  const rematchNote = String((picture && picture.rematch_note) || '')
+  const opponentAsked = rematchRequests.length > 0 && !iAsked
+  const closedNote = String((table && table.closed_text) || '')
+  const rematchNote = String((picture && picture.rematch_note) || '') || (state === 'closed' ? closedNote : '')
+  const tableClosed = state === 'closed'
   const winner = String((picture && picture.winner) || '')
   const iWon = Boolean(winner && mySide && winner === mySide)
   const resultLine = status === 'draw' ? 'It is a draw.'
@@ -25389,16 +25393,17 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         jsx('div', { className: 'games-result-why', style: { fontSize: 13, color: text.secondary }, children: `You vs ${opponent}, on the lobby server` }),
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
           // Blackjack deals the next hand itself. Every other online game asks both people.
-          stageView === 'blackjack' ? null : jsx('div', {
+          // A closed room has nothing left to accept.
+          stageView === 'blackjack' || tableClosed ? null : jsx('div', {
             'data-rematch': '1', style: { width: '100%', fontSize: 16, fontWeight: 750 },
-            children: 'Rematch?'
+            children: opponentAsked ? `${opponent} wants a rematch.` : 'Rematch?'
           }),
-          stageView === 'blackjack' ? null : button(
+          stageView === 'blackjack' || tableClosed ? null : button(
             iAsked ? 'Rematch requested' : 'Yes',
             () => command('rematch'),
             { primary: true, disabled: busy || iAsked, title: 'Ask for another game with the same seats. It starts when you have both said yes.' }
           ),
-          stageView === 'blackjack' ? null : button('No', declineRematch, {
+          stageView === 'blackjack' || tableClosed ? null : button('No', declineRematch, {
             disabled: busy, title: 'Decline the rematch. The other person is told, and the table closes.'
           }),
           button('Back to games', stepAway, { primary: stageView === 'blackjack' })
@@ -25471,10 +25476,10 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
             jsx('span', { style: { fontSize: 12, color: text.tertiary }, children: 'Nothing useful to place? Pass and let your opponent move.' })
           ]
         }) : null,
-        table.error || state === 'error'
+        state === 'error' && table.error
           ? jsx('div', { role: 'alert', style: { fontSize: 13, border: '1px solid #d76b65', borderRadius: 8, padding: '8px 10px' }, children: String(table.error || 'The table stopped.') })
           : null,
-        state === 'closed' ? jsx('div', { role: 'status', style: { fontSize: 13, color: text.secondary }, children: 'This table is closed. The lobby is where a new one is found.' }) : null
+        state === 'closed' ? jsx('div', { role: 'status', style: { fontSize: 13, color: text.secondary }, children: closedNote || 'This table is closed. The lobby is where a new one is found.' }) : null
       ] })
 
   return jsxs('div', {

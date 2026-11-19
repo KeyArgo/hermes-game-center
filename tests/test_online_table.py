@@ -55,6 +55,57 @@ def test_person_plays_and_close_does_not_resign(tmp_path):
     run(scenario())
 
 
+def test_an_active_rematch_clears_the_finished_flag(tmp_path, monkeypatch):
+    """Game 2 is a live board. The finished flag from game 1 must not stay stuck."""
+    import queue
+    from shelf import online_table
+
+    class Scripted:
+        def __init__(self, address, timeout):
+            self.inbox = queue.Queue()
+
+        def send_json(self, message):
+            if message.get("t") == "auth":
+                self.inbox.put({"t": "hello", "me": {"id": "a"}, "room": {"id": "r"}, "chat": []})
+                self.inbox.put({"t": "state", "room": {"id": "r"}, "picture": {
+                    "status": "win", "seats": [{"id": "a", "side": "white"}, {"id": "b", "name": "Bea", "side": "black"}]}})
+
+        def receive(self, timeout):
+            try:
+                return self.inbox.get(timeout=timeout)
+            except queue.Empty:
+                return None
+
+        def close(self):
+            pass
+
+    sockets = []
+    monkeypatch.setattr(online_table.wsmod, "Socket", lambda *a, **k: sockets.append(Scripted(*a, **k)) or sockets[-1])
+    source = Online(tmp_path, url="http://example.test", secret=lambda _: "person-secret")
+    source.turn_on()
+    table = OnlineTable(source)
+    try:
+        assert table.open("r")["ok"]
+        deadline = time.monotonic() + 2
+        while table.snapshot().get("finished") is None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert table.snapshot()["finished"], "the finished game is remembered"
+        sockets[0].inbox.put({"t": "state", "room": {"id": "r"}, "picture": {
+            "status": "active", "seats": [{"id": "a", "side": "white"}, {"id": "b", "name": "Bea", "side": "black"}]}})
+        deadline = time.monotonic() + 2
+        while table.snapshot().get("finished") is not None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert table.snapshot()["finished"] is None, table.snapshot()["finished"]
+        assert table.snapshot()["picture"]["status"] == "active"
+        sockets[0].inbox.put({"t": "state", "room": {"id": "r", "closed": True}, "picture": {"status": "active", "seats": []}})
+        deadline = time.monotonic() + 2
+        while table.snapshot().get("state") != "closed" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert table.snapshot()["state"] == "closed", table.snapshot()["state"]
+    finally:
+        table.close()
+
+
 def test_opening_a_missing_room_fails(tmp_path, monkeypatch):
     """A closed or missing room is a failure, not a table that opens and then dies."""
     import queue
