@@ -21831,6 +21831,13 @@ function WaitPane({ ctx }) {
     ]
   })
 
+  // One name at a time, and the honest one: signed in, other people meet the lobby account's name,
+  // so that is the name this column says - the same line the Games page's header carries (owner,
+  // 2026-11-18: "in chat I'm Potato, in game center it says You are BlueWren").
+  const whoLine = online.on && online.linked && online.name
+    ? `You are ${online.name} online`
+    : view && view.player && view.player.named ? `You are ${view.player.name}` : ''
+
   // The lobby, in two columns when the frame is wide: the people beside you on the left, online play
   // (and, when it is on, the ladder and leagues) on the right. A narrow pane folds them into one
   // column, in the same order.
@@ -21842,8 +21849,8 @@ function WaitPane({ ctx }) {
         className: 'games-pane-column games-pane-lobby',
         style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 },
         children: [
-          view && view.player && view.player.named
-            ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `You are ${view.player.name}` })
+          whoLine
+            ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: whoLine })
             : jsxs('div', {
                 style: { display: 'flex', gap: 6 },
                 children: [

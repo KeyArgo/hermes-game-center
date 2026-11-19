@@ -1838,6 +1838,22 @@ async function paneContract() {
   await find.props.onClick()
   assert.ok(lobbyCtx.asked.includes('looking connect4'), 'Find a match asks the local lobby for this game')
 
+  // One name at a time, and the honest one: signed in to the lobby, the name this column says is
+  // the lobby account's, not this computer's label (owner, 2026-11-18: "in chat I'm Potato, in
+  // game center it says You are BlueWren"). The account block further down already names the
+  // account, so the proof here is that the local name is nowhere on the screen.
+  tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
+  assert.ok(words(tree).includes('You are Ada'), 'offline, the pane names this computer')
+  view.online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Potato' }
+  tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
+  assert.ok(words(tree).includes('You are Potato'), 'signed in, the pane names the lobby account: ' + words(tree).slice(0, 240))
+  assert.ok(!words(tree).includes('You are Ada'), 'and never this computer\'s label beside it')
+  view.online = { on: true, url: 'https://games.hermesnet.xyz', linked: false }
+  tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
+  assert.ok(words(tree).includes('You are Ada'), 'online but not signed in, the local name is the only one there is')
+  delete view.online
+  tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
+
   // Alerts: off by default, per game, and pausable. They live on the Game tab.
   findButton(tree, 'Game').props.onClick()
   tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
