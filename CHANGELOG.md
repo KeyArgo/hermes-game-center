@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **A held invite switch says why it is held, in words beside it.** The switch is disabled while
+  another Hall action is still out, while the lobby refuses this computer's sign-in, and while the
+  server has no Hall at all — and it said the same "Lobby not connected — Retry" for all of them, or
+  nothing about the press that was out at all. Now `HALL_BUSY_NOTE` says another action is going
+  through, `snap.error` says the lobby's own sentence when it refused the sign-in, and a server with
+  no Hall says so with no Retry button that could never fix it; the reason also rides on the label's
+  title and on `data-people-open-why` (`busy`, `refused`, `old-server`). Guards:
+  `tests/table_ui_harness.cjs` (`switchReasonsContract` — fails against the old card).
+
 - **Retry no longer reports "not connected" for a dial that is still running, and the sentence it
   leaves behind goes when the dial lands.** `/online/hall/retry` set
   "Not connected to the lobby yet — Retry" for every state that was not `live`, `connecting`

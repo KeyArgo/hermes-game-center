@@ -3990,7 +3990,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -8221,6 +8221,76 @@ async function retryStatesContract() {
     'the retry that reached live takes the Hall with it: ' + words(hall).slice(-200))
   assert.ok(words(hall).includes('Take game requests'), 'and the live panel is drawn')
   console.log('retry: the Hall paints the state the retry answered with: passed')
+}
+
+// ---- A held invite switch always says why -----------------------------------------------
+// The switch is disabled while another Hall action is out, while the lobby refuses the sign-in and
+// while there is no socket at all - and each of those is a different sentence. "Lobby not connected
+// — Retry" for a refused key hid the refusal, and a box that greys out with no reason beside it
+// reads as simply dead.
+async function switchReasonsContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const liveSnap = (extra = {}) => ({
+    state: 'live', you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: true, games: { connect4: true }, until: {} },
+    roster: [], requests: [], seated: null, ...extra
+  })
+  const paint = async (snapshot, extra = {}) => {
+    const ctx = { rest: async (path) => {
+      if (path === '/online/hall') return snapshot()
+      if (extra.hold && path === extra.hold.path) return extra.hold.answer
+      return { ok: true, text: '' }
+    } }
+    sandbox.switchProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(switchProps)')
+      const pending = effects
+      effects = []
+      pending.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const whyOf = tree => nodes(tree).find(node => node.props && node.props['data-people-open-why'])
+  const switchFor = tree => nodes(tree).find(node => node.props && node.props['data-people-open'])
+
+  // 1. Another action is still going through: the box is held and says why.
+  reset()
+  let release = () => {}
+  const answer = new Promise(resolve => { release = () => resolve({ ok: true, text: '' }) })
+  let tree = await paint(() => liveSnap(), { hold: { path: '/online/hall/prefs', answer } })
+  // Not awaited: this press is the one that is still out, which is what the test is about.
+  nodes(tree).find(node => node.props && node.props['data-accept-chip'] === 'chessboard').props.onClick()
+  await tick()
+  tree = await paint(() => liveSnap())
+  assert.equal(whyOf(tree).props['data-people-open-why'], 'busy', 'a held switch knows it is waiting')
+  assert.ok(words(whyOf(tree)).includes('Another Hall action is still going through'),
+    'and says so beside it: ' + words(whyOf(tree)))
+  assert.equal(nodes(tree).find(node => node.props && node.props.type === 'checkbox').props.disabled, true)
+  release()
+  await tick()
+
+  // 2. The lobby refused the sign-in: that sentence is the reason, not the generic one.
+  reset()
+  tree = await paint(() => liveSnap({ state: 'off', error: 'The lobby did not accept your sign-in.' }))
+  assert.equal(whyOf(tree).props['data-people-open-why'], 'refused', 'a refusal is its own reason')
+  assert.equal(words(whyOf(tree)), 'The lobby did not accept your sign-in.',
+    'the lobby\'s own sentence, not "Lobby not connected": ' + words(whyOf(tree)))
+
+  // 3. A server with no Hall: said in words, and no Retry that can never fix it.
+  reset()
+  tree = await paint(() => liveSnap({ state: 'old-server' }))
+  assert.equal(whyOf(tree).props['data-people-open-why'], 'old-server', 'an old server is its own reason')
+  assert.ok(words(whyOf(tree)).includes('has no Hall yet'),
+    'and says the server has no Hall: ' + words(whyOf(tree)))
+  assert.ok(!findButton(tree, 'Retry'), 'with no pointless Retry beside it')
+  assert.equal(switchFor(tree).props['data-people-open'], 'unreachable', 'the switch is still held')
+  console.log('play with people: a held switch says why - busy, refused, or no Hall: passed')
 }
 
 // ---- The twenty-minute accept asks if it should stay -----------------------------------

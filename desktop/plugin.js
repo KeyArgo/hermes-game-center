@@ -22935,6 +22935,18 @@ function PlayWithPeople({ ctx, view }) {
   // Not connected is not the same as switched off: say which it is, with the one control
   // that fixes the first.
   const notConnected = signedIn && !live
+  // Why the switch cannot be used, in words beside it. Each of these is a different thing - another
+  // action still going through, the lobby's own refusal, a server with no Hall at all (no Retry can
+  // fix that one), or a socket that is simply not up yet - and a box that greys out without saying
+  // which reads as dead.
+  const refused = snap && typeof snap.error === 'string' ? snap.error.trim() : ''
+  const oldServer = Boolean(snap) && snap.state === 'old-server'
+  const whyHeld = !signedIn ? 'signed-out'
+    : pending ? 'busy'
+      : refused ? 'refused'
+        : oldServer ? 'old-server'
+          : notConnected ? 'unreachable'
+            : 'state'
   const requests = (snap && snap.requests) || []
   const mine = Array.isArray(you.looking) ? you.looking : []
   const nowSeconds = Date.now() / 1000
@@ -22986,9 +22998,13 @@ function PlayWithPeople({ ctx, view }) {
     children: [
       jsx('label', {
         'aria-label': 'Let people invite me',
-        title: notConnected
-          ? 'The lobby is not connected, so this switch cannot be read or changed yet. Press Retry.'
-          : signedIn ? 'When this is on, people who press Play can invite you to the games you accept.' : 'Sign in above first.',
+        title: whyHeld === 'busy' ? HALL_BUSY_NOTE
+          : whyHeld === 'refused' ? refused
+            : whyHeld === 'old-server'
+              ? 'This lobby server has no Hall yet, so this switch cannot be read or changed. A Retry cannot fix that.'
+              : notConnected
+                ? 'The lobby is not connected, so this switch cannot be read or changed yet. Press Retry.'
+                : signedIn ? 'When this is on, people who press Play can invite you to the games you accept.' : 'Sign in above first.',
         style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 650, cursor: 'pointer' },
         children: [
           jsx('input', {
@@ -23002,16 +23018,19 @@ function PlayWithPeople({ ctx, view }) {
       }),
       jsx('span', {
         'data-people-open-state': '1',
-        'data-people-open-why': !signedIn ? 'signed-out' : notConnected ? 'unreachable' : 'state',
+        'data-people-open-why': whyHeld,
         role: 'status', 'aria-live': 'polite',
         style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
-        children: !signedIn
-          ? 'Sign in above first.'
-          : notConnected
-            ? 'Lobby not connected — Retry'
-            : prefs.open ? 'ON — people who accept your games can ask you.' : 'OFF — nobody can invite you.'
+        children: whyHeld === 'signed-out' ? 'Sign in above first.'
+          : whyHeld === 'busy' ? HALL_BUSY_NOTE
+            : whyHeld === 'refused' ? refused
+              : whyHeld === 'old-server' ? 'This lobby server has no Hall yet — invites cannot be checked on it.'
+                : whyHeld === 'unreachable' ? 'Lobby not connected — Retry'
+                  : prefs.open ? 'ON — people who accept your games can ask you.' : 'OFF — nobody can invite you.'
       }),
-      notConnected
+      // Retry is the one control that fixes a socket that is not up. It cannot fix a server without
+      // a Hall, so it is not offered against that one.
+      whyHeld === 'unreachable'
         ? button('Retry', retry, { primary: true, disabled: Boolean(pending), title: 'Dial the lobby again now.' })
         : null
     ]
