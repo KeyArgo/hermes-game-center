@@ -209,6 +209,10 @@ const HALL_POLL_MS = 3000
 // while that one is out — and says so on hover, rather than looking pressable and being ignored.
 const HALL_BUSY_NOTE = 'Another Hall action is still going through. Wait for it, then try again.'
 
+// The last game you asked anyone for. A row defaults to it when that person takes it too, so
+// asking three people in a row does not mean choosing the same game three times.
+let lastHallAsked = ''
+
 // online is ready to play, away is here but idle, playing is already at a table.
 const HALL_STATUS_DOT = { online: '#3ee0c5', away: '#ffb020', playing: 'var(--ui-fill-tertiary, rgba(127,127,127,0.45))' }
 
@@ -231,6 +235,9 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // Rooms already opened, so a seat the server keeps reporting opens the table once.
   const handled = useRef(new Set())
   const alive = useRef(true)
+  // The game each person's Ask will send, remembered by person. It lives in a ref because
+  // choosing from the list must not redraw the panel (and so must not move every other row).
+  const asks = useRef({})
 
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
 
@@ -379,26 +386,54 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     : null
 
   // The roster, you left out. A dot says whether each person can play now, and Ask is
-  // offered only to someone online who accepts a game you are also taking.
+  // offered only to someone online who accepts a game you are also taking — for the game
+  // you choose from the ones you both take, not quietly for the first of them.
   const others = roster.filter(row => String(row.id) !== String(you.id))
   const anyMine = LOBBY_GAME_IDS.some(id => prefs.games && prefs.games[id])
   const myAccepted = (prefs.open || anyMine) ? LOBBY_GAME_IDS.filter(id => prefs.games && prefs.games[id]) : LOBBY_GAME_IDS
   const rosterRows = others.length ? others.map(row => {
     const status = String(row.status || '')
-    const shared = (Array.isArray(row.games) ? row.games : []).filter(id => myAccepted.includes(id))
-    const askGame = shared[0] || ''
-    const canAsk = status === 'online' && Boolean(askGame)
+    const theirs = LOBBY_GAME_IDS.filter(id => Array.isArray(row.games) && row.games.includes(id))
+    const shared = theirs.filter(id => myAccepted.includes(id))
+    // The game this row asks for: one chosen in it, else the last game you asked anyone for
+    // when they take it too, else the first game you both take. A choice that stops being
+    // shared (they turned it off, you did) falls back to one that still is.
+    const picked = asks.current[row.id]
+    const chosen = shared.includes(picked) ? picked
+      : (shared.includes(lastHallAsked) ? lastHallAsked : shared[0]) || ''
+    const canAsk = status === 'online' && Boolean(chosen)
     const askKey = `ask:${row.id}`
+    // Ask reads the ref rather than this draw: choosing in the list does not redraw the panel.
+    const ask = () => {
+      const game = shared.includes(asks.current[row.id]) ? asks.current[row.id] : chosen
+      lastHallAsked = game
+      return post(askKey, '/online/hall/request', { to: row.id, game })
+    }
     return jsxs('div', {
       'data-hall-row': String(row.id),
       style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: text.secondary },
       children: [
         jsx('span', { 'aria-hidden': true, style: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: HALL_STATUS_DOT[status] || text.tertiary } }),
         jsx('span', { style: { flex: 1, minWidth: 0 }, children: row.name }),
-        shared.length ? jsx('span', { style: { ...muted, flexShrink: 0 }, children: shared.map(lobbyTitle).join(', ') }) : null,
+        // A row you can ask carries the choice in its own control: a list when you both take
+        // more than one game, the game's name in the button when you take just one. A row you
+        // cannot ask keeps saying why in words.
+        canAsk && shared.length > 1 ? jsx('select', {
+          'data-hall-pick': String(row.id),
+          'aria-label': `Game to ask ${row.name} for`,
+          title: `The games you and ${row.name} both take. Ask sends the one chosen here.`,
+          defaultValue: chosen,
+          disabled: Boolean(pending),
+          style: { fontSize: 12, flexShrink: 0, maxWidth: 140, color: text.primary, background: 'transparent', border: `1px solid ${stroke}`, borderRadius: 6, padding: '1px 4px' },
+          onChange: event => { asks.current[row.id] = String((event.target && event.target.value) || '') },
+          children: shared.map(id => jsx('option', { value: id, children: lobbyTitle(id) }, id))
+        }, String(row.id)) : null,
+        canAsk ? null : jsx('span', { style: { ...muted, flexShrink: 0 }, children: shared.length
+          ? shared.map(lobbyTitle).join(', ')
+          : theirs.length ? `Takes ${theirs.map(lobbyTitle).join(', ')}` : 'Not taking requests' }),
         jsx('span', { 'data-hall-status': status, style: muted, children: status }),
-        canAsk ? button('Ask', () => post(askKey, '/online/hall/request', { to: row.id, game: askGame }),
-          held(`Ask ${row.name} to a game of ${lobbyTitle(askGame)}.`)) : null
+        canAsk ? button(shared.length === 1 ? `Ask to ${lobbyTitle(chosen)}` : 'Ask', ask,
+          held(`Ask ${row.name} to a game of ${lobbyTitle(chosen)}.`)) : null
       ]
     }, String(row.id))
   }) : jsx('div', { style: muted, children: 'Nobody else is here right now.' })
@@ -417,7 +452,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
         held('Say no to this request.'))
     ] }, String(req.id))),
     ...outbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
-      jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asked ${req.to.name}… ` }),
+      jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asked ${req.to.name} to play ${lobbyTitle(req.game)}… ` }),
       button('Cancel', () => post(`cancel:${req.id}`, '/online/hall/cancel', { id: req.id }),
         held(`Take back your request to ${req.to.name}.`))
     ] }, String(req.id)))

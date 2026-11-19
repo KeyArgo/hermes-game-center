@@ -3924,7 +3924,7 @@ async function experimentalShelfContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => getOnlineCardContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -4863,6 +4863,9 @@ async function hallContract() {
   }
   const settle = async value => { draw(value); await tick(); return draw(value) }
   const rowFor = (tree, id) => nodes(tree).filter(node => node.props && node.props['data-hall-row'] === id)[0]
+  // Ask names the game when a row has only one you both take ("Ask to Connect 4"), so every
+  // lookup reads the button by the word it starts with rather than the exact word it had.
+  const askFor = (tree, id) => nodes(rowFor(tree, id)).find(node => node.type === 'button' && /^Ask/.test(words(node)))
   const you = { id: 'me', name: 'Ada' }
   const liveSnap = (extra = {}) => ({
     state: 'live', you, prefs: { open: true, games: { connect4: true } },
@@ -4952,14 +4955,15 @@ async function hallContract() {
   const statuses = nodes(tree).filter(node => node.props && node.props['data-hall-status'] !== undefined).map(node => node.props['data-hall-status'])
   assert.ok(statuses.includes('online') && statuses.includes('away') && statuses.includes('playing'), 'and shows each person\'s status')
 
-  // 3. Ask is offered only to someone online who accepts the current game, and posts the exact body.
-  const askButtons = nodes(tree).filter(node => node.type === 'button' && words(node) === 'Ask')
+  // 3. Ask is offered only to someone online who accepts a game you also take, and posts the exact body.
+  const askButtons = nodes(tree).filter(node => node.type === 'button' && /^Ask/.test(words(node)))
   assert.equal(askButtons.length, 1, 'only the online player who accepts this game can be asked')
-  assert.ok(findButton(rowFor(tree, 'bea'), 'Ask'), 'Bea is online and accepts connect4, so she can be asked')
-  assert.equal(findButton(rowFor(tree, 'cole'), 'Ask'), undefined, 'an away player cannot be asked')
-  assert.equal(findButton(rowFor(tree, 'dot'), 'Ask'), undefined, 'a player who does not accept this game cannot be asked')
-  assert.equal(findButton(rowFor(tree, 'eve'), 'Ask'), undefined, 'a player already at a table cannot be asked')
-  findButton(rowFor(tree, 'bea'), 'Ask').props.onClick()
+  assert.ok(askFor(tree, 'bea'), 'Bea is online and accepts connect4, so she can be asked')
+  assert.equal(words(askFor(tree, 'bea')), 'Ask to Connect 4', 'with one game in common the button names it')
+  assert.equal(askFor(tree, 'cole'), undefined, 'an away player cannot be asked')
+  assert.equal(askFor(tree, 'dot'), undefined, 'a player who does not accept this game cannot be asked')
+  assert.equal(askFor(tree, 'eve'), undefined, 'a player already at a table cannot be asked')
+  askFor(tree, 'bea').props.onClick()
   await tick()
   const asked = run.asked.filter(item => item[0] === '/online/hall/request').pop()
   assert.deepEqual(JSON.parse(JSON.stringify(asked[1])), { to: 'bea', game: 'connect4' }, 'Ask posts the exact request body')
@@ -5038,17 +5042,17 @@ async function hallContract() {
   const hold = { path: '/online/hall/request' }
   run = makeCtx(liveSnap(), { hold })
   tree = await settle(props({ ctx: run.ctx }))
-  findButton(rowFor(tree, 'bea'), 'Ask').props.onClick()
+  askFor(tree, 'bea').props.onClick()
   tree = draw(props({ ctx: run.ctx }))
-  assert.equal(findButton(rowFor(tree, 'bea'), 'Ask').props.disabled, true, 'Ask locks while its request is in flight')
+  assert.equal(askFor(tree, 'bea').props.disabled, true, 'Ask locks while its request is in flight')
   hold.release()
   await tick()
   tree = draw(props({ ctx: run.ctx }))
-  assert.equal(findButton(rowFor(tree, 'bea'), 'Ask').props.disabled, false, 'and unlocks when the server answers')
+  assert.equal(askFor(tree, 'bea').props.disabled, false, 'and unlocks when the server answers')
   reset()
   run = makeCtx(liveSnap(), { fail: 'They are not taking requests right now.' })
   tree = await settle(props({ ctx: run.ctx }))
-  findButton(rowFor(tree, 'bea'), 'Ask').props.onClick()
+  askFor(tree, 'bea').props.onClick()
   await tick()
   tree = draw(props({ ctx: run.ctx }))
   assert.ok(words(tree).includes('They are not taking requests right now.'), 'a refused Ask shows the server\'s own reason')
@@ -5133,7 +5137,7 @@ async function hallContract() {
     { id: 'q7', state: 'pending', from: { id: 'me', name: 'Ada' }, to: { id: 'dot', name: 'Dot' }, game: 'connect4', created: 0, expires: 90 }
   ] }), { hold: holdAsk })
   tree = await settleTrip(props({ ctx: run.ctx }))
-  findButton(rowFor(tree, 'bea'), 'Ask').props.onClick()
+  askFor(tree, 'bea').props.onClick()
   tree = await roundTrip(props({ ctx: run.ctx }))
   assert.equal(findButton(tree, 'Accept').props.disabled, true,
     'another request cannot be answered while one Hall action is out')
@@ -5157,6 +5161,124 @@ async function hallContract() {
   evaluate("rememberOnlineRoom('')")
   reset()
   console.log('plugin hall (contract D): roster, prefs, requests, and one seat-open: passed')
+}
+
+// E1: asking a person for the game you choose. A row offers every game you both take, Ask sends
+// the one on screen, and the choice survives the Hall's three-second poll and the person's own
+// switches changing under it (owner, 2026-11-18: "the user should be able to choose a game").
+async function hallGamePickContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const draw = value => {
+    sandbox.hallPickProps = value
+    cursor = 0
+    const tree = evaluate('LobbyHall(hallPickProps)')
+    const pending = effects
+    effects = []
+    pending.forEach(effect => effect())
+    return tree
+  }
+  const settle = async value => { draw(value); await tick(); return draw(value) }
+  const rowFor = (tree, id) => nodes(tree).filter(node => node.props && node.props['data-hall-row'] === id)[0]
+  const pickerFor = (tree, id) => nodes(rowFor(tree, id)).find(node => node.type === 'select')
+  const askFor = (tree, id) => nodes(rowFor(tree, id)).find(node => node.type === 'button' && /^Ask/.test(words(node)))
+  const you = { id: 'me', name: 'Ada' }
+  // Every game a row below takes is one you take too, unless the row itself says otherwise.
+  const prefs = { open: true, games: { connect4: true, reversi: true, chessboard: true, blackjack: true } }
+  const snap = (rows, extra = {}) => ({
+    state: 'live', you, prefs,
+    roster: [{ id: 'me', name: 'Ada', status: 'online', games: ['connect4'] }, ...rows],
+    requests: [], seated: null, ...extra
+  })
+  const makeCtx = snapshot => {
+    const asked = []
+    const state = { snap: snapshot }
+    const ctx = {
+      rest: async (path, options) => {
+        asked.push([path, (options && options.body) || null])
+        if (path === '/online/hall') return state.snap
+        return { ok: true }
+      }
+    }
+    return { ctx, asked, state }
+  }
+  const props = extra => ({ ctx: null, current: 'connect4', view: {}, onPlayHere: () => {}, ...extra })
+  const sent = run => {
+    const last = run.asked.filter(item => item[0] === '/online/hall/request').pop()
+    assert.ok(last, 'a request was sent')
+    return JSON.parse(JSON.stringify(last[1]))
+  }
+
+  // 1. Four games in common, Blackjack among them: the list offers every one, in the lobby's order,
+  //    and Ask sends the one chosen — not the first.
+  reset()
+  let run = makeCtx(snap([{ id: 'bea', name: 'Bea', status: 'online', games: ['connect4', 'reversi', 'chessboard', 'blackjack'] }]))
+  let tree = await settle(props({ ctx: run.ctx }))
+  let picker = pickerFor(tree, 'bea')
+  assert.ok(picker, 'a row with more than one game in common carries a game picker')
+  assert.equal(picker.props['aria-label'], 'Game to ask Bea for', 'the picker names the person it is for')
+  const options = nodes(picker).filter(node => node.type === 'option').map(node => node.props.value)
+  assert.deepEqual(options, ['connect4', 'reversi', 'chessboard', 'blackjack'], 'every game you both take, in the lobby order')
+  assert.equal(picker.props.defaultValue, 'connect4', 'the first game in common is chosen to begin with')
+  // Choosing does not redraw the panel, so Ask reads the choice it kept rather than this draw.
+  picker.props.onChange({ target: { value: 'reversi' } })
+  askFor(tree, 'bea').props.onClick()
+  await tick()
+  assert.deepEqual(sent(run), { to: 'bea', game: 'reversi' }, 'Ask sends the game chosen in the list')
+  assert.ok(String(askFor(draw(props({ ctx: run.ctx })), 'bea').props.title).includes('Reversi'),
+    'and the tooltip names the game it will ask for')
+
+  // 2. The next person defaults to the last game you asked anyone for, when they take it too.
+  reset()
+  run = makeCtx(snap([{ id: 'cal', name: 'Cal', status: 'online', games: ['connect4', 'reversi'] }]))
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(pickerFor(tree, 'cal').props.defaultValue, 'reversi',
+    'a row defaults to the game you last asked for, not the first one in common')
+
+  // 3. One game in common needs no list: the button names it.
+  reset()
+  run = makeCtx(snap([{ id: 'dot', name: 'Dot', status: 'online', games: ['connect4'] }]))
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(pickerFor(tree, 'dot'), undefined, 'one game in common is no list')
+  assert.equal(words(askFor(tree, 'dot')), 'Ask to Connect 4', 'the button names the one game you both take')
+  askFor(tree, 'dot').props.onClick()
+  await tick()
+  assert.deepEqual(sent(run), { to: 'dot', game: 'connect4' }, 'and sends that game')
+
+  // 4. Their master switch off: the server sends no games at all, so say they take none.
+  reset()
+  run = makeCtx(snap([{ id: 'eve', name: 'Eve', status: 'online', games: [] }]))
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(askFor(tree, 'eve'), undefined, 'someone taking no requests cannot be asked')
+  assert.ok(words(rowFor(tree, 'eve')).includes('Not taking requests'), 'and the row says they take none')
+
+  // 5. They take games, but none you take: no button, and the row names theirs.
+  reset()
+  run = makeCtx(snap([{ id: 'fay', name: 'Fay', status: 'online', games: ['gomoku'] }]))
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(askFor(tree, 'fay'), undefined, 'no game in common means no Ask')
+  assert.ok(words(rowFor(tree, 'fay')).includes('Takes Gomoku'), 'and the row names the game they take')
+
+  // 6. The chosen game stops being shared after a refresh: Ask falls back to one that is.
+  reset()
+  run = makeCtx(snap([{ id: 'gus', name: 'Gus', status: 'online', games: ['reversi', 'blackjack'] }]))
+  tree = await settle(props({ ctx: run.ctx }))
+  picker = pickerFor(tree, 'gus')
+  assert.equal(picker.props.defaultValue, 'reversi', 'a row with nothing remembered picks the first game in common')
+  picker.props.onChange({ target: { value: 'blackjack' } })
+  // The Hall polls: Gus turns Blackjack off while the list is on screen.
+  run.state.snap = snap([{ id: 'gus', name: 'Gus', status: 'online', games: ['reversi'] }])
+  run.ctx = { ...run.ctx }
+  tree = await settle(props({ ctx: run.ctx }))
+  assert.equal(pickerFor(tree, 'gus'), undefined, 'one game left in common is no longer a list')
+  assert.equal(words(askFor(tree, 'gus')), 'Ask to Reversi', 'the chosen game that went away is replaced by the one left')
+  askFor(tree, 'gus').props.onClick()
+  await tick()
+  assert.deepEqual(sent(run), { to: 'gus', game: 'reversi' }, 'and Ask sends the game that is still shared')
+
+  reset()
+  console.log('plugin hall: choosing the game before asking: passed')
 }
 
 async function championsContract() {
