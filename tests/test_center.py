@@ -249,9 +249,11 @@ def test_desktop_backend_runs_lines_as_the_person_at_the_desktop(tmp_path: Path,
     more = {item["id"]: item["plugin"] for item in view["more"]}
     assert "chess" not in more
     assert view["player"]["named"] is False
-    assert "name" in api.command({"line": "chat say hi"})["text"].lower()
+    # The Games page's #games chat is the lobby's chat, so signed out it says so and keeps nothing.
+    refused = api.command({"line": "chat say hi"})
+    assert refused["ok"] is False and "Sign in to online play to chat" in refused["text"], refused
     assert "Argo" in api.command({"line": "/games name Argo"})["text"]
-    assert "Argo: hi" in api.command({"line": "chat say hi"})["text"]
+    assert "Sign in to online play to chat" in api.command({"line": "chat say hi"})["text"]
     assert "Red to move." in api.command({"line": "connect4 new"})["text"]
     assert "library" in api.command({"line": "install connect4"})["text"].lower()
     played = api.command({"line": "connect4 move 4"})["text"]
@@ -260,11 +262,9 @@ def test_desktop_backend_runs_lines_as_the_person_at_the_desktop(tmp_path: Path,
     assert api.board("../etc") == {"text": "", "picture": None}
     after = api.view()
     assert after["player"] == {"name": "Argo", "named": True}
-    # A lobby post is its author, its words, and the moment it was written: the lobby shows
-    # the date and time on every line, so the time is part of the line.
-    line = after["lobby"]["lines"][-1]
-    assert {key: line[key] for key in ("id", "name", "text")} == {"id": "local", "name": "Argo", "text": "hi"}
-    assert abs(line["at"] - time.time()) < 60, line
+    # The #games chat is the lobby's and nothing else, so signed out nothing was written into this
+    # computer's own lobby either: the desktop keeps no local chat to fall back on.
+    assert after["lobby"]["lines"] == []
     assert "connect4" in after["play_now"]
     assert "chess" not in {item["id"] for item in after["more"]}
 

@@ -579,14 +579,20 @@ def _lobby_payload(data_root) -> dict:
 
 
 def _lobby_say(line: str) -> dict | None:
-    """``chat say …`` goes to the lobby's #games chat when signed in online; None means local."""
+    """``chat say …`` is the lobby's #games chat, and nothing else: an answer either way.
+
+    The Games page's column is the lobby's chat (owner, 2026-11-18: two PCs said hi and neither saw
+    the other), so there is no local chat behind it to fall back on. Signed out, the line is refused
+    out loud instead of being written into this computer's own lobby; a server that does not answer
+    says the message was not sent. Only a line that is not a chat line returns None.
+    """
     words = line.split(None, 2)
     if len(words) < 3 or words[0].lower() != "chat" or words[1].lower() != "say":
         return None
     try:
         source, _ladder = _online_pair()
         if not source.chat_shared():
-            return None
+            return {"ok": False, "text": "Sign in to online play to chat."}
         return source.say_lobby(words[2])
     except Exception:
         log.warning("a lobby chat line could not be sent", exc_info=True)

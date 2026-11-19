@@ -538,10 +538,14 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
     }
   }
   const lobby = view.lobby || { lines: [], looking: [] }
-  const match = onlineView(view).match
+  const online = onlineView(view)
+  const match = online.match
+  // The #games box is the lobby's chat and nothing else (owner, 2026-11-18): signed in it goes to
+  // the server, and signed out it is closed with one sentence rather than saving the line here.
+  const signedIn = Boolean(online.on && online.linked)
   const looking = lobby.looking || []
-  // Posts from the last day only, each with its own date and time beside it.
-  const posts = freshLobbyLines(lobby.lines)
+  // Posts from the last 30 days only — the window the server keeps — each with its own date and time.
+  const posts = lobby.shared ? freshLobbyLines(lobby.lines) : []
   const lookingLine = looking.length
     ? `Looking: ${looking.map(item => (item.address ? `${item.name} (${item.game}) @ ${item.address}` : `${item.name} (${item.game})`)).join(', ')}`
     : 'Nobody is looking yet.'
@@ -562,6 +566,7 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
     setName('')
   }
   const sendChat = async () => {
+    if (!signedIn) return
     const said = chat.trim()
     if (!said) return
     setSayProblem('')
@@ -593,24 +598,25 @@ function LobbyChatColumn({ view, ctx, send, chat, setChat, name, setName, curren
       jsxs('div', {
         style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }, children: [
           jsx('div', { style: { fontWeight: 650, fontSize: 12 }, children: '#games' }),
-          // Whose chat this is. Signed in online it is the lobby's, read by everyone online; otherwise
-          // it never leaves this computer (owner, 2026-11-18: two PCs said hi and neither saw the other).
-          jsx('div', { 'data-lobby-chat-where': lobby.shared ? 'online' : 'local', style: muted, children: lobby.shared
+          // Whose chat this is. Signed in online it is the lobby's, read by everyone online; signed
+          // out there is no chat here at all (owner, 2026-11-18: two PCs said hi and neither saw
+          // the other - a local column was the reason), and nothing typed is kept on this computer.
+          jsx('div', { 'data-lobby-chat-where': lobby.shared ? 'online' : 'signed-out', style: muted, children: lobby.shared
             ? (lobby.reached === false ? 'Everyone online reads this. The lobby could not be read just now; trying again.' : 'Everyone online reads this.')
-            : 'Only this computer. Sign in to online play to talk with everyone online.' }),
+            : 'Sign in to online play to chat.' }),
           view.player.named ? null : jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
             jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(name, setName, 'Your name', setPlayerName, { label: 'Your name' }) }), button('Set', setPlayerName, { disabled: !name.trim() })
           ] }),
           jsx('div', { style: muted, children: lookingLine }),
-          jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
+          lobby.shared ? jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, fontSize: 11 }, children: posts.length
             ? posts.map((item, index) => jsxs('div', { 'data-lobby-post': String(index), children: [
               jsx('span', { style: { fontWeight: 650 }, children: `${item.name}: ` }),
               jsx('span', { style: { color: text.secondary }, children: item.text }),
               jsx('span', { style: { color: text.tertiary, marginLeft: 4, whiteSpace: 'nowrap' }, children: lobbyStamp(item.at) })
-            ] }, index)) : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' }) }),
+            ] }, index)) : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' }) }) : null,
           jsxs('div', { 'data-lobby-say-row': '1', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }, children: [
-            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(chat, setChat, view.player.named ? 'Say something' : 'Set a name first', sendChat, { label: 'Say something in the lobby chat' }) }),
-            button('Send', sendChat, { disabled: !chat.trim() || !view.player.named })
+            jsx('div', { style: { display: 'flex', alignSelf: 'stretch' }, children: field(chat, setChat, signedIn ? 'Say something' : 'Sign in to online play to chat', sendChat, { label: 'Say something in the lobby chat', disabled: !signedIn }) }),
+            button('Send', sendChat, { disabled: !signedIn || !chat.trim() })
           ] }),
           sayProblem ? jsx('div', {
             role: 'alert', 'data-lobby-say-note': '1',

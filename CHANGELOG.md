@@ -6,6 +6,15 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The #games chat is the lobby's, or it takes no line at all.** The owner (2026-11-18): two PCs said
+  hi and neither saw the other, because the column quietly wrote to this computer's own lobby whenever
+  nobody was signed in. Signed out the box now reads *“Sign in to online play to chat”*, is closed, and
+  posts nothing — no silent local save — and a server that does not answer says *“The online server isn't
+  answering; your message wasn't sent.”* (`shelf/online_source.py` CHAT_DOWN). The column also stops
+  drawing a chat it is not reading. Guards: `tests/test_online_lobby_chat.py`
+  (`test_signed_out_the_games_chat_takes_no_line_and_saves_nothing`) and the signed-out case in *lobby
+  chat column* in `tests/table_ui_harness.cjs`.
+
 - **A #games post stays on the screen for 30 days, the same as the server keeps it.** The owner (2026-11-18):
   the chat is worth reading back. `LOBBY_POST_MS` is 30 days instead of one, so a three-week-old post is
   still drawn and only a line past the server's own window is dropped. Guard: the chat-window check at the

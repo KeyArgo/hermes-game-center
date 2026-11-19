@@ -4553,8 +4553,10 @@ async function lobbyColumnContract() {
   const drafts = { chat: '', name: '' }
   const sends = []
   let sender = async line => { sends.push(line); return { ok: true, text: 'OK' } }
-  const named = { player: { id: 'me', name: 'Ada', named: true }, lobby: { lines: [], looking: [] }, online: { on: true, url: 'https://games.hermesnet.xyz' } }
-  const unnamed = { player: { id: 'me', name: '', named: false }, lobby: { lines: [], looking: [] }, online: { on: true, url: 'https://games.hermesnet.xyz' } }
+  const onlineSignedIn = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada' }
+  const named = { player: { id: 'me', name: 'Ada', named: true }, lobby: { lines: [], looking: [] }, online: onlineSignedIn }
+  const signedOut = { ...named, online: { on: true, url: 'https://games.hermesnet.xyz', linked: false } }
+  const unnamed = { player: { id: 'me', name: '', named: false }, lobby: { lines: [], looking: [] }, online: onlineSignedIn }
   const paint = (extra = {}) => {
     sandbox.lobbyProps = {
       view: named, ctx: { os: { openExternal: () => false } }, current: 'connect4', onPlayHere: () => {},
@@ -4585,8 +4587,12 @@ async function lobbyColumnContract() {
     effects = []
     return drawn
   }
-  tree = whereOf(named)
-  assert.ok(words(tree).includes('Only this computer.'), 'a chat that is not shared says it stays on this computer')
+  tree = whereOf(signedOut)
+  assert.ok(words(tree).includes('Sign in to online play to chat.'), 'a chat with no online sign-in says what it needs')
+  assert.ok(!words(tree).includes('Only this computer'), 'and never offers a local chat instead')
+  const offSend = whereOf(signedOut)
+  assert.ok(findButton(offSend, 'Send').props.disabled, 'with nothing to press: no line is kept on this computer')
+  assert.equal(inputFor(offSend, 'Say something in the lobby chat').props.disabled, true, 'and the box is closed')
   tree = whereOf({ ...named, lobby: { lines: [], looking: [], shared: true, reached: true } })
   assert.ok(words(tree).includes('Everyone online reads this.'), 'a shared chat says everyone online reads it')
   assert.ok(!words(tree).includes('Only this computer'), 'and never also says it is local')
@@ -6765,12 +6771,12 @@ async function lobbyAsksContract() {
   }
   const withPosts = paints({
     view: { player: { id: 'me', name: 'Ada', named: true },
-      lobby: { looking: [], lines: [
+      lobby: { shared: true, reached: true, looking: [], lines: [
         { id: 'p1', name: 'Bea', text: 'anyone for connect4?', at: seconds - 60 },
         { id: 'p2', name: 'Cole', text: 'last month\u2019s news', at: seconds - 31 * 24 * 3600 },
         { id: 'p3', name: 'Dot', text: 'no stamp at all' }
       ] },
-      online: { on: true, url: '' } },
+      online: { on: true, url: '', linked: true, name: 'Ada' } },
     ctx: { os: { openExternal: () => false } }, current: 'connect4', onPlayHere: () => {},
     chat: '', setChat: () => {}, name: '', setName: () => {}, send: async () => ({ ok: true })
   })

@@ -47,7 +47,7 @@ STATE_FILE = "online.json"
 POLL_SECONDS = 15
 # The #games chat on the Games page is read from the lobby at most this often.
 CHAT_SECONDS = 3
-CHAT_DOWN = "The online server is not answering right now. Your message was not sent."
+CHAT_DOWN = "The online server isn't answering; your message wasn't sent."
 LEAGUE_SECONDS = 20
 BACKOFF_SECONDS = (15, 30, 60, 120)
 ALERT_EVERY_SECONDS = 600
