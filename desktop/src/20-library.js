@@ -78,8 +78,8 @@ const GAMES_REPO = 'https://github.com/KeyArgo/hermes-game-center'
 const GAMES_LINKS = [
   { id: 'report', label: 'Report a problem', href: GAMES_REPO + '/issues/new',
     title: 'Open a new issue on the Game Center repository in your browser' },
-  { id: 'contribute', label: 'Contribute', href: GAMES_REPO,
-    title: 'The Game Center repository on GitHub, in your browser' },
+  { id: 'contribute', label: 'How to help', href: GAMES_REPO + '/blob/main/CONTRIBUTING.md',
+    title: 'How to help: report a problem, add a game, or work on the code' },
   { id: 'add', label: 'Add your own game', href: '',
     title: 'Add your own game: a community game or a Game Center game, in a form here' }
 ]

@@ -6,6 +6,7 @@ yielding to the event loop so the server can answer it.
 """
 import asyncio
 import json
+import threading
 import time
 
 from shelf.online_source import Online
@@ -134,10 +135,14 @@ def test_hall_snapshot_shape_when_off(tmp_path):
     snap = hall.snapshot()
     assert set(snap) == {"state", "you", "prefs", "roster", "requests", "seated"}
     assert snap["state"] == "off"
-    assert snap["prefs"] == {"open": False, "games": {game: False for game in
-                                                      ("connect4", "reversi", "checkers", "gomoku",
-                                                       "chessboard", "go", "hex", "breakthrough",
-                                                       "seabattle")}}
+    assert snap["prefs"] == {
+        "open": False,
+        "games": {game: False for game in ("connect4", "reversi", "checkers", "gomoku",
+                                           "chessboard", "go", "hex", "breakthrough",
+                                           "seabattle", "blackjack")},
+        # A temporary accept carries the moment it lapses; nothing is temporary when off.
+        "until": {},
+    }
     # No key and online off: start() opens no socket.
     hall.start()
     assert hall.snapshot()["state"] == "off"
@@ -445,3 +450,77 @@ def test_two_halls_find_each_other_again_after_the_server_restarts(tmp_path):
                     await asyncio.to_thread(hall.stop)
             await client.close()
     run(scenario())
+
+
+def test_prefs_carry_the_twenty_minute_window():
+    """A temporary accept keeps its window: the screen says "for 20 min" from it.
+
+    The server sends prefs.games true while a game is accepted standing or for twenty
+    minutes, and prefs.until holds the moment a temporary one lapses. Dropping until here
+    left every screen calling a temporary accept permanent.
+    """
+    live = Hall._clean_prefs({
+        "open": True,
+        "games": {"chessboard": True, "connect4": True},
+        "until": {"chessboard": 1700000000.5, "connect4": 0},
+    })
+    assert live["until"] == {"chessboard": 1700000000.5}, live
+    assert live["games"]["chessboard"] is True
+
+    # An older server has no until at all, and that is simply a standing list.
+    old = Hall._clean_prefs({"open": True, "games": {"connect4": True}})
+    assert old["until"] == {}
+    assert old["games"]["connect4"] is True
+    # Nor does a broken one make the page fail: it is read as standing.
+    assert Hall._clean_prefs({"games": {"connect4": True}, "until": "soon"})["until"] == {}
+
+
+def test_the_hall_lists_every_game_the_server_can_seat():
+    """The socket's own list, not just the panel's.
+
+    Blackjack reached the server and the lobby panel but not this list, so "All games" left
+    it out and a Blackjack search read back as an empty one.
+    """
+    from online.requests import REQUESTABLE as SERVER_GAMES
+    from shelf.online_hall import REQUESTABLE as HALL_GAMES
+    assert sorted(HALL_GAMES) == sorted(SERVER_GAMES)
+
+
+def test_always_keeps_a_game_and_a_looking_ack_carries_ask_always():
+    """"Always let people invite you to Chess?": both ends of that question.
+
+    Yes is a prefs frame carrying always - the server clears the twenty-minute window and
+    leaves the game accepted. And the press that created the window gets ask_always back on
+    its ack: a screen cannot ask a question it was never told to ask.
+    """
+    class Wire:
+        def __init__(self):
+            self._lock = threading.Lock()
+            self._prefs = {"open": False, "games": {}, "until": {"chessboard": 1.0}}
+            self._you = {"id": "me", "name": "Ada", "invisible": False, "looking": []}
+            self.frames = []
+            self.answer = {"ok": True, "text": "Looking for Chess.", "ask_always": True}
+
+        def send(self, frame):
+            self.frames.append(frame)
+            return dict(self.answer)
+
+    wire = Wire()
+    answer = Hall.prefs(wire, always={"chessboard": True})
+    assert wire.frames[-1] == {"t": "prefs", "always": {"chessboard": True}}, wire.frames[-1]
+    assert answer["ok"] is True
+    assert wire._prefs["games"]["chessboard"] is True
+    assert wire._prefs["open"] is True, "keeping a game turns the master switch on"
+    assert "chessboard" not in wire._prefs["until"], "the twenty-minute window is gone"
+
+    # A shape the server cannot read is refused here, in words, and nothing is sent.
+    wire.frames.clear()
+    refused = Hall.prefs(wire, always={"chessboard": "yes"})
+    assert refused["ok"] is False and wire.frames == []
+
+    # The whole ack is kept, so ask_always reaches the screen that pressed.
+    hall = Hall.__new__(Hall)
+    hall._lock = threading.Lock()
+    hall._pending = {"h7": {"event": threading.Event(), "answer": None}}
+    hall._apply({"t": "ack", "op": "h7", "ok": True, "text": "Looking for Chess.", "ask_always": True})
+    assert hall._pending["h7"]["answer"]["ask_always"] is True
