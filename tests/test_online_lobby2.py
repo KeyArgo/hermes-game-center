@@ -300,8 +300,8 @@ def test_find_match_pairs_with_someone_open_to_requests_and_either_can_join(worl
     run(scenario())
 
 
-def test_find_match_pairing_is_reachable_by_the_looking_side_too(world):
-    """Both sides get the same offer, so either one may sit down."""
+def test_find_match_asks_one_of_two_lookers_and_only_that_one_sits_down(world):
+    """Both sides see the offer, but only the person asked may accept it."""
     store, _rooms, people, _clock, hub, service = world
 
     async def scenario():
@@ -309,15 +309,17 @@ def test_find_match_pairing_is_reachable_by_the_looking_side_too(world):
         here(hub, ada, bea)
         assert (await look(service, ada, ["hex"]))["ok"]
         assert (await look(service, bea, ["hex"]))["ok"]
-        told = offers(hub)
-        rid = told[0][1]["id"]
-        sender = told[0][1]["from"]["id"]
-        joiner = ada if sender == bea["id"] else bea
+        card = offers(hub)[0][1]
+        seeker = bea if card["from"]["id"] == bea["id"] else ada
+        asked = bea if card["to"]["id"] == bea["id"] else ada
+        assert seeker is not asked
+        own = await service.handle(seeker, {"t": "respond", "id": card["id"], "accept": True})
+        assert own["ok"] is False and own["text"] == "Only the other player can accept.", own
         hub.sent.clear()
-        joined = await service.handle(joiner, {"t": "respond", "id": rid, "accept": True})
+        joined = await service.handle(asked, {"t": "respond", "id": card["id"], "accept": True})
         assert joined["ok"], joined
         assert set(seats(hub)) == {ada["id"], bea["id"]}
-        assert store.play_request(rid)["state"] == "accepted"
+        assert store.play_request(card["id"])["state"] == "accepted"
 
     run(scenario())
 
@@ -379,10 +381,11 @@ def test_find_match_stops_by_hand_and_by_a_seat(world):
         stopped = await look(service, ada, on=False)
         assert stopped["ok"] and service.looking(ada["id"]) == []
         assert (await look(service, ada, ["connect4"]))["ok"]
-        # An offer that is answered elsewhere takes the pair out of the pool.
+        # An offer that is answered takes both out of the pool.
         assert (await look(service, bea, ["connect4"]))["ok"]
-        rid = offers(hub)[0][1]["id"]
-        await service.handle(bea, {"t": "respond", "id": rid, "accept": True})
+        card = offers(hub)[0][1]
+        await service.handle(bea if card["to"]["id"] == bea["id"] else ada,
+                             {"t": "respond", "id": card["id"], "accept": True})
         assert service.looking(ada["id"]) == [] and service.looking(bea["id"]) == []
         assert store.db.execute("SELECT COUNT(*) FROM looking").fetchone()[0] == 0
 
@@ -433,11 +436,12 @@ def test_a_declined_offer_is_not_re_offered_at_once(world):
         here(hub, ada, bea)
         assert (await look(service, ada, ["checkers"]))["ok"]
         assert (await look(service, bea, ["checkers"]))["ok"]
-        rid = offers(hub)[0][1]["id"]
+        card = offers(hub)[0][1]
+        asked = bea if card["to"]["id"] == bea["id"] else ada
         hub.sent.clear()
-        declined = await service.handle(bea, {"t": "respond", "id": rid, "accept": False})
+        declined = await service.handle(asked, {"t": "respond", "id": card["id"], "accept": False})
         assert declined["ok"], declined
-        assert store.play_request(rid)["state"] == "declined"
+        assert store.play_request(card["id"])["state"] == "declined"
         hub.sent.clear()
         # Looking again, and any later pairing pass, leaves the pair alone for ten minutes.
         assert (await look(service, ada, ["checkers"]))["ok"]

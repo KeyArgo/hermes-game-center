@@ -22,6 +22,10 @@ REQUESTABLE = (
     "go", "hex", "breakthrough", "seabattle", "blackjack",
 )
 REQUEST_SECONDS = 90
+# One matchmaking offer at a time, sixty seconds each (the owner: at least sixty).
+OFFER_SECONDS = 60.0
+# A search keeps asking for as long as the twenty-minute window it opened.
+LOOKING_SECONDS = 1200.0
 HOUR = 3600.0
 MAX_PER_HOUR = 8
 MAX_INBOUND = 5
@@ -90,6 +94,9 @@ class Service:
         # One lock for the whole accept path, shared with the other writes so two
         # accepts cannot open two tables and a create cannot race an accept.
         self.accept_lock = asyncio.Lock()
+        # The last status sentence each person was sent about a game, so the janitor does
+        # not repeat "still looking" every few seconds.
+        self._said: dict[tuple[str, str], str] = {}
 
     # Reading -----------------------------------------------------------------
 
@@ -135,6 +142,9 @@ class Service:
         async with self.accept_lock:
             rows = self.store.expire_play_requests(float(now))
             frames = [item for row in rows for item in self._updates(self._card(row))]
+            if any(row.get("offer") for row in rows):
+                # Sixty seconds, no answer: the next person is asked at once.
+                frames.extend(self._pair_locked(float(now)))
         await self._emit(frames)
         return len(rows)
 
@@ -185,60 +195,83 @@ class Service:
             if frame["invisible"]:
                 # Somebody who is not in the lobby is not looking for a match in it.
                 self.store.clear_looking(player_id)
+                self._forget(player_id)
         return ""
 
     # Find match ---------------------------------------------------------------
 
     async def _looking(self, player: dict, frame: dict) -> dict:
         async with self.accept_lock:
-            text = self._apply_looking(player["id"], frame)
+            text, withdrawn = self._apply_looking(player["id"], frame)
             if text:
                 return self._ack(frame, False, text)
-            frames = self._pair_locked(float(self.clock()))
+            frames = [item for card in withdrawn for item in self._updates(self._card(card))]
+            frames.extend(self._pair_locked(float(self.clock())))
             games = self.looking(player["id"])
         await self._emit(frames)
         return self._ack(frame, True, self._looking_text(games))
 
-    def _apply_looking(self, player_id: str, frame: dict) -> str:
+    def _apply_looking(self, player_id: str, frame: dict) -> tuple[str, list[dict]]:
+        """(refusal, the offers withdrawn because the search is over)."""
         if frame.get("on") is False or frame.get("stop") is True:
             self.store.clear_looking(player_id)
-            return ""
+            self._forget(player_id)
+            return "", self._withdraw_offers(player_id)
         all_games = frame.get("all")
         if all_games is not None and not isinstance(all_games, bool):
-            return "Say whether to look for every game."
+            return "Say whether to look for every game.", []
         if all_games:
             games = list(REQUESTABLE)
         else:
             wanted = frame.get("games")
             if not isinstance(wanted, list) or not wanted:
-                return "Name at least one game to look for."
+                return "Name at least one game to look for.", []
             chosen = []
             for game in wanted:
                 if not isinstance(game, str) or game not in REQUESTABLE:
-                    return "That game cannot be chosen."
+                    return "That game cannot be chosen.", []
                 if game not in chosen:
                     chosen.append(game)
             # Store in the one order the lobby lists games in.
             games = [game for game in REQUESTABLE if game in set(chosen)]
         if self.invisible(player_id):
-            return APPEAR_OFFLINE
+            return APPEAR_OFFLINE, []
         self.store.set_looking(player_id, games, float(self.clock()))
-        return ""
+        self._forget(player_id)
+        return "", []
 
-    @staticmethod
-    def _looking_text(games: list[str]) -> str:
+    def _withdraw_offers(self, player_id: str) -> list[dict]:
+        """Stopping takes the offer that is out back, so nobody is seated by mistake."""
+        out = []
+        for row in self.store.pending_offers_from(player_id):
+            saved = self.store.set_play_state(row["id"], "cancelled")
+            out.append(saved or row)
+        return out
+
+    def _forget(self, player_id: str) -> None:
+        for key in [key for key in self._said if key[0] == player_id]:
+            del self._said[key]
+
+    def _title(self, game: str) -> str:
+        """The name people read, from the game's own manifest."""
+        module = (getattr(self.rooms, "games", None) or {}).get(game)
+        return str(((getattr(module, "MANIFEST", None) or {}).get("title")) or game)
+
+    def _looking_text(self, games: list[str]) -> str:
         if not games:
             return "Stopped looking."
         if len(games) == 1:
-            return f"Looking for {games[0]}."
+            return f"Looking for {self._title(games[0])}."
         return f"Looking for {len(games)} games."
 
     def _pair_locked(self, now: float) -> list[tuple[str, dict]]:
-        """Pair people who want the same game right now, and offer it to both.
+        """One person at a time, longest wait first: the owner's matchmaking.
 
-        Only someone online, visible and not already at a table is paired, and only
-        one offer is out per person: a second one would be a second table waiting.
+        Every pass asks the best person who has not been asked yet in this search. When
+        nobody is left it says so and keeps looking, so whoever comes online later is
+        asked on a later pass. A search lasts as long as its twenty-minute window.
         """
+        self.store.clear_looking_expired(now - LOOKING_SECONDS)
         looking: dict[str, dict[str, float]] = {}
         for row in self.store.all_looking():
             looking.setdefault(str(row["player_id"]), {})[str(row["game"])] = float(row["created"])
@@ -246,33 +279,61 @@ class Service:
             return []
         connected = self.hub.online_players() if callable(getattr(self.hub, "online_players", None)) else None
         busy = self.store.pending_offer_players()
-        # Whoever has waited longest is offered first.
-        order = sorted(looking, key=lambda pid: (min(looking[pid].values()), pid))
+        behind = self.store.last_game_ends(list(looking))
+        # Whoever has waited longest since a game is asked first.
+        order = sorted(looking, key=lambda pid: (behind.get(pid, 0.0), pid))
         frames: list[tuple[str, dict]] = []
         for looker in order:
             if looker in busy or not self._may_be_offered(looker, connected):
                 continue
-            for game in REQUESTABLE:
-                if game not in looking[looker]:
-                    continue
-                partner = self._partner_for(looker, game, looking, busy, connected, now)
+            games = [game for game in REQUESTABLE if game in looking[looker]]
+            for game in games:
+                partner = self._partner_for(looker, game, looking, busy, connected, now,
+                                            looking[looker][game])
                 if partner is None:
                     continue
                 row = self.store.create_play_request(
-                    looker, partner, game, now, REQUEST_SECONDS, offer=True)
+                    looker, partner, game, now, OFFER_SECONDS, offer=True)
                 busy = busy | {looker, partner}
                 frames.extend(self._announce(self._card(row)))
+                self._say(frames, looker, game, partner)
                 break
+            else:
+                # Everyone for this game has been asked, or nobody accepts it right now.
+                self._say(frames, looker, games[0], "")
+
         return frames
 
-    def _partner_for(self, looker, game, looking, busy, connected, now):
-        """Someone else looking for this game first, then anyone open to it."""
-        wanted = [pid for pid in sorted(looking, key=lambda pid: (min(looking[pid].values()), pid))
-                  if pid != looker and game in looking[pid]]
-        wanted += [pid for pid in sorted(self._open_to(game, connected))
-                   if pid != looker and pid not in wanted]
-        for partner in wanted:
-            if partner in busy or not self._may_be_offered(partner, connected):
+    def _say(self, frames: list[tuple[str, dict]], player_id: str, game: str, partner: str) -> None:
+        """One status line per person: who is being asked, or that nobody is free."""
+        if partner:
+            name = self._who(partner)["name"] or "them"
+            text = f"Asking {name} — {int(OFFER_SECONDS)} s"
+            asking = {"id": partner, "name": name}
+        else:
+            text = f"Nobody is free for {self._title(game)} right now — still looking."
+            asking = None
+        if self._said.get((player_id, game)) == text:
+            return
+        self._said[(player_id, game)] = text
+        frames.append((player_id, {"t": "looking_status", "game": game, "title": self._title(game),
+                                   "asking": asking, "text": text}))
+
+    def _partner_for(self, looker, game, looking, busy, connected, now, since):
+        """The best person for this game right now, or None.
+
+        A person also looking for this game is an accepter too, and is ordered by the
+        same rule. Nobody is asked twice in one search.
+        """
+        wanted = {pid for pid in looking if pid != looker and game in looking[pid]}
+        wanted |= set(self._open_to(game, connected))
+        wanted.discard(looker)
+        behind = self.store.last_game_ends(wanted)
+        already = self.store.offers_made_since(looker, game, since)
+        for partner in sorted(wanted, key=lambda pid: (behind.get(pid, 0.0), pid)):
+            if partner in busy or partner in already:
+                continue
+            if not self._may_be_offered(partner, connected):
                 continue
             if self._can_pair(looker, partner, game, now):
                 return partner
@@ -331,6 +392,9 @@ class Service:
                 ack, frames = await self._accept_locked(player, frame)
             else:
                 ack, frames = self._decline_locked(player, frame)
+                if ack["ok"]:
+                    # A decline asks the next person at once, in the same pass.
+                    frames = list(frames) + self._pair_locked(float(self.clock()))
         await self._emit(frames)
         return ack
 
@@ -362,10 +426,11 @@ class Service:
 
     @staticmethod
     def _may_answer(player_id: str, row: dict) -> bool:
-        """Who may answer: the person asked. A match offer has no asker, so either side may."""
-        if player_id == row["to_id"]:
-            return True
-        return bool(row.get("offer")) and player_id == row["from_id"]
+        """Who may answer: the person asked, match offer or not.
+
+        A match offer is the seeker's ask too, so the seeker cannot accept their own.
+        """
+        return player_id == row["to_id"]
 
     async def _accept_locked(self, player: dict, frame: dict) -> tuple[dict, list]:
         row = self._load(frame)
@@ -396,6 +461,8 @@ class Service:
         # Both are at a table now: find match has done its job for both of them.
         self.store.clear_looking(row["from_id"])
         self.store.clear_looking(row["to_id"])
+        self._forget(row["from_id"])
+        self._forget(row["to_id"])
         others = self.store.release_other_pending(row["from_id"], row["to_id"], row["id"])
         frames = self._seated_notice(saved)
         for other in others:
