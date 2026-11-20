@@ -249,12 +249,12 @@ function ChampionsPage({ ctx, view }) {
         field(form.motto, value => setForm(current => ({ ...current, motto: value })), `Motto (max ${data.limits.motto})`)
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }, children: [
-        jsx('div', { style: { fontSize: 12, color: text.tertiary, width: 54 }, children: 'Colour' }),
+        jsx('div', { style: { fontSize: 12, color: text.tertiary, width: 54 }, children: 'Color' }),
         ...(data.colors || []).map(item => jsx('button', {
           type: 'button',
           key: item.id,
           title: item.id,
-          'aria-label': `${item.id} colour`,
+          'aria-label': `${item.id} color`,
           'aria-pressed': form.color === item.id,
           onClick: () => setForm(current => ({ ...current, color: item.id })),
           style: {
@@ -440,7 +440,7 @@ function ChampionsPage({ ctx, view }) {
       ] }),
       jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: count < 2
         ? 'Pick at least two entrants.'
-        : `${count} entrants · ${estimateGames} games (both colours) · about ${estimateCalls} model calls · roughly ${estimateMinutes} min. Limits: ${data.caps.games} games, ${data.caps.calls} calls.` }),
+        : `${count} entrants · ${estimateGames} games (both colors) · about ${estimateCalls} model calls · roughly ${estimateMinutes} min. Limits: ${data.caps.games} games, ${data.caps.calls} calls.` }),
       jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
         button('Start tournament', start, { primary: true, disabled: !canStart }),
         run && run.status === 'running' ? button('Stop', () => act('/tournament/stop', { id: run.id })) : null,

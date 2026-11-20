@@ -262,9 +262,30 @@ assert.equal(stageNode.props.style['--jp2-tint-bg'], evaluate('jp2LTintVars()')[
   'the tint rides on the stage as the three CSS values the one rule reads')
 assert.deepEqual(plain(Object.keys(evaluate('jp2LTintVars()'))), ['--jp2-tint-bg', '--jp2-tint-edge', '--jp2-tint-glow'],
   'three values, all of them colours: nothing that can affect the art')
-const fullStage = evaluate(`jp2LStage(lookCtx, { scale: 1 }, 'full')`)
-assert.equal(nodes(fullStage).find(node => node.props && node.props['data-jp2-stage'] === '1').props['data-jp2-tint'], undefined,
-  'the full view on the Games page is the cabinet\'s own drawing, untinted')
+// The Color setting recolors the cabinet itself, in every mode. It used to tint only the faint
+// over-chat copy, so a swatch pressed inside the full cabinet changed nothing anyone could see
+// (owner, 2026-11-20: "I don't think colour in slot machine works").
+sandbox.colorProps = { ctx: sandbox.lookCtx, mode: 'full' }
+const cabinetRoot = () => nodes(evaluate('JackpotMachine(colorProps)')).find(node => node.props && node.props.className === 'jp2-machine')
+const paintedViolet = cabinetRoot().props.style
+evaluate('jp2LSetHue(170, lookCtx)')
+const paintedDefault = cabinetRoot().props.style
+assert.equal(evaluate(`jp2LCabinetPaint(jp2LTint(), 'full', false)`), null, 'at the default the cabinet keeps its own paint')
+assert.ok(/#070b14/.test(paintedDefault.background), 'so the default full cabinet is the navy it has always been')
+assert.equal(paintedDefault.border, '1px solid rgba(62,224,197,0.28)', 'with its own teal edge')
+assert.notEqual(paintedViolet.background, paintedDefault.background, 'a violet hue repaints the FULL cabinet\'s ground')
+assert.notEqual(paintedViolet.border, paintedDefault.border, 'and its edge')
+evaluate('jp2LSetHue(248, lookCtx)')
+const fullLooks = ['teal', 'violet', 'sunset', 'mono'].map(id => {
+  evaluate(`jp2LSetGradient('${id}', lookCtx)`)
+  return cabinetRoot().props.style.background
+})
+assert.equal(new Set(fullLooks).size, 4, 'each style is a different full cabinet')
+sandbox.colorProps = { ctx: sandbox.lookCtx, mode: 'overlay' }
+assert.equal(cabinetRoot().props.style.background, evaluate('jp2LTintPalette().background'),
+  'and the over-chat copy wears the same tint as its stage')
+evaluate(`jp2LSetGradient('teal', lookCtx)`)
+evaluate('jp2LSetHue(248, lookCtx)')
 console.log('jackpot2 look: one rule on the cabinet\'s root, no filter, no text shadow, the art untouched: passed')
 
 // ---- the place is the slot's, and the fit follows the share --------------------
@@ -313,8 +334,11 @@ assert.deepEqual(plain(namedButtons), ['Bigger', 'Biggest', 'Normal', 'Reset loo
   'and every button says what it is — an empty button is a defect the panel layout hides; Normal, Bigger and Biggest ride on the size row')
 assert.ok(words(rows[1]).includes('See-through') && words(rows[1]).includes('Backdrop size'),
   `both sliders on the shared row keep their name (${words(rows[1]).trim()})`)
-assert.ok(words(rows[2]).includes('Colour') && words(rows[2]).includes('Teal (current)'),
-  `the colour row names the setting and the gradient (${words(rows[2]).trim()})`)
+assert.ok(words(rows[2]).includes('Color') && !words(rows[2]).includes('Colour'),
+  `the color row is spelled Color (${words(rows[2]).trim()})`)
+for (const label of ['Plain', 'Two-tone', 'Warm fade', 'Gray (no color)']) {
+  assert.ok(words(rows[2]).includes(label), `the style choice reads ${label} (${words(rows[2]).trim()})`)
+}
 assert.ok(words(rows[2]).includes(`${evaluate('jp2LTint().hue')}°`),
   'and reads the hue that is actually set')
 const settingsPanel = panelFor('settings')

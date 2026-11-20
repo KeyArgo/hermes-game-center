@@ -181,7 +181,7 @@ function skinToggle(skin, onSkin) {
   const classic = skin === 'classic'
   return toggleRow({
     title: 'Classic look',
-    note: 'Off is Signal Hall, a night-hall skin. On keeps the old Game Center colours.',
+    note: 'Off is Signal Hall, a night-hall skin. On keeps the old Game Center colors.',
     on: classic,
     onToggle: () => {
       if (typeof onSkin === 'function') onSkin(classic ? 'signal' : 'classic')
@@ -4924,6 +4924,9 @@ function JackpotMachine(props) {
   const [busy, setBusy] = useState(false)
   const [cashBusy, setCashBusy] = useState(false)
   const [positions, setPositions] = useState([0, 0, 0])
+  // The Color setting (19-jackpot2-layer.js), subscribed so a swatch repaints this cabinet at once.
+  // The guard is fixed per bundle, so the hook order never changes between renders.
+  const [tint] = typeof useJp2LTint === 'function' ? useJp2LTint(ctx) : [null]
   const [run, setRun] = useState([0, 0, 0])
   const [land, setLand] = useState([false, false, false])
   const [lit, setLit] = useState(0)
@@ -5815,7 +5818,8 @@ function JackpotMachine(props) {
       // In the over-chat layer the cabinet must not swallow the conversation: the frame is inert and
       // only the controls below opt back in.
       pointerEvents: mode === 'overlay' ? 'none' : 'auto',
-      transition: reduced ? 'none' : 'box-shadow 260ms linear, border-color 260ms linear'
+      transition: reduced ? 'none' : 'box-shadow 260ms linear, border-color 260ms linear',
+      ...((typeof jp2LCabinetPaint === 'function' && tint && jp2LCabinetPaint(tint, mode, flash)) || {})
     },
     children: [
       jsx('style', { children: jp2Style() }, 'style'),
@@ -9430,10 +9434,10 @@ const JP2L_SWATCHES = [
 // How the tint is laid across the frame. 'teal' is the frame's own flat frost — the default, and the
 // look the copy had before this setting existed; the others run a second stop into the chosen hue.
 const JP2L_GRADIENTS = [
-  { id: 'teal', label: 'Teal (current)' },
-  { id: 'violet', label: 'Violet to teal' },
-  { id: 'sunset', label: 'Sunset' },
-  { id: 'mono', label: 'Mono' }
+  { id: 'teal', label: 'Plain' },
+  { id: 'violet', label: 'Two-tone' },
+  { id: 'sunset', label: 'Warm fade' },
+  { id: 'mono', label: 'Gray (no color)' }
 ]
 const JP2L_GRADIENT_KEY = 'jackpot2.gradient'
 const JP2L_GRADIENT_DEFAULT = 'teal'
@@ -9572,6 +9576,40 @@ function jp2LTintVars(tint) {
   if (!look.active) return null
   const palette = jp2LTintPalette(look)
   return { '--jp2-tint-bg': palette.background, '--jp2-tint-edge': palette.edge, '--jp2-tint-glow': palette.glow }
+}
+
+// The cabinet's own paint at the chosen color, for every mode. The over-chat copy alone used to be
+// tinted, so a swatch pressed inside the full cabinet changed nothing anyone could see (owner,
+// 2026-11-20). JackpotMachine spreads this over its root style; at the default it is null and the
+// cabinet keeps the exact values it has always drawn. `flash` keeps the win flash's stronger edge.
+function jp2LCabinetPaint(tint, mode, flash) {
+  const look = tint || jp2LTint()
+  if (!look.active) return null
+  const hue = look.hue
+  const mono = look.gradient === 'mono'
+  const accentHue = mono ? 215 : hue
+  const accentS = mono ? 6 : JP2L_ACCENT_S
+  const accentL = mono ? 62 : JP2L_ACCENT_L
+  const edge = jp2LRgba(accentHue, accentS, accentL, flash ? 0.72 : 0.28)
+  const glow = jp2LRgba(accentHue, accentS, accentL, flash ? 0.42 : 0.16)
+  let background
+  if (mode === 'overlay') {
+    background = jp2LTintPalette(look).background
+  } else {
+    // The full cabinet is opaque: the same dark ground it has always had, turned to the chosen hue.
+    const base = mono ? 215 : hue
+    const sat = mono ? 6 : JP2L_FROST_S
+    const top = look.gradient === 'violet' ? jp2LRgba(hue + 78, sat, 14, 1)
+      : look.gradient === 'sunset' ? jp2LRgba(28, 62, 18, 1)
+        : jp2LRgba(base, sat, 10, 1)
+    background = `radial-gradient(90% 60% at 50% 112%, ${jp2LRgba(accentHue, accentS, accentL, 0.12)}, rgba(0,0,0,0) 60%),
+      linear-gradient(180deg, ${top} 0%, ${jp2LRgba(base, sat, 6, 1)} 45%, ${jp2LRgba(base, sat, 3, 1)} 100%)`
+  }
+  return {
+    background,
+    border: `1px solid ${edge}`,
+    boxShadow: `inset 0 0 0 1px rgba(255,255,255,.05), 0 18px 60px rgba(2,4,10,.8), 0 0 ${flash ? 90 : 60}px ${glow}`
+  }
 }
 
 // The shorthand a repaint is decided by: the hue and the gradient, not the pixels.
@@ -9945,7 +9983,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
   const swatch = item => jsx('button', {
     type: 'button',
     'data-jp2-oc-swatch': String(item.hue),
-    'aria-label': `Jackpot backdrop: tint ${item.name}`,
+    'aria-label': `Jackpot cabinet color: ${item.name}`,
     'aria-pressed': tint.hue === item.hue,
     title: `${item.name} (hue ${item.hue})`,
     onClick: () => tintActions.setHue(item.hue),
@@ -9988,7 +10026,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
               jsx('span', { children: 'Show as backdrop' }, 'text')
             ]
           }, 'toggle'),
-          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The backdrop switch itself is left as it is.', () => tintActions.reset())
+          button('reset', 'Reset look', 'Restore every look setting: see-through, size and color. The backdrop switch itself is left as it is.', () => tintActions.reset())
         ]
       }, 'switch'),
       row('alpha', 'See-through', [
@@ -10013,14 +10051,14 @@ function Jackpot2OverChatControls({ ctx, tone }) {
       ], dark ? 64 : 74),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.
-      row('colour', 'Colour', [
+      row('color', 'Color', [
         ...JP2L_SWATCHES.map(swatch),
         slider('hue', 'tint hue', tint.hue, value => tintActions.setHue(value)),
         readout('hue', `${tint.hue}°`),
         jsx('select', {
           'data-jp2-oc-select': 'gradient',
-          'aria-label': 'Jackpot backdrop: gradient',
-          title: 'Gradient: how the tint is laid across the frame. The teal is the frame the cabinet has always worn.',
+          'aria-label': 'Jackpot cabinet: color style',
+          title: 'Style: how the color is laid across the cabinet\'s frame. Plain is the frame the cabinet has always worn.',
           value: tint.gradient,
           onChange: event => tintActions.setGradient(event.target.value),
           style: {
@@ -10039,8 +10077,8 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         'data-jp2-oc': 'why',
         style: { fontSize: 10, color: dim, lineHeight: 1.4 },
         children: on
-          ? 'The cabinet floats over the conversation at the size, place and colour set here.'
-          : 'Off: the cabinet stays in its own panel, and nothing is drawn over the conversation.'
+          ? 'The cabinet floats over the conversation at the size and see-through set here. Color recolors the cabinet everywhere.'
+          : 'Off: the cabinet stays in its own panel, and nothing is drawn over the conversation. Color recolors the cabinet everywhere.'
       }, 'why')
     ]
   })
@@ -12380,7 +12418,7 @@ function PlayTable({ game, view, board, playMove, send, onBack, ctx }) {
           ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `Series: ${seriesLine}` })
           : null,
         jsxs('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }, children: [
-          playAgainLine ? button('Play again', () => newMatch(playAgainLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : 'human-bot')), lock({ primary: true, title: 'The same game and the same settings, with the colours swapped.' })) : null,
+          playAgainLine ? button('Play again', () => newMatch(playAgainLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : 'human-bot')), lock({ primary: true, title: 'The same game and the same settings, with the colors swapped.' })) : null,
           access.can_review ? button('Review my game', () => command(`${game.id} review`), lock({ title: 'We look at one move you could have played better. Nothing is scored, and you can play again right after.' })) : null,
           button(requestedByMe ? 'Rematch requested' : rematchRequests.length ? 'Accept rematch' : 'Rematch', () => ask('rematch', 'Start another game with the same seats and series score. Any built-in bot seats are included in your consent.', `${game.id} rematch`), lock({ primary: true, disabled: !access.can_rematch || requestedByMe || (botOff && seats.some(seat => seat.kind === 'local')) })),
           button(newGameLabel, () => newMatch(machineLine, () => setLocalSetup(machineSeat && machineSeat.kind === 'agent' ? 'human-agent' : machineSeat ? 'human-bot' : 'shared')), lock({ disabled: !access.can_manage, title: 'A fresh game with the same opponent.' })),
@@ -17888,7 +17926,7 @@ function PassportCard({ ctx, champion, avatars, colors, pet, badges: earned, onE
       ] }),
       jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, borderTop: `1px solid ${stroke}`, paddingTop: 8 }, children: [
         jsx('div', { style: { fontSize: 12, color: text.secondary }, children: line }),
-        jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `From ${colour.id}: its colour. W ${record.wins || 0} · L ${record.losses || 0} · D ${record.draws || 0}${records ? ` · this version ${records.wins || 0}-${records.losses || 0}-${records.draws || 0}` : ''}` })
+        jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `From ${colour.id}: its color. W ${record.wins || 0} · L ${record.losses || 0} · D ${record.draws || 0}${records ? ` · this version ${records.wins || 0}-${records.losses || 0}-${records.draws || 0}` : ''}` })
       ] }),
       (earned || []).length ? jsx('div', { style: { display: 'flex', gap: 4, flexWrap: 'wrap' }, children: (earned || []).map(name => badge(String(name).replace('_', ' '))) }) : null,
       jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }, children: [
@@ -18665,12 +18703,12 @@ function ChampionsPage({ ctx, view }) {
         field(form.motto, value => setForm(current => ({ ...current, motto: value })), `Motto (max ${data.limits.motto})`)
       ] }),
       jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }, children: [
-        jsx('div', { style: { fontSize: 12, color: text.tertiary, width: 54 }, children: 'Colour' }),
+        jsx('div', { style: { fontSize: 12, color: text.tertiary, width: 54 }, children: 'Color' }),
         ...(data.colors || []).map(item => jsx('button', {
           type: 'button',
           key: item.id,
           title: item.id,
-          'aria-label': `${item.id} colour`,
+          'aria-label': `${item.id} color`,
           'aria-pressed': form.color === item.id,
           onClick: () => setForm(current => ({ ...current, color: item.id })),
           style: {
@@ -18856,7 +18894,7 @@ function ChampionsPage({ ctx, view }) {
       ] }),
       jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: count < 2
         ? 'Pick at least two entrants.'
-        : `${count} entrants · ${estimateGames} games (both colours) · about ${estimateCalls} model calls · roughly ${estimateMinutes} min. Limits: ${data.caps.games} games, ${data.caps.calls} calls.` }),
+        : `${count} entrants · ${estimateGames} games (both colors) · about ${estimateCalls} model calls · roughly ${estimateMinutes} min. Limits: ${data.caps.games} games, ${data.caps.calls} calls.` }),
       jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
         button('Start tournament', start, { primary: true, disabled: !canStart }),
         run && run.status === 'running' ? button('Stop', () => act('/tournament/stop', { id: run.id })) : null,

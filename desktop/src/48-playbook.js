@@ -563,7 +563,7 @@ function PassportCard({ ctx, champion, avatars, colors, pet, badges: earned, onE
       ] }),
       jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, borderTop: `1px solid ${stroke}`, paddingTop: 8 }, children: [
         jsx('div', { style: { fontSize: 12, color: text.secondary }, children: line }),
-        jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `From ${colour.id}: its colour. W ${record.wins || 0} · L ${record.losses || 0} · D ${record.draws || 0}${records ? ` · this version ${records.wins || 0}-${records.losses || 0}-${records.draws || 0}` : ''}` })
+        jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: `From ${colour.id}: its color. W ${record.wins || 0} · L ${record.losses || 0} · D ${record.draws || 0}${records ? ` · this version ${records.wins || 0}-${records.losses || 0}-${records.draws || 0}` : ''}` })
       ] }),
       (earned || []).length ? jsx('div', { style: { display: 'flex', gap: 4, flexWrap: 'wrap' }, children: (earned || []).map(name => badge(String(name).replace('_', ' '))) }) : null,
       jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }, children: [

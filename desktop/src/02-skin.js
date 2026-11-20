@@ -139,7 +139,7 @@ function skinToggle(skin, onSkin) {
   const classic = skin === 'classic'
   return toggleRow({
     title: 'Classic look',
-    note: 'Off is Signal Hall, a night-hall skin. On keeps the old Game Center colours.',
+    note: 'Off is Signal Hall, a night-hall skin. On keeps the old Game Center colors.',
     on: classic,
     onToggle: () => {
       if (typeof onSkin === 'function') onSkin(classic ? 'signal' : 'classic')

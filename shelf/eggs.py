@@ -40,7 +40,7 @@ EGGS = (
     {"id": "nous-in-the-marquee", "points": 6000, "where": "slots",
      "hint": "The marquee is blank until a jackpot. It is not always blank."},
     {"id": "the-argo-stamp", "points": 10000, "where": "anywhere",
-     "hint": "One developer stamp is slightly the wrong colour."},
+     "hint": "One developer stamp is slightly the wrong color."},
     # The one that is just the mark. ``art`` names a picture the desktop already draws for the reels
     # (the Nous stamp), and that artwork carries its own slogan - nothing is printed on top of it.
     # Allowed up to 5,000 points, the top of the second tier.

@@ -113,10 +113,10 @@ const JP2L_SWATCHES = [
 // How the tint is laid across the frame. 'teal' is the frame's own flat frost — the default, and the
 // look the copy had before this setting existed; the others run a second stop into the chosen hue.
 const JP2L_GRADIENTS = [
-  { id: 'teal', label: 'Teal (current)' },
-  { id: 'violet', label: 'Violet to teal' },
-  { id: 'sunset', label: 'Sunset' },
-  { id: 'mono', label: 'Mono' }
+  { id: 'teal', label: 'Plain' },
+  { id: 'violet', label: 'Two-tone' },
+  { id: 'sunset', label: 'Warm fade' },
+  { id: 'mono', label: 'Gray (no color)' }
 ]
 const JP2L_GRADIENT_KEY = 'jackpot2.gradient'
 const JP2L_GRADIENT_DEFAULT = 'teal'
@@ -255,6 +255,40 @@ function jp2LTintVars(tint) {
   if (!look.active) return null
   const palette = jp2LTintPalette(look)
   return { '--jp2-tint-bg': palette.background, '--jp2-tint-edge': palette.edge, '--jp2-tint-glow': palette.glow }
+}
+
+// The cabinet's own paint at the chosen color, for every mode. The over-chat copy alone used to be
+// tinted, so a swatch pressed inside the full cabinet changed nothing anyone could see (owner,
+// 2026-11-20). JackpotMachine spreads this over its root style; at the default it is null and the
+// cabinet keeps the exact values it has always drawn. `flash` keeps the win flash's stronger edge.
+function jp2LCabinetPaint(tint, mode, flash) {
+  const look = tint || jp2LTint()
+  if (!look.active) return null
+  const hue = look.hue
+  const mono = look.gradient === 'mono'
+  const accentHue = mono ? 215 : hue
+  const accentS = mono ? 6 : JP2L_ACCENT_S
+  const accentL = mono ? 62 : JP2L_ACCENT_L
+  const edge = jp2LRgba(accentHue, accentS, accentL, flash ? 0.72 : 0.28)
+  const glow = jp2LRgba(accentHue, accentS, accentL, flash ? 0.42 : 0.16)
+  let background
+  if (mode === 'overlay') {
+    background = jp2LTintPalette(look).background
+  } else {
+    // The full cabinet is opaque: the same dark ground it has always had, turned to the chosen hue.
+    const base = mono ? 215 : hue
+    const sat = mono ? 6 : JP2L_FROST_S
+    const top = look.gradient === 'violet' ? jp2LRgba(hue + 78, sat, 14, 1)
+      : look.gradient === 'sunset' ? jp2LRgba(28, 62, 18, 1)
+        : jp2LRgba(base, sat, 10, 1)
+    background = `radial-gradient(90% 60% at 50% 112%, ${jp2LRgba(accentHue, accentS, accentL, 0.12)}, rgba(0,0,0,0) 60%),
+      linear-gradient(180deg, ${top} 0%, ${jp2LRgba(base, sat, 6, 1)} 45%, ${jp2LRgba(base, sat, 3, 1)} 100%)`
+  }
+  return {
+    background,
+    border: `1px solid ${edge}`,
+    boxShadow: `inset 0 0 0 1px rgba(255,255,255,.05), 0 18px 60px rgba(2,4,10,.8), 0 0 ${flash ? 90 : 60}px ${glow}`
+  }
 }
 
 // The shorthand a repaint is decided by: the hue and the gradient, not the pixels.
@@ -628,7 +662,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
   const swatch = item => jsx('button', {
     type: 'button',
     'data-jp2-oc-swatch': String(item.hue),
-    'aria-label': `Jackpot backdrop: tint ${item.name}`,
+    'aria-label': `Jackpot cabinet color: ${item.name}`,
     'aria-pressed': tint.hue === item.hue,
     title: `${item.name} (hue ${item.hue})`,
     onClick: () => tintActions.setHue(item.hue),
@@ -671,7 +705,7 @@ function Jackpot2OverChatControls({ ctx, tone }) {
               jsx('span', { children: 'Show as backdrop' }, 'text')
             ]
           }, 'toggle'),
-          button('reset', 'Reset look', 'Restore every look setting: see-through, size and colour. The backdrop switch itself is left as it is.', () => tintActions.reset())
+          button('reset', 'Reset look', 'Restore every look setting: see-through, size and color. The backdrop switch itself is left as it is.', () => tintActions.reset())
         ]
       }, 'switch'),
       row('alpha', 'See-through', [
@@ -696,14 +730,14 @@ function Jackpot2OverChatControls({ ctx, tone }) {
       ], dark ? 64 : 74),
       // What colour its frosted frame is: six quick picks, a hue for anything else, and how the tint is
       // laid across the frame. The reels and the symbol art are never touched by any of it.
-      row('colour', 'Colour', [
+      row('color', 'Color', [
         ...JP2L_SWATCHES.map(swatch),
         slider('hue', 'tint hue', tint.hue, value => tintActions.setHue(value)),
         readout('hue', `${tint.hue}°`),
         jsx('select', {
           'data-jp2-oc-select': 'gradient',
-          'aria-label': 'Jackpot backdrop: gradient',
-          title: 'Gradient: how the tint is laid across the frame. The teal is the frame the cabinet has always worn.',
+          'aria-label': 'Jackpot cabinet: color style',
+          title: 'Style: how the color is laid across the cabinet\'s frame. Plain is the frame the cabinet has always worn.',
           value: tint.gradient,
           onChange: event => tintActions.setGradient(event.target.value),
           style: {
@@ -722,8 +756,8 @@ function Jackpot2OverChatControls({ ctx, tone }) {
         'data-jp2-oc': 'why',
         style: { fontSize: 10, color: dim, lineHeight: 1.4 },
         children: on
-          ? 'The cabinet floats over the conversation at the size, place and colour set here.'
-          : 'Off: the cabinet stays in its own panel, and nothing is drawn over the conversation.'
+          ? 'The cabinet floats over the conversation at the size and see-through set here. Color recolors the cabinet everywhere.'
+          : 'Off: the cabinet stays in its own panel, and nothing is drawn over the conversation. Color recolors the cabinet everywhere.'
       }, 'why')
     ]
   })

@@ -478,6 +478,9 @@ function JackpotMachine(props) {
   const [busy, setBusy] = useState(false)
   const [cashBusy, setCashBusy] = useState(false)
   const [positions, setPositions] = useState([0, 0, 0])
+  // The Color setting (19-jackpot2-layer.js), subscribed so a swatch repaints this cabinet at once.
+  // The guard is fixed per bundle, so the hook order never changes between renders.
+  const [tint] = typeof useJp2LTint === 'function' ? useJp2LTint(ctx) : [null]
   const [run, setRun] = useState([0, 0, 0])
   const [land, setLand] = useState([false, false, false])
   const [lit, setLit] = useState(0)
@@ -1369,7 +1372,8 @@ function JackpotMachine(props) {
       // In the over-chat layer the cabinet must not swallow the conversation: the frame is inert and
       // only the controls below opt back in.
       pointerEvents: mode === 'overlay' ? 'none' : 'auto',
-      transition: reduced ? 'none' : 'box-shadow 260ms linear, border-color 260ms linear'
+      transition: reduced ? 'none' : 'box-shadow 260ms linear, border-color 260ms linear',
+      ...((typeof jp2LCabinetPaint === 'function' && tint && jp2LCabinetPaint(tint, mode, flash)) || {})
     },
     children: [
       jsx('style', { children: jp2Style() }, 'style'),
