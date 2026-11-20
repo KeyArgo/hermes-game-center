@@ -27,6 +27,14 @@ def test_pet_with_stub_modules(monkeypatch, tmp_path):
 
 
 def test_unsupported_import(monkeypatch):
+    """Both answers on purpose, independent of test order (available() remembers a good probe).
+
+    A Hermes with no pet seam reports "no-pet"; a seam that was seen and then fails to import
+    reports "unsupported". Neither raises, and cells() is off in both."""
     monkeypatch.setitem(sys.modules, 'agent.pet', None)
+    monkeypatch.setattr(pet, '_AVAILABLE', None)
+    assert pet.active({})['reason'] == 'no-pet'
+    assert pet.cells({}, 'idle')['enabled'] is False
+    monkeypatch.setattr(pet, '_AVAILABLE', True)
     assert pet.active({})['reason'] == 'unsupported'
     assert pet.cells({}, 'idle')['enabled'] is False
