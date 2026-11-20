@@ -361,7 +361,7 @@ class Rooms:
     # Commands ----------------------------------------------------------------
 
     def run(self, room: dict, player: dict, action: str, args: list[str] | None = None, *,
-            reason: str = "") -> dict:
+            reason: str = "", require_live: bool = False) -> dict:
         """One table action as this player. Returns {ok, text, finished}."""
         args = [str(item)[:16] for item in (args or [])][:3]
         fresh = self.store.room(room["id"])
@@ -427,6 +427,8 @@ class Rooms:
             else:
                 line = "join"
         elif action == "move":
+            if not self._socket_live(room["id"], player["id"], require_live=require_live):
+                return {"ok": False, "text": "Your connection to this table is closed.", "finished": None}
             if not args:
                 return {"ok": False, "text": "Pick a move.", "finished": None}
             line = "move " + " ".join(args)
@@ -474,6 +476,14 @@ class Rooms:
                     self._write_state(room, sync)
             self._close_when_empty(room)
         return answer
+
+    def _socket_live(self, room_id: str, player_id: str, *, require_live: bool = False) -> bool:
+        """Whether this player's table socket is live (so a dying socket cannot move or bet)."""
+        if (room_id, player_id) in self.left_at:
+            return False
+        if require_live or room_id in self.online:
+            return player_id in self.online.get(room_id, set())
+        return True
 
     def _resign_seat(self, room: dict, player: dict, reason: str) -> dict:
         if reason != "disconnect":

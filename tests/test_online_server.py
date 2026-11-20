@@ -376,3 +376,30 @@ def test_the_janitor_unseats_a_quiet_table(tmp_path):
             task.cancel()
             await client.close()
     run(scenario())
+
+
+def test_a_dying_socket_cannot_stake_a_blackjack_hand(tmp_path):
+    """A move arriving for a socket that is no longer live is rejected."""
+    async def scenario():
+        server, client = await started(tmp_path)
+        try:
+            ada, ada_token = await sign_in(client, "Ada")
+            _bea, bea_token = await sign_in(client, "Bea")
+            room = (await open_room(client, ada_token, game="blackjack"))["room"]
+            a = await connect(client, room["id"], ada_token)
+            b = await connect(client, room["id"], bea_token)
+            assert (await b.result(1, t="cmd", action="join"))["ok"]
+            conn = next(c for c in server.conns[room["id"]] if c.player["id"] == ada["id"])
+            # Simulate a dying socket already dropped from live table presence.
+            server.rooms.disconnected(room["id"], ada["id"])
+            await server.handle(conn, {"t": "cmd", "action": "move", "args": ["bet1000"], "ref": 9})
+            res = await a.until(lambda m: m.get("t") == "result" and m.get("ref") == 9)
+            assert res["ok"] is False, res
+            state = server.rooms.state(server.store.room(room["id"]))
+            assert not state.get("mid_round")
+            assert state["stacks"] == [10000, 10000]
+            await a.ws.close()
+            await b.ws.close()
+        finally:
+            await client.close()
+    run(scenario())

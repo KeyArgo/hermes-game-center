@@ -352,6 +352,29 @@ def test_disconnect_grace_refunds_an_undealt_bet_and_keeps_a_dealt_one(setup):
     assert rooms.run(dealt_room, bea, "move", ["stand"])["ok"]
 
 
+def test_a_disconnected_player_cannot_stake_the_next_hand(setup):
+    """A player whose table socket is not live cannot bet or move."""
+    _store, rooms, people, _root = setup
+    room = pinned(rooms, people)
+    ada, bea = people["Ada"], people["Bea"]
+    rooms.connected(room["id"], ada["id"])
+    rooms.connected(room["id"], bea["id"])
+    rooms.disconnected(room["id"], ada["id"])
+    refused = rooms.run(room, ada, "move", ["bet1000"])
+    assert not refused["ok"], refused
+    state = rooms.state(room)
+    assert not state.get("mid_round")
+    assert state["stacks"] == [10000, 10000]
+    assert (state.get("round_bets") or [0, 0]) == [0, 0]
+    # Reconnecting restores play.
+    rooms.connected(room["id"], ada["id"])
+    assert rooms.run(room, ada, "move", ["bet1000"])["ok"]
+    # Explicit live-socket check also rejects a seat that never connected.
+    fresh_room = pinned(rooms, people)
+    assert not rooms.run(fresh_room, ada, "move", ["bet10"], require_live=True)["ok"]
+    assert not rooms.state(fresh_room).get("mid_round")
+
+
 def test_a_room_with_no_seated_socket_closes_after_the_grace(setup, caplog):
     import logging
     store, rooms, people, _root = setup

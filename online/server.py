@@ -1346,10 +1346,14 @@ class App:
                 return
             player = self.store.player(conn.player["id"]) or conn.player
             conn.player = player
+            action = ""
             if kind == "cmd":
                 args = message.get("args") if isinstance(message.get("args"), list) else []
                 action = str(message.get("action") or "")
-                answer = self.rooms.run(room, player, action, args)
+                if action == "move" and (conn.ws.closed or conn not in self.conns.get(room["id"], ())):
+                    answer = {"ok": False, "text": "Your connection to this table is closed.", "finished": None}
+                else:
+                    answer = self.rooms.run(room, player, action, args, require_live=(action == "move"))
                 # Jackpot Mode: track tool calls and award pulls
                 if answer["ok"]:
                     player_id = player["id"]
