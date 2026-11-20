@@ -256,12 +256,14 @@ class HealthSampler:
         threads: Callable[[], int] = threading.active_count,
         sockets: Callable[[], int] = lobby_socket_count,
         logger: logging.Logger = log,
+        extra: Callable[[], str] | None = None,
     ) -> None:
         self.interval = interval
         self.rss = rss
         self.threads = threads
         self.sockets = sockets
         self.logger = logger
+        self.extra = extra or (lambda: "")
         self._history: deque = deque(maxlen=GROWTH_SAMPLES)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -285,6 +287,10 @@ class HealthSampler:
                         total / _MB, GROWTH_SAMPLES,
                     )
                     self._history.clear()
+        try:
+            line += self.extra() or ""
+        except Exception:
+            pass
         self.logger.info(line)
         return line
 

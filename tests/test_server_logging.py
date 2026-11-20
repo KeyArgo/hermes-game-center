@@ -7,6 +7,7 @@ Timing is judged with the App's injectable clock; the health line with a fake RS
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from types import SimpleNamespace
 
@@ -68,6 +69,60 @@ def test_only_requests_slower_than_two_seconds_warn(tmp_path, caplog):
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "slow request" in r.getMessage()]
     assert len(warnings) == 1
     assert "2.5" in warnings[0].getMessage()
+
+
+def test_health_says_when_the_sweep_has_not_finished_for_two_minutes(tmp_path, caplog):
+    """The periodic sweep stamps itself. Two minutes without that stamp shows on /health."""
+    import contextlib
+
+    now = {"t": 1_000_000.0}
+    app = App(tmp_path, clock=lambda: now["t"])
+
+    async def health():
+        response = await app.health(SimpleNamespace())
+        return json.loads(response.body)
+
+    async def ask():
+        fresh = await health()
+        assert fresh["ok"] is True
+        assert fresh["sweep_stale"] is False
+        now["t"] += 119
+        still = await health()
+        assert still["sweep_stale"] is False
+        now["t"] += 1
+        late = await health()
+        assert late["sweep_stale"] is True
+        assert late["sweep"] == "no sweep for 2 minutes"
+        app.note_sweep_done()
+        cleared = await health()
+        assert cleared["sweep_stale"] is False
+        assert cleared["sweep"] == "ok"
+
+    asyncio.run(ask())
+
+    app.sweep_completed_at = app.clock() - 120
+    app.health_watch.rss = lambda: 100 * MB
+    with caplog.at_level(logging.INFO, logger="gameshelf.online"):
+        line = app.health_watch.sample_once()
+    assert "sweep=stale" in line
+
+    # A finished pass of the janitor is what clears the alarm.
+    app.sweep_completed_at = 0.0
+
+    async def one_pass():
+        task = asyncio.create_task(app.janitor(app.build()))
+        try:
+            for _ in range(40):
+                if app.sweep_completed_at == now["t"]:
+                    return
+                await asyncio.sleep(0.05)
+        finally:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(one_pass())
+    assert app.sweep_completed_at == now["t"]
 
 
 def test_the_health_line_uses_the_server_logger_and_counts_sockets(tmp_path, caplog):

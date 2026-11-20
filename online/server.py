@@ -64,6 +64,9 @@ LOBBY_CACHE_SECONDS = 2.0
 # an open room stays listed, and raising chat retention must never leave old rooms in the lobby.
 CHAT_KEEP_DAYS = 30
 LOBBY_HOURS = 24
+# The janitor stamps a sweep when a pass finishes. Longer than this with no stamp
+# means the loop is stuck, and /health says so.
+SWEEP_ALARM_SECONDS = 120.0
 JANITOR = web.AppKey("janitor", asyncio.Task)
 IMPORTMAP = json.dumps({"imports": {
     "react": "/vendor/react.mjs",
@@ -135,10 +138,25 @@ class App:
         play_requests.service = self.requests
         # The same health line the plugin writes, to this server's own logger (journald):
         # RSS, threads and the sockets it holds, one line every five minutes.
-        self.health_watch = diagnostics.HealthSampler(logger=log, sockets=self._socket_count)
+        # A sweep counts as just finished at startup, so a process that has not had
+        # two minutes yet does not report the loop stuck.
+        self.sweep_completed_at = self.clock()
+        self.health_watch = diagnostics.HealthSampler(
+            logger=log, sockets=self._socket_count, extra=self._sweep_health_note)
 
     def _socket_count(self) -> int:
         return sum(len(conns) for conns in self.conns.values())
+
+    def note_sweep_done(self) -> None:
+        self.sweep_completed_at = self.clock()
+
+    def sweep_is_late(self) -> bool:
+        return self.clock() - float(self.sweep_completed_at) >= SWEEP_ALARM_SECONDS
+
+    def _sweep_health_note(self) -> str:
+        if self.sweep_is_late():
+            return " sweep=stale"
+        return ""
 
     # Helpers -----------------------------------------------------------------
 
@@ -274,7 +292,14 @@ class App:
         return web.FileResponse(BOARD_JS, headers={"Content-Type": "text/javascript", "Cache-Control": "no-cache"})
 
     async def health(self, request: web.Request) -> web.Response:
-        return web.json_response({"ok": True, "games": list(self.rooms.games), "connections": sum(map(len, self.conns.values()))})
+        late = self.sweep_is_late()
+        return web.json_response({
+            "ok": True,
+            "games": list(self.rooms.games),
+            "connections": sum(map(len, self.conns.values())),
+            "sweep_stale": late,
+            "sweep": "no sweep for 2 minutes" if late else "ok",
+        })
 
     async def session(self, request: web.Request) -> web.Response:
         body = await _json(request)
@@ -1515,6 +1540,7 @@ class App:
                             del self.blocked[room_id]
                     for room_id in list(self.conns):
                         await self.broadcast(room_id)
+                self.note_sweep_done()
             except Exception:
                 log.exception("janitor")
             await asyncio.sleep(5)
