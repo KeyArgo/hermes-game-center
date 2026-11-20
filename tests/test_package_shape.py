@@ -60,6 +60,13 @@ def test_lane_notes_were_moved_not_lost():
         assert (history / name).is_file(), f"docs/history/{name} missing"
 
 
+def _stored_bytes() -> int:
+    """What the repository stores, not what a checkout happens to write: a Windows checkout turns
+    every LF into CRLF, which made the same tree read 15.8 MB there and 15.6 MB on Linux."""
+    out = subprocess.run(["git", "ls-tree", "-r", "-l", "HEAD"], cwd=ROOT, capture_output=True, check=True).stdout
+    return sum(int(line.split()[3]) for line in out.decode().splitlines() if line.split()[3].isdigit())
+
+
 def test_tracked_tree_is_small():
-    total = sum((ROOT / name).stat().st_size for name in _tracked() if (ROOT / name).is_file())
+    total = _stored_bytes()
     assert total < 15 * 1024 * 1024, f"tracked tree is {total / 1e6:.1f} MB"
