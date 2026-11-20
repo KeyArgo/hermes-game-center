@@ -456,6 +456,78 @@ def test_a_disconnected_board_player_resigns_after_the_grace(setup):
     assert not store.room(room["id"])["closed"]
 
 
+def test_leave_grace_applies_after_server_restart(setup):
+    """Presence lives in memory. After a restart a seat nobody comes back to still gets the
+    45 s grace, counted from when the sweep first sees it empty, and is then given up."""
+    store, rooms, p, clock = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.connected(room["id"], p["Ada"]["id"])
+    rooms.connected(room["id"], p["Bea"]["id"])
+    rooms.run(room, p["Ada"], "move", [legal(rooms, room, p["Ada"])[0]])
+    restarted = Rooms(store, rooms.data_root, games=LOADED, clock=clock)
+    restarted.connected(room["id"], p["Ada"]["id"])
+    assert restarted.sweep_disconnected(clock.now) == []
+    clock.now += DISCONNECT_LEAVE_SECONDS - 1
+    assert restarted.sweep_disconnected(clock.now) == []
+    assert restarted.state(room)["black_id"] == p["Bea"]["id"]
+    clock.now += 2
+    events = restarted.sweep_disconnected(clock.now)
+    assert [event.get("player_id") for event in events] == [p["Bea"]["id"]]
+    state = restarted.state(room)
+    assert state["status"] == "resigned" and state["result_reason"] == "disconnect"
+    assert not state.get("black_id")
+    assert state["white_id"] == p["Ada"]["id"]
+
+
+def test_a_seat_that_reconnects_after_a_restart_keeps_it(setup):
+    store, rooms, p, clock = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.run(room, p["Ada"], "move", [legal(rooms, room, p["Ada"])[0]])
+    rooms.connected(room["id"], p["Ada"]["id"])
+    assert rooms.sweep_disconnected(clock.now) == []
+    clock.now += 30
+    rooms.connected(room["id"], p["Bea"]["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS
+    assert rooms.sweep_disconnected(clock.now) == []
+    assert rooms.state(room)["black_id"] == p["Bea"]["id"]
+    assert rooms.state(room)["status"] == "active"
+
+
+def test_disconnect_sweep_does_not_repeat_notice_when_leave_refused(setup, monkeypatch):
+    """A leave the table refuses is tried again quietly. "<name> left the table." is said once."""
+    store, rooms, p, clock = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.connected(room["id"], p["Ada"]["id"])
+    rooms.connected(room["id"], p["Bea"]["id"])
+    rooms.run(room, p["Ada"], "move", [legal(rooms, room, p["Ada"])[0]])
+    rooms.disconnected(room["id"], p["Bea"]["id"])
+    real_run = rooms.run
+    tries = []
+
+    def refusing(room_, player, action, args=None, **kwargs):
+        if action == "leave":
+            tries.append(player["id"])
+            return {"ok": False, "text": "Refused: not now.", "finished": None}
+        return real_run(room_, player, action, args, **kwargs)
+
+    monkeypatch.setattr(rooms, "run", refusing)
+    clock.now += DISCONNECT_LEAVE_SECONDS + 1
+    first = rooms.sweep_disconnected(clock.now)
+    assert [event.get("text") for event in first] == ["Bea left the table."]
+    for _ in range(3):
+        clock.now += 5
+        assert rooms.sweep_disconnected(clock.now) == []
+    assert len(tries) == 4, "the leave is still tried on every sweep"
+    # Coming back and going again is a new absence, said again once its grace is over.
+    rooms.connected(room["id"], p["Bea"]["id"])
+    rooms.disconnected(room["id"], p["Bea"]["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS + 1
+    assert [event.get("text") for event in rooms.sweep_disconnected(clock.now)] == ["Bea left the table."]
+
+
 def test_reconnect_cancels_claim(setup):
     store, rooms, p, clock = setup
     room, _ = rooms.create("connect4", p["Ada"], public=True)

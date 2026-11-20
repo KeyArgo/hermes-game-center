@@ -195,9 +195,13 @@ class Rooms:
         self.games = games if games is not None else load_games()
         self.clock = clock
         self.turn_since: dict[str, float] = {}
-        # (room_id, player_id) -> time their last connection closed. Absent means never connected
-        # or connected now; the server keeps it current.
+        # (room_id, player_id) -> time their last connection closed, or the time the disconnect
+        # sweep first saw a seated person with no table socket (never connected, or seated
+        # before a restart). Absent means connected now, or not yet seen by the sweep.
         self.left_at: dict[tuple[str, str], float] = {}
+        # Seats whose disconnect leave the table refused. "<name> left the table." is said
+        # once; the leave is tried again on later sweeps without saying it again.
+        self.leave_refused: set[tuple[str, str]] = set()
         self.online: dict[str, set[str]] = {}
         # Presence is not saved. After a restart, everyone seated counts as away from now,
         # so a player who never comes back can still be claimed against.
@@ -856,6 +860,7 @@ class Rooms:
     def connected(self, room_id: str, player_id: str) -> None:
         self.online.setdefault(room_id, set()).add(player_id)
         self.left_at.pop((room_id, player_id), None)
+        self.leave_refused.discard((room_id, player_id))
         room = self.store.room(room_id)
         if room and room.get("ladder") and room_id not in self.turn_since:
             state = self.state(room) or {}
@@ -871,6 +876,10 @@ class Rooms:
         The same path as leave: an un-dealt blackjack bet is refunded, a hand in
         progress is forfeited, a board game in progress is a disconnect resignation.
         A room that has had no seated socket for that long is closed.
+
+        A seated person with no socket and no ``left_at`` entry (they never connected, or
+        the server restarted) starts the grace now. A leave the table refuses is said once
+        and tried again quietly on the next sweeps.
         """
         events = []
         for room in list(self.store.open_rooms(public_only=False)):
@@ -886,18 +895,29 @@ class Rooms:
                 if pid in online:
                     continue
                 left = self.left_at.get((room["id"], pid))
-                if left is None or now - left < DISCONNECT_LEAVE_SECONDS:
+                if left is None:
+                    self.left_at[(room["id"], pid)] = now
+                    continue
+                if now - left < DISCONNECT_LEAVE_SECONDS:
                     continue
                 due.append((side, pid, name))
             if not due:
                 continue
             quiet = len(due) == len(humans)
+            first_event = len(events)
             for _side, pid, name in due:
                 current = self.store.room(room["id"]) or room
                 if current.get("closed"):
                     break
                 player = self.store.player(pid) or {"id": pid, "name": name, "bot": False}
                 answer = self.run(current, player, "leave", reason="disconnect")
+                key = (room["id"], pid)
+                if not answer.get("ok"):
+                    if key in self.leave_refused:
+                        continue
+                    self.leave_refused.add(key)
+                else:
+                    self.leave_refused.discard(key)
                 events.append({
                     "room_id": room["id"],
                     "player_id": pid,
@@ -912,11 +932,16 @@ class Rooms:
                 current = self.store.room(room["id"]) or room
             if quiet and current.get("closed"):
                 self._log_empty(current)
-                if events:
+                if len(events) > first_event:
                     events[-1]["closed"] = True
                 else:
                     events.append({"room_id": room["id"], "closed": True,
                                    "text": "This table is closed.", "notice": None})
+            if current.get("closed"):
+                # A closed room has no seat to give up: its absences are not kept.
+                for _side, pid, _name in humans:
+                    self.left_at.pop((room["id"], pid), None)
+                    self.leave_refused.discard((room["id"], pid))
         return events
 
     def _log_empty(self, room: dict) -> None:

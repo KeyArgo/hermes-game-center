@@ -352,6 +352,28 @@ def test_disconnect_grace_refunds_an_undealt_bet_and_keeps_a_dealt_one(setup):
     assert rooms.run(dealt_room, bea, "move", ["stand"])["ok"]
 
 
+def test_seated_player_who_never_connected_is_unseated_after_grace(setup):
+    """Bea sat down (an accepted invite) but her table never opened. The 45 s grace still runs,
+    from when the sweep first sees her seat with no socket, and Ada plays on alone."""
+    store, rooms, people, _root = setup
+    clock = rooms.clock
+    room = pinned(rooms, people)
+    ada, bea = people["Ada"], people["Bea"]
+    rooms.connected(room["id"], ada["id"])
+    assert rooms.sweep_disconnected(clock.now) == []
+    clock.now += DISCONNECT_LEAVE_SECONDS - 1
+    assert rooms.sweep_disconnected(clock.now) == []
+    assert rooms.state(room)["black_id"] == bea["id"]
+    clock.now += 2
+    events = rooms.sweep_disconnected(clock.now)
+    assert [event.get("player_id") for event in events] == [bea["id"]]
+    state = rooms.state(room)
+    assert not state.get("black_id")
+    assert state["white_id"] == ada["id"]
+    assert not store.room(room["id"])["closed"]
+    assert rooms.picture(room, ada["id"])["table_players"] == 1
+
+
 def test_a_disconnected_player_cannot_stake_the_next_hand(setup):
     """A player whose table socket is not live cannot bet or move."""
     _store, rooms, people, _root = setup
