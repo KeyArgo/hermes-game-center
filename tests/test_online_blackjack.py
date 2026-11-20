@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import kit  # noqa: E402
-from online.rooms import Rooms, load_games  # noqa: E402
+from online.rooms import DISCONNECT_LEAVE_SECONDS, Rooms, load_games  # noqa: E402
 from online.store import Store  # noqa: E402
 
 LOADED = load_games()
@@ -308,6 +308,74 @@ def test_leaving_after_a_hand_does_not_resign_and_the_other_plays_on(setup):
     after = rooms.state(room)
     assert after["status"] == "active"
     assert after["hands"] >= 2 or after["phase"] == "play"
+
+
+def test_disconnect_grace_refunds_an_undealt_bet_and_keeps_a_dealt_one(setup):
+    """44s after the socket drops the seat is still there. 46s later it is cleared."""
+    store, rooms, people, _root = setup
+    clock = rooms.clock
+    room = pinned(rooms, people)
+    ada, bea = people["Ada"], people["Bea"]
+    rooms.connected(room["id"], ada["id"])
+    rooms.connected(room["id"], bea["id"])
+    assert rooms.run(room, ada, "move", ["bet1000"])["ok"]
+    assert rooms.state(room)["mid_round"] and rooms.state(room)["stacks"][0] == 9000
+    rooms.disconnected(room["id"], bea["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS - 1
+    assert rooms.sweep_disconnected(clock.now) == []
+    assert rooms.state(room)["black_id"] == bea["id"]
+    assert rooms.state(room)["stacks"][0] == 9000
+    # Coming back before the grace cancels it.
+    rooms.connected(room["id"], bea["id"])
+    clock.now += 2
+    assert rooms.sweep_disconnected(clock.now) == []
+    assert rooms.state(room)["black_id"] == bea["id"]
+    rooms.disconnected(room["id"], bea["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS + 1
+    rooms.sweep_disconnected(clock.now)
+    state = rooms.state(room)
+    assert not state.get("black_id")
+    assert state["stacks"] == [10000, 10000], state["stacks"]
+    assert not state["mid_round"]
+    assert not store.room(room["id"])["closed"]
+    # A hand already dealt is forfeited, not refunded, and the other person plays on.
+    dealt_room = dealt(rooms, people)
+    rooms.connected(dealt_room["id"], ada["id"])
+    rooms.connected(dealt_room["id"], bea["id"])
+    rooms.disconnected(dealt_room["id"], ada["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS + 1
+    rooms.sweep_disconnected(clock.now)
+    mid = rooms.state(dealt_room)
+    assert not mid.get("white_id")
+    assert mid["stacks"][0] == 9990
+    assert mid["status"] == "active"
+    assert rooms.run(dealt_room, bea, "move", ["stand"])["ok"]
+
+
+def test_a_room_with_no_seated_socket_closes_after_the_grace(setup, caplog):
+    import logging
+    store, rooms, people, _root = setup
+    clock = rooms.clock
+    room = pinned(rooms, people)
+    ada, bea = people["Ada"], people["Bea"]
+    rooms.connected(room["id"], ada["id"])
+    rooms.connected(room["id"], bea["id"])
+    assert rooms.run(room, ada, "move", ["bet1000"])["ok"]
+    rooms.disconnected(room["id"], ada["id"])
+    rooms.disconnected(room["id"], bea["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS - 1
+    rooms.sweep_disconnected(clock.now)
+    assert rooms.state(room)["white_id"] == ada["id"]
+    assert rooms.state(room)["black_id"] == bea["id"]
+    assert not store.room(room["id"])["closed"]
+    clock.now += 2
+    with caplog.at_level(logging.WARNING):
+        rooms.sweep_disconnected(clock.now)
+    assert store.room(room["id"])["closed"]
+    assert "reason=empty" in caplog.text
+    rows = store.db.execute(
+        "SELECT action, reason FROM audit WHERE target_id = ?", (room["id"],)).fetchall()
+    assert any(row["reason"] == "empty" for row in rows), [dict(row) for row in rows]
 
 
 def test_an_undealt_bet_is_refunded_when_someone_leaves(setup):

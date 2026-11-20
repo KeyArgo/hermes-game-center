@@ -1459,6 +1459,25 @@ class App:
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(other.ws.close(), 1)
 
+    async def sweep_disconnects(self, now: float) -> list[dict]:
+        """The leave grace, on the janitor's cadence: unseat, then hang up an empty room."""
+        events = self.rooms.sweep_disconnected(now)
+        closed = []
+        for event in events:
+            room_id = str(event.get("room_id") or "")
+            notice = event.get("notice")
+            if notice and room_id:
+                for other in list(self.conns.get(room_id, ())):
+                    with contextlib.suppress(Exception):
+                        await _send(other.ws, notice)
+            if event.get("closed") and room_id and room_id not in closed:
+                closed.append(room_id)
+            elif room_id and room_id not in closed:
+                await self.broadcast(room_id)
+        for room_id in closed:
+            await self.shut_room(room_id, "This table is closed.")
+        return events
+
     async def close_finished(self, now: float) -> None:
         """A finished room the sweep closed: say so, then hang up."""
         for room_id in self.rooms.sweep_finished(now):
@@ -1518,6 +1537,7 @@ class App:
                 for room_id in self.rooms.check_clocks(now):
                     await self.broadcast(room_id)
                 await self.close_finished(now)
+                await self.sweep_disconnects(now)
                 if time.monotonic() - last_housekeeping >= 15:
                     last_housekeeping = time.monotonic()
                     self.rooms.expire()

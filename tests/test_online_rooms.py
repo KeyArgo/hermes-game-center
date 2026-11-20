@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 import kit  # noqa: E402
 from online import guard, league  # noqa: E402
-from online.rooms import DISCONNECT_GRACE, GAMES, Rooms, load_games  # noqa: E402
+from online.rooms import DISCONNECT_GRACE, DISCONNECT_LEAVE_SECONDS, GAMES, Rooms, load_games  # noqa: E402
 from online.store import Store  # noqa: E402
 
 LOADED = load_games()
@@ -417,6 +417,43 @@ def test_disconnect_claim_after_grace_only(setup):
     answer = rooms.claim(room, p["Ada"])
     assert answer["ok"] and answer["finished"]["winner"] == "white" and answer["finished"]["reason"] == "disconnect"
     assert rooms.state(room)["result_reason"] == "disconnect"
+
+
+def test_reconnect_within_the_leave_grace_cancels_eviction(setup):
+    store, rooms, p, clock = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.connected(room["id"], p["Ada"]["id"])
+    rooms.connected(room["id"], p["Bea"]["id"])
+    rooms.run(room, p["Ada"], "move", [legal(rooms, room, p["Ada"])[0]])
+    rooms.disconnected(room["id"], p["Bea"]["id"])
+    clock.now += 30
+    rooms.connected(room["id"], p["Bea"]["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS
+    assert rooms.sweep_disconnected(clock.now) == []
+    assert rooms.state(room)["black_id"] == p["Bea"]["id"]
+    assert rooms.state(room)["status"] == "active"
+
+
+def test_a_disconnected_board_player_resigns_after_the_grace(setup):
+    store, rooms, p, clock = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    rooms.run(room, p["Bea"], "join")
+    rooms.connected(room["id"], p["Ada"]["id"])
+    rooms.connected(room["id"], p["Bea"]["id"])
+    rooms.run(room, p["Ada"], "move", [legal(rooms, room, p["Ada"])[0]])
+    rooms.disconnected(room["id"], p["Bea"]["id"])
+    clock.now += DISCONNECT_LEAVE_SECONDS - 1
+    assert rooms.sweep_disconnected(clock.now) == []
+    assert rooms.state(room)["status"] == "active"
+    clock.now += 2
+    rooms.sweep_disconnected(clock.now)
+    state = rooms.state(room)
+    assert state["status"] == "resigned"
+    assert state["result_reason"] == "disconnect"
+    assert not state.get("black_id")
+    assert state["white_id"] == p["Ada"]["id"]
+    assert not store.room(room["id"])["closed"]
 
 
 def test_reconnect_cancels_claim(setup):

@@ -325,3 +325,54 @@ def test_a_decline_and_a_sweep_close_the_sockets(tmp_path):
         finally:
             await client.close()
     run(scenario())
+
+
+def test_the_janitor_unseats_a_quiet_table(tmp_path):
+    """The periodic sweep is the disconnect grace: still seated at 44s, gone at 46s."""
+    async def scenario():
+        import time
+        now = {"t": time.time()}
+        server, client = await started(tmp_path, clock=lambda: now["t"])
+        seen = []
+        original = server.sweep_disconnects
+
+        async def wrapped(moment):
+            seen.append(moment)
+            return await original(moment)
+
+        server.sweep_disconnects = wrapped
+        task = asyncio.create_task(server.janitor(None))
+        try:
+            for _ in range(20):
+                if seen:
+                    break
+                await asyncio.sleep(0.05)
+            assert seen, "the janitor runs the disconnect sweep on its own cadence"
+            ada, ada_token = await sign_in(client, "Ada")
+            _bea, bea_token = await sign_in(client, "Bea")
+            _eve, eve_token = await sign_in(client, "Eve")
+            room = (await open_room(client, ada_token))["room"]
+            a = await connect(client, room["id"], ada_token)
+            b = await connect(client, room["id"], bea_token)
+            eve = await connect(client, room["id"], eve_token)
+            assert (await b.result(1, t="cmd", action="join"))["ok"]
+            await a.ws.close()
+            await b.ws.close()
+            await asyncio.sleep(0.05)
+            now["t"] += 44
+            await server.sweep_disconnects(now["t"])
+            state = server.rooms.state(server.store.room(room["id"]))
+            assert state["white_id"] == ada["id"] and state["black_id"]
+            now["t"] += 2
+            waiting = asyncio.create_task(eve.until(lambda m: m.get("t") == "closed"))
+            await server.sweep_disconnects(now["t"])
+            closed = await waiting
+            assert closed["t"] == "closed"
+            assert server.store.room(room["id"])["closed"] == 1
+            rows = server.store.db.execute(
+                "SELECT reason FROM audit WHERE target_id = ?", (room["id"],)).fetchall()
+            assert any(row["reason"] == "empty" for row in rows)
+        finally:
+            task.cancel()
+            await client.close()
+    run(scenario())

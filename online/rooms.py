@@ -65,6 +65,9 @@ MODES = {
 }
 FINISHED = {"win", "draw", "resigned"}
 DISCONNECT_GRACE = 120.0
+# A seated player whose table socket has closed. Past this, the seat is cleared
+# the same way as leaving. A room with no seated socket for this long is closed.
+DISCONNECT_LEAVE_SECONDS = 45.0
 # A rematch that one person asked for and the other never answers.
 REMATCH_ANSWER_SECONDS = 60.0
 # A finished room with nobody asking for another game. The two-hour idle sweep
@@ -357,7 +360,8 @@ class Rooms:
 
     # Commands ----------------------------------------------------------------
 
-    def run(self, room: dict, player: dict, action: str, args: list[str] | None = None) -> dict:
+    def run(self, room: dict, player: dict, action: str, args: list[str] | None = None, *,
+            reason: str = "") -> dict:
         """One table action as this player. Returns {ok, text, finished}."""
         args = [str(item)[:16] for item in (args or [])][:3]
         fresh = self.store.room(room["id"])
@@ -439,7 +443,8 @@ class Rooms:
                 and int(state.get("plies") or 0) and str(room.get("game") or "") not in NO_COLOUR_SWAP:
             # The kit resigns and then clears the seat in one write, which would record the
             # result without the leaver. Resign on its own first so the record names them.
-            resigned = self._command(room, player, "resign")
+            # A socket that did not come back resigns for the same reason a claim would.
+            resigned = self._resign_seat(room, player, reason)
             left = self._command(room, player, "leave")
             if left["ok"]:
                 self._close_when_empty(room)
@@ -466,6 +471,21 @@ class Rooms:
                     self._write_state(room, sync)
             self._close_when_empty(room)
         return answer
+
+    def _resign_seat(self, room: dict, player: dict, reason: str) -> dict:
+        if reason != "disconnect":
+            return self._command(room, player, "resign")
+        self.settle(room)
+        text = self.table(room).command("resign", source="command", player=person(player))
+        root = self.folder(room["id"])
+        with kit.locked(root):
+            after = kit.load(root)
+            if after and after.get("status") == "resigned" and after.get("result_reason") == "resignation":
+                after["result_reason"] = "disconnect"
+                kit.write(root, after)
+        finished = self.settle(room)
+        self.store.touch_room(room["id"])
+        return {"ok": not refused(text), "text": text, "finished": finished}
 
     def _command(self, room: dict, player: dict, line: str) -> dict:
         # A ladder bot that misses the move clock forfeits even if its move lands before
@@ -798,6 +818,71 @@ class Rooms:
                 # The first seated bot to arrive starts the move clock; a slow connection
                 # is not a slow move.
                 self.turn_since[room_id] = self.clock()
+
+    def sweep_disconnected(self, now: float) -> list[dict]:
+        """Unseat anyone whose table socket has been gone for the leave grace.
+
+        The same path as leave: an un-dealt blackjack bet is refunded, a hand in
+        progress is forfeited, a board game in progress is a disconnect resignation.
+        A room that has had no seated socket for that long is closed.
+        """
+        events = []
+        for room in list(self.store.open_rooms(public_only=False)):
+            if room.get("ladder"):
+                continue
+            state = self.state(room) or {}
+            humans = self._human_seats(state)
+            if not humans:
+                continue
+            online = self.online.get(room["id"], set())
+            due = []
+            for side, pid, name in humans:
+                if pid in online:
+                    continue
+                left = self.left_at.get((room["id"], pid))
+                if left is None or now - left < DISCONNECT_LEAVE_SECONDS:
+                    continue
+                due.append((side, pid, name))
+            if not due:
+                continue
+            quiet = len(due) == len(humans)
+            for _side, pid, name in due:
+                current = self.store.room(room["id"]) or room
+                if current.get("closed"):
+                    break
+                player = self.store.player(pid) or {"id": pid, "name": name, "bot": False}
+                answer = self.run(current, player, "leave", reason="disconnect")
+                events.append({
+                    "room_id": room["id"],
+                    "player_id": pid,
+                    "name": name,
+                    "text": f"{name} left the table.",
+                    "closed": bool((self.store.room(room["id"]) or {}).get("closed")),
+                    "notice": answer.get("notice"),
+                })
+            current = self.store.room(room["id"]) or room
+            if quiet and not current.get("closed"):
+                self.store.close_room(room["id"])
+                current = self.store.room(room["id"]) or room
+            if quiet and current.get("closed"):
+                self._log_empty(current)
+                if events:
+                    events[-1]["closed"] = True
+                else:
+                    events.append({"room_id": room["id"], "closed": True,
+                                   "text": "This table is closed.", "notice": None})
+        return events
+
+    def _log_empty(self, room: dict) -> None:
+        """One log line and one audit row for a room whose seats lost their sockets."""
+        when = float(self.clock())
+        game = str(room.get("game") or "")
+        log.warning("swept room %s %s reason=empty", room["id"], game)
+        self.store.log_audit(
+            "close-empty-room", target_id=str(room.get("id") or ""), target_name=game,
+            reason="empty", at=when,
+            detail={"game": game, "reason": "empty", "note": "no seated socket"},
+        )
 
     def disconnected(self, room_id: str, player_id: str) -> None:
         self.online.get(room_id, set()).discard(player_id)
