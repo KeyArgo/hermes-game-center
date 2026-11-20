@@ -9,6 +9,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -225,6 +226,10 @@ def test_doctor_script_says_how_to_set_the_ssh_target():
     assert "GC_SERVER_SSH" in text
     assert "/opt/gameshelf-online/app" in text
     assert "journalctl -u gameshelf-online" in text
+    if sys.platform == "win32":
+        # On Windows "bash" is often WSL's, which cannot open a Windows path; the script is an
+        # ssh helper for Linux and macOS, so its text is checked above and the run is not.
+        return
     env = os.environ.copy()
     env.pop("GC_SERVER_SSH", None)
     proc = subprocess.run(["bash", str(script)], cwd=ROOT, env=env, capture_output=True, text=True)
