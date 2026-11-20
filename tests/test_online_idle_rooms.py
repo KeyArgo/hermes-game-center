@@ -45,22 +45,23 @@ def quiet_for(server, room_id, seconds):
 
 def test_an_abandoned_table_does_not_keep_its_host_playing(tmp_path):
     async def scenario():
-        server, client = await started(tmp_path)
+        now = {'t': time.time()}
+        server, client = await started(tmp_path, clock=lambda: now['t'])
         try:
             ada, ada_token, _bea, _bea_token, room, first, second = await a_table(client)
             assert ada['id'] in server.hub.playing_players()
             await first.ws.close()
             await second.ws.close()
             await asyncio.sleep(.05)
-            # Sixteen minutes of nothing, and nobody at the table: the room row is still open
+            # Past the disconnect grace with nobody at the table: the room row is still open
             # and its state still 'active', but nobody is playing it.
-            quiet_for(server, room['id'], 16 * 60)
+            now['t'] += 60
             assert server.store.room(room['id'])['closed'] == 0
             assert ada['id'] not in server.hub.playing_players()
             # The shape of the live bug: the host is back in the lobby, and the room is still
             # open and 'active' fifteen hours later. A lobby socket is not a seat at a table,
             # so the host reads as online, not as playing.
-            quiet_for(server, room['id'], 15 * 3600)
+            now['t'] += 15 * 3600
             watcher, hello = await lobby(client, ada_token)
             await asyncio.sleep(.05)
             assert ada['id'] in [row['id'] for row in hello['roster']]
@@ -97,18 +98,23 @@ def test_a_table_in_live_play_still_reads_as_playing(tmp_path):
     run(decision_and_play())
 
 
-def test_a_room_touched_a_minute_ago_still_counts(tmp_path):
+def test_a_disconnected_seat_counts_inside_the_grace_and_frees_after(tmp_path):
     async def scenario():
-        server, client = await started(tmp_path)
+        now = {'t': time.time()}
+        server, client = await started(tmp_path, clock=lambda: now['t'])
         try:
-            ada, _at, _bea, _bt, room, first, second = await a_table(client)
+            ada, _at, bea, _bt, _room, first, second = await a_table(client)
             await first.ws.close()
             await second.ws.close()
             await asyncio.sleep(.05)
-            # Both stepped away seconds ago: the fifteen-minute window is what keeps a table
-            # that is being played from blinking out between moves.
-            quiet_for(server, room['id'], 60)
+            # Inside the 45-second disconnect grace, a brief drop still reads as playing.
+            now['t'] += 30
             assert ada['id'] in server.hub.playing_players()
+            assert bea['id'] in server.hub.playing_players()
+            # Past the grace, neither is held as playing — no 15-minute wait.
+            now['t'] += 16
+            assert ada['id'] not in server.hub.playing_players()
+            assert bea['id'] not in server.hub.playing_players()
         finally:
             await client.close()
     run(scenario())

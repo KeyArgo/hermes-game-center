@@ -1305,6 +1305,7 @@ class App:
             if player["id"] == room["host_id"]:
                 await _send(ws, {"t": "invites", "invites": self.store.live_invites(room["id"])})
             await self.broadcast(room["id"])
+            await self.hub.refresh()
             code = str(message.get("invite") or "")
             if code:
                 await self.handle(conn, {"t": "redeem", "code": code, "ref": "invite"})
@@ -1325,6 +1326,8 @@ class App:
                 if fresh and not fresh.get("closed"):
                     with contextlib.suppress(Exception):
                         await self.broadcast(room["id"])
+            with contextlib.suppress(Exception):
+                await self.hub.refresh()
         return ws
 
     async def handle(self, conn: Conn, message: dict) -> None:
@@ -1391,15 +1394,25 @@ class App:
                 answer = {"ok": False, "text": "Unknown message."}
             await _send(conn.ws, {"t": "result", "ref": ref, "ok": answer["ok"], "text": answer["text"],
                                   "finished": answer.get("finished")})
+            refresh_presence = bool(answer.get("ok")) and (
+                kind in {"close", "redeem", "claim"}
+                or bool(answer.get("closed"))
+                or bool(answer.get("finished"))
+                or (kind == "cmd" and action in {"leave", "join", "sit", "resign", "rematch", "new", "decline"})
+            )
             if answer.get("closed"):
                 await self.shut_room(room["id"], str(answer.get("text") or "This table is closed."))
+                await self.hub.refresh()
                 return
             if kind == "close" and answer["ok"]:
                 for other in list(self.conns.get(room["id"], ())):
                     await _send(other.ws, {"t": "closed", "text": "The host closed this table."})
                     await other.ws.close()
+                await self.hub.refresh()
                 return
         await self.broadcast(conn.room_id)
+        if refresh_presence:
+            await self.hub.refresh()
 
     async def chat(self, conn: Conn, room: dict, message: dict, ref) -> None:
         player = conn.player
@@ -1476,13 +1489,18 @@ class App:
                 await self.broadcast(room_id)
         for room_id in closed:
             await self.shut_room(room_id, "This table is closed.")
+        if events:
+            await self.hub.refresh()
         return events
 
     async def close_finished(self, now: float) -> None:
         """A finished room the sweep closed: say so, then hang up."""
-        for room_id in self.rooms.sweep_finished(now):
+        closed = self.rooms.sweep_finished(now)
+        for room_id in closed:
             note = self.rooms.swept_notes.pop(room_id, "") or "This table is closed."
             await self.shut_room(room_id, note)
+        if closed:
+            await self.hub.refresh()
 
     async def broadcast(self, room_id: str) -> None:
         room = self.store.room(room_id)
@@ -1520,6 +1538,8 @@ class App:
         closed = self.sweep_idle_rooms(now)
         for room in closed:
             await self.shut_room(room["id"], "This table is closed.")
+        if closed:
+            await self.hub.refresh()
         return closed
 
     async def janitor(self, app: web.Application) -> None:
@@ -1529,15 +1549,15 @@ class App:
                 now = self.clock()
                 self.queue.prune(now)
                 await self.requests.expire(now)
+                for room_id in self.rooms.check_clocks(now):
+                    await self.broadcast(room_id)
+                await self.close_finished(now)
+                await self.sweep_disconnects(now)
                 # Find match: someone who left the lobby is not looking any more, a window
                 # that has run out counts as off, and everyone still looking gets paired.
                 self.store.clear_looking_outside(self.hub.online_players())
                 self.store.clear_expired_windows(now)
                 await self.requests.pair_looking(now)
-                for room_id in self.rooms.check_clocks(now):
-                    await self.broadcast(room_id)
-                await self.close_finished(now)
-                await self.sweep_disconnects(now)
                 if time.monotonic() - last_housekeeping >= 15:
                     last_housekeeping = time.monotonic()
                     self.rooms.expire()

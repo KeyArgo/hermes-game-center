@@ -10,11 +10,13 @@ from dataclasses import dataclass
 
 from aiohttp import WSMsgType, web
 
+from online.rooms import DISCONNECT_LEAVE_SECONDS
+
 MAX_LOBBY_CONNECTIONS = 2000
 ROSTER_CAP = 200
-# A seat at a table counts as play while the room was touched this recently, even with no
-# socket on it: a move, a chat line, a seat taken. Past it, play needs someone at the table.
-PLAYING_IDLE_SECONDS = 15 * 60.0
+# Legacy alias retained for callers; playing presence now tracks each seated player
+# against a live table socket or the disconnect-leave grace window.
+PLAYING_IDLE_SECONDS = DISCONNECT_LEAVE_SECONDS
 
 
 def _service():
@@ -89,13 +91,23 @@ class Hub:
         state = (self.app.rooms.state(room) or {}) if state is None else state
         return any(pid and self._table_connection(room["id"], pid) for pid in self._seated(state))
 
-    def playing_players(self):
-        """Who is in a game: a seat at an open, active table that is still being played.
+    def _seat_in_grace(self, room: dict, player_id: str, now: float) -> bool:
+        """Whether a seated player without a live table socket is still inside the grace."""
+        rooms = getattr(self.app, "rooms", None)
+        left_at = getattr(rooms, "left_at", None) or {}
+        left = left_at.get((room["id"], player_id))
+        if left is not None:
+            return now - float(left) < DISCONNECT_LEAVE_SECONDS
+        # Seated before any socket connected (e.g. a freshly accepted request): keep
+        # them marked playing only for the same grace window while the table opens.
+        stamp = float(room.get("active") or room.get("created") or 0)
+        return stamp > 0 and now - stamp < DISCONNECT_LEAVE_SECONDS
 
-        A room counts only while it is active AND either someone seated there is connected to
-        that table, or the room saw activity within the last fifteen minutes. The room's own
-        activity stamp is ``rooms.active``, which every command stamps. A table left open
-        overnight used to keep its host "playing" for fifteen hours, and Play skipped them.
+    def playing_players(self):
+        """Who is in a game: per seated player, a live table socket or within the grace.
+
+        Once someone leaves, or their socket has been gone past the disconnect grace,
+        they report online again without waiting for an idle timer.
         """
         playing = set()
         now = self.clock()
@@ -104,11 +116,11 @@ class Hub:
             state = self.app.rooms.state(room) or {}
             if state.get('status') != 'active':
                 continue
-            seated = [pid for pid in self._seated(state) if pid]
-            if not seated:
-                continue
-            if now - float(room.get('active') or 0) < PLAYING_IDLE_SECONDS or self.seated_live(room, state):
-                playing.update(seated)
+            for pid in self._seated(state):
+                if not pid:
+                    continue
+                if self._table_connection(room["id"], pid) or self._seat_in_grace(room, pid, now):
+                    playing.add(pid)
         return playing
 
     def online_players(self):

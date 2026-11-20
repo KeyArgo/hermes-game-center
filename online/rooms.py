@@ -436,6 +436,7 @@ class Rooms:
                 and str(room.get("game") or "") not in NO_COLOUR_SWAP:
             name = str(player.get("name") or "The other player")
             note = f"{name} left the table."
+            self.left_at.pop((room["id"], player["id"]), None)
             self._write_state(room, lambda saved, text=note: saved.__setitem__("rematch_note", text))
             self._close_finished(room, note)
             return {"ok": True, "text": note, "finished": None, "closed": True}
@@ -447,6 +448,7 @@ class Rooms:
             resigned = self._resign_seat(room, player, reason)
             left = self._command(room, player, "leave")
             if left["ok"]:
+                self.left_at.pop((room["id"], player["id"]), None)
                 self._close_when_empty(room)
             return {"ok": left["ok"], "text": left["text"], "finished": resigned["finished"]}
         elif action == "lesson":
@@ -464,6 +466,7 @@ class Rooms:
         if action == "rematch" and answer.get("ok"):
             self._after_rematch(room)
         if action == "leave" and answer.get("ok"):
+            self.left_at.pop((room["id"], player["id"]), None)
             if str(room.get("game") or "") == "blackjack":
                 module = self.games.get("blackjack")
                 sync = getattr(module, "_sync_turn", None) if module else None

@@ -148,3 +148,128 @@ def test_refresh_reuses_room_scan_and_preferences(tmp_path, monkeypatch):
         assert sum('FROM blocks WHERE' in q for q in queries) == 2
         server.store.db.close()
     run(scenario())
+
+
+def test_leaving_and_disconnect_eviction_free_both_players_immediately(tmp_path):
+    """After both seats leave (or disconnect past the grace), both report online at once,
+    presence is pushed without waiting, and direct requests and pairing work right away."""
+    import time
+
+    async def scenario():
+        now = {'t': time.time()}
+        server, client = await started(tmp_path, clock=lambda: now['t'])
+        try:
+            ada, at = await sign_in(client, 'Ada')
+            bea, bt = await sign_in(client, 'Bea')
+            a_lobby, _ = await lobby(client, at)
+            b_lobby, _ = await lobby(client, bt)
+            for token in (at, bt):
+                resp = await client.post(
+                    '/api/availability',
+                    headers={'Authorization': f'Bearer {token}'},
+                    json={'open': True, 'games': {'blackjack': True, 'connect4': True}},
+                )
+                assert resp.status == 200
+            # Cancel the periodic 0.5s hub task so the presence pushes we wait on must come
+            # from the server's own leave/eviction hooks rather than a background timer.
+            if server.hub.task:
+                server.hub.task.cancel()
+                server.hub.task = None
+                await asyncio.sleep(0)
+
+            # 1. Explicit leave: both leave blackjack -> room closes, both online at once,
+            #    pushed to lobby sockets, and a direct request succeeds immediately.
+            room = (await open_room(client, at, game='blackjack'))['room']
+            a = await connect(client, room['id'], at)
+            b = await connect(client, room['id'], bt)
+            assert (await b.result(1, t='cmd', action='join'))['ok']
+            assert server.hub.status(ada['id']) == 'playing'
+            assert server.hub.status(bea['id']) == 'playing'
+
+            assert (await a.result(2, t='cmd', action='leave'))['ok']
+            await until(b_lobby, lambda m: m.get('t') == 'presence'
+                        and m['row']['id'] == ada['id'] and m['row']['status'] == 'online')
+            assert server.hub.status(ada['id']) == 'online'
+            assert server.hub.status(bea['id']) == 'playing'
+
+            assert (await b.result(3, t='cmd', action='leave'))['ok']
+            await until(a_lobby, lambda m: m.get('t') == 'presence'
+                        and m['row']['id'] == bea['id'] and m['row']['status'] == 'online')
+            assert server.store.room(room['id'])['closed'] == 1
+            assert server.hub.status(ada['id']) == 'online'
+            assert server.hub.status(bea['id']) == 'online'
+            req = await client.post(
+                '/api/requests',
+                headers={'Authorization': f'Bearer {at}'},
+                json={'to': bea['id'], 'game': 'connect4'},
+            )
+            assert req.status == 200, await req.text()
+            body = await req.json()
+            assert body['ok'] is True
+            # Cancel that request so the pair can test disconnect-eviction and pairing next.
+            cancel = await client.post(
+                f"/api/requests/{body['request']['id']}",
+                headers={'Authorization': f'Bearer {at}'},
+                json={'cancel': True},
+            )
+            assert cancel.status == 200
+            await a.ws.close()
+            await b.ws.close()
+
+            # 2. Per-seat grace & disconnect eviction without the 15-minute wait.
+            room2 = (await open_room(client, at, game='blackjack'))['room']
+            a2 = await connect(client, room2['id'], at)
+            b2 = await connect(client, room2['id'], bt)
+            assert (await b2.result(1, t='cmd', action='join'))['ok']
+            assert (await a2.result(2, t='cmd', action='move', args=['bet1000']))['ok']
+            await a2.ws.close()
+            await asyncio.sleep(0.05)
+            # Within grace: Ada still counts as playing alongside live Bea.
+            now['t'] += 30
+            for ws in (a_lobby, b_lobby):
+                await ws.send_json({'t': 'ping'})
+                await until(ws, lambda m: m.get('t') == 'pong')
+            assert ada['id'] in server.hub.playing_players()
+            assert bea['id'] in server.hub.playing_players()
+            # Past grace: Ada is freed per-seat even while Bea still holds a live socket.
+            now['t'] += 16
+            for ws in (a_lobby, b_lobby):
+                await ws.send_json({'t': 'ping'})
+                await until(ws, lambda m: m.get('t') == 'pong')
+            assert ada['id'] not in server.hub.playing_players()
+            assert bea['id'] in server.hub.playing_players()
+
+            # Now Bea also disconnects and both are swept past grace.
+            await b2.ws.close()
+            await asyncio.sleep(0.05)
+            now['t'] += 46
+            for ws in (a_lobby, b_lobby):
+                await ws.send_json({'t': 'ping'})
+                await until(ws, lambda m: m.get('t') == 'pong')
+            await server.sweep_disconnects(now['t'])
+            await until(a_lobby, lambda m: m.get('t') == 'presence'
+                        and m['row']['id'] == bea['id'] and m['row']['status'] == 'online')
+            assert server.store.room(room2['id'])['closed'] == 1
+            assert server.hub.status(ada['id']) == 'online'
+            assert server.hub.status(bea['id']) == 'online'
+            # Direct request and find-match pairing both work immediately.
+            looking = await server.requests.handle(ada, {'t': 'looking', 'games': ['blackjack']})
+            assert looking['ok']
+            pending = server.requests.pending_for(bea['id'])
+            assert any(item['game'] == 'blackjack' and item['from']['id'] == ada['id']
+                       for item in pending), f'expected immediate blackjack offer: {pending}'
+            # Also test pairing someone who was already looking when eviction freed the table.
+            cancel2 = await client.post(
+                f"/api/requests/{pending[0]['id']}",
+                headers={'Authorization': f'Bearer {at}'},
+                json={'cancel': True},
+            )
+            assert cancel2.status == 200
+            server.store.set_looking(ada['id'], ['connect4'], now['t'])
+            paired = await server.requests.pair_looking(now['t'])
+            assert paired >= 1, 'pairing succeeds immediately without a 15-minute wait'
+            await a_lobby.close()
+            await b_lobby.close()
+        finally:
+            await client.close()
+    run(scenario())
