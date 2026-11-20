@@ -518,6 +518,25 @@ def refund_undealt(state: dict) -> None:
     state["betting"] = 0
 
 
+def forfeit_seat(state: dict, owner: int) -> str:
+    """This person left during a hand. Their unfinished hands are lost and the wager stays taken.
+
+    Whoever is still sitting plays the rest of the hand. If nothing is left to play, the
+    round settles, and the person who stayed is the one it pays.
+    """
+    seat = 1 if int(owner) == 1 else 0
+    for hand in _migrate(state):
+        if _owner(hand) != seat or hand.get("result"):
+            continue
+        hand["done"] = True
+        hand["result"] = "lose"
+    note = _advance(state)
+    if note:
+        state["note"] = note
+    _sync_turn(state)
+    return str(state.get("note") or "")
+
+
 def _round_bets(state: dict) -> list[int]:
     bets = state.get("round_bets")
     if not isinstance(bets, list) or len(bets) != 2:
@@ -746,9 +765,13 @@ def _settle_round(state: dict) -> str:
     if paid[1]:
         _credit(state, 1, paid[1])
     state["phase"] = "bet"
-    state["outcome"] = _round_outcome([str(hand.get("result") or "") for hand in hands
-                                       if _owner(hand) == 0] or results)
-    state["won"] = net[0]
+    # One person left in the second seat: the felt, the outcome and the chips that
+    # moved are theirs. Reading seat 0 here named an empty chair and a net of nothing.
+    lone = _lone_owner(state)
+    focus = lone if lone is not None else 0
+    told = [str(hand.get("result") or "") for hand in hands if _owner(hand) == focus] or results
+    state["outcome"] = _round_outcome(told)
+    state["won"] = net[focus]
     state["hands"] = int(state.get("hands") or 0) + 1
     state["betting"] = 0
     state["round_bets"] = [0, 0]
@@ -764,7 +787,11 @@ def _settle_round(state: dict) -> str:
     if _table_players(state) == 2:
         state["note"] = _two_player_note(state, hands)
         return state["note"]
-    state["note"] = _round_note(results, net[0])
+    if focus == 1:
+        mine = [hand for hand in hands if _owner(hand) == 1]
+        state["note"] = _two_player_note(state, mine) or _round_note(told, net[1])
+        return state["note"]
+    state["note"] = _round_note(told, net[focus])
     return state["note"]
 
 

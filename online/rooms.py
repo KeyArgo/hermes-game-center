@@ -367,20 +367,30 @@ class Rooms:
             return {"ok": False, "text": "This table is closed.", "finished": None}
         host = player["id"] == room["host_id"]
         state = self.state(room)
-        if action == "leave" and room.get("game") == "blackjack":
+        if action == "leave":
+            # Two people have sat here. When the last of them gets up, the room closes
+            # even if nobody has moved yet. A host who leaves before anyone sits does
+            # not set this, so that seat stays open.
+            self._remember_pair(room)
+        if action == "leave" and room.get("game") == "blackjack" and self._seated(state, player["id"]):
             phase = str((state or {}).get("phase") or "")
-            if phase != "bet":
-                return {"ok": False,
-                        "text": "Finish this hand, then leave the table.",
-                        "finished": None}
-            # A chip on the felt before the deal is not a hand. Give it back, then
-            # the seat can be cleared. Otherwise the other person is stuck in mid_round.
-            bets = (state or {}).get("round_bets") or []
-            if (state or {}).get("mid_round") or any(isinstance(value, int) and not isinstance(value, bool) and value for value in bets):
-                module = self.games.get("blackjack")
-                refund = getattr(module, "refund_undealt", None) if module else None
-                if refund is not None:
-                    self._write_state(room, refund)
+            module = self.games.get("blackjack")
+            if phase == "bet":
+                # A chip on the felt before the deal is not a hand. Give it back, then
+                # the seat can be cleared. Otherwise the other person is stuck in mid_round.
+                bets = (state or {}).get("round_bets") or []
+                if (state or {}).get("mid_round") or any(isinstance(value, int) and not isinstance(value, bool) and value for value in bets):
+                    refund = getattr(module, "refund_undealt", None) if module else None
+                    if refund is not None:
+                        self._write_state(room, refund)
+                        state = self.state(room)
+            elif phase in {"play", "deal", "dealer"} and module is not None:
+                # Mid-hand: that person's wager stays lost, and the other hand plays on.
+                sides = self._seated(state, player["id"])
+                owner = 1 if sides == ["black"] else 0
+                forfeit = getattr(module, "forfeit_seat", None)
+                if forfeit is not None:
+                    self._write_state(room, lambda saved, who=owner, fn=forfeit: fn(saved, who))
                     state = self.state(room)
         if action == "resign" and room.get("game") == "blackjack":
             # A session table has no match to resign. Leaving is how a person gets up,
@@ -650,8 +660,16 @@ class Rooms:
             return
         status = str(state.get("status") or "")
         session = str(fresh_room.get("game") or "") in NO_COLOUR_SWAP
-        if status in FINISHED or status == "abandoned" or session:
+        # `paired` is a table both people sat at. Getting up from it closes the room
+        # even when the match never started (no plies) and the status is still active.
+        if status in FINISHED or status == "abandoned" or session or state.get("paired"):
             self._close_finished(fresh_room, "both players left")
+
+    def _remember_pair(self, room: dict) -> None:
+        state = self.state(room) or {}
+        if state.get("paired") or len(self._human_seats(state)) < 2:
+            return
+        self._write_state(room, lambda saved: saved.__setitem__("paired", True))
 
     def sweep_finished(self, now: float) -> list[str]:
         """Close a finished room that will not be replayed.

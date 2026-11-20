@@ -186,6 +186,23 @@ def test_only_a_seated_player_can_decline(setup):
     assert not store.room(room["id"])["closed"]
 
 
+def test_both_players_leaving_a_fresh_connect4_room_closes_it(setup):
+    """No moves yet is still a table. Once both people have got up, the room closes."""
+    store, rooms, p, _ = setup
+    room, _ = rooms.create("connect4", p["Ada"], public=True)
+    assert rooms.run(room, p["Bea"], "join")["ok"]
+    assert int(rooms.state(room).get("plies") or 0) == 0
+    assert rooms.run(room, p["Ada"], "leave")["ok"]
+    assert not store.room(room["id"])["closed"], "Bea is still sitting"
+    assert rooms.run(room, p["Bea"], "leave")["ok"]
+    assert store.room(room["id"])["closed"]
+    # The host getting up before anyone sits still leaves the seat for someone else.
+    waiting, _ = rooms.create("connect4", p["Ada"], public=True)
+    assert rooms.run(waiting, p["Ada"], "leave")["ok"]
+    assert not store.room(waiting["id"])["closed"]
+    assert rooms.run(waiting, p["Bea"], "sit", ["white"])["ok"]
+
+
 def test_leaving_a_finished_match_closes_the_room(setup):
     store, rooms, p, _ = setup
     room, _ = rooms.create("connect4", p["Ada"], public=True)

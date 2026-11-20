@@ -240,13 +240,49 @@ def test_between_hands_the_same_bet_is_remembered_and_leaving_gets_up(setup):
     assert store.room(room["id"])["closed"], "both got up, so the table closes"
 
 
-def test_a_hand_being_played_is_not_left_in_the_middle(setup):
-    _store, rooms, people, _root = setup
+def test_settling_pays_the_person_who_stayed_in_the_second_seat():
+    """The second seat, alone, is the one the round pays and the one the note names."""
+    from blackjack.game import _make_hand, _settle_round
+
+    lost = _make_hand(["10S", "6C"], 10, player=0)
+    lost["done"] = True
+    lost["result"] = "lose"
+    state = {
+        "players": 2, "stacks": [9990, 9990], "status": "active", "phase": "play",
+        "white_id": "", "white_name": "", "black_id": "bea", "black_name": "Bea",
+        "dealer": ["9H", "7D"], "deck": ["2C"], "hands": 0, "player_hands": [
+            lost, _make_hand(["10S", "9S"], 10, player=1)],
+    }
+    _settle_round(state)
+    assert state["stacks"][1] == 10010, state["stacks"]
+    assert state["won"] == 10, state["won"]
+    assert state["outcome"] == "win", state["outcome"]
+    assert "Bea" in state["note"], state["note"]
+
+
+def test_leaving_mid_hand_forfeits_only_that_hand_and_the_other_plays_on(setup):
+    """A hand in progress is not a reason to refuse leave. The leaver's wager stays
+    lost, their seat clears, and the person who stayed finishes the hand."""
+    store, rooms, people, _root = setup
     room = dealt(rooms, people)
-    answer = rooms.run(room, people["Ada"], "leave")
-    assert not answer["ok"]
-    assert "Finish this hand" in answer["text"]
-    assert rooms.state(room)["white_id"] == people["Ada"]["id"]
+    before = rooms.state(room)
+    assert before["stacks"] == [9990, 9990]
+    left = rooms.run(room, people["Ada"], "leave")
+    assert left["ok"], left["text"]
+    state = rooms.state(room)
+    assert not state.get("white_id"), "Ada got up"
+    assert state["black_id"] == people["Bea"]["id"], "Bea is still sitting"
+    assert state["stacks"][0] == 9990, "Ada's dealt wager is not refunded"
+    assert state["status"] == "active"
+    assert not store.room(room["id"])["closed"], "Bea is still at the table"
+    ada_hands = [hand for hand in state["player_hands"] if hand.get("player") == 0]
+    assert ada_hands and all(hand.get("result") == "lose" for hand in ada_hands), ada_hands
+    assert rooms.run(room, people["Bea"], "move", ["stand"])["ok"], "Bea finishes her own hand"
+    settled = rooms.state(room)
+    assert settled["phase"] == "bet", settled.get("note")
+    assert "Bea" in str(settled.get("note") or ""), settled.get("note")
+    assert rooms.run(room, people["Bea"], "leave")["ok"]
+    assert store.room(room["id"])["closed"], "both got up, so the table closes"
 
 
 def test_leaving_after_a_hand_does_not_resign_and_the_other_plays_on(setup):
