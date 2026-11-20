@@ -1468,8 +1468,15 @@ class App:
     # Housekeeping ------------------------------------------------------------
 
     def sweep_idle_rooms(self, now: float) -> list[dict]:
-        """Close rooms nobody has been at for hours, with no one seated still connected."""
+        """Close quiet rooms. No seated player connected: thirty minutes. A live seat keeps two hours."""
         return self.rooms.sweep_idle(now, connected=self.hub.seated_live)
+
+    async def close_idle(self, now: float) -> list[dict]:
+        """The idle sweep, then the same hang-up a finished table gets: say so, then drop sockets."""
+        closed = self.sweep_idle_rooms(now)
+        for room in closed:
+            await self.shut_room(room["id"], "This table is closed.")
+        return closed
 
     async def janitor(self, app: web.Application) -> None:
         last_housekeeping = 0.0
@@ -1489,8 +1496,10 @@ class App:
                 if time.monotonic() - last_housekeeping >= 15:
                     last_housekeeping = time.monotonic()
                     self.rooms.expire()
-                    # A table left open is not a game: shut the quiet ones nobody is at.
-                    self.sweep_idle_rooms(time.time())
+                    # A table left open is not a game. Nobody seated and connected: thirty
+                    # minutes. A live seat keeps the two-hour rule. Tell whoever is watching,
+                    # then hang up.
+                    await self.close_idle(now)
                     self.expire_challenges()
                     self.store.expire_punishments(time.time())
                     self.store.purge_chat(time.time() - CHAT_KEEP_DAYS * 86400)

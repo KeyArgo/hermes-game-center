@@ -19,8 +19,8 @@ def run(coro):
     return asyncio.run(coro)
 
 
-async def started(tmp_path):
-    server = App(tmp_path, games=LOADED)
+async def started(tmp_path, clock=None):
+    server = App(tmp_path, games=LOADED, **({} if clock is None else {"clock": clock}))
     client = TestClient(TestServer(server.build()))
     await client.start_server()
     return server, client

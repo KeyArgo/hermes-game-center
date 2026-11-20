@@ -51,7 +51,10 @@ LADDER_CONNECT_GRACE = 60.0
 ROOM_IDLE_DAYS = 3
 # A room nobody has been at for this long is closed by the server's sweep. An abandoned
 # table keeps its host "playing" until it is closed, and Play skips them.
+# A live seat (someone seated, and their socket still on the table) keeps this wait.
+# A room with no seated player connected closes after the shorter quiet stretch.
 IDLE_CLOSE_SECONDS = 2 * 3600.0
+EMPTY_IDLE_CLOSE_SECONDS = 30 * 60.0
 
 # Same refusal heuristics the Desktop adapter uses; the kit returns text, not typed results.
 _REFUSALS = (
@@ -831,19 +834,26 @@ class Rooms:
         return stale
 
     def sweep_idle(self, now: float, connected=None) -> list[dict]:
-        """Close rooms that have been quiet for hours with nobody sitting at them.
+        """Close a quiet room. No seated player connected: thirty minutes. A live seat keeps two hours.
 
-        ``connected(room, state)`` says whether anyone is still at the table; the server
-        passes the lobby's own answer (a socket on that room). Without one, idleness alone
-        decides. The close goes through the store's one close path, so the room's invites die
-        with it, and every close leaves an audit row and a log line naming room and game.
+        ``connected(room, state)`` is the lobby's own answer (``hub.seated_live``): a socket
+        held by someone sitting at that table. A watcher, or a person only in the lobby, does
+        not count. A live seat is not closed by this sweep — the two-hour rule still spares a
+        table someone is at, however quiet the last move was. Without a callback, idleness
+        alone decides, at the shorter wait. The close goes through the store's one close path,
+        so the room's invites die with it.
         """
         closed = []
-        for room in self.store.idle_rooms(now - IDLE_CLOSE_SECONDS):
+        # `idle_rooms` keeps rows with active < before. A room quiet for exactly thirty
+        # minutes has active == now - 30min, so the bound is a hair later and the
+        # comparison below is the real threshold.
+        for room in self.store.idle_rooms(now - EMPTY_IDLE_CLOSE_SECONDS + 1e-3):
             state = self.state(room) or {}
-            if connected is not None and connected(room, state):
+            live = bool(connected(room, state)) if connected is not None else False
+            idle_for = now - float(room.get("active") or 0)
+            if live or idle_for < EMPTY_IDLE_CLOSE_SECONDS:
                 continue
-            idle_minutes = int(max(0.0, now - float(room.get("active") or 0)) // 60)
+            idle_minutes = int(max(0.0, idle_for) // 60)
             self.store.close_room(room["id"])
             self.store.log_audit(
                 "close-idle-room", target_id=room["id"], target_name=str(room["game"]),

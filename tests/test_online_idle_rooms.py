@@ -4,7 +4,10 @@ One Blackjack room was opened and left on 11-18: it stayed open with state 'acti
 read as "playing" for fifteen hours, and Play skipped them. Presence now counts a room only
 while it is active AND someone seated there is connected, or the room was touched in the last
 fifteen minutes. The server also closes rooms that have been quiet for two hours with nobody
-seated still connected, and says so in the audit log and in journald.
+seated still connected. A room with no seated player connected closes after thirty
+minutes; a live seat keeps the two-hour rule and is not closed while they are there.
+The close is said in the audit log and in journald, and anyone still on the socket
+is told before it hangs up.
 
 python3 -m pytest -q tests/test_online_idle_rooms.py
 """
@@ -106,6 +109,68 @@ def test_a_room_touched_a_minute_ago_still_counts(tmp_path):
             # that is being played from blinking out between moves.
             quiet_for(server, room['id'], 60)
             assert ada['id'] in server.hub.playing_players()
+        finally:
+            await client.close()
+    run(scenario())
+
+
+def test_an_empty_table_closes_after_thirty_minutes_and_a_live_seat_keeps_two_hours(tmp_path):
+    """Nobody seated and connected: thirty minutes. A live seat stays on the two-hour rule.
+
+    The clock is the server's own, not the wall: the room's activity stamp is moved
+    under that clock, and the sweep is asked what it would do at that instant.
+    """
+    async def scenario():
+        now = {"t": time.time()}
+        server, client = await started(tmp_path, clock=lambda: now["t"])
+        try:
+            ada, ada_token = await sign_in(client, "Ada")
+            bea, bea_token = await sign_in(client, "Bea")
+            empty = (await open_room(client, ada_token))["room"]
+
+            def age(room_id, seconds):
+                server.store.db.execute(
+                    "UPDATE rooms SET active = ? WHERE id = ?", (now["t"] - seconds, room_id))
+
+            age(empty["id"], 29 * 60)
+            assert server.sweep_idle_rooms(now["t"]) == []
+            assert server.store.room(empty["id"])["closed"] == 0
+            assert server.hub.seated_live(server.store.room(empty["id"])) is False
+
+            age(empty["id"], 30 * 60)
+            closed = [item["id"] for item in server.sweep_idle_rooms(now["t"])]
+            assert closed == [empty["id"]]
+            assert server.store.room(empty["id"])["closed"] == 1
+
+            # Someone is at the table. Thirty minutes does not close it, and neither does
+            # a quiet stretch past two hours: a live seat is not an abandoned table.
+            attended = (await open_room(client, ada_token))["room"]
+            sitting = await connect(client, attended["id"], ada_token)
+            assert server.hub.seated_live(server.store.room(attended["id"])) is True
+            age(attended["id"], 30 * 60)
+            assert server.sweep_idle_rooms(now["t"]) == []
+            age(attended["id"], 3 * 3600)
+            assert server.sweep_idle_rooms(now["t"]) == []
+            assert server.store.room(attended["id"])["closed"] == 0
+            await sitting.ws.close()
+
+            # The host has left. A watcher is still on the socket, and is not a seated
+            # player, so the thirty-minute close tells them and then hangs up.
+            quiet = (await open_room(client, ada_token))["room"]
+            host = await connect(client, quiet["id"], ada_token)
+            await host.ws.close()
+            await asyncio.sleep(0.05)
+            watcher = await connect(client, quiet["id"], bea_token)
+            assert server.hub.seated_live(server.store.room(quiet["id"])) is False
+            age(quiet["id"], 30 * 60)
+            waiting = asyncio.create_task(watcher.until(lambda message: message.get("t") == "closed"))
+            await server.close_idle(now["t"])
+            note = await waiting
+            assert "closed" in note["text"].lower()
+            raw = await watcher.ws.receive(timeout=2)
+            assert raw.type.name != "TEXT", raw.data
+            assert server.store.room(quiet["id"])["closed"] == 1
+            assert ada and bea
         finally:
             await client.close()
     run(scenario())
