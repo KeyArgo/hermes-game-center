@@ -211,6 +211,61 @@ def test_a_rematch_keeps_the_score_with_the_person(setup):
     assert state["score"]["black"] == 0
 
 
+def test_each_sweep_logs_once_and_the_counters_move(setup, caplog):
+    """One line and one audit row per room a sweep closes, and today's counts follow."""
+    import logging
+
+    store, rooms, p, clock = setup
+    caplog.set_level(logging.WARNING, logger="gameshelf.online")
+
+    def rows(room_id):
+        return store.db.execute("SELECT * FROM audit WHERE target_id = ?", (room_id,)).fetchall()
+
+    def line(room, reason):
+        return f"swept room {room['id']} {room['game']} reason={reason}"
+
+    idle, _ = rooms.create("connect4", p["Ada"], public=True)
+    store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (clock.now - 31 * 60, idle["id"]))
+    assert [item["id"] for item in rooms.sweep_idle(clock.now)] == [idle["id"]]
+    assert rooms.sweeps.counts["idle"] == 1
+    assert rooms.sweeps.last_at == clock.now
+    assert line(idle, "idle") in caplog.text
+    assert len(rows(idle["id"])) == 1 and rows(idle["id"])[0]["reason"] == "idle"
+
+    finished, _ = rooms.create("chessboard", p["Ada"], public=True)
+    rooms.run(finished, p["Bea"], "join")
+    rooms.run(finished, p["Ada"], "resign")
+    state = rooms.state(finished)
+    state["finished_at"] = clock.now - 400
+    kit.write(rooms.folder(finished["id"]), state)
+    assert finished["id"] in rooms.sweep_finished(clock.now)
+    assert rooms.sweeps.counts["finished"] == 1
+    assert line(finished, "finished") in caplog.text
+    assert len(rows(finished["id"])) == 1 and rows(finished["id"])[0]["reason"] == "finished"
+
+    declined, _ = rooms.create("reversi", p["Ada"], public=True)
+    rooms.run(declined, p["Bea"], "join")
+    rooms.run(declined, p["Ada"], "resign")
+    assert rooms.run(declined, p["Bea"], "decline")["ok"]
+    assert rooms.sweeps.counts["declined"] == 1
+    assert line(declined, "declined") in caplog.text
+    assert len(rows(declined["id"])) == 1 and rows(declined["id"])[0]["reason"] == "declined"
+
+    stale, _ = rooms.create("gomoku", p["Ada"], public=True)
+    store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (clock.now - 4 * 86400, stale["id"]))
+    assert stale["id"] in rooms.expire()
+    assert rooms.sweeps.counts["stale"] == 1
+    assert line(stale, "stale") in caplog.text
+    assert len(rows(stale["id"])) == 1 and rows(stale["id"])[0]["reason"] == "stale"
+
+    # Yesterday does not stay in today's counts. The last sweep time does stay.
+    rooms.sweeps.note("idle", clock.now - 86400)
+    rooms.sweeps.note("idle", clock.now)
+    assert rooms.sweeps.counts["idle"] == 1
+    assert rooms.sweeps.counts["finished"] == 0
+    assert rooms.sweeps.last_at == clock.now
+
+
 def test_an_old_rematch_request_still_times_out(setup):
     store, rooms, p, clock = setup
     room, _ = rooms.create("connect4", p["Ada"], public=True)

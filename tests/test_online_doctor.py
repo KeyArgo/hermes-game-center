@@ -105,6 +105,108 @@ def test_doctor_reads_a_store_database_and_does_not_write(tmp_path):
     assert quiet["id"] in text
 
 
+def test_the_doctor_shows_the_sweep_record_and_when_the_next_rooms_go(tmp_path):
+    """Last sweep, today's counts, and the rooms the next sweep will close, with when."""
+    from online.doctor import _when
+    from online.rooms import Rooms, load_games
+
+    store = Store(tmp_path / "online.sqlite3")
+    now = time.time()
+    ada, _token = store.create_player("Ada")
+    rooms = Rooms(store, tmp_path, games=load_games(), clock=lambda: now)
+    due, _ = rooms.create("connect4", ada, True)
+    soon, _ = rooms.create("chessboard", ada, True)
+    held, _ = rooms.create("reversi", ada, True)
+    store.log_audit("close-idle-room", target_id="yesterday", target_name="connect4",
+                    reason="idle", at=now - 86400)
+    closed, _ = rooms.create("gomoku", ada, True)
+    store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (now - 31 * 60, closed["id"]))
+    swept = rooms.sweep_idle(now)
+    assert [item["id"] for item in swept] == [closed["id"]]
+    store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (now - 40 * 60, due["id"]))
+    store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (now - 10 * 60, soon["id"]))
+    store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (now - 3 * 3600, held["id"]))
+    store.close()
+
+    report = collect(tmp_path / "online.sqlite3", now=now, spared={held["id"]})
+    assert report["sweep"]["today"] == {"finished": 0, "declined": 0, "idle": 1, "stale": 0}
+    assert report["sweep"]["last_at"] == now
+    by_id = {room["id"]: room for room in report["sweep_next"]}
+    assert held["id"] not in by_id
+    assert by_id[due["id"]]["would_sweep"] is True
+    assert by_id[due["id"]]["sweep_at"] == (now - 40 * 60) + 30 * 60
+    assert by_id[soon["id"]]["would_sweep"] is False
+    assert by_id[soon["id"]]["sweep_at"] > now
+    assert [room["id"] for room in report["sweep_next"]] == [due["id"], soon["id"]]
+
+    text = render_text(report)
+    assert "last sweep: " + _when(now) in text
+    assert "swept today: finished=0 declined=0 idle=1 stale=0" in text
+    assert "rooms that will be swept next:" in text
+    assert due["id"] in text and _when(by_id[due["id"]]["sweep_at"]) in text
+    assert held["id"] not in text.split("rooms that will be swept next:", 1)[1]
+
+    html = render_html(report)
+    assert "Last sweep" in html
+    assert "idle=1" in html
+    assert due["id"] in html and _when(by_id[due["id"]]["sweep_at"]) in html
+    assert "Rooms that will be swept next" in html
+
+    proc = subprocess.run(
+        ["python3", "-m", "online.doctor", "--db", str(tmp_path / "online.sqlite3")],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "swept today: finished=0 declined=0 idle=1 stale=0" in proc.stdout
+    assert "rooms that will be swept next:" in proc.stdout
+    assert due["id"] in proc.stdout
+
+
+def test_the_doctor_page_shows_the_sweep_and_refuses_without_the_staff_key(tmp_path):
+    import asyncio
+
+    from aiohttp.test_utils import TestClient, TestServer
+
+    from online.rooms import load_games
+    from online.server import App
+    from online.store import token_hash
+
+    async def scenario():
+        server = App(tmp_path / "live", games=load_games())
+        client = TestClient(TestServer(server.build()))
+        await client.start_server()
+        try:
+            response = await client.post("/api/session", json={"name": "Ada"})
+            body = await response.json()
+            token = body["token"]
+            server.store.set_staff(body["player"]["id"], "owner", token_hash("owner-key"), "test")
+            room = server.store.create_room("connect4", body["player"]["id"], True)
+            now = time.time()
+            server.store.db.execute("UPDATE rooms SET active = ? WHERE id = ?", (now - 31 * 60, room["id"]))
+            closed = server.sweep_idle_rooms(now)
+            assert [item["id"] for item in closed] == [room["id"]]
+            assert server.rooms.sweeps.counts["idle"] == 1
+
+            bare = await client.get("/admin/doctor")
+            assert bare.status == 401
+            only_account = await client.get("/admin/doctor", headers={"Authorization": f"Bearer {token}"})
+            assert only_account.status == 401
+
+            page = await client.get(
+                "/admin/doctor",
+                headers={"Authorization": f"Bearer {token}", "X-Staff-Key": "owner-key"},
+            )
+            assert page.status == 200
+            html = await page.text()
+            assert "Last sweep" in html
+            assert "idle=1" in html
+            assert "finished=0" in html
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())
+
+
 def test_doctor_cli_prints_json(tmp_path):
     quiet, _fresh, _now = _built(tmp_path)
     proc = subprocess.run(

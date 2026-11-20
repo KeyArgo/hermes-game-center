@@ -592,7 +592,7 @@ class Store:
 
     def log_audit(self, action: str, *, actor_id: str = "server", actor_name: str = "server",
                   actor_role: str = "server", target_id: str = "", target_name: str = "",
-                  reason: str = "", detail: dict | None = None) -> int:
+                  reason: str = "", detail: dict | None = None, at: float | None = None) -> int:
         """One row in the staff audit log, written by the code rather than by a staff action.
 
         The same table, so a person reading the audit trail sees a sweep beside every
@@ -601,8 +601,8 @@ class Store:
         cursor = self.db.execute(
             "INSERT INTO audit (at, actor_id, actor_name, actor_role, action, target_id, target_name,"
             " reason, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (time.time(), actor_id, actor_name, actor_role, action, target_id, target_name,
-             reason, json.dumps(detail or {})),
+            (time.time() if at is None else float(at), actor_id, actor_name, actor_role, action,
+             target_id, target_name, reason, json.dumps(detail or {})),
         )
         return int(cursor.lastrowid or 0)
 

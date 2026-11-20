@@ -26,6 +26,33 @@ from . import league  # noqa: E402
 
 log = logging.getLogger("gameshelf.online")
 
+# Why a sweep closed a room. The doctor counts a day by these, and the log line names one.
+SWEEP_REASONS = ("finished", "declined", "idle", "stale")
+
+
+class SweepBook:
+    """How many rooms the sweeps closed today, and when the last one was.
+
+    The day is UTC. A note from a new day starts the counts again. The last sweep
+    time stays, so a quiet morning still shows when the last table was cleared.
+    """
+
+    def __init__(self) -> None:
+        self.last_at = 0.0
+        self.day = ""
+        self.counts = {reason: 0 for reason in SWEEP_REASONS}
+
+    def note(self, reason: str, when: float) -> None:
+        if reason not in self.counts:
+            return
+        day = time.strftime("%Y-%m-%d", time.gmtime(float(when)))
+        if day != self.day:
+            self.day = day
+            self.counts = {name: 0 for name in SWEEP_REASONS}
+        self.counts[reason] += 1
+        if float(when) >= self.last_at:
+            self.last_at = float(when)
+
 # Listed first, in this order; any other table game found beside them follows by title.
 CURATED = ("connect4", "reversi", "checkers", "gomoku", "chessboard",
            "go", "hex", "breakthrough", "seabattle", "blackjack", "slots")
@@ -174,6 +201,7 @@ class Rooms:
         self.started = clock()
         # The sentence a sweep closed a room with, so the server can say it on the socket.
         self.swept_notes: dict[str, str] = {}
+        self.sweeps = SweepBook()
 
     # Tables ------------------------------------------------------------------
 
@@ -536,12 +564,36 @@ class Rooms:
                 found.append((side, pid, str(state.get(f"{side}_name") or side)))
         return found
 
-    def _close_finished(self, room: dict, reason: str) -> None:
-        """The store's one close path. Invites die with the room; the idle sweep stays the backstop."""
+    def _record_sweep(self, room: dict, code: str, note: str = "") -> None:
+        """One log line and one audit row for a room a sweep closed."""
+        when = float(self.clock())
+        game = str(room.get("game") or "")
+        log.warning("swept room %s %s reason=%s", room["id"], game, code)
+        action = {
+            "finished": "close-finished-room",
+            "declined": "close-finished-room",
+            "idle": "close-idle-room",
+            "stale": "close-stale-room",
+        }.get(code, "close-finished-room")
+        self.store.log_audit(
+            action, target_id=str(room.get("id") or ""), target_name=game, reason=code, at=when,
+            detail={"game": game, "reason": code, "sweep": code, "note": note},
+        )
+        self.sweeps.note(code, when)
+
+    def _close_finished(self, room: dict, reason: str, sweep: str | None = None) -> None:
+        """The store's one close path. Invites die with the room; the idle sweep stays the backstop.
+
+        A sweep names itself (finished, declined). Someone leaving a finished table is not a
+        sweep: it keeps the older audit line and does not move the sweep counts.
+        """
         current = self.store.room(room["id"]) or room
         if current.get("closed"):
             return
         self.store.close_room(room["id"])
+        if sweep:
+            self._record_sweep(room, sweep, reason)
+            return
         self.store.log_audit(
             "close-finished-room", target_id=room["id"], target_name=str(room.get("game") or ""),
             reason=reason, detail={"game": room.get("game") or "", "reason": reason},
@@ -556,7 +608,7 @@ class Rooms:
         name = str(player.get("name") or "The other player")
         note = f"{name} declined a rematch."
         self._write_state(room, lambda saved, text=note: saved.__setitem__("rematch_note", text))
-        self._close_finished(room, note)
+        self._close_finished(room, note, sweep="declined")
         return {"ok": True, "text": note, "finished": None, "closed": True}
 
     def _after_rematch(self, room: dict) -> None:
@@ -641,7 +693,7 @@ class Rooms:
             if note and note != "no rematch":
                 text = note
                 self._write_state(room, lambda saved, line=text: saved.__setitem__("rematch_note", line))
-            self._close_finished(room, note)
+            self._close_finished(room, note, sweep="finished")
             self.swept_notes[room["id"]] = "This table is closed." if note == "no rematch" else note
             closed.append(room["id"])
         return closed
@@ -823,7 +875,9 @@ class Rooms:
     def expire(self) -> list[str]:
         stale = self.store.stale_rooms(self.clock() - ROOM_IDLE_DAYS * 86400)
         for room_id in stale:
+            room = self.store.room(room_id) or {"id": room_id, "game": ""}
             self.store.close_room(room_id)
+            self._record_sweep(room, "stale", "quiet for days")
             try:
                 folder = self.folder(room_id)
             except ValueError:
@@ -855,13 +909,6 @@ class Rooms:
                 continue
             idle_minutes = int(max(0.0, idle_for) // 60)
             self.store.close_room(room["id"])
-            self.store.log_audit(
-                "close-idle-room", target_id=room["id"], target_name=str(room["game"]),
-                reason=f"nobody at the table for {idle_minutes} minutes",
-                detail={"game": room["game"], "idle_minutes": idle_minutes,
-                        "status": str(state.get("status") or "")},
-            )
-            log.warning("closed idle room %s (%s): nobody at the table for %d min",
-                        room["id"], room["game"], idle_minutes)
+            self._record_sweep(room, "idle", f"nobody at the table for {idle_minutes} minutes")
             closed.append(room)
         return closed

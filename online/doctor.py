@@ -10,6 +10,7 @@ Chat text stays out of the report: a line is an id, an author and a time.
 from __future__ import annotations
 
 import argparse
+import datetime
 import html
 import json
 import logging
@@ -18,7 +19,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-from online.rooms import FINISHED, IDLE_CLOSE_SECONDS
+from online.rooms import EMPTY_IDLE_CLOSE_SECONDS, FINISHED, IDLE_CLOSE_SECONDS, SWEEP_REASONS
 
 # A player seen within this window counts as recent presence when this process
 # has no lobby sockets to ask. The live page passes the hub's own connections
@@ -85,6 +86,33 @@ def _when(then: float) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(float(then)))
 
 
+def _utc_midnight(when: float) -> float:
+    moment = datetime.datetime.fromtimestamp(float(when), datetime.timezone.utc)
+    start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start.timestamp()
+
+
+def _sweep_summary(conn, now: float) -> dict:
+    """Last sweep, and how many rooms each reason closed since UTC midnight."""
+    today = {reason: 0 for reason in SWEEP_REASONS}
+    last = 0.0
+    start = _utc_midnight(now)
+    rows = conn.execute(
+        "SELECT at, reason FROM audit WHERE reason IN (?, ?, ?, ?)",
+        SWEEP_REASONS,
+    ).fetchall()
+    for row in rows:
+        code = str(row["reason"] or "")
+        if code not in today:
+            continue
+        at = float(row["at"] or 0)
+        if at >= last:
+            last = at
+        if at >= start:
+            today[code] += 1
+    return {"last_at": last, "today": today}
+
+
 def _room_state(data_root: Path, room_id: str) -> dict:
     name = str(room_id or "")
     if not name or "/" in name or "\\" in name or ".." in Path(name).parts:
@@ -130,19 +158,26 @@ def collect(db_path, *, now: float | None = None, lobby_ids=None, spared=None,
             state = _room_state(data_root, room["id"])
             status = str(state.get("status") or "")
             idle = _age(moment, room.get("active") or 0)
+            held = room["id"] in spared_ids
+            # A live seat keeps the two-hour rule and is not closed while they sit.
+            # Everyone else is on the thirty-minute clock.
+            limit = IDLE_CLOSE_SECONDS if held else EMPTY_IDLE_CLOSE_SECONDS
+            active = float(room.get("active") or 0)
             rooms.append({
                 "id": room["id"],
                 "game": room["game"],
                 "host_id": room["host_id"],
                 "host_name": room.get("host_name") or "",
                 "created": float(room.get("created") or 0),
-                "active": float(room.get("active") or 0),
+                "active": active,
                 "age_seconds": _age(moment, room.get("created") or 0),
                 "idle_seconds": idle,
                 "seats": _seats(state),
                 "status": status,
                 "finished_open": bool(status in FINISHED),
-                "would_sweep": idle >= IDLE_CLOSE_SECONDS and room["id"] not in spared_ids,
+                "sweep_held": held,
+                "sweep_at": active + limit,
+                "would_sweep": (not held) and idle >= limit,
             })
 
         if lobby_ids is None:
@@ -200,9 +235,12 @@ def collect(db_path, *, now: float | None = None, lobby_ids=None, spared=None,
             (CHAT_LINES,),
         )]
         chat.reverse()
+        sweep = _sweep_summary(conn, moment)
     finally:
         conn.close()
 
+    sweep_next = [room for room in rooms if not room.get("sweep_held")]
+    sweep_next.sort(key=lambda room: (float(room.get("sweep_at") or 0), str(room.get("id") or "")))
     report = {
         "now": moment,
         "rooms": rooms,
@@ -211,6 +249,8 @@ def collect(db_path, *, now: float | None = None, lobby_ids=None, spared=None,
         "availability": availability,
         "requests": requests,
         "would_sweep": [room for room in rooms if room["would_sweep"]],
+        "sweep": sweep,
+        "sweep_next": sweep_next,
         "chat": chat,
         "errors": list(errors or []),
     }
@@ -261,8 +301,22 @@ def _seat_words(seats: list[dict]) -> str:
     return ", ".join(parts)
 
 
+def _sweep_lines(report: dict) -> list[str]:
+    sweep = report.get("sweep") or {}
+    today = sweep.get("today") or {}
+    last = float(sweep.get("last_at") or 0)
+    lines = [
+        "last sweep: " + (_when(last) if last else "(none)"),
+        "swept today: " + " ".join(
+            f"{name}={int(today.get(name) or 0)}" for name in SWEEP_REASONS
+        ),
+    ]
+    return lines
+
+
 def render_text(report: dict) -> str:
     lines = ["Game Center server doctor"]
+    lines.extend(_sweep_lines(report))
     counts = report.get("counts") or {}
     lines.append(
         "counts: "
@@ -327,6 +381,15 @@ def render_text(report: dict) -> str:
         lines.append("  (none in this process)")
     for row in report.get("errors") or []:
         lines.append(f"  {_when(row.get('at') or 0)} {row.get('level')} {row.get('message')}")
+    lines.append("rooms that will be swept next:")
+    upcoming = report.get("sweep_next") or []
+    if not upcoming:
+        lines.append("  (none)")
+    for room in upcoming:
+        lines.append(
+            f"  {room['id']} {room['game']} at={_when(room.get('sweep_at') or 0)} "
+            f"idle={room['idle_seconds']}s"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -346,6 +409,14 @@ def render_html(report: dict) -> str:
         "<h1>Game Center doctor</h1>",
         "<p>Read-only. Chat text is not on this page.</p>",
     ]
+    sweep = report.get("sweep") or {}
+    today = sweep.get("today") or {}
+    last = float(sweep.get("last_at") or 0)
+    parts.append("<h2>Sweep</h2>")
+    parts.append("<p>Last sweep: " + (_cell(_when(last)) if last else "(none)") + "</p>")
+    parts.append("<p>Today: " + _cell(" ".join(
+        f"{name}={int(today.get(name) or 0)}" for name in SWEEP_REASONS
+    )) + "</p>")
     parts.append("<h2>Open rooms</h2>")
     parts.append("<table><tr><th>Game</th><th>Seats</th><th>Status</th><th>Created</th>"
                  "<th>Last active</th><th>Finished, still open</th><th>Would sweep</th></tr>")
@@ -401,6 +472,15 @@ def render_html(report: dict) -> str:
         parts.append("<li>" + _cell(row.get("level")) + " " + _cell(row.get("message")) + "</li>")
     if not report.get("errors"):
         parts.append("<li>(none in this process)</li>")
+    parts.append("</ul>")
+    parts.append("<h2>Rooms that will be swept next</h2><ul>")
+    for room in report.get("sweep_next") or []:
+        parts.append(
+            "<li>" + _cell(room.get("id")) + " " + _cell(room.get("game"))
+            + " at " + _cell(_when(room.get("sweep_at") or 0)) + "</li>"
+        )
+    if not report.get("sweep_next"):
+        parts.append("<li>(none)</li>")
     parts.append("</ul></body></html>")
     return "".join(parts)
 
