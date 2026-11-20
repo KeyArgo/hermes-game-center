@@ -1,5 +1,6 @@
 """The version shown on screen must be the build that is actually running."""
 
+import re
 from pathlib import Path
 
 from dashboard import plugin_api
@@ -71,13 +72,23 @@ def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
     assert "data-games-version-row" not in bundle, "the masthead version row is gone"
     assert "data-games-version-footer" not in bundle, "and so is the pane's version footer"
     assert "id: 'version'" not in bundle, "the version is not a status-bar item"
-    # The other status-bar items: one, the Slots chip. The old Slots item was retired when Slots became
+    # Right-side status-bar contributions, by id. The old Slots chip was retired when Slots became
     # one game on the Jackpot machine, and the Jackpot v2 item went with the overlay it existed to anchor:
-    # both see-through machines are a composer-slot contribution now. The one other status-bar entry is
-    # the invisible over-chat stage, there only because the composer dock's transform traps a fixed box.
-    assert bundle.count("area: STATUSBAR_AREAS.right") == 2
-    assert "id: 'status'" in bundle
-    assert "id: 'overchat-stage'" in bundle
+    # both see-through machines are a composer-slot contribution now. What remains on the right is the
+    # actionable status line, the invite bell, and the invisible over-chat stage (there only because the
+    # composer dock's transform traps a fixed box). The bell is a real status-bar item; it is not the
+    # version chip, so a chip put back in the bar cannot hide inside a higher count of the area.
+    right_ids = re.findall(r"id: '([^']+)',\s*area: STATUSBAR_AREAS\.right", bundle)
+    assert right_ids == ["status", "invite", "overchat-stage"], right_ids
+    for ident, component in (
+        ("status", "GamesStatusItem"),
+        ("invite", "InviteBell"),
+        ("overchat-stage", "OverChatStage"),
+    ):
+        block = bundle.split(f"id: '{ident}'", 1)[1].split("id:", 1)[0]
+        assert "area: STATUSBAR_AREAS.right" in block
+        assert f"jsx({component}" in block, f"{ident} should draw {component}"
+        assert "GamesVersionChip" not in block, f"the version chip is not the {ident} contribution"
     assert "id: 'jackpot'" not in bundle
     assert "id: 'jackpot2'" not in bundle
     assert "area: COMPOSER_AREAS.underside" in bundle
