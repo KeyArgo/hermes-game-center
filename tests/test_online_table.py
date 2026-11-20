@@ -307,3 +307,63 @@ def test_two_people_chat_through_a_real_server(tmp_path):
             await client.close()
     run(scenario())
 
+
+def test_snapshot_exposes_notice_from_frame_and_from_picture(tmp_path, monkeypatch):
+    """OnlineTable.snapshot() carries a notice frame and falls back to picture.table_notice."""
+    import queue
+    from shelf import online_table
+
+    class NoticeSocket:
+        def __init__(self, address, timeout):
+            self.inbox = queue.Queue()
+
+        def send_json(self, message):
+            if message.get("t") == "auth":
+                self.inbox.put({"t": "hello", "me": {"id": "a"}, "room": {"id": "r"}, "chat": []})
+
+        def receive(self, timeout):
+            try:
+                return self.inbox.get(timeout=timeout)
+            except queue.Empty:
+                return None
+
+        def close(self):
+            pass
+
+    sockets = []
+    monkeypatch.setattr(online_table.wsmod, "Socket", lambda *a, **k: sockets.append(NoticeSocket(*a, **k)) or sockets[-1])
+    source = Online(tmp_path, url="http://example.test", secret=lambda _: "person-secret")
+    source.turn_on()
+    table = OnlineTable(source)
+    try:
+        assert table.open("r")["ok"]
+        sockets[0].inbox.put({"t": "presence", "people": [{"id": "a", "name": "Ada"}]})
+        sockets[0].inbox.put({"t": "notice", "kind": "left", "name": "Locutus", "text": "Locutus left the table."})
+        deadline = time.monotonic() + 2
+        while not table.snapshot().get("notice") and time.monotonic() < deadline:
+            time.sleep(0.01)
+        snap = table.snapshot()
+        assert snap["notice"]["kind"] == "left"
+        assert snap["notice"]["name"] == "Locutus"
+        assert snap["notice"]["text"] == "Locutus left the table."
+        assert snap["presence"] == [{"id": "a", "name": "Ada"}]
+    finally:
+        table.close()
+
+    # Poll / late join path: no transient notice frame, only picture.table_notice in state.
+    table2 = OnlineTable(source)
+    try:
+        assert table2.open("r2")["ok"]
+        sockets[-1].inbox.put({"t": "state", "room": {"id": "r2"}, "picture": {
+            "status": "active",
+            "seats": [{"id": "a", "side": "white", "name": "Ada"}],
+            "table_notice": {"kind": "disconnected", "name": "Locutus", "text": "Locutus left the table."},
+        }})
+        deadline = time.monotonic() + 2
+        while not table2.snapshot().get("notice") and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert table2.snapshot()["notice"]["text"] == "Locutus left the table."
+        assert table2.snapshot()["notice"]["kind"] == "disconnected"
+    finally:
+        table2.close()
+

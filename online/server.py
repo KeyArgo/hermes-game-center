@@ -1398,6 +1398,13 @@ class App:
                 answer = {"ok": False, "text": "Unknown message."}
             await _send(conn.ws, {"t": "result", "ref": ref, "ok": answer["ok"], "text": answer["text"],
                                   "finished": answer.get("finished")})
+            notice = answer.get("notice")
+            if notice:
+                for other in list(self.conns.get(room["id"], ())):
+                    if other is conn:
+                        continue
+                    with contextlib.suppress(Exception):
+                        await _send(other.ws, notice)
             refresh_presence = bool(answer.get("ok")) and (
                 kind in {"close", "redeem", "claim"}
                 or bool(answer.get("closed"))
@@ -1405,7 +1412,8 @@ class App:
                 or (kind == "cmd" and action in {"leave", "join", "sit", "resign", "rematch", "new", "decline"})
             )
             if answer.get("closed"):
-                await self.shut_room(room["id"], str(answer.get("text") or "This table is closed."))
+                close_text = str((notice or {}).get("text") or answer.get("text") or "This table is closed.")
+                await self.shut_room(room["id"], close_text)
                 await self.hub.refresh()
                 return
             if kind == "close" and answer["ok"]:

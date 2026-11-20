@@ -41,7 +41,7 @@ class OnlineTable:
         self._opened = threading.Event()
         # The frames that only add to what the panel keeps — who is here, and what was said — one
         # entry each, so the next such feed is a line here rather than another branch in the loop.
-        self._feeds = {"presence": self._keep_presence, "chat": self._keep_chat}
+        self._feeds = {"presence": self._keep_presence, "chat": self._keep_chat, "notice": self._keep_notice}
 
     def open(self, room_id):
         with self._lifecycle:
@@ -58,7 +58,8 @@ class OnlineTable:
             with self._lock:
                 self._data = {"room_id": room_id, "state": "connecting", "picture": None,
                               "room": None, "side": "", "opponent": None, "error": "", "finished": None,
-                              "chat": [], "chat_error": None, "closed_text": ""}
+                              "chat": [], "chat_error": None, "closed_text": "",
+                              "notice": None, "presence": []}
                 self.presence, self.result, self._me, self._saying = [], None, "", ""
                 self._out = queue.Queue()
                 self._stop = threading.Event()
@@ -149,7 +150,20 @@ class OnlineTable:
 
     def _keep_presence(self, message):
         """Who is at the table, from a presence frame."""
-        self.presence = message.get("people") or []
+        people = list(message.get("people") or [])
+        self.presence = people
+        self._data["presence"] = people
+
+    def _keep_notice(self, message):
+        """A table event (such as an opponent leaving), from a notice frame."""
+        text = str(message.get("text") or "")
+        if not text:
+            return
+        self._data["notice"] = {
+            "kind": str(message.get("kind") or ""),
+            "name": str(message.get("name") or ""),
+            "text": text,
+        }
 
     def _run(self, room_id, key):
         delay = 1
@@ -199,8 +213,18 @@ class OnlineTable:
                             seats = picture.get("seats") or []
                             own = next((s for s in seats if s.get("id") == self._me), {})
                             other = next((s for s in seats if s.get("id") and s.get("id") != self._me), {})
+                            had_opponent = bool(self._data.get("opponent"))
                             self._data["side"] = own.get("side", "")
                             self._data["opponent"] = {"name": other.get("name", "")} if other else None
+                            table_notice = picture.get("table_notice")
+                            if isinstance(table_notice, dict) and table_notice.get("text"):
+                                self._data["notice"] = {
+                                    "kind": str(table_notice.get("kind") or ""),
+                                    "name": str(table_notice.get("name") or ""),
+                                    "text": str(table_notice.get("text") or ""),
+                                }
+                            elif other and not had_opponent:
+                                self._data["notice"] = None
                             # A rematch is a new game. The last game's finished flag must not
                             # stay stuck over a board whose status is active again.
                             if picture.get("status") == "active":

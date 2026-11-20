@@ -327,9 +327,13 @@ class Rooms:
         if self.between_hands(room):
             pictured["permissions"]["can_join"] = False
         pictured["absent"] = self.absent_sides(room)
-        note = str((self.state(room) or {}).get("rematch_note") or "")
+        saved = self.state(room) or {}
+        note = str(saved.get("rematch_note") or "")
         if note:
             pictured["rematch_note"] = note
+        table_notice = saved.get("table_notice")
+        if isinstance(table_notice, dict) and table_notice.get("text"):
+            pictured["table_notice"] = dict(table_notice)
         pictured["pair"] = self.pair_info(room)
         pictured["open_league"] = bool(room.get("open_league"))
         pictured["labels"] = self.labels(room)
@@ -371,6 +375,7 @@ class Rooms:
             return {"ok": False, "text": "This table is closed.", "finished": None}
         host = player["id"] == room["host_id"]
         state = self.state(room)
+        was_seated = bool(self._seated(state, player["id"]))
         if action == "leave":
             # Two people have sat here. When the last of them gets up, the room closes
             # even if nobody has moved yet. A host who leaves before anyone sits does
@@ -439,9 +444,10 @@ class Rooms:
             name = str(player.get("name") or "The other player")
             note = f"{name} left the table."
             self.left_at.pop((room["id"], player["id"]), None)
+            notice = self._record_leave_notice(room, player, reason)
             self._write_state(room, lambda saved, text=note: saved.__setitem__("rematch_note", text))
             self._close_finished(room, note)
-            return {"ok": True, "text": note, "finished": None, "closed": True}
+            return {"ok": True, "text": note, "finished": None, "closed": True, "notice": notice}
         elif action == "leave" and self._seated(state, player["id"]) and state and state.get("status") == "active" \
                 and int(state.get("plies") or 0) and str(room.get("game") or "") not in NO_COLOUR_SWAP:
             # The kit resigns and then clears the seat in one write, which would record the
@@ -449,10 +455,14 @@ class Rooms:
             # A socket that did not come back resigns for the same reason a claim would.
             resigned = self._resign_seat(room, player, reason)
             left = self._command(room, player, "leave")
+            notice = None
             if left["ok"]:
                 self.left_at.pop((room["id"], player["id"]), None)
+                notice = self._record_leave_notice(room, player, reason)
                 self._close_when_empty(room)
-            return {"ok": left["ok"], "text": left["text"], "finished": resigned["finished"]}
+            closed = bool((self.store.room(room["id"]) or {}).get("closed"))
+            return {"ok": left["ok"], "text": left["text"], "finished": resigned["finished"],
+                    "notice": notice, "closed": closed}
         elif action == "lesson":
             if not host:
                 return {"ok": False, "text": "Only the host starts a lesson.", "finished": None}
@@ -465,6 +475,8 @@ class Rooms:
         else:
             return {"ok": False, "text": "Unknown action.", "finished": None}
         answer = self._command(room, player, line)
+        if action in {"join", "sit"} and answer.get("ok"):
+            self._write_state(room, lambda saved: saved.pop("table_notice", None))
         if action == "rematch" and answer.get("ok"):
             self._after_rematch(room)
         if action == "leave" and answer.get("ok"):
@@ -474,8 +486,28 @@ class Rooms:
                 sync = getattr(module, "_sync_turn", None) if module else None
                 if sync is not None:
                     self._write_state(room, sync)
+            if was_seated:
+                answer["notice"] = self._record_leave_notice(room, player, reason)
             self._close_when_empty(room)
+            if (self.store.room(room["id"]) or {}).get("closed"):
+                answer["closed"] = True
         return answer
+
+    def _record_leave_notice(self, room: dict, player: dict, reason: str) -> dict:
+        """Persist '<name> left the table.' into state and return the socket notice frame."""
+        name = str(player.get("name") or "The other player")
+        kind = "disconnected" if reason == "disconnect" else "left"
+        text = f"{name} left the table."
+        stored = {"kind": kind, "name": name, "text": text, "at": float(self.clock())}
+        is_blackjack = str(room.get("game") or "") == "blackjack"
+
+        def record(saved: dict) -> None:
+            saved["table_notice"] = stored
+            if is_blackjack:
+                saved["note"] = text
+
+        self._write_state(room, record)
+        return {"t": "notice", "kind": kind, "name": name, "text": text}
 
     def _socket_live(self, room_id: str, player_id: str, *, require_live: bool = False) -> bool:
         """Whether this player's table socket is live (so a dying socket cannot move or bet)."""
@@ -672,6 +704,7 @@ class Rooms:
             saved.pop("finished_at", None)
             saved.pop("rematch_asked_at", None)
             saved.pop("rematch_note", None)
+            saved.pop("table_notice", None)
             if str(room.get("game") or "") in NO_COLOUR_SWAP:
                 return
             for suffix in ("", "_id", "_name"):

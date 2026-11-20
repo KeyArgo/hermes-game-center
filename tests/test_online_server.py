@@ -403,3 +403,62 @@ def test_a_dying_socket_cannot_stake_a_blackjack_hand(tmp_path):
         finally:
             await client.close()
     run(scenario())
+
+
+def test_leave_and_disconnect_eviction_broadcast_notice_and_persist_it_in_picture(tmp_path):
+    """Explicit leave and disconnect-grace eviction both emit a notice frame and store it in picture."""
+    async def scenario():
+        import time
+        now = {"t": time.time()}
+        server, client = await started(tmp_path, clock=lambda: now["t"])
+        try:
+            ada, ada_token = await sign_in(client, "Ada")
+            _locutus, loc_token = await sign_in(client, "Locutus")
+
+            # 1. Explicit leave on blackjack.
+            room1 = (await open_room(client, ada_token, game="blackjack"))["room"]
+            a1 = await connect(client, room1["id"], ada_token)
+            l1 = await connect(client, room1["id"], loc_token)
+            assert (await l1.result(1, t="cmd", action="join"))["ok"]
+            waiting = asyncio.create_task(a1.until(lambda m: m.get("t") == "notice"))
+            assert (await l1.result(2, t="cmd", action="leave"))["ok"]
+            notice = await waiting
+            assert notice["t"] == "notice"
+            assert notice["kind"] == "left"
+            assert notice["name"] == "Locutus"
+            assert notice["text"] == "Locutus left the table."
+            pic1 = server.rooms.picture(server.store.room(room1["id"]), ada["id"])
+            assert pic1["table_notice"]["kind"] == "left"
+            assert pic1["table_notice"]["name"] == "Locutus"
+            assert pic1["table_notice"]["text"] == "Locutus left the table."
+            assert pic1.get("note") == "Locutus left the table."
+            await a1.ws.close()
+            await l1.ws.close()
+
+            # 2. Disconnect grace eviction on blackjack.
+            room2 = (await open_room(client, ada_token, game="blackjack"))["room"]
+            a2 = await connect(client, room2["id"], ada_token)
+            l2 = await connect(client, room2["id"], loc_token)
+            assert (await l2.result(1, t="cmd", action="join"))["ok"]
+            assert (await a2.result(2, t="cmd", action="move", args=["bet1000"]))["ok"]
+            await l2.ws.close()
+            await asyncio.sleep(0.05)
+            now["t"] += 44
+            assert await server.sweep_disconnects(now["t"]) == []
+            now["t"] += 2
+            waiting2 = asyncio.create_task(a2.until(lambda m: m.get("t") == "notice"))
+            await server.sweep_disconnects(now["t"])
+            notice2 = await waiting2
+            assert notice2["t"] == "notice"
+            assert notice2["kind"] == "disconnected"
+            assert notice2["name"] == "Locutus"
+            assert notice2["text"] == "Locutus left the table."
+            pic2 = server.rooms.picture(server.store.room(room2["id"]), ada["id"])
+            assert pic2["table_notice"]["kind"] == "disconnected"
+            assert pic2["table_notice"]["name"] == "Locutus"
+            assert pic2["table_notice"]["text"] == "Locutus left the table."
+            assert pic2.get("note") == "Locutus left the table."
+            await a2.ws.close()
+        finally:
+            await client.close()
+    run(scenario())

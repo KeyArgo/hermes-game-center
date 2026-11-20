@@ -25337,7 +25337,12 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const myTurn = onlineCanMove(picture, view)
   // The chat is open while the table is: the same condition the server's own room uses.
   const atTable = state === 'live'
+  const hasOpponent = Boolean(table && table.opponent && table.opponent.name)
   const opponent = onlineOpponent(table)
+  const rawNotice = (table && table.notice) || (picture && picture.table_notice) || null
+  const leftNotice = typeof rawNotice === 'string'
+    ? rawNotice
+    : String((rawNotice && rawNotice.text) || '')
   const mySide = String((table && table.side) || '')
   // What this picture is, so the header and the stage can speak the game's language and not
   // always chess's. A table with no picture yet falls back to the game the surface asked for.
@@ -25346,9 +25351,10 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   // duel: two people each play their own hand against the same dealer. Slots has no other
   // person's board at all, so there is no side to name.
   const opponentLine = stageView === 'blackjack'
-    ? `You and ${opponent} vs the dealer`
-    : stageView === 'slots' ? `${opponent} is at this table`
-    : `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}`
+    ? (leftNotice && !hasOpponent ? `You vs the dealer · ${leftNotice}` : `You and ${opponent} vs the dealer`)
+    : stageView === 'slots'
+      ? (leftNotice && !hasOpponent ? leftNotice : `${opponent} is at this table`)
+      : (leftNotice && !hasOpponent ? leftNotice : `Against ${opponent}${mySide ? ` · you play ${mySide}` : ''}`)
   // Go offers Pass as a move; the local table carries it, so this one does too.
   const passOffered = Boolean(picture && (picture.legal || []).includes('pass') && canMove)
   // A session table (blackjack, slots) has no match to resign: the felt is one hand after
@@ -25373,10 +25379,12 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   })
   // The turn line: your move the moment the server says it is yours;
   // otherwise it waits, by name. A table that is reconnecting says that instead of pretending.
+  // If the other player left, say so instead of waiting for them.
   const reconnecting = state === 'reconnecting'
-  const turnKind = reconnecting ? 'reconnecting' : done ? 'over' : myTurn ? 'mine' : 'theirs'
+  const turnKind = reconnecting ? 'reconnecting' : done ? 'over' : leftNotice && !myTurn ? 'left' : myTurn ? 'mine' : 'theirs'
   const caption = reconnecting ? 'Reconnecting…'
     : done ? resultLine
+    : leftNotice && !myTurn ? leftNotice
     : myTurn ? 'Your turn'
     : `Waiting for ${opponent}`
   const dotColor = !picture || done ? '#7d8796' : picture.turn === 'black' ? '#20262e' : '#f0d0b0'
@@ -25531,9 +25539,13 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       }),
       jsx('span', {
         'data-turn-line': turnKind,
+        ...(leftNotice && caption === leftNotice ? { 'data-opponent-notice': '1' } : {}),
         style: myTurn ? { color: accent, fontWeight: 800 } : { color: text.secondary },
         children: caption
       }),
+      leftNotice && caption !== leftNotice
+        ? jsx('span', { 'data-opponent-notice': '1', style: { fontSize: 13, color: text.secondary, fontWeight: 600 }, children: leftNotice })
+        : null,
       // Never "Hermes is thinking" here: nobody's model is playing this seat. A command that is
       // out is the table's own round trip, and it says so.
       busy ? jsx('span', { className: 'games-waiting', style: { fontSize: 12, color: text.tertiary, fontWeight: 400 }, children: 'sending…' }) : null,
@@ -25580,6 +25592,9 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     })
   }) : null
 
+  const stagePicture = (picture && leftNotice && (!picture.note || !String(picture.note).includes(leftNotice)))
+    ? { ...picture, note: leftNotice }
+    : picture
   const board = jsxs('div', {
     className: 'games-board-hero',
     style: { display: 'flex', flex: '0 0 auto', alignItems: 'center', justifyContent: 'center', padding: 4, position: 'relative' },
@@ -25588,8 +25603,8 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       // same table the game draws at home. A view with no renderer says so in words rather than
       // drawing an empty grid, and slots opens the person's own machine until the shared floor
       // is built.
-      picture ? tableStage({
-        picture,
+      stagePicture ? tableStage({
+        picture: stagePicture,
         ctx,
         height: height || PLAY_HEIGHT,
         flat: true,
@@ -25597,7 +25612,9 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         busy,
         onMove: token => { if (canMove) command('move', [token]) },
         against: stageView === 'blackjack'
-          ? { who: `You and ${opponent} vs the dealer`, kind: 'human', why: `${opponent} plays their own hand against the same dealer.` }
+          ? (leftNotice && !hasOpponent
+            ? { who: 'You vs the dealer', kind: 'human', why: leftNotice }
+            : { who: `You and ${opponent} vs the dealer`, kind: 'human', why: `${opponent} plays their own hand against the same dealer.` })
           : null,
         slotsNote: 'Side-by-side Slots online is coming; this is your own machine.',
         unknownText: "This game can't be drawn online yet"

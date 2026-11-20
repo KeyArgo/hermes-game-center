@@ -4006,7 +4006,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => leaveNotRacedContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => leaveNotRacedContract()).then(() => opponentLeftNoticeContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -10022,4 +10022,90 @@ async function leaveNotRacedContract() {
   assert.ok(elapsed < 3200, 'the exit did not wait past the short timeout: ' + elapsed + 'ms')
   reset()
   console.log('leave: close follows leave, and a hanging leave still exits on the timeout: passed')
+}
+
+// ---- Opponent left notice replaces "Waiting for <name>" in status and on the felt ----
+async function opponentLeftNoticeContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const bjGame = { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true }
+  const waitingPic = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'black',
+    hands: 1, next_bet: 1000, mid_round: true, legal: [], table_players: 2,
+    note: 'Potato bets 1,000. Locutus to bet.',
+    permissions: { can_move: false },
+    seats: [
+      { side: 'white', kind: 'human', id: 'me', name: 'Potato', open: false },
+      { side: 'black', kind: 'human', id: 'loc', name: 'Locutus', open: false }
+    ]
+  }
+  const draw = props => {
+    sandbox.noticeProps = props
+    cursor = 0
+    const tree = evaluate('OnlineTable(noticeProps)')
+    const queued = effects
+    effects = []
+    queued.forEach(effect => effect())
+    return tree
+  }
+  const settle = async props => { draw(props); await tick(); return draw(props) }
+
+  // 1. Before leaving, status says Waiting for Locutus. After notice frame, status line
+  //    and felt both show "Locutus left the table." instead of "Waiting for Locutus".
+  reset()
+  let current = {
+    room_id: 'bj-left-1', state: 'live', picture: waitingPic, room: { id: 'bj-left-1' },
+    side: 'white', opponent: { name: 'Locutus' }, error: '', finished: null, notice: null
+  }
+  const ctx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async path => (path === '/online/table' ? { table: current } : { ok: true })
+  }
+  let tree = await settle({ game: bjGame, ctx, roomId: 'bj-left-1', onBack: () => {} })
+  assert.ok(words(tree).includes('Waiting for Locutus'), 'starts waiting for Locutus')
+
+  current = {
+    ...current,
+    opponent: null,
+    notice: { kind: 'left', name: 'Locutus', text: 'Locutus left the table.' },
+    picture: { ...waitingPic, table_players: 1, mid_round: false }
+  }
+  reset()
+  tree = await settle({ game: bjGame, ctx, roomId: 'bj-left-1', onBack: () => {} })
+  const statusNode = nodes(tree).find(node => node.props && node.props.className === 'games-status')
+  assert.ok(statusNode && words(statusNode).includes('Locutus left the table.'),
+    'status line shows Locutus left the table.: ' + words(statusNode))
+  assert.ok(!words(tree).includes('Waiting for Locutus'), 'no longer Waiting for Locutus')
+  assert.ok(!words(tree).includes('Waiting for your opponent'), 'never falls back to Waiting for your opponent')
+  const bjStage = nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'BlackjackTable')
+  assert.ok(bjStage && bjStage.props.picture && String(bjStage.props.picture.note || '').includes('Locutus left the table.'),
+    'felt picture.note carries Locutus left the table.: ' + JSON.stringify(bjStage && bjStage.props.picture && bjStage.props.picture.note))
+  const feltTree = bjStage.type(bjStage.props)
+  assert.ok(words(feltTree).includes('Locutus left the table.'), 'rendered blackjack felt shows Locutus left the table.')
+
+  // 2. Missed transient notice frame: picture.table_notice alone still shows the message
+  //    even after the turn shifts to the remaining player (can_move: true).
+  reset()
+  current = {
+    room_id: 'bj-left-2', state: 'live', room: { id: 'bj-left-2' }, side: 'white',
+    opponent: null, error: '', finished: null, notice: null,
+    picture: {
+      ...waitingPic, table_players: 1, mid_round: false, turn: 'white',
+      permissions: { can_move: true },
+      table_notice: { kind: 'disconnected', name: 'Locutus', text: 'Locutus left the table.' }
+    }
+  }
+  tree = await settle({ game: bjGame, ctx, roomId: 'bj-left-2', onBack: () => {} })
+  const status2 = nodes(tree).find(node => node.props && node.props.className === 'games-status')
+  assert.ok(status2 && words(status2).includes('Locutus left the table.'),
+    'polled picture.table_notice still shows in status line: ' + words(status2))
+  const bjStage2 = nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'BlackjackTable')
+  assert.ok(bjStage2 && String(bjStage2.props.picture.note || '').includes('Locutus left the table.'),
+    'polled picture.table_notice shows on the felt too')
+  const feltTree2 = bjStage2.type(bjStage2.props)
+  assert.ok(words(feltTree2).includes('Locutus left the table.'), 'rendered felt shows polled notice too')
+  reset()
+  console.log('opponent left notice: status line and felt show "<name> left the table.": passed')
 }
