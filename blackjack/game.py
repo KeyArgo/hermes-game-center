@@ -407,13 +407,15 @@ def _table_players(state: dict) -> int:
     second player - the host plays their own hand until a person sits down between hands.
     The same is true the other way: if the first person gets up and the second stays, the
     second person plays on alone instead of waiting for an empty seat.
+
+    A local two-person screen has no seat ids. Both people are at the keyboard, and the guest
+    record is the second stack, so an empty ``black_id`` must not collapse that table to one.
+    Only a lobby table (chips kept in the table's own stacks) counts occupied seats.
     """
     if _two_seats(state) != 2:
         return 1
     if _table_chips(state):
         return 2 if len(_occupied_owners(state)) >= 2 else 1
-    if not str(state.get("black_id") or ""):
-        return 1
     return 2
 
 
