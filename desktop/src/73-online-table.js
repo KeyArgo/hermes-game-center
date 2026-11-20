@@ -100,6 +100,8 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
   const [confirming, setConfirming] = useState(false)
+  // Back in the middle of a board match is a loss, so it asks first, the way Resign does.
+  const [askingLeave, setAskingLeave] = useState(false)
   const [resultShown, setResultShown] = useState(true)
   const alive = useRef(true)
   const inFlight = useRef(false)
@@ -235,7 +237,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const over = ['win', 'draw', 'resigned', 'abandoned', 'done'].includes(status)
   // A live rematch has status active. A leftover finished flag must not freeze it.
   const done = Boolean(over || (status !== 'active' && table && table.finished && picture))
-  const canMove = Boolean(!busy && !confirming && !done && state !== 'reconnecting' && onlineCanMove(picture, view))
+  const canMove = Boolean(!busy && !confirming && !askingLeave && !done && state !== 'reconnecting' && onlineCanMove(picture, view))
   const myTurn = onlineCanMove(picture, view)
   // The chat is open while the table is: the same condition the server's own room uses.
   const atTable = state === 'live'
@@ -298,6 +300,8 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   // was opened on. A refusal is deliberately not cleared here — the table's own words stay until
   // the next move, so a refused move can never look like it did nothing.
   useEffect(() => { setConfirming(false) }, [picture && picture.plies, status, state])
+  // The leave question is about a match in play. Once it ends, or the table goes, it is moot.
+  useEffect(() => { setAskingLeave(false) }, [status, state])
 
   // One door for every command: the board and the resign button both go through it, both are
   // locked while it is out, and the answer's picture is painted at once. No prediction — the
@@ -323,17 +327,15 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
-  // One person at an online blackjack table deals the next hand for the same bet,
-  // only while the table is live, this person is not leaving, and the opponent is present.
-  // Two people choose. A timed bet used to lock the round before either could leave.
+  // One person alone at an online blackjack table deals the next hand for the same bet,
+  // while the table is live and this person is not leaving. That includes the person left
+  // after the other one got up. Two seated people choose their own bets, so there is no timer.
   const dealtHand = useRef(0)
   const betTimer = useRef(null)
   const crowd = Number((picture && picture.table_players) || 0)
-  const opponentAbsent = Boolean(picture && picture.absent && Object.keys(picture.absent).length > 0)
-  const opponentPresent = Boolean(hasOpponent && !opponentAbsent && !leftNotice)
   useEffect(() => {
-    if (crowd >= 2) return undefined
-    if (!atTable || leaving.current || !opponentPresent) return undefined
+    if (crowd !== 1) return undefined
+    if (!atTable || leaving.current) return undefined
     const token = blackjackNextBet(picture)
     if (!token || !canMove) return undefined
     const hand = Number(picture.hands || 0)
@@ -349,7 +351,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       if (betTimer.current === timer) betTimer.current = null
       clearTimeout(timer)
     }
-  }, [crowd, atTable, opponentPresent, picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
+  }, [crowd, atTable, picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
 
   // Back, Close table, and a room the server has already closed all leave this
   // screen. The request is a courtesy. A refused leave, a dead socket, or no
@@ -391,8 +393,16 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     goGames()
   }
   const stepAway = () => leaveHome(true)
-  // Putting the table away here is not resigning. The match stays on the lobby
-  // server; this computer just stops pointing at it.
+  // A board match after its first move: the server records a leave as a resignation.
+  // Before the first move, and at a session table, there is nothing to lose.
+  const leaveLoses = Boolean(atTable && status === 'active' && !done && !sessionTable && Number((picture && picture.plies) || 0) > 0)
+  const backAway = () => {
+    if (leaveLoses) setAskingLeave(true)
+    else stepAway()
+  }
+  // Putting the table away sends no leave, but it drops this computer's table socket. The
+  // server gives the seat up once it has been gone 45 seconds (a match in play is then a
+  // disconnect resignation), so the words on the button say so.
   const putAway = () => leaveHome(false)
   // No asks the server to decline. An old server answers "Unknown action." and
   // the person still leaves, the same way Back does.
@@ -419,10 +429,12 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
     leaveHome(true)
   }
-  // A room the server says is gone is not a screen to sit on.
+  // A table that failed is not a screen to sit on. A table the server closed stays up with
+  // its reason ("Bea declined a rematch.", "Bea left the table.", "Bea did not answer.")
+  // until the person presses Back to games.
   useEffect(() => {
     if (!table || table.held) return undefined
-    if (state !== 'closed' && state !== 'error') return undefined
+    if (state !== 'error') return undefined
     leaveHome(true)
     return undefined
   }, [state, table && table.held, table && table.room_id])
@@ -431,7 +443,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 10, borderBottom: `1px solid ${stroke}` },
     children: [
       jsxs('div', { style: { display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }, children: [
-        button('Back', stepAway),
+        button('Back', backAway),
         jsxs('div', { style: { minWidth: 0 }, children: [
           jsx('div', { style: { fontSize: 20, fontWeight: 700 }, children: (game && game.title) || (picture && picture.game) || 'Online table' }),
           jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: opponentLine })
@@ -443,7 +455,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         button('Close table', stageView === 'blackjack' ? stepAway : putAway, {
           title: stageView === 'blackjack'
             ? 'Leave the table and go back to Games.'
-            : 'Puts this table away here. The match stays on the lobby server.'
+            : 'Puts this table away here. After 45 seconds away your seat is given up, and a match in play counts as a loss.'
         })
       ] })
     ]
@@ -580,7 +592,15 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
         state === 'error' && table.error
           ? jsx('div', { role: 'alert', style: { fontSize: 13, border: '1px solid #d76b65', borderRadius: 8, padding: '8px 10px' }, children: String(table.error || 'The table stopped.') })
           : null,
-        state === 'closed' ? jsx('div', { role: 'status', style: { fontSize: 13, color: text.secondary }, children: closedNote || 'This table is closed. The lobby is where a new one is found.' }) : null
+        state === 'closed' ? jsxs('div', {
+          className: 'games-online-closed',
+          style: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
+          children: [
+            jsx('div', { role: 'status', style: { fontSize: 13, color: text.secondary }, children: closedNote || 'This table is closed. The lobby is where a new one is found.' }),
+            // The result card has its own Back to games; this one is for a table closed mid-session.
+            done && resultShown ? null : button('Back to games', stepAway, { primary: true })
+          ]
+        }) : null
       ] })
 
   return jsxs('div', {
@@ -605,7 +625,19 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
           ] })
         ]
       }) : null,
-      jsx('div', { style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }, children: 'This table is a match on the lobby server. Closing it here puts the table away; it does not resign the game.' })
+      askingLeave ? jsxs('section', {
+        role: 'alertdialog', 'aria-label': 'Confirm leave', 'aria-describedby': 'games-online-leave',
+        onKeyDown: event => { if (event.key === 'Escape') setAskingLeave(false) },
+        style: { padding: 16, border: `1px solid ${accent}`, borderRadius: 12, background: card },
+        children: [
+          jsx('p', { id: 'games-online-leave', style: { margin: '0 0 12px', fontSize: 13 }, children: 'Leaving now counts as a loss. Leave?' }),
+          jsxs('div', { style: { display: 'flex', gap: 8 }, children: [
+            button('Keep playing', () => setAskingLeave(false), { autoFocus: true }),
+            button('Leave', () => { setAskingLeave(false); stepAway() }, { primary: true })
+          ] })
+        ]
+      }) : null,
+      jsx('div', { style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }, children: 'This table is a match on the lobby server. Closing it here puts the table away; after 45 seconds away the seat is given up, and a match in play counts as a loss.' })
     ]
   })
 }

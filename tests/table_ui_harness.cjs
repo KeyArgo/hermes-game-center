@@ -4359,11 +4359,60 @@ async function onlineTableContract() {
   await tick()
   assert.equal(commands(leaving).pop()[1].body.action, 'resign', 'only the confirmation resigns')
   tree = draw('OnlineTable(onlineProps)', 'onlineProps', leavingProps)
+  // Closing drops this computer's table socket, and the server gives the seat up 45 s later.
+  // The words say that, and never that the match waits on the server.
+  const closeTip = String(findButton(tree, 'Close table').props.title || '')
+  assert.ok(closeTip.includes('45 seconds'), 'Close table says the seat is given up after 45 s away: ' + closeTip)
+  assert.ok(!closeTip.includes('stays on the lobby server'), 'and does not promise the match stays: ' + closeTip)
+  assert.ok(!words(tree).includes('it does not resign the game'), 'the footnote does not promise it either')
   findButton(tree, 'Close table').props.onClick()
   await tick()
   assert.ok(leaving.asked.some(item => item[0] === '/online/table/close'), 'Close table posts the close route')
   assert.equal(localCalls.pop(), 'back', 'and puts the person back where they came from')
   assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'a closed table is forgotten')
+
+  reset()
+  // 5b. Back in the middle of a board match asks first, in the pane, the way the local table
+  //     asks before Leave table. Keep playing sends nothing; Leave is what resigns and goes.
+  const midBack = []
+  const mid = makeCtx(live(minePicture))
+  const midProps = { game, ctx: mid.ctx, roomId: 'r1', onBack: () => midBack.push('back') }
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', midProps)
+  findButton(tree, 'Back').props.onClick()
+  await tick()
+  tree = draw('OnlineTable(onlineProps)', 'onlineProps', midProps)
+  assert.equal(commands(mid).length, 0, 'Back mid-match sends no leave before it is confirmed')
+  assert.deepEqual(midBack, [], 'and the screen stays')
+  const leaveAsk = nodes(tree).find(node => node.props && node.props.role === 'alertdialog')
+  assert.ok(leaveAsk, 'it asks in the pane')
+  assert.ok(words(leaveAsk).includes('Leaving now counts as a loss. Leave?'), 'in plain words: ' + words(leaveAsk))
+  assert.ok(findButton(tree, 'Leave') && findButton(tree, 'Keep playing'), 'with Leave and Keep playing')
+  assert.equal(boardNode(tree).props.interactive, false, 'the board waits while the question is open')
+  uniqueControlNames(tree, 'the online table asking before Back')
+  findButton(tree, 'Keep playing').props.onClick()
+  tree = draw('OnlineTable(onlineProps)', 'onlineProps', midProps)
+  assert.equal(commands(mid).length, 0, 'Keep playing sends nothing')
+  assert.equal(nodes(tree).some(node => node.props && node.props.role === 'alertdialog'), false, 'and the question goes away')
+  findButton(tree, 'Back').props.onClick()
+  tree = draw('OnlineTable(onlineProps)', 'onlineProps', midProps)
+  findButton(tree, 'Leave').props.onClick()
+  await tick()
+  await tick()
+  assert.equal(commands(mid).pop()[1].body.action, 'leave', 'Leave sends the leave')
+  assert.deepEqual(midBack, ['back'], 'and goes back')
+  evaluate("rememberOnlineRoom('')")
+
+  // Before the first move there is nothing to lose: Back leaves at once.
+  reset()
+  const freshBack = []
+  const fresh = makeCtx(live({ ...minePicture, plies: 0 }))
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: fresh.ctx, roomId: 'r1', onBack: () => freshBack.push('back') })
+  findButton(tree, 'Back').props.onClick()
+  await tick()
+  await tick()
+  assert.equal(commands(fresh).pop()[1].body.action, 'leave', 'Back before the first move leaves without asking')
+  assert.deepEqual(freshBack, ['back'])
+  evaluate("rememberOnlineRoom('')")
 
   reset()
   // 6. The end of the game reads like the local table's result.
@@ -4726,8 +4775,8 @@ async function onlineTableContract() {
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: noted.ctx, roomId: 'r1', onBack: () => {} })
   assert.ok(words(tree).includes('Bea declined a rematch.'), 'a decline is said on the result')
 
-  // A closed room, a refused leave, and Close table all return to Games, and the
-  // Hall does not open that room again.
+  // A closed room (once the person presses Back to games), a refused leave, and Close table
+  // all return to Games, and the Hall does not open that room again.
   reset()
   const deadRoom = 'dead-bj'
   const deadBack = []
@@ -4738,10 +4787,17 @@ async function onlineTableContract() {
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
     game, ctx: deadRun.ctx, roomId: deadRoom, onBack: () => deadBack.push('back')
   })
+  await tick()
+  assert.deepEqual(deadBack, [], 'a closed table waits for the person before it leaves')
+  tree = draw('OnlineTable(onlineProps)', 'onlineProps', {
+    game, ctx: deadRun.ctx, roomId: deadRoom, onBack: () => deadBack.push('back')
+  })
+  assert.ok(words(tree).includes('This table is closed.'), 'and says it is closed')
+  findButton(tree, 'Back to games').props.onClick()
   // Leave is sent before close. The screen goes once that leave has been handed off,
   // which is the next turn when the table answers at once.
   await tick()
-  assert.ok(deadBack.includes('back'), 'a closed table leaves the screen on its own')
+  assert.ok(deadBack.includes('back'), 'Back to games leaves a closed table')
   assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'and forgets the room')
   assert.equal(evaluate(`HALL_LEFT.has('${deadRoom}')`), true, 'and tells the Hall that room was left')
   assert.ok(deadRun.asked.some(item => item[0] === '/online/table/close'), 'and asks the plugin to drop the table')
@@ -4753,10 +4809,11 @@ async function onlineTableContract() {
     leave: { ok: false, text: 'The table is not connected.' }
   })
   evaluate(`rememberOnlineRoom('${refusedRoom}', 'connect4')`)
-  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
-    game, ctx: refusedRun.ctx, roomId: refusedRoom, onBack: () => refusedBack.push('back')
-  })
+  const refusedProps = { game, ctx: refusedRun.ctx, roomId: refusedRoom, onBack: () => refusedBack.push('back') }
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', refusedProps)
   findButton(tree, 'Back').props.onClick()
+  tree = draw('OnlineTable(onlineProps)', 'onlineProps', refusedProps)
+  findButton(tree, 'Leave').props.onClick()
   await tick()
   assert.equal(refusedBack.pop(), 'back', 'Back leaves even when leave is refused')
   assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'the refused leave still forgets the room')
@@ -4838,15 +4895,49 @@ async function onlineTableContract() {
   const askedRun = makeCtx(live(askedPic, { finished: true }))
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: askedRun.ctx, roomId: 'r1', onBack: () => {} })
   assert.ok(words(tree).includes('Bea wants a rematch.'), 'the card names who asked: ' + words(tree).slice(0, 240))
-  const endedPic = live(wonPicture, { state: 'closed', finished: true, error: '', closed_text: 'Ada declined a rematch.' })
+  const endedPic = live(wonPicture, { state: 'closed', finished: true, error: '', closed_text: 'Bea declined a rematch.' })
   const endedRun = makeCtx(endedPic)
-  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', { game, ctx: endedRun.ctx, roomId: 'r1', onBack: () => {} })
+  const endedBack = []
+  const endedProps = { game, ctx: endedRun.ctx, roomId: 'r1', onBack: () => endedBack.push('back') }
+  tree = await settle('OnlineTable(onlineProps)', 'onlineProps', endedProps)
+  await tick()
+  tree = draw('OnlineTable(onlineProps)', 'onlineProps', endedProps)
   assert.equal(findButton(tree, 'Yes'), undefined, 'a closed table hides Yes')
   assert.equal(findButton(tree, 'No'), undefined, 'and No')
-  assert.ok(words(tree).includes('Ada declined a rematch.'), 'and shows the closing sentence')
+  assert.ok(words(tree).includes('Bea declined a rematch.'), 'and shows the closing sentence')
+  assert.deepEqual(endedBack, [], 'a closed table stays on screen so its reason can be read')
   assert.ok(findButton(tree, 'Back to games'), 'Back to games is the way out')
+  uniqueControlNames(tree, 'a closed online table with its result')
+  findButton(tree, 'Back to games').props.onClick()
+  await tick()
+  assert.deepEqual(endedBack, ['back'], 'and pressing it goes back to Games')
+
+  // A table closed in the middle of a session (the other person got up, or did not answer)
+  // keeps its sentence too, with its own way back, and does not leave on its own.
+  for (const reason of ['Bea left the table.', 'Bea did not answer.']) {
+    reset()
+    const shutPic = { ...minePicture, permissions: { can_move: false } }
+    const shut = makeCtx(live(shutPic, { state: 'closed', error: '', closed_text: reason }))
+    const shutBackCalls = []
+    const shutProps = { game, ctx: shut.ctx, roomId: 'r1', onBack: () => shutBackCalls.push('back') }
+    tree = await settle('OnlineTable(onlineProps)', 'onlineProps', shutProps)
+    await tick()
+    tree = draw('OnlineTable(onlineProps)', 'onlineProps', shutProps)
+    assert.ok(words(tree).includes(reason), 'the closing sentence stays on screen: ' + reason)
+    assert.deepEqual(shutBackCalls, [], 'and the screen does not leave on its own: ' + reason)
+    assert.equal(commands(shut).length, 0, 'nothing is sent to a closed table before the press')
+    assert.ok(findButton(tree, 'Back to games'), 'a Back to games button is offered')
+    uniqueControlNames(tree, 'a closed online table')
+    findButton(tree, 'Back to games').props.onClick()
+    await tick()
+    assert.deepEqual(shutBackCalls, ['back'], 'and it goes back to Games')
+    assert.ok(shut.asked.some(item => item[0] === '/online/table/close'), 'and drops the table here')
+  }
+  evaluate("rememberOnlineRoom('')")
+  reset()
 
   // Two people at online blackjack choose the next bet. One person still gets the timed deal.
+  // A lone seat is the server's real shape: table_players 1 and no opponent named.
   const bjBase = {
     view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white',
     hands: 1, next_bet: 10, mid_round: false, legal: ['bet10', 'bet25'],
@@ -4864,12 +4955,12 @@ async function onlineTableContract() {
   })
   assert.ok(!betDelays.includes(1600), 'a two-player table does not auto-bet: ' + betDelays.join(','))
   betDelays.length = 0
-  const soloRun = makeCtx(live({ ...bjBase, table_players: 1 }, { opponent: { name: 'Bea' } }))
+  const soloRun = makeCtx(live({ ...bjBase, table_players: 1 }, { opponent: null, notice: null }))
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
     game: { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true },
     ctx: soloRun.ctx, roomId: 'r1', onBack: () => {}
   })
-  assert.ok(betDelays.includes(1600), 'one player still deals the next hand')
+  assert.ok(betDelays.includes(1600), 'one player alone at the table still deals the next hand: ' + betDelays.join(','))
   sandbox.setTimeout = realTimeout
   sandbox.clearTimeout = realClear
 
@@ -9980,8 +10071,12 @@ async function leaveNotRacedContract() {
     }
   }
   const backed = []
-  let tree = await settle({ game, ctx, roomId: 'leave-1', onBack: () => { order.push('back'); backed.push('back') } })
+  const firstProps = { game, ctx, roomId: 'leave-1', onBack: () => { order.push('back'); backed.push('back') } }
+  let tree = await settle(firstProps)
+  // A match one move in asks first; Leave is the press that sends leave.
   findButton(tree, 'Back').props.onClick()
+  tree = draw(firstProps)
+  findButton(tree, 'Leave').props.onClick()
   await tick()
   assert.deepEqual(order, ['leave'], 'leave is sent, and close waits for it: ' + order.join(','))
   assert.equal(backed.length, 0, 'the screen stays until leave has been handed off')
@@ -10010,9 +10105,12 @@ async function leaveNotRacedContract() {
     }
   }
   const left = []
-  tree = await settle({ game, ctx: hungCtx, roomId: 'leave-hang', onBack: () => { hung.push('back'); left.push('back') } })
-  const started = Date.now()
+  const hungProps = { game, ctx: hungCtx, roomId: 'leave-hang', onBack: () => { hung.push('back'); left.push('back') } }
+  tree = await settle(hungProps)
   findButton(tree, 'Back').props.onClick()
+  tree = draw(hungProps)
+  const started = Date.now()
+  findButton(tree, 'Leave').props.onClick()
   await wait(200)
   assert.deepEqual(hung, ['leave'], 'a hanging leave has not closed the table yet: ' + hung.join(','))
   assert.equal(left.length, 0, 'and the screen has not gone')
@@ -10110,7 +10208,7 @@ async function opponentLeftNoticeContract() {
   console.log('opponent left notice: status line and felt show "<name> left the table.": passed')
 }
 
-// ---- Blackjack: Close table uses awaited leave, and auto-bet stops when not live/leaving/alone ----
+// ---- Blackjack: Close table uses awaited leave; a lone player gets the next hand dealt ----
 async function blackjackOneExitAndNoAutoBetContract() {
   sandbox.setTimeout = setTimeout
   sandbox.clearTimeout = clearTimeout
@@ -10171,8 +10269,9 @@ async function blackjackOneExitAndNoAutoBetContract() {
   await tick()
   assert.deepEqual(order, ['leave', 'close', 'back'], 'then close, then back: ' + order.join(','))
 
-  // 2. Continuous blackjack loop does not schedule a bet when opponent left, is absent,
-  //    table is not live, or person is leaving.
+  // 2. A lone player gets the timed deal, including the one left after the other person got
+  //    up. No timed deal while a second person is seated (even one who is away), while the
+  //    table is not live, or once this person is leaving.
   const realTimeout = sandbox.setTimeout
   const realClear = sandbox.clearTimeout
   const scheduled = []
@@ -10198,7 +10297,7 @@ async function blackjackOneExitAndNoAutoBetContract() {
   })
 
   try {
-    // 2a. Opponent left (opponent: null + left notice): no auto-bet scheduled.
+    // 2a. Opponent left (opponent: null + left notice, one seat): the next hand is dealt.
     reset()
     scheduled.length = 0
     const movesLeft = []
@@ -10211,10 +10310,10 @@ async function blackjackOneExitAndNoAutoBetContract() {
         picture: bjPic
       }, movesLeft)
     })
-    assert.equal(scheduled.filter(s => s.ms === 1600 && !s.cleared).length, 0,
-      'no auto-bet scheduled after opponent left')
+    assert.equal(scheduled.filter(s => s.ms === 1600 && !s.cleared).length, 1,
+      'the player left alone after the opponent got up still gets the next hand dealt')
 
-    // 2b. Opponent absent (disconnected): no auto-bet scheduled.
+    // 2b. Opponent seated but absent (disconnected): two seats, so no auto-bet scheduled.
     reset()
     scheduled.length = 0
     await settle({
@@ -10222,7 +10321,7 @@ async function blackjackOneExitAndNoAutoBetContract() {
       ctx: makeRest({
         room_id: 'bj-nobet-2', state: 'live', room: { id: 'bj-nobet-2' }, side: 'white',
         opponent: { name: 'Locutus' }, error: '', finished: null,
-        picture: { ...bjPic, absent: { black: 5 } }
+        picture: { ...bjPic, table_players: 2, absent: { black: 5 } }
       }, [])
     })
     assert.equal(scheduled.filter(s => s.ms === 1600 && !s.cleared).length, 0,
@@ -10235,7 +10334,7 @@ async function blackjackOneExitAndNoAutoBetContract() {
       game: bjGame, roomId: 'bj-nobet-3', onBack: () => {},
       ctx: makeRest({
         room_id: 'bj-nobet-3', state: 'reconnecting', room: { id: 'bj-nobet-3' }, side: 'white',
-        opponent: { name: 'Bea' }, error: '', finished: null,
+        opponent: null, error: '', finished: null,
         picture: bjPic
       }, [])
     })
@@ -10250,12 +10349,12 @@ async function blackjackOneExitAndNoAutoBetContract() {
       game: bjGame, roomId: 'bj-nobet-4', onBack: () => {},
       ctx: makeRest({
         room_id: 'bj-nobet-4', state: 'live', room: { id: 'bj-nobet-4' }, side: 'white',
-        opponent: { name: 'Bea' }, error: '', finished: null,
+        opponent: null, error: '', finished: null,
         picture: bjPic
       }, movesLeaving)
     })
     const betTimer = scheduled.find(s => s.ms === 1600 && !s.cleared)
-    assert.ok(betTimer, 'live table with opponent present schedules the bet timer')
+    assert.ok(betTimer, 'a live table with one person at it schedules the bet timer')
     findButton(tree, 'Back').props.onClick()
     betTimer.fn()
     await new Promise(resolve => realTimeout(resolve, 0))
@@ -10265,5 +10364,5 @@ async function blackjackOneExitAndNoAutoBetContract() {
     sandbox.clearTimeout = realClear
   }
   reset()
-  console.log('blackjack: one awaited-leave exit and no auto-bet when alone/away/leaving: passed')
+  console.log('blackjack: one awaited-leave exit; a lone player gets the next hand, never when two/away/leaving: passed')
 }
