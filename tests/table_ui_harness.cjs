@@ -4006,7 +4006,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => leaveNotRacedContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -4738,6 +4738,9 @@ async function onlineTableContract() {
   tree = await settle('OnlineTable(onlineProps)', 'onlineProps', {
     game, ctx: deadRun.ctx, roomId: deadRoom, onBack: () => deadBack.push('back')
   })
+  // Leave is sent before close. The screen goes once that leave has been handed off,
+  // which is the next turn when the table answers at once.
+  await tick()
   assert.ok(deadBack.includes('back'), 'a closed table leaves the screen on its own')
   assert.equal(evaluate('ONLINE_ROOM.roomId'), '', 'and forgets the room')
   assert.equal(evaluate(`HALL_LEFT.has('${deadRoom}')`), true, 'and tells the Hall that room was left')
@@ -9923,3 +9926,100 @@ async function pillsLightContract() {
   console.log('pills: a press lights the chip at once, one POST, and a refusal puts it back: passed')
 }
 
+// ---- Leave reaches the server before the table socket is dropped ---------------------
+// Back used to fire leave and close together. Close drops the socket, so a leave that
+// lost the race never arrived, and the seat stayed seated. Leave is sent first and given
+// a short wait; close follows. A leave that never answers still lets the person out once
+// that wait is over, and not later.
+async function leaveNotRacedContract() {
+  sandbox.setTimeout = setTimeout
+  sandbox.clearTimeout = clearTimeout
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+  const picture = {
+    status: 'active', turn: 'white', winner: '', schema_version: 2, view: 'connect4', game: 'connect4',
+    plies: 1, legal: ['1'], permissions: { can_move: true }
+  }
+  const table = {
+    room_id: 'leave-1', state: 'live', picture, room: 'leave-1', side: 'white',
+    opponent: { name: 'Bea' }, error: '', finished: false
+  }
+  const game = { id: 'connect4', title: 'Connect Four', kind: 'table', installed: true, bots: true }
+  const draw = props => {
+    sandbox.leaveProps = props
+    cursor = 0
+    const tree = evaluate('OnlineTable(leaveProps)')
+    const queued = effects
+    effects = []
+    queued.forEach(effect => effect())
+    return tree
+  }
+  const settle = async props => { draw(props); await tick(); return draw(props) }
+
+  // 1. Leave is on the wire before close, and the screen waits for that leave.
+  reset()
+  const order = []
+  let releaseLeave = () => {}
+  const ctx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path, options) => {
+      const action = options && options.body && options.body.action
+      if (path === '/online/table') return { table }
+      if (path === '/online/table/cmd' && action === 'leave') {
+        order.push('leave')
+        return new Promise(resolve => { releaseLeave = () => resolve({ ok: true, text: '' }) })
+      }
+      if (path === '/online/table/close') {
+        order.push('close')
+        return { ok: true, text: 'Table put away.' }
+      }
+      return { ok: true }
+    }
+  }
+  const backed = []
+  let tree = await settle({ game, ctx, roomId: 'leave-1', onBack: () => { order.push('back'); backed.push('back') } })
+  findButton(tree, 'Back').props.onClick()
+  await tick()
+  assert.deepEqual(order, ['leave'], 'leave is sent, and close waits for it: ' + order.join(','))
+  assert.equal(backed.length, 0, 'the screen stays until leave has been handed off')
+  releaseLeave()
+  await tick()
+  assert.deepEqual(order, ['leave', 'close', 'back'], 'then close, then the screen leaves: ' + order.join(','))
+
+  // 2. A leave that never answers still leaves, once the short wait is over and not before.
+  reset()
+  const hung = []
+  const hungCtx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path, options) => {
+      const action = options && options.body && options.body.action
+      if (path === '/online/table') return { table: { ...table, room_id: 'leave-hang' } }
+      if (path === '/online/table/cmd' && action === 'leave') {
+        hung.push('leave')
+        return new Promise(() => {})
+      }
+      if (path === '/online/table/close') {
+        hung.push('close')
+        return { ok: true }
+      }
+      return { ok: true }
+    }
+  }
+  const left = []
+  tree = await settle({ game, ctx: hungCtx, roomId: 'leave-hang', onBack: () => { hung.push('back'); left.push('back') } })
+  const started = Date.now()
+  findButton(tree, 'Back').props.onClick()
+  await wait(200)
+  assert.deepEqual(hung, ['leave'], 'a hanging leave has not closed the table yet: ' + hung.join(','))
+  assert.equal(left.length, 0, 'and the screen has not gone')
+  await wait(2000)
+  const elapsed = Date.now() - started
+  assert.deepEqual(hung, ['leave', 'close', 'back'], 'after the wait, close runs and the screen leaves: ' + hung.join(','))
+  assert.ok(elapsed < 3200, 'the exit did not wait past the short timeout: ' + elapsed + 'ms')
+  reset()
+  console.log('leave: close follows leave, and a hanging leave still exits on the timeout: passed')
+}

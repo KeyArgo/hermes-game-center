@@ -340,22 +340,31 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     if (onBack) onBack()
     else if (onClose) onClose()
   }
-  const bestEffort = (serverLeave) => {
+  // How long a leave may take before the screen goes anyway. Close drops this
+  // computer's table socket, so it has to follow leave or the leave never arrives.
+  // A socket that does not answer cannot hold the screen past this.
+  const TABLE_LEAVE_WAIT_MS = 1500
+  const bestEffort = async (serverLeave) => {
     if (!ctx || typeof ctx.rest !== 'function') return
     const rest = ctx.rest
-    // Leave and close are both optional. Neither one is waited on, so a hung
-    // socket cannot keep the screen up.
     if (serverLeave) {
-      Promise.resolve(rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })).catch(() => {})
+      let timer = null
+      const leave = Promise.resolve(rest('/online/table/cmd', { method: 'POST', body: { action: 'leave', args: [] } })).catch(() => {})
+      const timeout = new Promise(resolve => { timer = setTimeout(resolve, TABLE_LEAVE_WAIT_MS) })
+      try {
+        await Promise.race([leave, timeout])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
     }
     Promise.resolve(rest('/online/table/close', { method: 'POST' })).catch(() => {})
   }
-  const leaveHome = (serverLeave) => {
+  const leaveHome = async (serverLeave) => {
     if (leaving.current) return
     leaving.current = true
     markHallLeft(roomNow())
     rememberOnlineRoom('')
-    bestEffort(serverLeave)
+    await bestEffort(serverLeave)
     goGames()
   }
   const stepAway = () => leaveHome(true)
