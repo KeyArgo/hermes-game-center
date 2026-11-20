@@ -20,6 +20,8 @@ _CHAT_KEEP = 50
 _CHAT_MAX = 300
 # How long open() listens for the server to accept the room or refuse it.
 _OPEN_WAIT = 2.0
+# How long close() waits for a queued leave to finish before dropping the socket.
+_LEAVE_WAIT = 1.5
 
 
 class OnlineTable:
@@ -89,7 +91,7 @@ class OnlineTable:
             self._ref += 1
             ref = self._ref
             event = threading.Event()
-            pending = {"event": event, "answer": None}
+            pending = {"event": event, "answer": None, "action": action, "queued_at": time.monotonic()}
             self._pending[ref] = pending
             self._out.put({"t": "cmd", "action": action, "args": args, "ref": ref})
         event.wait(5)
@@ -121,6 +123,15 @@ class OnlineTable:
 
     def close(self):
         with self._lifecycle:
+            # Never tear down the socket while a leave command is queued or awaiting its
+            # reply, up to the short leave wait cap so a hung socket cannot block exit.
+            with self._lock:
+                leaving = [(p["event"], float(p.get("queued_at") or 0.0))
+                           for p in self._pending.values() if p.get("action") == "leave"]
+            for event, queued_at in leaving:
+                remaining = max(0.0, _LEAVE_WAIT - (time.monotonic() - queued_at))
+                if remaining > 0:
+                    event.wait(remaining)
             with self._lock:
                 self._stop.set()
                 sock, thread = self._socket, self._thread
@@ -135,7 +146,8 @@ class OnlineTable:
 
     def _fail_pending(self, text):
         for pending in self._pending.values():
-            pending["answer"] = {"ok": False, "text": text}
+            if pending["answer"] is None:
+                pending["answer"] = {"ok": False, "text": text}
             pending["event"].set()
 
     def _keep_chat(self, message):
@@ -183,7 +195,7 @@ class OnlineTable:
                             sock.send_json(self._out.get_nowait())
                     except queue.Empty:
                         pass
-                    message = sock.receive(timeout=0.15)
+                    message = sock.receive(timeout=0.05)
                     if not message:
                         continue
                     kind = message.get("t")

@@ -367,3 +367,82 @@ def test_snapshot_exposes_notice_from_frame_and_from_picture(tmp_path, monkeypat
     finally:
         table2.close()
 
+
+def test_close_waits_for_a_queued_leave_before_dropping_the_socket(tmp_path, monkeypatch):
+    """close() must not tear down the socket while a leave command is queued or awaiting its reply."""
+    import queue
+    import threading
+    from shelf import online_table
+
+    class SlowReceiveSocket:
+        def __init__(self, address, timeout):
+            self.inbox = queue.Queue()
+            self.events = []
+            self.reply_leave = True
+
+        def send_json(self, message):
+            self.events.append(("send", message.get("t"), message.get("action")))
+            if message.get("t") == "auth":
+                self.inbox.put({"t": "hello", "me": {"id": "a"}, "room": {"id": "r"}, "chat": []})
+            elif message.get("action") == "leave" and self.reply_leave:
+                self.inbox.put({"t": "result", "ref": message["ref"], "ok": True, "text": "Left."})
+
+        def receive(self, timeout):
+            try:
+                return self.inbox.get(timeout=timeout)
+            except queue.Empty:
+                return None
+
+        def close(self):
+            self.events.append(("close",))
+
+    sockets = []
+    monkeypatch.setattr(online_table.wsmod, "Socket",
+                        lambda *a, **k: sockets.append(SlowReceiveSocket(*a, **k)) or sockets[-1])
+    source = Online(tmp_path, url="http://example.test", secret=lambda _: "person-secret")
+    source.turn_on()
+    table = OnlineTable(source)
+    try:
+        assert table.open("r")["ok"]
+        deadline = time.monotonic() + 2
+        while table.snapshot().get("state") != "live" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        # Queue leave and immediately call close() while leave is still in _out.
+        results = {}
+        leave_thread = threading.Thread(target=lambda: results.setdefault("leave", table.command("leave", [])))
+        leave_thread.start()
+        deadline = time.monotonic() + 1
+        while not table._pending and time.monotonic() < deadline:
+            time.sleep(0.001)
+        table.close()
+        leave_thread.join(timeout=3)
+        assert results.get("leave", {}).get("ok") is True, results
+        events = sockets[0].events
+        leave_idx = next((i for i, e in enumerate(events) if e == ("send", "cmd", "leave")), -1)
+        close_idx = next((i for i, e in enumerate(events) if e == ("close",)), -1)
+        assert leave_idx != -1 and close_idx != -1 and leave_idx < close_idx, events
+    finally:
+        table.close()
+
+    # A hung server still lets close() finish within the short cap after sending leave.
+    table2 = OnlineTable(source)
+    try:
+        assert table2.open("r2")["ok"]
+        sockets[-1].reply_leave = False
+        deadline = time.monotonic() + 2
+        while table2.snapshot().get("state") != "live" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        t2 = threading.Thread(target=lambda: table2.command("leave", []))
+        t2.start()
+        deadline = time.monotonic() + 1
+        while not table2._pending and time.monotonic() < deadline:
+            time.sleep(0.001)
+        started = time.monotonic()
+        table2.close()
+        elapsed = time.monotonic() - started
+        t2.join(timeout=3)
+        assert ("send", "cmd", "leave") in sockets[-1].events, sockets[-1].events
+        assert elapsed < 2.5, f"hung leave held close() too long: {elapsed:.2f}s"
+    finally:
+        table2.close()
+

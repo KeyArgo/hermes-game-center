@@ -25230,6 +25230,7 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   // paints its answer, so a move played in the browser shows up here too.
   useEffect(() => {
     const mine = roomId || ''
+    leaving.current = false
     let timer = null
     const readTable = async () => {
       if (!ctx || typeof ctx.rest !== 'function') return
@@ -25421,23 +25422,33 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
     }
   }
 
-  // One person at an online blackjack table deals the next hand for the same bet.
+  // One person at an online blackjack table deals the next hand for the same bet,
+  // only while the table is live, this person is not leaving, and the opponent is present.
   // Two people choose. A timed bet used to lock the round before either could leave.
   const dealtHand = useRef(0)
+  const betTimer = useRef(null)
   const crowd = Number((picture && picture.table_players) || 0)
+  const opponentAbsent = Boolean(picture && picture.absent && Object.keys(picture.absent).length > 0)
+  const opponentPresent = Boolean(hasOpponent && !opponentAbsent && !leftNotice)
   useEffect(() => {
     if (crowd >= 2) return undefined
+    if (!atTable || leaving.current || !opponentPresent) return undefined
     const token = blackjackNextBet(picture)
     if (!token || !canMove) return undefined
     const hand = Number(picture.hands || 0)
     if (dealtHand.current === hand) return undefined
     const timer = setTimeout(() => {
-      if (!alive.current || dealtHand.current === hand) return
+      if (betTimer.current === timer) betTimer.current = null
+      if (!alive.current || leaving.current || dealtHand.current === hand) return
       dealtHand.current = hand
       command('move', [token])
     }, BLACKJACK_NEXT_HAND_MS)
-    return () => clearTimeout(timer)
-  }, [crowd, picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
+    betTimer.current = timer
+    return () => {
+      if (betTimer.current === timer) betTimer.current = null
+      clearTimeout(timer)
+    }
+  }, [crowd, atTable, opponentPresent, picture && picture.phase, picture && picture.hands, picture && picture.next_bet, picture && picture.legal, canMove])
 
   // Back, Close table, and a room the server has already closed all leave this
   // screen. The request is a courtesy. A refused leave, a dead socket, or no
@@ -25469,6 +25480,10 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
   const leaveHome = async (serverLeave) => {
     if (leaving.current) return
     leaving.current = true
+    if (betTimer.current) {
+      clearTimeout(betTimer.current)
+      betTimer.current = null
+    }
     markHallLeft(roomNow())
     rememberOnlineRoom('')
     await bestEffort(serverLeave)
@@ -25524,7 +25539,11 @@ function OnlineTable({ game, view, ctx, roomId, height, onBack, onClose }) {
       jsxs('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, children: [
         status === 'active' && !done && !sessionTable ? button('Resign', () => setConfirming(true), { disabled: busy }) : null,
         stageView === 'blackjack' ? button('Leave table', stepAway, { title: 'Get up from the table. The screen leaves either way.' }) : null,
-        button('Close table', putAway, { title: 'Puts this table away here. The match stays on the lobby server.' })
+        button('Close table', stageView === 'blackjack' ? stepAway : putAway, {
+          title: stageView === 'blackjack'
+            ? 'Leave the table and go back to Games.'
+            : 'Puts this table away here. The match stays on the lobby server.'
+        })
       ] })
     ]
   })

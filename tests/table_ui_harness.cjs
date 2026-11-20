@@ -4006,7 +4006,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => leaveNotRacedContract()).then(() => opponentLeftNoticeContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => leaveNotRacedContract()).then(() => opponentLeftNoticeContract()).then(() => blackjackOneExitAndNoAutoBetContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -10108,4 +10108,162 @@ async function opponentLeftNoticeContract() {
   assert.ok(words(feltTree2).includes('Locutus left the table.'), 'rendered felt shows polled notice too')
   reset()
   console.log('opponent left notice: status line and felt show "<name> left the table.": passed')
+}
+
+// ---- Blackjack: Close table uses awaited leave, and auto-bet stops when not live/leaving/alone ----
+async function blackjackOneExitAndNoAutoBetContract() {
+  sandbox.setTimeout = setTimeout
+  sandbox.clearTimeout = clearTimeout
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const bjGame = { id: 'blackjack', title: 'Blackjack', kind: 'table', installed: true, bots: true }
+  const bjPic = {
+    view: 'blackjack', game: 'blackjack', status: 'active', phase: 'bet', turn: 'white',
+    hands: 1, next_bet: 1000, mid_round: false, legal: ['bet10', 'bet1000'], table_players: 1,
+    permissions: { can_move: true }
+  }
+  const draw = props => {
+    sandbox.bjExitProps = props
+    cursor = 0
+    const tree = evaluate('OnlineTable(bjExitProps)')
+    const queued = effects
+    effects = []
+    queued.forEach(effect => effect())
+    return tree
+  }
+  const settle = async props => { draw(props); await tick(); return draw(props) }
+
+  // 1. Close table on blackjack awaits leave before close, the same exit as Back.
+  reset()
+  const order = []
+  let releaseLeave = () => {}
+  const exitCtx = {
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path, options) => {
+      const action = options && options.body && options.body.action
+      if (path === '/online/table') {
+        return {
+          table: {
+            room_id: 'bj-exit-1', state: 'live', room: { id: 'bj-exit-1' }, side: 'white',
+            opponent: { name: 'Locutus' }, error: '', finished: null,
+            picture: { ...bjPic, table_players: 2 }
+          }
+        }
+      }
+      if (path === '/online/table/cmd' && action === 'leave') {
+        order.push('leave')
+        return new Promise(resolve => { releaseLeave = () => resolve({ ok: true, text: '' }) })
+      }
+      if (path === '/online/table/close') {
+        order.push('close')
+        return { ok: true }
+      }
+      return { ok: true }
+    }
+  }
+  let tree = await settle({ game: bjGame, ctx: exitCtx, roomId: 'bj-exit-1', onBack: () => order.push('back') })
+  findButton(tree, 'Close table').props.onClick()
+  await tick()
+  assert.deepEqual(order, ['leave'], 'Close table on blackjack sends leave first: ' + order.join(','))
+  releaseLeave()
+  await tick()
+  assert.deepEqual(order, ['leave', 'close', 'back'], 'then close, then back: ' + order.join(','))
+
+  // 2. Continuous blackjack loop does not schedule a bet when opponent left, is absent,
+  //    table is not live, or person is leaving.
+  const realTimeout = sandbox.setTimeout
+  const realClear = sandbox.clearTimeout
+  const scheduled = []
+  sandbox.setTimeout = (fn, ms) => {
+    const entry = { id: scheduled.length + 1, fn, ms, cleared: false }
+    scheduled.push(entry)
+    return entry.id
+  }
+  sandbox.clearTimeout = id => {
+    const entry = scheduled.find(item => item.id === id)
+    if (entry) entry.cleared = true
+  }
+  const makeRest = (snapshot, moves) => ({
+    storage: { get: (key, fallback) => fallback, set() {}, remove() {} },
+    os: { openExternal() { return false }, notify() {} },
+    rest: async (path, options) => {
+      if (path === '/online/table') return { table: snapshot }
+      if (path === '/online/table/cmd' && options && options.body && options.body.action === 'move') {
+        moves.push(options.body.args)
+      }
+      return { ok: true }
+    }
+  })
+
+  try {
+    // 2a. Opponent left (opponent: null + left notice): no auto-bet scheduled.
+    reset()
+    scheduled.length = 0
+    const movesLeft = []
+    await settle({
+      game: bjGame, roomId: 'bj-nobet-1', onBack: () => {},
+      ctx: makeRest({
+        room_id: 'bj-nobet-1', state: 'live', room: { id: 'bj-nobet-1' }, side: 'white',
+        opponent: null, error: '', finished: null,
+        notice: { kind: 'left', name: 'Locutus', text: 'Locutus left the table.' },
+        picture: bjPic
+      }, movesLeft)
+    })
+    assert.equal(scheduled.filter(s => s.ms === 1600 && !s.cleared).length, 0,
+      'no auto-bet scheduled after opponent left')
+
+    // 2b. Opponent absent (disconnected): no auto-bet scheduled.
+    reset()
+    scheduled.length = 0
+    await settle({
+      game: bjGame, roomId: 'bj-nobet-2', onBack: () => {},
+      ctx: makeRest({
+        room_id: 'bj-nobet-2', state: 'live', room: { id: 'bj-nobet-2' }, side: 'white',
+        opponent: { name: 'Locutus' }, error: '', finished: null,
+        picture: { ...bjPic, absent: { black: 5 } }
+      }, [])
+    })
+    assert.equal(scheduled.filter(s => s.ms === 1600 && !s.cleared).length, 0,
+      'no auto-bet scheduled while opponent is disconnected')
+
+    // 2c. Table state is not live (reconnecting): no auto-bet scheduled.
+    reset()
+    scheduled.length = 0
+    await settle({
+      game: bjGame, roomId: 'bj-nobet-3', onBack: () => {},
+      ctx: makeRest({
+        room_id: 'bj-nobet-3', state: 'reconnecting', room: { id: 'bj-nobet-3' }, side: 'white',
+        opponent: { name: 'Bea' }, error: '', finished: null,
+        picture: bjPic
+      }, [])
+    })
+    assert.equal(scheduled.filter(s => s.ms === 1600 && !s.cleared).length, 0,
+      'no auto-bet scheduled when table state is not live')
+
+    // 2d. Person starts leaving while a timer was scheduled: firing it sends no bet.
+    reset()
+    scheduled.length = 0
+    const movesLeaving = []
+    tree = await settle({
+      game: bjGame, roomId: 'bj-nobet-4', onBack: () => {},
+      ctx: makeRest({
+        room_id: 'bj-nobet-4', state: 'live', room: { id: 'bj-nobet-4' }, side: 'white',
+        opponent: { name: 'Bea' }, error: '', finished: null,
+        picture: bjPic
+      }, movesLeaving)
+    })
+    const betTimer = scheduled.find(s => s.ms === 1600 && !s.cleared)
+    assert.ok(betTimer, 'live table with opponent present schedules the bet timer')
+    findButton(tree, 'Back').props.onClick()
+    betTimer.fn()
+    await new Promise(resolve => realTimeout(resolve, 0))
+    assert.deepEqual(movesLeaving, [], 'a pending bet timer must not fire after leaving starts')
+  } finally {
+    sandbox.setTimeout = realTimeout
+    sandbox.clearTimeout = realClear
+  }
+  reset()
+  console.log('blackjack: one awaited-leave exit and no auto-bet when alone/away/leaving: passed')
 }
