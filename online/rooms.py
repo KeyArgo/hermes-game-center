@@ -70,8 +70,8 @@ DISCONNECT_GRACE = 120.0
 DISCONNECT_LEAVE_SECONDS = 45.0
 # A rematch that one person asked for and the other never answers.
 REMATCH_ANSWER_SECONDS = 60.0
-# A finished room with nobody asking for another game. The two-hour idle sweep
-# is the backstop for a room this does not catch.
+# A finished room with nobody asking for another game. The idle sweep is the
+# backstop for a room this does not catch.
 FINISHED_ROOM_SECONDS = 5 * 60.0
 # These are not white-versus-black. A rematch keeps the seats as they are.
 NO_COLOUR_SWAP = {"blackjack", "slots"}
@@ -79,11 +79,10 @@ NO_COLOUR_SWAP = {"blackjack", "slots"}
 # move clock starts. A bot that never arrives forfeits 15 s after that.
 LADDER_CONNECT_GRACE = 60.0
 ROOM_IDLE_DAYS = 3
-# A room nobody has been at for this long is closed by the server's sweep. An abandoned
-# table keeps its host "playing" until it is closed, and Play skips them.
-# A live seat (someone seated, and their socket still on the table) keeps this wait.
-# A room with no seated player connected closes after the shorter quiet stretch.
-IDLE_CLOSE_SECONDS = 2 * 3600.0
+# A room with no seated player connected is closed by the server's idle sweep after this
+# quiet stretch. An abandoned table keeps its host "playing" until it is closed, and Play
+# skips them. A live seat (someone seated, and their socket still on the table) is never
+# closed by the idle sweep, however quiet it is.
 EMPTY_IDLE_CLOSE_SECONDS = 30 * 60.0
 
 # Same refusal heuristics the Desktop adapter uses; the kit returns text, not typed results.
@@ -746,7 +745,7 @@ class Rooms:
 
         A decline closes at once (see ``_decline_rematch``). Here: one person asked
         and the other said nothing for a minute, or five minutes passed with nobody
-        asking. Rooms this misses still fall to the two-hour idle sweep.
+        asking. Rooms this misses still fall to the idle sweep.
         """
         closed = []
         for room in self.store.open_rooms(public_only=False):
@@ -1062,14 +1061,14 @@ class Rooms:
         return stale
 
     def sweep_idle(self, now: float, connected=None) -> list[dict]:
-        """Close a quiet room. No seated player connected: thirty minutes. A live seat keeps two hours.
+        """Close a room quiet for thirty minutes with no seated player connected.
 
         ``connected(room, state)`` is the lobby's own answer (``hub.seated_live``): a socket
         held by someone sitting at that table. A watcher, or a person only in the lobby, does
-        not count. A live seat is not closed by this sweep — the two-hour rule still spares a
-        table someone is at, however quiet the last move was. Without a callback, idleness
-        alone decides, at the shorter wait. The close goes through the store's one close path,
-        so the room's invites die with it.
+        not count. A live seat is never closed by this sweep, however quiet the last move
+        was; a seat whose socket is gone is given up by ``sweep_disconnected`` instead.
+        Without a callback, idleness alone decides. The close goes through the store's one
+        close path, so the room's invites die with it.
         """
         closed = []
         # `idle_rooms` keeps rows with active < before. A room quiet for exactly thirty

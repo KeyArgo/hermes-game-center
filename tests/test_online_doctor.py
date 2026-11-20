@@ -134,6 +134,10 @@ def test_the_doctor_shows_the_sweep_record_and_when_the_next_rooms_go(tmp_path):
     assert report["sweep"]["last_at"] == now
     by_id = {room["id"]: room for room in report["sweep_next"]}
     assert held["id"] not in by_id
+    # A live seat has no idle limit, so the doctor names no time it would be swept.
+    held_row = next(room for room in report["rooms"] if room["id"] == held["id"])
+    assert held_row["sweep_held"] is True and held_row["would_sweep"] is False
+    assert held_row["sweep_at"] is None, held_row["sweep_at"]
     assert by_id[due["id"]]["would_sweep"] is True
     assert by_id[due["id"]]["sweep_at"] == (now - 40 * 60) + 30 * 60
     assert by_id[soon["id"]]["would_sweep"] is False

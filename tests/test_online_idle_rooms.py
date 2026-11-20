@@ -3,9 +3,8 @@
 One Blackjack room was opened and left on 11-18: it stayed open with state 'active', its host
 read as "playing" for fifteen hours, and Play skipped them. Presence now counts a room only
 while it is active AND someone seated there is connected, or the room was touched in the last
-fifteen minutes. The server also closes rooms that have been quiet for two hours with nobody
-seated still connected. A room with no seated player connected closes after thirty
-minutes; a live seat keeps the two-hour rule and is not closed while they are there.
+fifteen minutes. The server closes a room with no seated player connected after thirty
+quiet minutes; a live seat is not closed by the idle sweep while they are there.
 The close is said in the audit log and in journald, and anyone still on the socket
 is told before it hangs up.
 
@@ -120,8 +119,8 @@ def test_a_disconnected_seat_counts_inside_the_grace_and_frees_after(tmp_path):
     run(scenario())
 
 
-def test_an_empty_table_closes_after_thirty_minutes_and_a_live_seat_keeps_two_hours(tmp_path):
-    """Nobody seated and connected: thirty minutes. A live seat stays on the two-hour rule.
+def test_an_empty_table_closes_after_thirty_minutes_and_a_live_seat_stays_open(tmp_path):
+    """Nobody seated and connected: thirty minutes. A live seat is not idle-closed at all.
 
     The clock is the server's own, not the wall: the room's activity stamp is moved
     under that clock, and the sweep is asked what it would do at that instant.
@@ -180,6 +179,19 @@ def test_an_empty_table_closes_after_thirty_minutes_and_a_live_seat_keeps_two_ho
         finally:
             await client.close()
     run(scenario())
+
+
+def test_the_idle_sweep_words_match_its_rule():
+    """The sweep never closes a room while someone seated is connected. Its words, the
+    janitor's and the doctor's must not promise a two-hour limit on a live seat."""
+    import inspect
+
+    from online import doctor, rooms, server
+    for text in (inspect.getsource(rooms.Rooms.sweep_idle), inspect.getsource(server.App.sweep_idle_rooms),
+                 inspect.getsource(server.App.janitor), inspect.getsource(doctor.collect)):
+        lowered = text.lower()
+        assert "two hours" not in lowered and "two-hour" not in lowered, text[:200]
+    assert not hasattr(rooms, "IDLE_CLOSE_SECONDS"), "no constant for a limit the sweep does not apply"
 
 
 def test_the_sweep_closes_only_rooms_nobody_is_sitting_at(tmp_path, caplog):

@@ -1542,7 +1542,7 @@ class App:
     # Housekeeping ------------------------------------------------------------
 
     def sweep_idle_rooms(self, now: float) -> list[dict]:
-        """Close quiet rooms. No seated player connected: thirty minutes. A live seat keeps two hours."""
+        """Close rooms quiet for thirty minutes with no seated player connected. A live seat stays."""
         return self.rooms.sweep_idle(now, connected=self.hub.seated_live)
 
     async def close_idle(self, now: float) -> list[dict]:
@@ -1574,7 +1574,7 @@ class App:
                     last_housekeeping = time.monotonic()
                     self.rooms.expire()
                     # A table left open is not a game. Nobody seated and connected: thirty
-                    # minutes. A live seat keeps the two-hour rule. Tell whoever is watching,
+                    # minutes. A live seat is not idle-closed. Tell whoever is watching,
                     # then hang up.
                     await self.close_idle(now)
                     self.expire_challenges()

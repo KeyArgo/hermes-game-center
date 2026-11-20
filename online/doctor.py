@@ -19,7 +19,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-from online.rooms import EMPTY_IDLE_CLOSE_SECONDS, FINISHED, IDLE_CLOSE_SECONDS, SWEEP_REASONS
+from online.rooms import EMPTY_IDLE_CLOSE_SECONDS, FINISHED, SWEEP_REASONS
 
 # A player seen within this window counts as recent presence when this process
 # has no lobby sockets to ask. The live page passes the hub's own connections
@@ -159,9 +159,9 @@ def collect(db_path, *, now: float | None = None, lobby_ids=None, spared=None,
             status = str(state.get("status") or "")
             idle = _age(moment, room.get("active") or 0)
             held = room["id"] in spared_ids
-            # A live seat keeps the two-hour rule and is not closed while they sit.
-            # Everyone else is on the thirty-minute clock.
-            limit = IDLE_CLOSE_SECONDS if held else EMPTY_IDLE_CLOSE_SECONDS
+            # A live seat is not closed by the idle sweep while they sit, so it has no
+            # sweep time. Everyone else is on the thirty-minute clock.
+            limit = EMPTY_IDLE_CLOSE_SECONDS
             active = float(room.get("active") or 0)
             rooms.append({
                 "id": room["id"],
@@ -176,7 +176,7 @@ def collect(db_path, *, now: float | None = None, lobby_ids=None, spared=None,
                 "status": status,
                 "finished_open": bool(status in FINISHED),
                 "sweep_held": held,
-                "sweep_at": active + limit,
+                "sweep_at": None if held else active + limit,
                 "would_sweep": (not held) and idle >= limit,
             })
 
