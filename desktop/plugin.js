@@ -23033,9 +23033,9 @@ function PlayWithPeople({ ctx, view }) {
   // The games the once-only "always?" question is still to ask about, in the order the
   // server granted them - the question in front is the one on screen.
   const [askAlways, setAskAlways] = useState([])
-  // The switch and the accept chips, as the person just set them. The lobby's answer replaces
-  // this; a refusal clears it, so the tick does not wait on the round trip and does not stay
-  // if the lobby says no.
+  // The switch, the accept chips and the Play pills, as the person just set them. The lobby's
+  // answer replaces this; a refusal clears it, so the press lights at once and does not stay
+  // lit if the lobby says no.
   const [wish, setWish] = useState(null)
   // Set for the whole round trip, including the moment before React has redrawn `pending`,
   // so a second press on the same control cannot send a second POST.
@@ -23076,19 +23076,21 @@ function PlayWithPeople({ ctx, view }) {
     inflight.current = true
     setPending(key)
     setNote('')
-    // The tick moves now. The request is still in flight; a refusal puts it back.
+    // The tick, the chip and the pill move now. The request is still in flight; a refusal puts them back.
     if (path === '/online/hall/prefs' && body && typeof body === 'object') {
-      setWish(prev => {
-        const next = { ...(prev || {}) }
-        if (typeof body.open === 'boolean') next.open = body.open
-        if (body.games && typeof body.games === 'object') next.games = { ...(next.games || {}), ...body.games }
-        return next
-      })
+      setWish(prev => lobbyWishPrefs(prev, body))
       // The side pane opens with the tick, not after the lobby answers. Turning
-      // the switch off forgets a close, so the next on shows the pane again.
-      if (typeof body.open === 'boolean' && typeof invitePaneFollow === 'function') {
-        invitePaneFollow({ state: 'live', prefs: { open: body.open } })
+      // the switch off forgets a close, so the next on shows the pane again. A chip
+      // that turns the master switch on opens it the same way.
+      const opens = typeof body.open === 'boolean' ? body.open
+        : (body.games && typeof body.games === 'object' && Object.values(body.games).some(Boolean) ? true : null)
+      if (opens !== null && typeof invitePaneFollow === 'function') {
+        invitePaneFollow({ state: 'live', prefs: { open: opens } })
       }
+    }
+    if (path === '/online/hall/looking') {
+      const lookingNow = lobbyWishLooking(body)
+      if (lookingNow !== null) setWish(prev => ({ ...(prev || {}), looking: lookingNow }))
     }
     try {
       const answer = ctx && typeof ctx.rest === 'function'
@@ -23097,22 +23099,10 @@ function PlayWithPeople({ ctx, view }) {
       if (answer && answer.ok === false) {
         setWish(null)
         setNote(String(answer.text || 'The lobby did not take that.'))
-      } else if (answer && answer.prefs && typeof answer.prefs === 'object') {
-        // The lobby answers a Play, a Find match or a prefs write with the accept list as it now
-        // stands, so the chip the press just made temporary reads "for 20 min" on the next draw
-        // instead of waiting for the next poll.
-        setSnap(previous => (previous ? { ...previous, prefs: answer.prefs } : previous))
-        setWish(null)
-      } else if (path === '/online/hall/prefs' && body && typeof body === 'object') {
-        setSnap(previous => {
-          if (!previous) return previous
-          const nextPrefs = { ...(previous.prefs || {}) }
-          if (typeof body.open === 'boolean') nextPrefs.open = body.open
-          if (body.games && typeof body.games === 'object') {
-            nextPrefs.games = { ...(nextPrefs.games || {}), ...body.games }
-          }
-          return { ...previous, prefs: nextPrefs }
-        })
+      } else {
+        // The lobby's own lists replace the press. A Play answers with the search and, when
+        // it had to accept the game, with the accept list, so neither waits for the next poll.
+        setSnap(previous => lobbyCommit(previous, path, body, answer))
         setWish(null)
       }
       // A Play that had to accept the game for twenty minutes comes back with ask_always:
@@ -23136,7 +23126,7 @@ function PlayWithPeople({ ctx, view }) {
   const shown = {
     open: wish && typeof wish.open === 'boolean' ? wish.open : Boolean(prefs.open),
     games: { ...(prefs.games || {}), ...((wish && wish.games) || {}) },
-    until: prefs.until || {}
+    until: { ...(prefs.until || {}), ...((wish && wish.until) || {}) }
   }
   const live = liveOf(snap)
   // Not connected is not the same as switched off: say which it is, with the one control
@@ -23155,7 +23145,8 @@ function PlayWithPeople({ ctx, view }) {
           : notConnected ? 'unreachable'
             : 'state'
   const requests = (snap && snap.requests) || []
-  const mine = Array.isArray(you.looking) ? you.looking : []
+  const mine = Array.isArray(wish && wish.looking) ? wish.looking
+    : (Array.isArray(you.looking) ? you.looking : [])
   const nowSeconds = Date.now() / 1000
   // A pending offer that has run out is not one that is out any more.
   const sent = requests.filter(req => req && req.state === 'pending' && req.offer
@@ -23168,7 +23159,11 @@ function PlayWithPeople({ ctx, view }) {
   // the moment it lapses, not a length, so the count is that moment minus now.
   const left = asking ? Math.max(0, Math.round(Number(asking.expires || 0) - nowSeconds)) : 0
   const comingOffer = came[0] || null
-  const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
+  // The pill just pressed stays lit. The others wait out the round trip.
+  const held = (say, key) => ({
+    disabled: Boolean(pending) && pending !== key,
+    title: pending && pending !== key ? HALL_BUSY_NOTE : say
+  })
   const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.5, minWidth: 0 }
 
   // Retry: ask the shelf to dial the lobby again now, then read what it says, so the card
@@ -23278,16 +23273,20 @@ function PlayWithPeople({ ctx, view }) {
       jsx('div', {
         role: 'group', 'aria-label': 'Play now',
         style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
-        children: LOBBY_GAMES.map(([id, label]) => jsx('button', {
-          'data-play-now': id,
-          ...held(`Ask people who accept ${label} for a game now.`),
-          onClick: () => post(`play:${id}`, '/online/hall/looking', lobbyLookingBody([id])),
-          style: {
-            fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'normal',
-            border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary
-          },
-          children: `Play ${label}`
-        }, id))
+        children: LOBBY_GAMES.map(([id, label]) => {
+          const on = mine.includes(id)
+          return jsx('button', {
+            'data-play-now': id,
+            'aria-pressed': on ? 'true' : 'false',
+            ...held(`Ask people who accept ${label} for a game now.`, `play:${id}`),
+            onClick: () => post(`play:${id}`, '/online/hall/looking', lobbyLookingBody([id])),
+            style: {
+              fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'normal',
+              border: `1px solid ${on ? accent : stroke}`, background: on ? fill : 'transparent', color: text.secondary
+            },
+            children: `Play ${label}`
+          }, id)
+        })
       }),
       // The search itself: who is being asked, or that nobody is free yet. Stop looking is
       // here, beside the sentence it ends, so the way out is where the person is looking.
@@ -23301,7 +23300,7 @@ function PlayWithPeople({ ctx, view }) {
                 : `Nobody is free for ${mine.map(lobbyTitle).join(', ')} right now — still looking` }),
               jsx('button', {
                 'data-people-stop': '1',
-                ...held('Stop looking for a match.'),
+                ...held('Stop looking for a match.', 'stop'),
                 onClick: () => post('stop', '/online/hall/looking', lobbyLookingBody([])),
                 style: { fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${stroke}`, background: 'transparent', color: text.tertiary, cursor: 'pointer' },
                 children: 'Stop looking'
@@ -24090,6 +24089,108 @@ function lobbyLookingBody(ids) {
   return games.length ? { games } : { on: false }
 }
 
+// What a looking press means, before the lobby has answered: one game, every game, or none.
+// null is "this body is not a looking change", so a prefs write does not clear a search.
+function lobbyWishLooking(body) {
+  if (!body || typeof body !== 'object') return null
+  if (body.on === false) return []
+  if (body.all) return LOBBY_GAME_IDS.slice()
+  if (Array.isArray(body.games)) return body.games.filter(Boolean)
+  return null
+}
+
+// The accept list, the master switch and appearing-offline, as the press just set them.
+// A chip turned on turns the master switch on with it, the same way the lobby does, so the
+// chip can light while that switch was off. A lapsed window is cleared so the chip is not
+// kept dark by a stamp the server is about to drop.
+function lobbyWishPrefs(prev, body) {
+  const next = { ...(prev || {}) }
+  if (!body || typeof body !== 'object') return next
+  if (typeof body.open === 'boolean') next.open = body.open
+  if (typeof body.invisible === 'boolean') {
+    next.invisible = body.invisible
+    if (body.invisible) next.looking = []
+  }
+  if (body.games && typeof body.games === 'object') {
+    next.games = { ...(next.games || {}), ...body.games }
+    const until = { ...(next.until || {}) }
+    for (const id of Object.keys(body.games)) until[id] = 0
+    next.until = until
+    if (typeof body.open !== 'boolean' && Object.values(body.games).some(Boolean)) next.open = true
+  }
+  if (body.always && typeof body.always === 'object') {
+    next.games = { ...(next.games || {}) }
+    const until = { ...(next.until || {}) }
+    let opened = false
+    for (const id of Object.keys(body.always)) {
+      if (!body.always[id]) continue
+      next.games[id] = true
+      until[id] = 0
+      opened = true
+    }
+    next.until = until
+    if (opened) next.open = true
+  }
+  return next
+}
+
+// The lobby's answer, or the press itself when the answer names no list. A refusal does not
+// come through here: the wish is dropped and the last snapshot stands.
+function lobbyCommit(previous, path, body, answer) {
+  if (!previous || typeof previous !== 'object') return previous
+  const next = { ...previous }
+  const posted = body && typeof body === 'object' ? body : null
+  if (answer && answer.prefs && typeof answer.prefs === 'object') {
+    next.prefs = answer.prefs
+  } else if (path === '/online/hall/prefs' && posted) {
+    const prefs = { ...(previous.prefs || {}) }
+    if (typeof posted.open === 'boolean') prefs.open = posted.open
+    if (posted.games && typeof posted.games === 'object') {
+      prefs.games = { ...(prefs.games || {}), ...posted.games }
+      const until = { ...(prefs.until || {}) }
+      const now = Date.now() / 1000
+      for (const id of Object.keys(posted.games)) {
+        if (posted.games[id] && !(Number(until[id] || 0) > now)) delete until[id]
+      }
+      prefs.until = until
+      if (typeof posted.open !== 'boolean' && Object.values(posted.games).some(Boolean)) prefs.open = true
+    }
+    if (posted.always && typeof posted.always === 'object') {
+      prefs.games = { ...(prefs.games || {}) }
+      const until = { ...(prefs.until || {}) }
+      for (const id of Object.keys(posted.always)) {
+        if (!posted.always[id]) continue
+        prefs.games[id] = true
+        delete until[id]
+        prefs.open = true
+      }
+      prefs.until = until
+    }
+    next.prefs = prefs
+  }
+  const you = { ...(previous.you || {}) }
+  let youChanged = false
+  if (answer && Array.isArray(answer.looking)) {
+    you.looking = answer.looking
+    youChanged = true
+  } else if (path === '/online/hall/looking') {
+    const looking = lobbyWishLooking(posted)
+    if (looking !== null) {
+      you.looking = looking
+      youChanged = true
+    }
+  } else if (path === '/online/hall/prefs' && posted && posted.invisible === true) {
+    you.looking = []
+    youChanged = true
+  }
+  if (path === '/online/hall/prefs' && posted && typeof posted.invisible === 'boolean') {
+    you.invisible = posted.invisible
+    youChanged = true
+  }
+  if (youChanged) next.you = you
+  return next
+}
+
 // "Connect 4 for 20 min": a temporary accept says how long it has, in the same words in both
 // places it is drawn. The server drops it by itself, so the label never promises more.
 function lobbyAcceptLabel(id, temp) { return temp ? `${lobbyTitle(id)} for 20 min` : lobbyTitle(id) }
@@ -24230,7 +24331,12 @@ function Avatar({ name, pet, kind }) {
 function LobbyFindMatch({ looking, post, pending, busyNote }) {
   const mine = LOBBY_GAME_IDS.filter(id => (looking || []).includes(id))
   const all = mine.length === LOBBY_GAME_IDS.length
-  const held = say => ({ disabled: Boolean(pending), title: pending ? busyNote : say })
+  // The pill that was just pressed stays lit. The others wait, so a second search cannot
+  // leave while this one is still on its way to the lobby.
+  const held = (say, key) => ({
+    disabled: Boolean(pending) && pending !== key,
+    title: pending && pending !== key ? busyNote : say
+  })
   const chipStyle = on => ({
     fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
     border: `1px solid ${on ? accent : stroke}`,
@@ -24239,7 +24345,7 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
   const chip = (id, label, on) => jsx('button', {
     'data-lobby-chip': id,
     'aria-pressed': on ? 'true' : 'false',
-    ...held(on ? `Stop looking for ${label}.` : `Look for a game of ${label} right now.`),
+    ...held(on ? `Stop looking for ${label}.` : `Look for a game of ${label} right now.`, `looking:${id}`),
     onClick: () => {
       const next = on ? mine.filter(item => item !== id) : mine.concat([id])
       post(`looking:${id}`, '/online/hall/looking', lobbyLookingBody(next))
@@ -24252,7 +24358,7 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
   const allChip = jsx('button', {
     'data-lobby-chip': 'all',
     'aria-pressed': all ? 'true' : 'false',
-    ...held(all ? 'Stop looking for a match.' : 'Look for every game the server can seat right now.'),
+    ...held(all ? 'Stop looking for a match.' : 'Look for every game the server can seat right now.', 'looking:all'),
     onClick: () => post('looking:all', '/online/hall/looking', all ? { on: false } : { all: true }),
     style: chipStyle(all),
     children: 'All games'
@@ -24270,7 +24376,7 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
       jsx('span', { style: { fontSize: 12, fontWeight: 650 }, children: 'Find match' }),
       mine.length ? jsx('button', {
         'data-lobby-find-stop': '1',
-        ...held('Stop looking for a match.'),
+        ...held('Stop looking for a match.', 'looking:stop'),
         onClick: () => post('looking:stop', '/online/hall/looking', { on: false }),
         style: { fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${stroke}`, background: 'transparent', color: text.tertiary, cursor: 'pointer' },
         children: 'Stop looking'
@@ -24294,7 +24400,12 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
   // clock that has run past it is off, exactly as the server will count it. With the master
   // switch off nothing is being taken, whatever the list says, so no chip reads as on.
   const isOn = id => !dim && Boolean(games && games[id]) && (!untilAt(id) || untilAt(id) > now)
-  const held = say => ({ disabled: Boolean(pending), title: pending ? busyNote : say })
+  // The chip just pressed stays at full weight, so the lit paint is what the person sees.
+  // A second press on it is ignored by the card's one door; the other chips wait.
+  const held = (say, key) => ({
+    disabled: Boolean(pending) && pending !== key,
+    title: pending && pending !== key ? busyNote : say
+  })
   return jsx('div', {
     'data-accept-row': '1', role: 'group', 'aria-label': 'Games you accept',
     style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
@@ -24305,7 +24416,7 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
         'data-accept-chip': id,
         ...(dim ? { 'data-accept-dim': '1' } : {}),
         'aria-pressed': on ? 'true' : 'false',
-        ...held(on ? `Stop accepting requests for ${label}.` : `Accept requests for ${label}.`),
+        ...held(on ? `Stop accepting requests for ${label}.` : `Accept requests for ${label}.`, `accept:${id}`),
         onClick: () => post(`accept:${id}`, '/online/hall/prefs', lobbyAcceptBody(id, !on)),
         style: {
           fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
@@ -24393,7 +24504,8 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // A read that failed. The last snapshot stays on screen — it is still the best picture
   // there is — but never as if it were live.
   const [stale, setStale] = useState(false)
-  // The one control whose POST is in flight; that control, and only it, is locked.
+  // The one control whose POST is in flight; every other control is held.
+  // The control that was pressed stays drawn in its new state, so the pill can light.
   const [pending, setPending] = useState('')
   const [ack, setAck] = useState('')
   // The once-only "always?" question for a looking press that accepted a game for twenty
@@ -24414,6 +24526,13 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // The game each person's Ask will send, remembered by person. It lives in a ref because
   // choosing from the list must not redraw the panel (and so must not move every other row).
   const asks = useRef({})
+  // The press, until the lobby's answer takes its place. A refusal clears it.
+  // These sit after the hooks the rest of the panel already had, so a card that is drawn
+  // in the same pass still lines up with them.
+  const [wish, setWish] = useState(null)
+  // Set for the whole round trip, including the moment before React has redrawn `pending`,
+  // so a second press on the same control cannot send a second POST.
+  const inflight = useRef(false)
 
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
 
@@ -24454,6 +24573,14 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // about the row it shows in the list.
   const invisible = Boolean(you.invisible)
   const looking = Array.isArray(you.looking) ? LOBBY_GAME_IDS.filter(id => you.looking.includes(id)) : []
+  // What the Hall draws: the press, until the lobby's answer takes its place.
+  const shownOpen = wish && typeof wish.open === 'boolean' ? wish.open : Boolean(prefs.open)
+  const shownGames = { ...(prefs.games || {}), ...((wish && wish.games) || {}) }
+  const shownUntil = { ...(prefs.until || {}), ...((wish && wish.until) || {}) }
+  const shownInvisible = wish && typeof wish.invisible === 'boolean' ? wish.invisible : invisible
+  const shownLooking = Array.isArray(wish && wish.looking)
+    ? LOBBY_GAME_IDS.filter(id => wish.looking.includes(id))
+    : looking
 
   // A seat the server has made opens the online table here, then hands the room to
   // the page — once. The same room never opens twice on the next poll. A room that
@@ -24495,14 +24622,26 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // One door for every control: it is locked while its own POST is out, and a
   // refusal is shown in the server's own words rather than swallowed.
   const post = async (key, path, body) => {
-    if (pending) return { ok: false }
+    if (inflight.current || pending) return { ok: false }
+    inflight.current = true
     setPending(key)
     setAck('')
+    // The pill, chip or toggle moves now. The request is still in flight; a refusal puts it back.
+    if (path === '/online/hall/prefs' && body && typeof body === 'object') {
+      setWish(prev => lobbyWishPrefs(prev, body))
+    }
+    if (path === '/online/hall/looking') {
+      const lookingNow = lobbyWishLooking(body)
+      if (lookingNow !== null) setWish(prev => ({ ...(prev || {}), looking: lookingNow }))
+    }
     try {
       const answer = ctx && typeof ctx.rest === 'function'
         ? await ctx.rest(path, { method: 'POST', body })
         : { ok: false, text: 'Game Center cannot be reached.' }
-      if (alive.current && answer && answer.ok === false) setAck(String(answer.text || ''))
+      if (alive.current && answer && answer.ok === false) {
+        setWish(null)
+        setAck(String(answer.text || ''))
+      }
       // Retry answers with the snapshot the dial reached. Paint it here rather than leaving the
       // old "not connected" panel up until the next 3 s read - a retry that worked would look
       // like one that failed.
@@ -24510,10 +24649,12 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
         setSnap(previous => ({ ...(previous || {}), ...answer }))
         if (answer.state === 'live') setAck('')
       }
-      // The accept list as the lobby has it now, so a switch this press changed shows it
-      // without waiting for the next poll (the Games page's chips take the same answer).
-      if (alive.current && answer && answer.prefs && typeof answer.prefs === 'object') {
-        setSnap(previous => (previous ? { ...previous, prefs: answer.prefs } : previous))
+      // The accept list and the search as the lobby has them now, so a switch or a pill this
+      // press changed shows the answer without waiting for the next poll. A refusal keeps the
+      // snapshot that was already on screen.
+      if (alive.current && answer && answer.ok !== false && (path === '/online/hall/prefs' || path === '/online/hall/looking')) {
+        setSnap(previous => lobbyCommit(previous, path, body, answer))
+        setWish(null)
       }
       // A Find match press that accepted a game for twenty minutes asks whether it should
       // stay, exactly as the Games page's Play button does: one question per granted game.
@@ -24521,17 +24662,24 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       if (alive.current && granted.length) setAskAlways(queue => queue.concat(granted))
       return answer || { ok: true }
     } catch (error) {
-      if (alive.current) setAck('That did not reach Game Center. Try again.')
+      if (alive.current) {
+        setWish(null)
+        setAck('That did not reach Game Center. Try again.')
+      }
       return { ok: false }
     } finally {
+      inflight.current = false
       if (alive.current) setPending('')
     }
   }
 
   const muted = { fontSize: 12, color: text.tertiary }
-  // Every control on this panel posts through the one pending slot, so every control wears the
-  // same lock and the same reason while anything is out.
-  const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
+  // Every other control waits. The one that was pressed does not: it is already showing the
+  // state the person asked for, and a second press on it is dropped by the door above.
+  const held = (say, key) => ({
+    disabled: Boolean(pending) && pending !== key,
+    title: pending && pending !== key ? HALL_BUSY_NOTE : say
+  })
   const checkPanel = onlineCheckBlock(check)
   const shell = children => jsxs('div', {
     'data-hall': '1', 'data-hall-state': state,
@@ -24581,28 +24729,32 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // on straight back.
   const nowSeconds = Date.now() / 1000
   const acceptsGame = id => {
-    const until = Number((prefs.until || {})[id] || 0)
+    const until = Number((shownUntil || {})[id] || 0)
     // No window means a choice made by hand; one still running is on until its moment.
-    return Boolean(prefs.games && prefs.games[id]) && (until <= 0 || until > nowSeconds)
+    return Boolean(shownGames && shownGames[id]) && (until <= 0 || until > nowSeconds)
   }
-  const toggle = (label, checked, key, body, title, only) => jsxs('label', {
-    title: pending ? HALL_BUSY_NOTE : title, 'data-hall-toggle': key,
-    ...(only ? { 'data-hall-game': only } : {}),
-    style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.secondary, cursor: 'pointer' },
-    children: [
-      jsx('input', { type: 'checkbox', checked: Boolean(checked), disabled: Boolean(pending),
-        onChange: event => post(key === 'game' ? `game:${only}` : key, '/online/hall/prefs', body(event.target.checked)) }),
-      jsx('span', { children: label })
-    ]
-  })
+  const toggle = (label, checked, key, body, title, only) => {
+    const toggleKey = key === 'game' ? `game:${only}` : key
+    const waiting = Boolean(pending) && pending !== toggleKey
+    return jsxs('label', {
+      title: waiting ? HALL_BUSY_NOTE : title, 'data-hall-toggle': key,
+      ...(only ? { 'data-hall-game': only } : {}),
+      style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: text.secondary, cursor: 'pointer' },
+      children: [
+        jsx('input', { type: 'checkbox', checked: Boolean(checked), disabled: waiting,
+          onChange: event => post(toggleKey, '/online/hall/prefs', body(event.target.checked)) }),
+        jsx('span', { children: label })
+      ]
+    })
+  }
   const offered = LOBBY_GAME_IDS.filter(id => acceptsGame(id))
   const header = jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-    toggle('Appear offline', invisible, 'invisible', on => ({ invisible: on }),
+    toggle('Appear offline', shownInvisible, 'invisible', on => ({ invisible: on }),
       'When this is on, nobody sees you in the lobby list and nobody can ask you to a game. Turn it off to be listed again.'),
-    jsx('div', { style: muted, children: invisible
+    jsx('div', { style: muted, children: shownInvisible
       ? 'You are appearing offline: you are not in anyone else\u2019s lobby list, and requests to you are refused.'
       : `You are ${you.name || 'in the lobby'} and everyone else in the lobby can see you.` }),
-    toggle('Take game requests', prefs.open, 'open', on => ({ open: on }),
+    toggle('Take game requests', shownOpen, 'open', on => ({ open: on }),
       'When this is on, other players can ask you to a game. Turn it off and new requests stop; your per-game choices are kept.'),
     jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: offered.length
       ? `Taking requests for: ${offered.map(lobbyTitle).join(', ')}.`
@@ -24706,7 +24858,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       style: { ...muted, color: text.secondary },
       children: 'Reconnecting… the list below is the last one this computer saw.'
     }) : null,
-    jsx(LobbyFindMatch, { looking, post, pending, busyNote: HALL_BUSY_NOTE }),
+    jsx(LobbyFindMatch, { looking: shownLooking, post, pending, busyNote: HALL_BUSY_NOTE }),
     lobbyAlwaysBlock(askAlways[0], {
       post, pending, busyNote: HALL_BUSY_NOTE,
       onDone: () => setAskAlways(queue => queue.slice(1))

@@ -283,9 +283,9 @@ function PlayWithPeople({ ctx, view }) {
   // The games the once-only "always?" question is still to ask about, in the order the
   // server granted them - the question in front is the one on screen.
   const [askAlways, setAskAlways] = useState([])
-  // The switch and the accept chips, as the person just set them. The lobby's answer replaces
-  // this; a refusal clears it, so the tick does not wait on the round trip and does not stay
-  // if the lobby says no.
+  // The switch, the accept chips and the Play pills, as the person just set them. The lobby's
+  // answer replaces this; a refusal clears it, so the press lights at once and does not stay
+  // lit if the lobby says no.
   const [wish, setWish] = useState(null)
   // Set for the whole round trip, including the moment before React has redrawn `pending`,
   // so a second press on the same control cannot send a second POST.
@@ -326,19 +326,21 @@ function PlayWithPeople({ ctx, view }) {
     inflight.current = true
     setPending(key)
     setNote('')
-    // The tick moves now. The request is still in flight; a refusal puts it back.
+    // The tick, the chip and the pill move now. The request is still in flight; a refusal puts them back.
     if (path === '/online/hall/prefs' && body && typeof body === 'object') {
-      setWish(prev => {
-        const next = { ...(prev || {}) }
-        if (typeof body.open === 'boolean') next.open = body.open
-        if (body.games && typeof body.games === 'object') next.games = { ...(next.games || {}), ...body.games }
-        return next
-      })
+      setWish(prev => lobbyWishPrefs(prev, body))
       // The side pane opens with the tick, not after the lobby answers. Turning
-      // the switch off forgets a close, so the next on shows the pane again.
-      if (typeof body.open === 'boolean' && typeof invitePaneFollow === 'function') {
-        invitePaneFollow({ state: 'live', prefs: { open: body.open } })
+      // the switch off forgets a close, so the next on shows the pane again. A chip
+      // that turns the master switch on opens it the same way.
+      const opens = typeof body.open === 'boolean' ? body.open
+        : (body.games && typeof body.games === 'object' && Object.values(body.games).some(Boolean) ? true : null)
+      if (opens !== null && typeof invitePaneFollow === 'function') {
+        invitePaneFollow({ state: 'live', prefs: { open: opens } })
       }
+    }
+    if (path === '/online/hall/looking') {
+      const lookingNow = lobbyWishLooking(body)
+      if (lookingNow !== null) setWish(prev => ({ ...(prev || {}), looking: lookingNow }))
     }
     try {
       const answer = ctx && typeof ctx.rest === 'function'
@@ -347,22 +349,10 @@ function PlayWithPeople({ ctx, view }) {
       if (answer && answer.ok === false) {
         setWish(null)
         setNote(String(answer.text || 'The lobby did not take that.'))
-      } else if (answer && answer.prefs && typeof answer.prefs === 'object') {
-        // The lobby answers a Play, a Find match or a prefs write with the accept list as it now
-        // stands, so the chip the press just made temporary reads "for 20 min" on the next draw
-        // instead of waiting for the next poll.
-        setSnap(previous => (previous ? { ...previous, prefs: answer.prefs } : previous))
-        setWish(null)
-      } else if (path === '/online/hall/prefs' && body && typeof body === 'object') {
-        setSnap(previous => {
-          if (!previous) return previous
-          const nextPrefs = { ...(previous.prefs || {}) }
-          if (typeof body.open === 'boolean') nextPrefs.open = body.open
-          if (body.games && typeof body.games === 'object') {
-            nextPrefs.games = { ...(nextPrefs.games || {}), ...body.games }
-          }
-          return { ...previous, prefs: nextPrefs }
-        })
+      } else {
+        // The lobby's own lists replace the press. A Play answers with the search and, when
+        // it had to accept the game, with the accept list, so neither waits for the next poll.
+        setSnap(previous => lobbyCommit(previous, path, body, answer))
         setWish(null)
       }
       // A Play that had to accept the game for twenty minutes comes back with ask_always:
@@ -386,7 +376,7 @@ function PlayWithPeople({ ctx, view }) {
   const shown = {
     open: wish && typeof wish.open === 'boolean' ? wish.open : Boolean(prefs.open),
     games: { ...(prefs.games || {}), ...((wish && wish.games) || {}) },
-    until: prefs.until || {}
+    until: { ...(prefs.until || {}), ...((wish && wish.until) || {}) }
   }
   const live = liveOf(snap)
   // Not connected is not the same as switched off: say which it is, with the one control
@@ -405,7 +395,8 @@ function PlayWithPeople({ ctx, view }) {
           : notConnected ? 'unreachable'
             : 'state'
   const requests = (snap && snap.requests) || []
-  const mine = Array.isArray(you.looking) ? you.looking : []
+  const mine = Array.isArray(wish && wish.looking) ? wish.looking
+    : (Array.isArray(you.looking) ? you.looking : [])
   const nowSeconds = Date.now() / 1000
   // A pending offer that has run out is not one that is out any more.
   const sent = requests.filter(req => req && req.state === 'pending' && req.offer
@@ -418,7 +409,11 @@ function PlayWithPeople({ ctx, view }) {
   // the moment it lapses, not a length, so the count is that moment minus now.
   const left = asking ? Math.max(0, Math.round(Number(asking.expires || 0) - nowSeconds)) : 0
   const comingOffer = came[0] || null
-  const held = say => ({ disabled: Boolean(pending), title: pending ? HALL_BUSY_NOTE : say })
+  // The pill just pressed stays lit. The others wait out the round trip.
+  const held = (say, key) => ({
+    disabled: Boolean(pending) && pending !== key,
+    title: pending && pending !== key ? HALL_BUSY_NOTE : say
+  })
   const muted = { fontSize: 11, color: text.tertiary, lineHeight: 1.5, minWidth: 0 }
 
   // Retry: ask the shelf to dial the lobby again now, then read what it says, so the card
@@ -528,16 +523,20 @@ function PlayWithPeople({ ctx, view }) {
       jsx('div', {
         role: 'group', 'aria-label': 'Play now',
         style: { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 },
-        children: LOBBY_GAMES.map(([id, label]) => jsx('button', {
-          'data-play-now': id,
-          ...held(`Ask people who accept ${label} for a game now.`),
-          onClick: () => post(`play:${id}`, '/online/hall/looking', lobbyLookingBody([id])),
-          style: {
-            fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'normal',
-            border: `1px solid ${stroke}`, background: 'transparent', color: text.secondary
-          },
-          children: `Play ${label}`
-        }, id))
+        children: LOBBY_GAMES.map(([id, label]) => {
+          const on = mine.includes(id)
+          return jsx('button', {
+            'data-play-now': id,
+            'aria-pressed': on ? 'true' : 'false',
+            ...held(`Ask people who accept ${label} for a game now.`, `play:${id}`),
+            onClick: () => post(`play:${id}`, '/online/hall/looking', lobbyLookingBody([id])),
+            style: {
+              fontSize: 11, padding: '3px 8px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'normal',
+              border: `1px solid ${on ? accent : stroke}`, background: on ? fill : 'transparent', color: text.secondary
+            },
+            children: `Play ${label}`
+          }, id)
+        })
       }),
       // The search itself: who is being asked, or that nobody is free yet. Stop looking is
       // here, beside the sentence it ends, so the way out is where the person is looking.
@@ -551,7 +550,7 @@ function PlayWithPeople({ ctx, view }) {
                 : `Nobody is free for ${mine.map(lobbyTitle).join(', ')} right now — still looking` }),
               jsx('button', {
                 'data-people-stop': '1',
-                ...held('Stop looking for a match.'),
+                ...held('Stop looking for a match.', 'stop'),
                 onClick: () => post('stop', '/online/hall/looking', lobbyLookingBody([])),
                 style: { fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${stroke}`, background: 'transparent', color: text.tertiary, cursor: 'pointer' },
                 children: 'Stop looking'

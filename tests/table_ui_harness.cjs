@@ -4006,7 +4006,7 @@ async function diagnosticsContract() {
 }
 
 
-lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
+lifecycle().then(() => resultContract()).then(() => ownerFeedbackContract()).then(() => pieceArtContract()).then(() => championsContract()).then(() => petSpriteContract()).then(() => iaContract()).then(() => firstRunContract()).then(() => paneContract()).then(() => paneFillContract()).then(() => paneDoorContract()).then(() => lobbyAsksContract()).then(() => soloSeatContract()).then(() => modelPickerContract()).then(() => talkTableContract()).then(() => teamTableContract()).then(() => watchItThinkContract()).then(() => onlineContract()).then(() => onlineTableContract()).then(() => onlineStageContract()).then(() => petBattlesContract()).then(sideWordsContract).then(mafiaTownContract).then(mafiaTownPanelContract).then(() => talkResultContract()).then(refereeBadgeContract).then(() => hallContract()).then(() => inviteBellContract()).then(() => hallGamePickContract()).then(() => lobbyColumnContract()).then(() => experimentalShelfContract()).then(() => gcextrasContract()).then(() => blackjackDealerContract()).then(() => blackjackActionRowContract()).then(() => blackjackTwoPlayersContract()).then(() => blackjackRoundContract()).then(() => getOnlineCardContract()).then(() => playWithPeopleContract()).then(() => retryStatesContract()).then(() => switchReasonsContract()).then(() => inviteSwitchOptimisticContract()).then(() => invitePaneContract()).then(() => lobbyPetContract()).then(() => alwaysInviteContract()).then(() => offerSidesContract()).then(() => hallAlwaysContract()).then(() => prefsFromAckContract()).then(() => alwaysRetryContract()).then(() => staleWindowContract()).then(() => invitesOffContract()).then(() => pillsLightContract()).then(() => diagnosticsContract()).catch(error => { console.error(error); process.exitCode = 1 })
 // Champions: the creator, the two divisions, the one model, and watching a
 // finished tournament game back. The backend owns the rules; this checks the
 // page asks for the right things and shows what came back.
@@ -9715,3 +9715,211 @@ async function alwaysRetryContract() {
   reset()
   console.log('always invite: a refused save keeps the question open, and the retry works: passed')
 }
+
+// ---- A pill lights on the press, and a refusal puts it back --------------------------
+// Connect 4, Chess and the rest waited on the round trip, and on the next Hall poll, before
+// they looked chosen. The press paints the new state at once, sends one POST, ignores a
+// second press on that same control while the first is out, and goes back with the lobby's
+// own sentence if the lobby says no. The server's looking list and accept list replace the
+// guess when they arrive.
+async function pillsLightContract() {
+  sandbox.setInterval = () => 1
+  sandbox.clearInterval = () => {}
+  const tick = async () => { await new Promise(resolve => setTimeout(resolve, 0)) }
+  const online = { on: true, url: 'https://games.hermesnet.xyz', linked: true, name: 'Ada', offline: false }
+  const baseSnap = (extra = {}) => ({
+    state: 'live',
+    you: { id: 'me', name: 'Ada', invisible: false, looking: [] },
+    prefs: { open: true, games: { connect4: true }, until: {} },
+    roster: [], requests: [], seated: null, ...extra
+  })
+  const paintCard = async ctx => {
+    sandbox.pillCardProps = { ctx, view: { online, player: { name: 'Ada', named: true } } }
+    let tree = null
+    for (let pass = 0; pass < 2; pass += 1) {
+      cursor = 0
+      tree = evaluate('PlayWithPeople(pillCardProps)')
+      const queued = effects
+      effects = []
+      queued.forEach(effect => effect())
+      await tick()
+    }
+    return tree
+  }
+  const playFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-play-now'] === id)
+  const chipFor = (tree, id) => nodes(tree).find(node => node.props && node.props['data-accept-chip'] === id)
+  const lit = node => node && node.props['aria-pressed'] === 'true'
+    && node.props.style.background !== 'transparent'
+    && /var\(--ui-accent\)/.test(String(node.props.style.border))
+
+  // 1. Play Chess lights before the lobby answers, one POST, and a second press does not send another.
+  reset()
+  let release = () => {}
+  let held = new Promise(resolve => { release = resolve })
+  const posts = []
+  const rest = async (path, options) => {
+    posts.push([path, (options && options.body) || null])
+    if (path === '/online/hall') return baseSnap()
+    if (path === '/online/hall/looking' || path === '/online/hall/prefs') return held
+    return { ok: true, text: '' }
+  }
+  const cardCtx = { rest }
+  let tree = await paintCard(cardCtx)
+  assert.equal(playFor(tree, 'chessboard').props['aria-pressed'], 'false', 'Chess starts unlit')
+  playFor(tree, 'chessboard').props.onClick()
+  tree = await paintCard(cardCtx)
+  const chess = playFor(tree, 'chessboard')
+  assert.ok(lit(chess), 'Play Chess lights on the press, before the lobby answers')
+  assert.notEqual(chess.props.disabled, true, 'the pill just pressed stays able to show that light')
+  assert.equal(playFor(tree, 'connect4').props.disabled, true, 'every other pill waits')
+  const looking = posts.filter(item => item[0] === '/online/hall/looking')
+  assert.equal(looking.length, 1, 'one press is one POST')
+  assert.equal(JSON.stringify(looking[0][1]), JSON.stringify({ games: ['chessboard'] }))
+  chess.props.onClick()
+  await tick()
+  assert.equal(posts.filter(item => item[0] === '/online/hall/looking').length, 1,
+    'a second press on that pill, while the first is out, sends nothing')
+  // The lobby's own list replaces the guess: it paired Chess as asked.
+  release({ ok: true, text: 'Looking for Chess.', looking: ['chessboard'],
+    prefs: { open: true, games: { connect4: true }, until: {} } })
+  await tick()
+  tree = await paintCard(cardCtx)
+  assert.ok(lit(playFor(tree, 'chessboard')), 'the lobby\'s looking list keeps Chess lit')
+  assert.equal(playFor(tree, 'connect4').props['aria-pressed'], 'false', 'and does not light a game it did not name')
+
+  // 2. A refusal puts the pill back and says why, in the lobby's words.
+  reset()
+  release = () => {}
+  held = new Promise(resolve => { release = resolve })
+  posts.length = 0
+  tree = await paintCard(cardCtx)
+  playFor(tree, 'chessboard').props.onClick()
+  tree = await paintCard(cardCtx)
+  assert.ok(lit(playFor(tree, 'chessboard')), 'the pill is lit while the lobby decides')
+  release({ ok: false, text: 'Nobody can be asked for Chess right now.' })
+  await tick()
+  tree = await paintCard(cardCtx)
+  assert.equal(playFor(tree, 'chessboard').props['aria-pressed'], 'false', 'a refusal puts the pill back')
+  assert.equal(playFor(tree, 'chessboard').props.style.background, 'transparent', 'and it is dark again')
+  assert.ok(words(tree).includes('Nobody can be asked for Chess right now.'),
+    'with the lobby\'s reason: ' + words(tree).slice(-240))
+
+  // 3. An accept chip lights at once even when the master switch is off: the press turns the
+  //    switch on with the chip, which is what the lobby does, so the chip is not left dark.
+  reset()
+  release = () => {}
+  held = new Promise(resolve => { release = resolve })
+  posts.length = 0
+  const offSnap = () => baseSnap({ prefs: { open: false, games: {}, until: {} } })
+  const restOff = async (path, options) => {
+    posts.push([path, (options && options.body) || null])
+    if (path === '/online/hall') return offSnap()
+    return held
+  }
+  const offCtx = { rest: restOff }
+  tree = await paintCard(offCtx)
+  assert.equal(chipFor(tree, 'chessboard').props['aria-pressed'], 'false', 'Chess is off the accept list')
+  chipFor(tree, 'chessboard').props.onClick()
+  tree = await paintCard(offCtx)
+  assert.ok(lit(chipFor(tree, 'chessboard')), 'the accept chip lights on the press')
+  assert.equal(chipFor(tree, 'chessboard').props['data-accept-dim'], undefined, 'and is not left dim')
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-people-open']).props['data-people-open'], 'on',
+    'the master switch comes on with the chip')
+  assert.equal(posts.filter(item => item[0] === '/online/hall/prefs').length, 1, 'one chip, one POST')
+  chipFor(tree, 'chessboard').props.onClick()
+  await tick()
+  assert.equal(posts.filter(item => item[0] === '/online/hall/prefs').length, 1,
+    'the chip ignores a second press while that POST is out')
+  release({ ok: false, text: 'The lobby could not save your accept list.' })
+  await tick()
+  tree = await paintCard(offCtx)
+  assert.equal(chipFor(tree, 'chessboard').props['aria-pressed'], 'false', 'a refusal puts the chip back')
+  assert.equal(nodes(tree).find(node => node.props && node.props['data-people-open']).props['data-people-open'], 'off',
+    'and the switch with it')
+  assert.ok(words(tree).includes('The lobby could not save your accept list.'),
+    'and says why: ' + words(tree).slice(-240))
+
+  // 4. Find match, in the Hall: the chip lights from the press, then rolls back on a refusal.
+  reset()
+  release = () => {}
+  held = new Promise(resolve => { release = resolve })
+  const hallPosts = []
+  const hallSnap = baseSnap()
+  const hallCtx = { rest: async (path, options) => {
+    hallPosts.push([path, (options && options.body) || null])
+    if (path === '/online/hall') return hallSnap
+    return held
+  } }
+  const drawHall = () => {
+    sandbox.pillHallProps = { ctx: hallCtx, current: 'connect4', view: {}, onPlayHere: () => {} }
+    cursor = 0
+    const drawn = evaluate('LobbyHall(pillHallProps)')
+    const queued = effects
+    effects = []
+    queued.forEach(effect => effect())
+    return drawn
+  }
+  const settleHall = async () => { drawHall(); await tick(); return drawHall() }
+  const findOf = tree => nodes(tree).find(node => typeof node.type === 'function' && node.type.name === 'LobbyFindMatch')
+  const drawFind = spot => {
+    sandbox.pillFindProps = { looking: spot.props.looking, post: spot.props.post, pending: spot.props.pending, busyNote: spot.props.busyNote }
+    return evaluate('LobbyFindMatch(pillFindProps)')
+  }
+  tree = await settleHall()
+  let spot = findOf(tree)
+  assert.deepEqual(JSON.parse(JSON.stringify(spot.props.looking)), [], 'find match starts with nothing picked')
+  spot.props.post('looking:connect4', '/online/hall/looking', { games: ['connect4'] })
+  tree = drawHall()
+  spot = findOf(tree)
+  assert.deepEqual(JSON.parse(JSON.stringify(spot.props.looking)), ['connect4'],
+    'the Hall paints the game as looked-for before the lobby answers')
+  let findTree = drawFind(spot)
+  const found = nodes(findTree).find(node => node.props && node.props['data-lobby-chip'] === 'connect4')
+  assert.ok(lit(found), 'the Find match pill lights on the press')
+  assert.notEqual(found.props.disabled, true, 'that pill is the one that stays showing the light')
+  assert.equal(hallPosts.filter(item => item[0] === '/online/hall/looking').length, 1, 'one Find match press, one POST')
+  found.props.onClick()
+  await tick()
+  assert.equal(hallPosts.filter(item => item[0] === '/online/hall/looking').length, 1,
+    'a second press on that pill sends nothing')
+  release({ ok: false, text: 'Find match is closed on this server.' })
+  await tick()
+  tree = drawHall()
+  spot = findOf(tree)
+  assert.deepEqual(JSON.parse(JSON.stringify(spot.props.looking)), [], 'a refusal clears the guess')
+  findTree = drawFind(spot)
+  assert.equal(nodes(findTree).find(node => node.props && node.props['data-lobby-chip'] === 'connect4').props['aria-pressed'], 'false',
+    'and the pill goes dark')
+  assert.ok(words(tree).includes('Find match is closed on this server.'),
+    'the Hall says the lobby\'s reason: ' + words(tree).slice(-240))
+
+  // 5. A Hall toggle (Take requests for Chess) ticks on the press and rolls back on a refusal.
+  reset()
+  release = () => {}
+  held = new Promise(resolve => { release = resolve })
+  hallPosts.length = 0
+  tree = await settleHall()
+  const gameSwitch = id => nodes(tree).find(node => node.props && node.props['data-hall-game'] === id)
+  let box = nodes(gameSwitch('chessboard')).find(node => node.type === 'input')
+  assert.equal(box.props.checked, false, 'Chess starts off in the Hall')
+  box.props.onChange({ target: { checked: true } })
+  tree = drawHall()
+  box = nodes(gameSwitch('chessboard')).find(node => node.type === 'input')
+  assert.equal(box.props.checked, true, 'the Hall toggle ticks on the press')
+  assert.notEqual(box.props.disabled, true, 'the toggle just pressed is not greyed out over that tick')
+  assert.equal(hallPosts.filter(item => item[0] === '/online/hall/prefs').length, 1, 'one toggle, one POST')
+  box.props.onChange({ target: { checked: false } })
+  await tick()
+  assert.equal(hallPosts.filter(item => item[0] === '/online/hall/prefs').length, 1,
+    'a second press on that toggle sends nothing')
+  release({ ok: false, text: 'That game cannot be chosen.' })
+  await tick()
+  tree = drawHall()
+  box = nodes(gameSwitch('chessboard')).find(node => node.type === 'input')
+  assert.equal(box.props.checked, false, 'a refusal puts the toggle back')
+  assert.ok(words(tree).includes('That game cannot be chosen.'),
+    'and the Hall shows the reason: ' + words(tree).slice(-240))
+  reset()
+  console.log('pills: a press lights the chip at once, one POST, and a refusal puts it back: passed')
+}
+
