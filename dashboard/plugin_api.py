@@ -837,7 +837,9 @@ def _egg_modules():
 
 
 def _jackpot_wallet():
-    wallets, _ = _jackpot_modules()
+    """The wallet only. A visibility ping must not pull in the reel solver."""
+    shelf_dir = Path(__file__).resolve().parent.parent / "shelf"
+    wallets = load_fresh("hermes_gameshelf_wallet", shelf_dir / "wallet.py")
     return wallets.Wallet(wallets.wallet_path(_data_root()))
 
 
@@ -993,7 +995,10 @@ def jackpot_visible(body: dict | None = None) -> dict:
     wallet = _jackpot_wallet()
     wallet.set_visible(bool(body.get("on")), str(body.get("source") or "slots"),
                        session_id=body.get("session_id"))
-    return _jackpot_payload(wallet)
+    # The machines that post this do not read the body. Building the payload here re-reads
+    # the whole spin log, and a cold cache solves every machine's reels, on a ping that
+    # only needed to say "this surface is on screen".
+    return {"ok": True}
 
 
 @router.post("/jackpot/spin")

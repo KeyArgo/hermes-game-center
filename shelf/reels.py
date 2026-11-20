@@ -35,6 +35,7 @@ import itertools
 import math
 import random
 import secrets
+import threading
 from functools import lru_cache
 
 # What a spin can cost, in chips: eight steps, 25 chips apart, so the smallest spin is 25.
@@ -508,15 +509,13 @@ def _dilutions(spec_id: str, target: float, pays_items: tuple) -> tuple:
     return counts, found
 
 
-@lru_cache(maxsize=32)
-def variant(spec_id: str) -> dict:
-    """The session's strips and paytable.
+# The cache remembers a session, but it does not stop a miss from being solved once per
+# caller. One cold solve runs; everyone else waits and then reads what it stored.
+_variant_lock = threading.Lock()
 
-    The dilution that lands the hit rate on the drawn chance (inside the session's own window), then
-    the paytable that puts the return on the machine's target with the jackpot as its top prize.
-    Both are re-solved per session and both are published as measured, so the numbers a player is
-    owed are this session's own.
-    """
+
+@lru_cache(maxsize=32)
+def _variant_cached(spec_id: str) -> dict:
     spec = SPECS[spec_id]
     target = target_chance(spec_id)
     blanks, _ladder = _dilutions(spec_id, target, tuple(spec["pays"].items()))
@@ -546,6 +545,26 @@ def variant(spec_id: str) -> dict:
         "jackpot_is_top": solve["jackpot_is_top"],
         "scale": round(solve["scale"], 4),
     }
+
+
+def variant(spec_id: str) -> dict:
+    """The session's strips and paytable.
+
+    The dilution that lands the hit rate on the drawn chance (inside the session's own window), then
+    the paytable that puts the return on the machine's target with the jackpot as its top prize.
+    Both are re-solved per session and both are published as measured, so the numbers a player is
+    owed are this session's own.
+    """
+    with _variant_lock:
+        return _variant_cached(spec_id)
+
+
+def _clear_variant_cache() -> None:
+    with _variant_lock:
+        _variant_cached.cache_clear()
+
+
+variant.cache_clear = _clear_variant_cache
 
 
 def spin(spec_id: str, stake: int = 1, rng=None) -> dict:
