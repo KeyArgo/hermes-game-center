@@ -10018,9 +10018,8 @@ async function pillsLightContract() {
 }
 
 // ---- Leave reaches the server before the table socket is dropped ---------------------
-// Back used to fire leave and close together. Close drops the socket, so a leave that
-// lost the race never arrived, and the seat stayed seated. Leave is sent first and given
-// a short wait; close follows. A leave that never answers still lets the person out once
+// Close drops the table socket, so a leave sent alongside it could lose the race and never
+// arrive, leaving the seat seated. Leave is sent first and given a short wait; close follows. A leave that never answers still lets the person out once
 // that wait is over, and not later.
 async function leaveNotRacedContract() {
   sandbox.setTimeout = setTimeout

@@ -14,10 +14,6 @@ from online.rooms import DISCONNECT_LEAVE_SECONDS
 
 MAX_LOBBY_CONNECTIONS = 2000
 ROSTER_CAP = 200
-# Legacy alias retained for callers; playing presence now tracks each seated player
-# against a live table socket or the disconnect-leave grace window.
-PLAYING_IDLE_SECONDS = DISCONNECT_LEAVE_SECONDS
-
 
 def _service():
     try:
@@ -86,7 +82,7 @@ class Hub:
         """Whether someone seated at this room still has a socket on it.
 
         A lobby socket is not a seat at a table: everyone signed in has one, so counting it
-        would keep an abandoned room "playing" for ever - which is the bug this answers.
+        would keep an abandoned room "playing" for ever.
         """
         state = (self.app.rooms.state(room) or {}) if state is None else state
         return any(pid and self._table_connection(room["id"], pid) for pid in self._seated(state))

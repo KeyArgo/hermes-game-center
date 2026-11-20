@@ -257,9 +257,8 @@ function jp2LTintVars(tint) {
   return { '--jp2-tint-bg': palette.background, '--jp2-tint-edge': palette.edge, '--jp2-tint-glow': palette.glow }
 }
 
-// The cabinet's own paint at the chosen color, for every mode. The over-chat copy alone used to be
-// tinted, so a swatch pressed inside the full cabinet changed nothing anyone could see (owner,
-// 2026-11-20). JackpotMachine spreads this over its root style; at the default it is null and the
+// The cabinet's own paint at the chosen color, for every mode: the full cabinet and the
+// over-chat copy both take the swatch. JackpotMachine spreads this over its root style; at the default it is null and the
 // cabinet keeps the exact values it has always drawn. `flash` keeps the win flash's stronger edge.
 function jp2LCabinetPaint(tint, mode, flash) {
   const look = tint || jp2LTint()

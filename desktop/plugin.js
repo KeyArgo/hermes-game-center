@@ -9578,9 +9578,8 @@ function jp2LTintVars(tint) {
   return { '--jp2-tint-bg': palette.background, '--jp2-tint-edge': palette.edge, '--jp2-tint-glow': palette.glow }
 }
 
-// The cabinet's own paint at the chosen color, for every mode. The over-chat copy alone used to be
-// tinted, so a swatch pressed inside the full cabinet changed nothing anyone could see (owner,
-// 2026-11-20). JackpotMachine spreads this over its root style; at the default it is null and the
+// The cabinet's own paint at the chosen color, for every mode: the full cabinet and the
+// over-chat copy both take the swatch. JackpotMachine spreads this over its root style; at the default it is null and the
 // cabinet keeps the exact values it has always drawn. `flash` keeps the win flash's stronger edge.
 function jp2LCabinetPaint(tint, mode, flash) {
   const look = tint || jp2LTint()
@@ -25855,11 +25854,9 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
 
 // ---- 77-invite-bell.js: an invite reaches the person wherever they are
 //
-// A play request used to exist only where the Games page draws it — the Hall's request cards
-// and the Play with people card. Someone reading their chat, or working on another screen, had
-// no way to know that another person had asked them to play until they went looking. The owner
-// (2026-11-19): "make sure it actually pops up on their screen no matter where they are instead
-// of requiring them to be in game center".
+// A play request is shown wherever the person is in Hermes, not only on the Games page (the
+// Hall's request cards and the Play with people card). Someone reading their chat, or working
+// on another screen, sees that another person has asked them to play without going looking.
 //
 // WHAT THIS IS. One contribution to the status bar and one to the titlebar's right cluster —
 // the two areas this plugin already renders into (78-overchat-slot.js draws its stage from

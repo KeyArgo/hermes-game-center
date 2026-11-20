@@ -1,10 +1,8 @@
 // ---- 77-invite-bell.js: an invite reaches the person wherever they are
 //
-// A play request used to exist only where the Games page draws it — the Hall's request cards
-// and the Play with people card. Someone reading their chat, or working on another screen, had
-// no way to know that another person had asked them to play until they went looking. The owner
-// (2026-11-19): "make sure it actually pops up on their screen no matter where they are instead
-// of requiring them to be in game center".
+// A play request is shown wherever the person is in Hermes, not only on the Games page (the
+// Hall's request cards and the Play with people card). Someone reading their chat, or working
+// on another screen, sees that another person has asked them to play without going looking.
 //
 // WHAT THIS IS. One contribution to the status bar and one to the titlebar's right cluster —
 // the two areas this plugin already renders into (78-overchat-slot.js draws its stage from
