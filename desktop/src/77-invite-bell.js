@@ -21,10 +21,8 @@
 // (80-plugin.js) and the plugin's disposal stops it, so which slots happen to be mounted never
 // decides whether an invite arrives. It reads /online/hall — the door the Hall itself reads —
 // every 3 s while something is moving (a request either way, a search, the pane's Play with
-// people tab on screen) and every 8 s when nothing is, and it does not read at all while the
-// window is hidden: a minimised Hermes asks the lobby nothing. The Hall's own 3 s read feeds
-// this store as well (inviteBellFeed), and a feed younger than INVITE_FEED_FRESH_MS is what the
-// timer counts as its own answer, so on the Games page there is one read, not two.
+// people tab on screen) and every 8 s otherwise. The Hall and matching card use the same
+// snapshots. A hidden window can still deliver a silent notice.
 //
 // THE SYSTEM NOTIFICATION. ctx.os.notify is the SDK's own notice. One silent notice is sent per
 // request id, only while "Open to invites" is on, and only when none of the three surfaces that
@@ -51,6 +49,7 @@ const INVITE_BELL = {
   fresh: 0,
   notified: new Set(),
   readGeneration: 0,
+  reading: null,
   noticeTimer: null,
   watching: false,
   timer: null,
@@ -70,8 +69,7 @@ function inviteBellDocument() {
   return (win && win.document) || null
 }
 
-// A hidden window is not watching, so nothing is read for it. The host's own tab visibility is
-// what every web surface uses; it is not the app's markup and it is not a selector.
+// A background window cannot show an invite, even if its elements still intersect the viewport.
 function inviteBellHidden() {
   const doc = inviteBellDocument()
   return Boolean(doc && doc.hidden)
@@ -130,7 +128,7 @@ function inviteBellDrop(id) {
 // draws its own line on every tab and in its strip.
 function inviteBellShown() {
   const seen = INVITE_BELL.seen || {}
-  return Boolean(seen.statusbar || seen.titlebar || seen.pane)
+  return !inviteBellHidden() && Boolean(seen.statusbar || seen.titlebar || seen.pane)
 }
 
 // The notice for one request, decided INVITE_NOTICE_WAIT_MS after the read that found it, so a
@@ -196,21 +194,49 @@ function inviteBellNextDelay() {
 function inviteBellSchedule() {
   if (!INVITE_BELL.watching) return
   if (INVITE_BELL.timer) { clearTimeout(INVITE_BELL.timer); INVITE_BELL.timer = null }
-  if (inviteBellHidden()) return
   INVITE_BELL.timer = setTimeout(inviteBellTick, inviteBellNextDelay())
 }
 
 async function inviteBellRead(ctx) {
   if (!ctx || typeof ctx.rest !== 'function') return
-  try {
-    const generation = ++INVITE_BELL.readGeneration
-    const answer = await ctx.rest('/online/hall')
-    if (generation !== INVITE_BELL.readGeneration) return
-    if (answer && typeof answer === 'object') inviteBellFeed(answer)
-    else inviteBellPublish({ error: '' })
-  } catch {
-    // The last invite stays on screen: a read that failed is not an invite that went away.
-    inviteBellPublish({ error: 'The lobby could not be read just now.' })
+  const generation = ++INVITE_BELL.readGeneration
+  const read = (async () => {
+    try {
+      const answer = await ctx.rest('/online/hall')
+      if (generation !== INVITE_BELL.readGeneration) return
+      if (answer && typeof answer === 'object') {
+        inviteBellFeed(answer)
+        return answer
+      }
+      inviteBellPublish({ error: '' })
+    } catch {
+      if (generation === INVITE_BELL.readGeneration) inviteBellPublish({ error: 'The lobby could not be read just now.' })
+    }
+  })()
+  INVITE_BELL.reading = read
+  const snap = await read
+  if (INVITE_BELL.reading === read) INVITE_BELL.reading = null
+  return snap
+}
+
+// The full-page Hall and its matching card share the same read and timer as the pane.
+function subscribeHall(ctx, receive) {
+  let lastSnap
+  let lastError
+  const update = () => {
+    const { snap, error } = INVITE_BELL
+    if (snap === lastSnap && error === lastError) return
+    lastSnap = snap
+    lastError = error
+    receive(snap, error)
+  }
+  INVITE_BELL.listeners.add(update)
+  inviteBellEager(true)
+  update()
+  if (!INVITE_BELL.watching) inviteBellRead(ctx)
+  return () => {
+    INVITE_BELL.listeners.delete(update)
+    inviteBellEager(false)
   }
 }
 
@@ -222,21 +248,22 @@ function inviteBellRefresh() {
 
 async function inviteBellTick() {
   INVITE_BELL.timer = null
-  if (!INVITE_BELL.watching || inviteBellHidden()) return
+  if (!INVITE_BELL.watching) return
   // A Hall on screen has just answered for us: asking again would be the second read of one
   // question. Only a read older than INVITE_FEED_FRESH_MS is worth making.
   const fed = Date.now() - Number(INVITE_BELL.fresh || 0) < INVITE_FEED_FRESH_MS
-  if (!fed) await inviteBellRead(INVITE_BELL.ctx)
+  if (!fed) await (INVITE_BELL.reading || inviteBellRead(INVITE_BELL.ctx))
   inviteBellSchedule()
 }
 
-// Coming back is a read at once; going away is no reads at all.
+// Refresh on return. While the window is hidden the regular poll can still deliver a notice.
 function inviteBellVisibility() {
   if (inviteBellHidden()) {
-    if (INVITE_BELL.timer) { clearTimeout(INVITE_BELL.timer); INVITE_BELL.timer = null }
-    return
+    if (INVITE_BELL.request) inviteBellNotice(INVITE_BELL.request)
+  } else {
+    clearTimeout(INVITE_BELL.timer)
+    inviteBellTick()
   }
-  inviteBellTick()
 }
 
 function inviteBellWatch() {
@@ -245,7 +272,7 @@ function inviteBellWatch() {
   if (doc && typeof doc.addEventListener === 'function') doc.addEventListener('visibilitychange', inviteBellVisibility)
   // The first look is now, not after a delay: a request that arrived while this window was
   // closed is on screen the moment the plugin is up.
-  if (!inviteBellHidden()) INVITE_BELL.timer = setTimeout(inviteBellTick, 0)
+  INVITE_BELL.timer = setTimeout(inviteBellTick, 0)
 }
 
 function inviteBellUnwatch() {
@@ -265,13 +292,14 @@ function inviteBellStart(ctx) {
 
 function inviteBellStop() {
   INVITE_BELL.readGeneration += 1
+  INVITE_BELL.reading = null
   inviteBellUnwatch()
 }
 
 // The quick rhythm, while a surface that shows the lobby live is on screen. Still the one timer.
 function inviteBellEager(on) {
   INVITE_BELL.eager = Math.max(0, Number(INVITE_BELL.eager || 0) + (on ? 1 : -1))
-  if (on && INVITE_BELL.watching && INVITE_BELL.timer) inviteBellSchedule()
+  if (on && INVITE_BELL.fresh && INVITE_BELL.watching && INVITE_BELL.timer) inviteBellSchedule()
 }
 
 // One chrome surface draws at a time: the first in INVITE_SURFACE_ORDER whose element is on
@@ -337,7 +365,6 @@ function useInviteBell(ctx) {
   useEffect(() => {
     const listener = () => setTick(count => count + 1)
     INVITE_BELL.listeners.add(listener)
-    INVITE_BELL.ctx = ctx || INVITE_BELL.ctx
     return () => { INVITE_BELL.listeners.delete(listener) }
   }, [ctx])
   return INVITE_BELL
@@ -444,14 +471,7 @@ function inviteSeatOf(snap, requestId) {
 // The seat the lobby just made, read once. A read that lands before the lobby's own "seated"
 // frame simply finds nothing; the surface opens the table from a later read.
 async function inviteBellSeat(ctx, request) {
-  try {
-    const snap = await ctx.rest('/online/hall')
-    if (!snap || typeof snap !== 'object') return null
-    inviteBellFeed(snap)
-    return inviteSeatOf(snap, request && request.id)
-  } catch {
-    return null
-  }
+  return inviteSeatOf(await inviteBellRead(ctx), request && request.id)
 }
 
 // One chrome surface's copy of the invite: who it is from, what game, and the two answers. Its

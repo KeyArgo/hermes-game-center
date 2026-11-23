@@ -296,24 +296,10 @@ function PlayWithPeople({ ctx, view }) {
 
   useEffect(() => {
     if (!online.on || !ctx || typeof ctx.rest !== 'function') return undefined
-    let alive = true
-    let timer = null
-    const read = async () => {
-      try {
-        const answer = await ctx.rest('/online/hall')
-        if (alive && answer && typeof answer === 'object') {
-          setSnap(answer)
-          // The invite bell reads from this very answer: one poll of the Hall serves this card
-          // and the always-mounted callout (77-invite-bell.js).
-          inviteBellFeed(answer)
-          // The lobby is up: whatever Retry said about not reaching it is no longer true.
-          if (answer.state === 'live') setDownNote('')
-        }
-      } catch { /* the last snapshot stands; the next tick tries again */ }
-    }
-    read()
-    timer = setInterval(read, HALL_POLL_MS)
-    return () => { alive = false; if (timer) clearInterval(timer) }
+    return subscribeHall(ctx, answer => {
+      if (answer) setSnap(answer)
+      if (answer && answer.state === 'live') setDownNote('')
+    })
   }, [ctx, online.on])
 
   // Online play off: there is nothing to accept and nobody to ask, so the card is not drawn.

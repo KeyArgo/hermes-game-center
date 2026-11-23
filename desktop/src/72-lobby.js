@@ -414,7 +414,6 @@ function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busy
 // sends every move through the four /online/hall/* doors. It never shows an
 // address, a key or an invite code — only names, the game each person accepts, and
 // the requests you have open.
-const HALL_POLL_MS = 3000
 
 // Rooms this person has backed out of. The Hall is unmounted while a table is on screen
 // and mounted again by Back, with an empty "already opened" set, so a seat the lobby
@@ -474,32 +473,10 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
 
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
 
-  // The Hall snapshot, read every 3 s while this screen is up. The socket is the
-  // shelf's; this only paints its latest answer, and clears the poll on unmount. A read
-  // that fails is said out loud rather than leaving an old roster looking live.
-  useEffect(() => {
-    if (!ctx || typeof ctx.rest !== 'function') return undefined
-    let timer = null
-    const read = async () => {
-      try {
-        const answer = await ctx.rest('/online/hall')
-        if (!alive.current) return
-        if (answer && typeof answer === 'object') {
-          setSnap(answer)
-          // The invite bell reads from this very answer: one poll of the Hall serves the panel
-          // and the always-mounted callout (77-invite-bell.js).
-          inviteBellFeed(answer)
-        }
-        setStale(false)
-      } catch (error) {
-        // Keep the last snapshot; the next tick retries. It is simply not live any more.
-        if (alive.current) setStale(true)
-      }
-    }
-    read()
-    timer = setInterval(read, HALL_POLL_MS)
-    return () => { if (timer) clearInterval(timer) }
-  }, [ctx])
+  useEffect(() => subscribeHall(ctx, (answer, error) => {
+    if (answer) setSnap(answer)
+    setStale(Boolean(error))
+  }), [ctx])
 
   const state = snap ? String(snap.state || '') : 'connecting'
   const you = (snap && snap.you) || {}

@@ -1830,19 +1830,17 @@ async function paneContract() {
   assert.deepEqual(tiles.map(node => words(node)), ['Connect Four', 'Reversi', 'Gomoku', 'Breakthrough', 'Chess'])
   assert.equal(nodes(tree).filter(node => node.type === 'select').length, 0, 'no drop-downs in the pane')
 
-  // The lobby: find a match keeps looking while Hermes is used normally.
+  // Local chat stays available offline in a closed disclosure.
   reset()
   const lobbyCtx = makeCtx({ 'pane-game': 'connect4' })
   tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
   await new Promise(resolve => setTimeout(resolve, 0))
   tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
-  findButton(tree, 'Lobby').props.onClick()
+  findButton(tree, 'Play with people').props.onClick()
   tree = draw('WaitPane(paneProps)', { ctx: lobbyCtx.ctx })
-  const find = findButton(tree, 'Find a match')
-  assert.ok(find, 'the dock has a Find a match control')
-  assert.equal(find.props.disabled, false, 'a named player can ask for a match')
-  await find.props.onClick()
-  assert.ok(lobbyCtx.asked.includes('looking connect4'), 'Find a match asks the local lobby for this game')
+  const chat = nodes(tree).find(node => node.type === 'details' && words(node).includes('#games chat'))
+  assert.ok(chat && !chat.props.open, 'chat starts folded')
+  assert.equal(findButton(tree, 'Find a match'), undefined, 'offline chat has no local matchmaking control')
 
   // One name at a time, and the honest one: signed in to the lobby, the name this column says is
   // the lobby account's, not this computer's label (owner, 2026-11-18: "in chat I'm Potato, in
@@ -2286,12 +2284,15 @@ async function paneContract() {
   // registering starts from the pane being wanted, as a fresh load does. The QA
   // localStorage has no removeItem, so clear the flag through setItem.
   evaluate("window.localStorage.setItem(PANE_GONE_KEY, '0')")
+  const disposers = []
   evaluate('plugin').register({
+    onDispose: fn => disposers.push(fn),
     registerMany: list => { list.forEach(item => entries.push(item)) },
     storage: { get: (key, fallback) => fallback, set() {} },
     os: {},
     rest: async () => ({})
   })
+  disposers.forEach(fn => fn())
   const paneEntry = entries.find(item => item.id === 'pane')
   assert.ok(paneEntry, 'the plugin contributes a pane')
   assert.equal(paneEntry.area, 'panes')
@@ -2699,13 +2700,13 @@ async function paneFillContract() {
       'and never the status cell')
 
     // 5. The lobby: the people beside you, and online play, as two columns when there is room.
-    findButton(tree, 'Lobby').props.onClick()
+    findButton(tree, 'Play with people').props.onClick()
     tree = await drawPane()
     const lobby = byClass(tree, 'games-pane-body')
     assert.ok(lobby, 'the lobby is drawn in the same grid of sections')
     const columns = nodes(lobby).filter(node => hasClass(node, 'games-pane-column'))
     assert.equal(columns.length, 2, 'in two columns: the lobby chat, then online play')
-    assert.ok(words(columns[0]).includes('Find a match'), 'the first column is the lobby chat')
+    assert.ok(words(columns[0]).includes('#games chat'), 'the first column is the lobby chat')
     assert.ok(words(columns[1]).includes('Play with people online'), 'the second is online play')
 
     // 6. Nothing in the pane caps its own width in pixels: a cap is what left the small lobby in
@@ -4068,7 +4069,7 @@ async function onlineContract() {
     let tree = draw('WaitPane(paneProps)', { ctx: runner.ctx })
     await tick()
     tree = draw('WaitPane(paneProps)', { ctx: runner.ctx })
-    findButton(tree, 'Lobby').props.onClick()
+    findButton(tree, 'Play with people').props.onClick()
     return draw('WaitPane(paneProps)', { ctx: runner.ctx })
   }
   const onlinePaths = runner => runner.asked.map(item => item[0]).filter(path => String(path).startsWith('/online'))
@@ -4119,17 +4120,12 @@ async function onlineContract() {
   assert.ok(findButton(tree, 'Hide this key'), 'and a way to put it away')
   assert.ok(words(tree).includes('You are Ada online'), 'the person is signed in in the same breath')
 
-  // 3. Linked: Find a match online asks the queue for this game. The online-alert switch is NOT
-  //    offered on the pane: it saves a flag, but the notification behind
-  //    it is a no-op, so the pane does not promise it. It is still in the source, behind a gate.
+  // Linked players match through the Hall. The per-game online-alert switch stays hidden.
   const linked = makeCtx({ on: true, linked: true, name: 'Ada' })
   tree = await open(linked)
   assert.ok(words(tree).includes('You are Ada online'))
-  const findOnline = findButton(tree, 'Find a match online: Connect Four')
-  assert.ok(findOnline, 'the online queue has its own button, named with the game')
-  await findOnline.props.onClick()
-  const queued = linked.asked.filter(item => item[0] === '/online/queue').pop()
-  assert.equal(queued[1].body.game, 'connect4', 'the queue is asked for the game the pane is on')
+  assert.ok(nodes(tree).some(node => node.type && node.type.name === 'PanePeople'), 'linked players use Hall matchmaking')
+  assert.equal(findButton(tree, 'Find a match online: Connect Four'), undefined, 'the legacy queue control is gone')
   const alertBox = nodes(tree).find(node => node.type === 'label' && words(node).includes('Tell me when someone online wants this game'))
   assert.equal(alertBox, undefined, 'the online-alert switch is not offered on the pane')
   assert.equal(linked.asked.filter(item => item[0] === '/online/alerts').length, 0, 'and nothing is sent for it')
@@ -4147,16 +4143,13 @@ async function onlineContract() {
   await findButton(tree, 'Not now').props.onClick()
   assert.ok(found.asked.some(item => item[0] === '/online/match/close'), 'and can be put away')
 
-  // 5. Server down: one plain sentence, and the local lobby button still works.
+  // An unavailable server explains its status and leaves local matchmaking out of the pane.
   const down = makeCtx({ on: true, linked: true, name: 'Ada', offline: true,
     offline_text: 'The online lobby cannot be reached right now. Everything here that runs on this computer still works.' })
   tree = await open(down)
   assert.ok(words(tree).includes('cannot be reached right now'), 'the offline state is plain')
-  const localFind = findButton(tree, 'Find a match')
-  assert.ok(localFind, 'the local Find a match is still there')
-  await localFind.props.onClick()
-  assert.ok(down.asked.some(item => item[0] === '/command' && item[1].body.line === 'looking connect4'),
-    'and local play is untouched by the online server being down')
+  assert.equal(findButton(tree, 'Find a match'), undefined, 'offline mode does not offer local matchmaking')
+  assert.ok(!down.asked.some(item => item[0] === '/command' && /^looking/.test(item[1].body.line)))
 
   // 6. The bot ladder and Bots & leagues are NOT on the pane: rated
   //    bot-versus-bot is not proven end to end, and watching a league leaves Hermes for the
@@ -4527,7 +4520,7 @@ async function onlineTableContract() {
   draw('WaitPane(paneProps)', 'paneProps', paneProps)
   await tick()
   tree = draw('WaitPane(paneProps)', 'paneProps', paneProps)
-  findButton(tree, 'Lobby').props.onClick()
+  findButton(tree, 'Play with people').props.onClick()
   tree = draw('WaitPane(paneProps)', 'paneProps', paneProps)
   const playHere = findButton(tree, 'Play here')
   assert.ok(playHere, 'a ready match is played here, not only in a browser')
@@ -6621,7 +6614,9 @@ async function refereeBadgeContract() {
   // × takes the wait pane off the screen completely: its registration is disposed,
   // and the palette / status item register it again.
   const live = new Set()
+  const disposers = []
   const fakeCtx = {
+    onDispose: fn => disposers.push(fn),
     registerMany: list => {
       list.forEach(item => live.add(item.id))
       return () => list.forEach(item => live.delete(item.id))
@@ -6637,6 +6632,7 @@ async function refereeBadgeContract() {
   assert.ok(!live.has('pane') && live.has('page'), 'closing removes only the pane')
   evaluate('openWaitPane')()
   assert.ok(live.has('pane'), 'opening registers it again')
+  disposers.forEach(fn => fn())
   console.log('wait pane: × removes it completely, open brings it back: passed')
 }
 
@@ -7757,7 +7753,19 @@ async function inviteBellContract() {
     return tree
   }
   // A read is a round trip: draw (which starts it), let it settle, draw again.
-  const settle = async value => { draw(value); await tick(); return draw(value) }
+  const start = ctx => {
+    sandbox.bellCtx = ctx
+    evaluate('inviteBellStart(bellCtx)')
+  }
+  const settle = async value => {
+    if (!evaluate('INVITE_BELL.watching')) {
+      start(value.ctx)
+      await evaluate('inviteBellTick()')
+    }
+    draw(value)
+    await tick()
+    return draw(value)
+  }
   const bell = tree => nodes(tree).filter(node => node.props && node.props['data-invite-bell'])[0]
   const line = tree => nodes(tree).find(node => node.props && node.props['data-invite-line'] !== undefined)
   const accept = tree => nodes(tree).find(node => node.props && node.props['data-invite-accept'] !== undefined)
@@ -7787,7 +7795,7 @@ async function inviteBellContract() {
   }
   // Every case starts from "nobody is asking", so one case cannot leave a request on the next.
   // The feed's freshness is cleared with it: this stands for "no Hall has read just now".
-  const bellClear = () => { evaluate("inviteBellFeed({ state: 'off', you: { id: 'me' }, prefs: {}, requests: [] }); INVITE_BELL.fresh = 0; inviteBellMark('statusbar', false); inviteBellMark('titlebar', false)") }
+  const bellClear = () => { evaluate("inviteBellFeed({ state: 'off', you: { id: 'me' }, prefs: {}, requests: [] }); inviteBellStop(); INVITE_BELL.fresh = 0; inviteBellSeen('statusbar', false); inviteBellSeen('titlebar', false)") }
   // The host door this contract watches. An earlier contract replaced host.navigate with its own
   // recorder and never put it back, so this one takes the door for itself.
   const went = []
@@ -7838,7 +7846,7 @@ async function inviteBellContract() {
   const both = makeCtx()
   let status = await settle({ ctx: both.ctx, where: 'statusbar' })
   // The titlebar copy is on screen too (its own registration is mounted); the store says so.
-  evaluate("inviteBellMark('titlebar', true)")
+  evaluate("inviteBellSeen('titlebar', true)")
   status = draw({ ctx: both.ctx, where: 'statusbar' })
   const title = draw({ ctx: both.ctx, where: 'titlebar' })
   assert.ok(bell(status), 'the status bar draws while it is mounted')
@@ -7852,22 +7860,18 @@ async function inviteBellContract() {
 
   reset()
   bellClear()
-  // 4. Nothing is read while the window is hidden, and coming back reads at once.
+  // 4. A hidden window still reads the Hall and its mounted bell cannot suppress a notice.
   const hidden = makeCtx()
   sandbox.document.hidden = true
-  const armed = bellDelays.length
-  tree = draw({ ctx: hidden.ctx, where: 'statusbar' })
-  await tick()
-  assert.equal(hidden.asked.filter(item => item[0] === '/online/hall').length, 0,
-    'a hidden window asks the lobby nothing')
-  assert.equal(bellDelays.length, armed, 'and arms no timer to ask later')
+  tree = await settle({ ctx: hidden.ctx, where: 'statusbar' })
+  assert.equal(hidden.asked.filter(item => item[0] === '/online/hall').length, 1)
+  evaluate("inviteBellNotify('q1')")
+  assert.equal(hidden.notified.length, 1, 'a background window delivers the notice')
   sandbox.document.hidden = false
   ;(windowListeners.visibilitychange || []).forEach(fn => fn({ type: 'visibilitychange' }))
   await tick()
-  tree = await settle({ ctx: hidden.ctx, where: 'statusbar' })
-  assert.equal(hidden.asked.filter(item => item[0] === '/online/hall').length, 1,
-    'coming back is a read at once')
-  assert.ok(bell(tree), 'and the invite is on screen again')
+  tree = draw({ ctx: hidden.ctx, where: 'statusbar' })
+  assert.ok(bell(tree), 'the request is ready when the window returns')
 
   reset()
   bellClear()
@@ -7894,23 +7898,26 @@ async function inviteBellContract() {
 
   reset()
   bellClear()
-  // 7. The system notice: once per invite, and only for a game the person asked to hear about.
+  // A visible bell suppresses the notice. With no surface, an open invite rings once.
   const quietAlerts = makeCtx()
   tree = await settle({ ctx: quietAlerts.ctx, where: 'statusbar' })
-  assert.equal(quietAlerts.notified.length, 0, 'no notice for a game whose alert switch is off')
+  evaluate("inviteBellNotify('q1')")
+  assert.equal(quietAlerts.notified.length, 0, 'the visible bell carries the request')
   reset()
   bellClear()
-  evaluate("INVITE_BELL.notified = ''")
+  evaluate('INVITE_BELL.notified.clear()')
   const loud = makeCtx({ alerts: { paused: false, games: { connect4: true } } })
   tree = await settle({ ctx: loud.ctx, where: 'statusbar' })
-  assert.equal(loud.notified.length, 1, 'a switched-on alert gets one notice')
+  evaluate("inviteBellSeen('statusbar', false); inviteBellNotify('q1')")
+  assert.equal(loud.notified.length, 1, 'an invite without a visible surface gets one notice')
   assert.equal(loud.notified[0].body, 'Bea invites you to Connect 4', 'that says who and what')
   tree = await settle({ ctx: loud.ctx, where: 'statusbar' })
+  evaluate("inviteBellNotify('q1')")
   assert.equal(loud.notified.length, 1, 'and the same invite never rings twice')
 
   reset()
   bellClear()
-  evaluate("INVITE_BELL.notified = ''")
+  evaluate('INVITE_BELL.notified.clear()')
   sandbox.document.hidden = undefined
 
   // A seat for a different request, or a room already left, is not this invite.
@@ -9155,8 +9162,7 @@ async function invitePaneContract() {
   const inviteAt = kids.findIndex(node => node && node.props && node.props['data-pane-invite'])
   const headerAt = kids.findIndex(node => node && words(node).includes('Play while you code'))
   assert.ok(inviteAt >= 0 && headerAt > inviteAt, 'the invite is above the rest of the pane')
-  assert.ok(words(block).includes('Bea invites you to Connect 4'), 'it names the person and the game: ' + words(block))
-  assert.match(words(block), /5[0-9] s|60 s/, 'and shows the countdown: ' + words(block))
+  assert.ok(words(block).includes('Bea asks to play Connect 4'), 'it names the person and the game: ' + words(block))
   const decline = nodes(tree).find(node => node.props && node.props['data-pane-invite-decline'])
   const accept = nodes(tree).find(node => node.props && node.props['data-pane-invite-accept'])
   assert.ok(accept && decline, 'Accept and Decline are on the invite')

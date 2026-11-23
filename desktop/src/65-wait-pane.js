@@ -11,6 +11,12 @@ const PANE_LADDER_OFF = true
 // leaves Hermes for the browser and the pane is not where a league belongs. The block is kept
 // whole; this line hides it on the pane (it is the only surface that mounts it).
 const PANE_LEAGUES_OFF = true
+// FUTURE(2026-11-11): the online-alert checkbox on the pane — remove if never built.
+// "Tell me when someone online wants this game" saves its flag, but the system notification it
+// promises returns immediately, so the switch would promise an alert nothing raises. Kept whole;
+// this line hides it.
+const PANE_ONLINE_ALERT_OFF = true
+
 // The pane's own stylesheet. It sits in the pane so every rule can follow the pane's width - a
 // container query on the pane root - rather than the window's: the frame is dragged from 300 px to
 // 1200 px, and the lobby and the board fill whatever frame they are given. Only the classes this
@@ -1102,7 +1108,20 @@ function WaitPane({ ctx }) {
             ] }),
             jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: 'Live tables are held by the lobby server; press Play here to play this one inside Hermes.' })
           ]
-        }) : null
+        }) : null,
+          // FUTURE(2026-11-11): the online-alert checkbox — remove if never built.
+          // "Tell me when someone online wants this game" writes its flag, but the system
+          // notification behind it returns immediately, so the switch would promise an alert
+          // nothing raises. The row is kept below the gate; PANE_ONLINE_ALERT_OFF hides it.
+          PANE_ONLINE_ALERT_OFF ? null : jsxs('label', { style: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: text.secondary }, children: [
+            jsx('input', {
+              type: 'checkbox',
+              checked: Boolean(current && online.alerts[current]),
+              disabled: !current || onlineBusy,
+              onChange: event => onlineCall('/online/alerts', { game: current, enabled: event.target.checked })
+            }),
+            jsx('span', { children: 'Tell me when someone online wants this game (at most once every ten minutes, never during a match)' })
+          ] })
       ] }) : null
     ]
   })
