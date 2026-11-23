@@ -169,12 +169,60 @@ def test_the_longest_wait_since_a_game_is_asked_first(world):
         hub.sent.clear()
         declined = await service.handle(cal, {"t": "respond", "id": first["id"], "accept": False})
         assert declined["ok"], declined
+        assert [frame["text"] for frame in lines(hub, ada)] == [
+            "Cal passed on Chess. Still looking.", "Asking Bea — 60 s"]
         second = asked_card(hub)
         assert second["to"]["id"] == bea["id"], "five hundred seconds' wait comes before one hundred"
         hub.sent.clear()
         declined = await service.handle(bea, {"t": "respond", "id": second["id"], "accept": False})
         assert declined["ok"], declined
         assert asked_card(hub)["to"]["id"] == eve["id"], "the shortest wait is asked last, not skipped"
+
+    run(scenario())
+
+
+@pytest.mark.parametrize("first_seeker", ["Ada", "Bea"])
+def test_auto_matching_waits_after_a_decline_in_either_direction(world, first_seeker):
+    _store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        for player in (ada, bea):
+            await accepts(service, player, "go")
+        assert (await ask(service, ada, bea, "go"))["ok"]
+        rid = service.pending_for(bea["id"])[0]["id"]
+        clock.now += 30
+        assert (await service.handle(bea, {"t": "respond", "id": rid, "accept": False}))["ok"]
+        hub.sent.clear()
+        assert (await look(service, people[first_seeker], ["go"]))["ok"]
+        other = bea if first_seeker == "Ada" else ada
+        assert (await look(service, other, ["go"]))["ok"]
+        clock.now += 119
+        await service.pair_looking(clock.now)
+        assert offers(hub) == []
+        clock.now += 1
+        await service.pair_looking(clock.now)
+        assert asked_card(hub)["game"] == "go"
+
+    run(scenario())
+
+
+def test_declining_a_search_offer_leaves_other_games_eligible(world):
+    _store, _rooms, people, _clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        here(hub, ada, bea)
+        await accepts(service, bea, "go", "hex")
+        assert (await look(service, ada, ["go", "hex"]))["ok"]
+        first = asked_card(hub)
+        assert first["game"] == "go"
+        hub.sent.clear()
+        assert (await service.handle(bea, {"t": "respond", "id": first["id"], "accept": False}))["ok"]
+        second = asked_card(hub)
+        assert (second["to_id"], second["game"]) == (bea["id"], "hex")
+        assert [card["id"] for card in service.pending_for(ada["id"])] == [second["id"]]
 
     run(scenario())
 

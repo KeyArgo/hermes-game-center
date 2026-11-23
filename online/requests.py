@@ -31,7 +31,7 @@ LOOKING_SECONDS = TEMP_SECONDS
 HOUR = 3600.0
 MAX_PER_HOUR = 8
 MAX_INBOUND = 5
-DECLINE_SECONDS = 600.0
+DECLINE_SECONDS = 120.0
 
 # Appear offline: the account is in nobody's roster and takes no requests. One
 # sentence either way, so it never says which of the two is behind it.
@@ -453,9 +453,9 @@ class Service:
             return False
         if self.store.inbound_pending_count(b) >= MAX_INBOUND:
             return False
-        if self.store.declined_recently(a, b, game, now - DECLINE_SECONDS):
-            return False
-        return True
+        since = now - DECLINE_SECONDS
+        return not (self.store.declined_recently(a, b, game, since)
+                    or self.store.declined_recently(b, a, game, since))
 
     async def _request(self, player: dict, frame: dict) -> dict:
         async with self.accept_lock:
@@ -513,8 +513,18 @@ class Service:
             return self._ack(frame, False, "Only the other player can decline."), []
         if row["state"] != "pending":
             return self._ack(frame, False, "That request is no longer open."), []
-        saved = self.store.set_play_state(row["id"], "declined")
-        return self._ack(frame, True, "Declined."), self._updates(self._card(saved or row))
+        now = float(self.clock())
+        saved = self.store.decline_play_request(row["id"], now)
+        card = self._card(saved or row)
+        frames = self._updates(card)
+        if card["offer"]:
+            self.store.clear_looking_expired(now - LOOKING_SECONDS)
+            if card["game"] in self.looking(card["from_id"]):
+                title = self._title(card["game"])
+                text = f"{card['to']['name']} passed on {title}. Still looking."
+                frames.append((card["from_id"], {"t": "looking_status", "game": card["game"],
+                                                 "title": title, "asking": None, "text": text}))
+        return self._ack(frame, True, "Declined."), frames
 
     @staticmethod
     def _may_answer(player_id: str, row: dict) -> bool:
@@ -620,7 +630,7 @@ class Service:
         if self.store.inbound_pending_count(target_id) >= MAX_INBOUND:
             return "They have too many requests waiting."
         if self.store.declined_recently(sender["id"], target_id, game, now - DECLINE_SECONDS):
-            return "That game was declined. Try again in ten minutes."
+            return "That game was declined. Try again in two minutes."
         return ""
 
     def _presence(self, player_id: str) -> str:

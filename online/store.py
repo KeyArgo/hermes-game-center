@@ -242,6 +242,7 @@ LATE_COLUMNS = (
     # A match offer is a request neither side asked for: find match made it, and either
     # person may join it. The flag is what lets the other side answer it.
     ("play_requests", "offer", "INTEGER NOT NULL DEFAULT 0"),
+    ("play_requests", "declined_at", "REAL"),
     # When this account last finished a game. 0 means never, which asks for a game first:
     # find match asks the person who has waited longest.
     ("availability", "last_game_end", "REAL NOT NULL DEFAULT 0"),
@@ -1570,17 +1571,20 @@ class Store:
             (a, b, b, a),
         ).fetchone() is not None
 
-    def declined_recently(self, a: str, b: str, game: str, since: float) -> bool:
-        """A decline for this pair and game newer than `since`.
-
-        There is no declined-at column. The request is created and answered inside
-        its 90s life, so the window is measured from `created`.
-        """
+    def declined_recently(self, from_id: str, to_id: str, game: str, since: float) -> bool:
+        """Whether the recipient declined this sender and game after the cutoff."""
         return self.db.execute(
-            "SELECT 1 FROM play_requests WHERE state = 'declined' AND game = ? AND created > ? AND "
-            "((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)) LIMIT 1",
-            (game, since, a, b, b, a),
+            "SELECT 1 FROM play_requests WHERE from_id = ? AND to_id = ? AND game = ? "
+            "AND state = 'declined' AND COALESCE(declined_at, created) > ? LIMIT 1",
+            (from_id, to_id, game, since),
         ).fetchone() is not None
+
+    def decline_play_request(self, request_id: str, now: float) -> dict | None:
+        self.db.execute(
+            "UPDATE play_requests SET state = 'declined', declined_at = ? WHERE id = ?",
+            (now, request_id),
+        )
+        return self.play_request(request_id)
 
     def set_play_state(self, request_id: str, state: str, room_id: str | None = None) -> dict | None:
         if room_id is None:

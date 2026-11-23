@@ -321,30 +321,32 @@ def test_five_inbound_pending(world):
 
 
 def test_decline_cooldown(world):
-    store, _rooms, people, clock, hub, service = world
+    _store, _rooms, people, clock, hub, service = world
 
     async def scenario():
         ada, bea = people["Ada"], people["Bea"]
         await open_up(service, hub, ada, bea)
         assert (await ask(service, ada, bea, "connect4"))["ok"]
         rid = service.pending_for(bea["id"])[0]["id"]
+        clock.now += 45
         hub.sent.clear()
         declined = await service.handle(bea, {"t": "respond", "id": rid, "accept": False})
         assert declined["ok"]
         assert hub.sent and {frame["t"] for _pid, frame in hub.sent} == {"request_update"}
         assert {frame["request"]["state"] for _pid, frame in hub.sent} == {"declined"}
         again = await ask(service, ada, bea, "connect4")
+        assert not again["ok"] and "declined" in again["text"].lower()
         reverse = await ask(service, bea, ada, "connect4")
-        assert not again["ok"] and not reverse["ok"]
-        assert "declined" in again["text"].lower() and again["text"] == reverse["text"]
+        assert reverse["ok"], reverse
+        back = service.pending_for(ada["id"])[0]["id"]
+        assert (await service.handle(bea, {"t": "cancel", "id": back}))["ok"]
         # A different game is not on cooldown. Cancel it so the pair is free again.
         assert (await ask(service, ada, bea, "reversi"))["ok"]
         other = service.pending_for(ada["id"])[0]["id"]
         assert (await service.handle(ada, {"t": "cancel", "id": other}))["ok"]
-        created = store.play_request(rid)["created"]
-        clock.now = created + 599
+        clock.now += 119
         assert not (await ask(service, ada, bea, "connect4"))["ok"]
-        clock.now = created + 601
+        clock.now += 1
         assert (await ask(service, ada, bea, "connect4"))["ok"]
 
     run(scenario())
