@@ -26125,7 +26125,7 @@ function inviteBellWatch() {
   if (doc && typeof doc.addEventListener === 'function') doc.addEventListener('visibilitychange', inviteBellVisibility)
   // The first look is now, not after a delay: a request that arrived while this window was
   // closed is on screen the moment the plugin is up.
-  inviteBellTick()
+  if (!inviteBellHidden()) INVITE_BELL.timer = setTimeout(inviteBellTick, 0)
 }
 
 function inviteBellUnwatch() {
