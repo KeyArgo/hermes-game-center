@@ -21060,16 +21060,11 @@ const PANE_CSS = `
 function WaitPane({ ctx }) {
   // The pane is a Game Center surface too: the same watch, the same log route.
   useEffect(() => diagSurfaceOpen(ctx), [ctx])
-  // The invite the bell already holds. watch is false: the bell polls, this only draws.
-  const inviteBell = useInviteBell(ctx, false)
+  const inviteBell = useInviteBell(ctx)
+  const observePane = useInviteSurface('pane')
   const [inviteBusy, setInviteBusy] = useState(false)
   const [inviteNote, setInviteNote] = useState('')
-  const [inviteTick, setInviteTick] = useState(0)
-  useEffect(() => {
-    if (!inviteBell.request) return undefined
-    const timer = setInterval(() => setInviteTick(count => count + 1), 1000)
-    return () => clearInterval(timer)
-  }, [inviteBell.request && inviteBell.request.id])
+  const [waitingForSeat, setWaitingForSeat] = useState('')
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
   const [gameId, setGameId] = useState(saved.current)
@@ -21125,6 +21120,10 @@ function WaitPane({ ctx }) {
   const [settings, setSettings] = useState(false)
   const [skin, setSkin] = useSkin(ctx)
   const rootBox = useRef(null)
+  const paneRef = useCallback(node => {
+    rootBox.current = node
+    observePane(node)
+  }, [observePane])
   const confirmBox = useRef(null)
   const ladderBox = useRef(null)
   const boardBox = useRef(null)
@@ -21353,6 +21352,15 @@ function WaitPane({ ctx }) {
     }
   }, [ctx, playingHere])
 
+  useEffect(() => {
+    if (!waitingForSeat) return
+    const seat = inviteSeatOf(inviteBell.snap, waitingForSeat)
+    if (seat && !playingHere) {
+      setWaitingForSeat('')
+      playHere(seat)
+    }
+  }, [waitingForSeat, inviteBell.snap, playingHere, playHere])
+
   const showLadderAsk = useCallback(async () => {
     const chosen = latest.current.game
     if (!chosen) return
@@ -21538,20 +21546,23 @@ function WaitPane({ ctx }) {
   const myName = (view && view.player && view.player.name) || ''
   const found = current ? othersLooking(lobby, current, myName) : []
 
-  // An invite sits above everything else in this pane. inviteTick is read so the
-  // countdown redraws each second; the request itself is the bell's.
   const inviteBar = paneInviteBlock(ctx, inviteBell.request, inviteBusy, inviteNote, async accept => {
     if (inviteBusy || !inviteBell.request) return
     setInviteBusy(true)
     setInviteNote('')
     try {
-      const reply = await inviteBellAnswer(ctx, inviteBell.request, accept)
+      const id = inviteBell.request.id
+      const reply = await inviteBellAnswer(ctx, inviteBell.request, accept, { here: true })
+      if (accept && reply.ok !== false) {
+        if (reply.seat) setOnlineRoom(String(reply.seat.room_id))
+        else setWaitingForSeat(id)
+        setSettings(false)
+      }
       if (reply && reply.ok === false) setInviteNote(String(reply.text || 'The lobby did not take that answer.'))
     } finally {
       setInviteBusy(false)
     }
   })
-  void inviteTick
 
   // Out of the way beats everything else: a slim strip with one way back. The
   // polls above keep running quietly, so the dot still means your turn.
@@ -21559,12 +21570,13 @@ function WaitPane({ ctx }) {
     const stripTurn = myTurn(latest.current.board, view)
     return jsxs('div', {
       className: 'games-wait-pane-strip',
+      ref: paneRef,
       style: { height: 34, display: 'flex', alignItems: 'center', background: paper, boxSizing: 'border-box' },
       children: [
-        inviteBar,
         jsx('button', {
+        'data-pane-invite-strip': inviteBar ? '1' : undefined,
         type: 'button',
-        'aria-label': 'Games. Restore the play pane',
+        'aria-label': inviteBar ? undefined : 'Games. Restore the play pane',
         title: 'Play while you code — restore the pane',
         onClick: widen,
         style: {
@@ -21572,7 +21584,7 @@ function WaitPane({ ctx }) {
           padding: '0 12px', border: 'none', background: 'transparent',
           color: text.secondary, fontSize: 12, fontWeight: 650, cursor: 'pointer'
         },
-        children: [
+        children: inviteBar ? paneInviteWords(inviteBell.request) + ' · View' : [
           jsx('span', { children: 'Games' }),
           stripTurn ? jsx('span', {
             'aria-hidden': true,
@@ -21587,7 +21599,7 @@ function WaitPane({ ctx }) {
   }
 
   if (error) {
-    return jsx('div', { role: 'alert', style: { padding: 12, fontSize: 12, color: text.secondary }, children: error })
+    return jsxs('div', { ref: paneRef, children: [inviteBar, jsx('div', { role: 'alert', style: { padding: 12 }, children: error })] })
   }
 
   const iconTitles = {
@@ -21617,7 +21629,7 @@ function WaitPane({ ctx }) {
       // wraps rather than pushing itself out of the frame.
       jsxs('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }, children: [
         button('Game', () => { setSettings(false); setTab('game') }, { primary: tab === 'game' && !settings }),
-        button('Lobby', () => { setSettings(false); setTab('lobby') }, { primary: tab === 'lobby' && !settings }),
+        button('Play with people', () => { setSettings(false); setTab('lobby') }, { primary: tab === 'lobby' && !settings }),
         // What the person has earned, right here under the two tabs they use most.
         jsx(PointsChip, { ctx, style: { marginLeft: 2 } }),
         // One press in and out of Settings: the full screen's own Settings, in a pane too narrow for
@@ -22192,7 +22204,7 @@ function WaitPane({ ctx }) {
   if (hereRoom) {
     return jsxs('div', {
       className: 'games-wait-pane',
-      ref: rootBox,
+      ref: paneRef,
       style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', background: paper, containerType: 'inline-size' },
       children: [
         jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
@@ -22216,18 +22228,22 @@ function WaitPane({ ctx }) {
   // drags - 300 px or 1200 px - instead of the window behind it.
   return jsxs('div', {
     className: 'games-wait-pane',
-    ref: rootBox,
-    style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'auto', background: paper, boxSizing: 'border-box', containerType: 'inline-size' },
+    ref: paneRef,
+    style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 10, height: '100%', minHeight: 0, overflow: 'hidden', background: paper, boxSizing: 'border-box', containerType: 'inline-size' },
     children: [
       jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
       inviteBar,
-      ...(settings ? [header, settingsView] : [
+      jsxs('div', {
+        'data-pane-scroll': '1',
+        style: { display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'auto' },
+        children: settings ? [header, settingsView] : [
         header,
         agentRow(agentNotice(busy, finished, approval), ctx),
         problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
         noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,
         tab === 'lobby' ? lobbyTab : gameTab
-      ])
+        ]
+      })
     ]
   })
 }
