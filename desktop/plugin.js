@@ -21440,10 +21440,14 @@ function WaitPane({ ctx }) {
     try {
       const answer = await openOnlineTable(ctx, match && match.room_id, match && match.game)
       if (answer && answer.ok === false) {
-        if (alive.current) setOnlineProblem(String(answer.text || 'That table would not open.'))
+        if (alive.current) setProblem(String(answer.text || 'That table would not open.'))
         return
       }
-      if (alive.current) setOnlineRoom(String((match && match.room_id) || ''))
+      if (alive.current) {
+        setOnlineRoom(String(match.room_id))
+        setTab('game')
+        setSettings(false)
+      }
     } finally {
       if (alive.current) setPlayingHere(false)
     }
@@ -21648,11 +21652,17 @@ function WaitPane({ ctx }) {
       const id = inviteBell.request.id
       const reply = await inviteBellAnswer(ctx, inviteBell.request, accept, { here: true })
       if (accept && reply.ok !== false) {
-        if (reply.seat) setOnlineRoom(String(reply.seat.room_id))
-        else setWaitingForSeat(id)
+        if (reply.seat) {
+          setOnlineRoom(String(reply.seat.room_id))
+          setTab('game')
+        } else setWaitingForSeat(id)
         setSettings(false)
       }
-      if (reply && reply.ok === false) setInviteNote(String(reply.text || 'The lobby did not take that answer.'))
+      if (reply && reply.ok === false) {
+        const message = String(reply.text || 'The lobby did not take that answer.')
+        if (INVITE_BELL.request) setInviteNote(message)
+        else setProblem(message)
+      }
     } finally {
       setInviteBusy(false)
     }
@@ -21666,8 +21676,7 @@ function WaitPane({ ctx }) {
       className: 'games-wait-pane-strip',
       ref: paneRef,
       style: { height: 34, display: 'flex', alignItems: 'center', background: paper, boxSizing: 'border-box' },
-      children: [
-        jsx('button', {
+      children: jsx('button', {
         'data-pane-invite-strip': inviteBar ? '1' : undefined,
         type: 'button',
         'aria-label': inviteBar ? undefined : 'Games. Restore the play pane',
@@ -21688,7 +21697,6 @@ function WaitPane({ ctx }) {
           jsx('span', { style: { fontWeight: 400, color: text.tertiary }, children: '— tap to reopen' })
         ]
       })
-      ]
     })
   }
 
@@ -21723,7 +21731,7 @@ function WaitPane({ ctx }) {
       // wraps rather than pushing itself out of the frame.
       jsxs('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }, children: [
         button('Game', () => { setSettings(false); setTab('game') }, { primary: tab === 'game' && !settings }),
-        button('Play with people', () => { setSettings(false); setTab('lobby') }, { primary: tab === 'lobby' && !settings }),
+        button('Play with people', () => { setSettings(false); setTab('people') }, { primary: tab === 'people' && !settings }),
         // What the person has earned, right here under the two tabs they use most.
         jsx(PointsChip, { ctx, style: { marginLeft: 2 } }),
         // One press in and out of Settings: the full screen's own Settings, in a pane too narrow for
@@ -22199,7 +22207,7 @@ function WaitPane({ ctx }) {
   // The lobby, in two columns when the frame is wide: the people beside you on the left, online play
   // (and, when it is on, the ladder and leagues) on the right. A narrow pane folds them into one
   // column, in the same order.
-  const lobbyTab = jsxs('div', {
+  const peopleTab = jsxs('div', {
     className: 'games-pane-body',
     style: { display: 'grid', gap: 10, alignItems: 'start', minWidth: 0 },
     children: [
@@ -22210,35 +22218,35 @@ function WaitPane({ ctx }) {
           online.on && online.linked ? jsx(PanePeople, { ctx, bell: inviteBell, playHere }) : null,
           jsxs('details', { children: [
             jsx('summary', { children: '#games chat' }),
-          whoLine
-            ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: whoLine })
-            : jsxs('div', {
-                style: { display: 'flex', gap: 6 },
-                children: [
-                  field(name, setName, 'Your name', () => { say(`name ${name.trim()}`); setName('') }),
-                  button('Set', () => { say(`name ${name.trim()}`); setName('') }, { disabled: !name.trim() })
-                ]
-              }),
-          jsx('div', {
-            style: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: text.secondary, maxHeight: 140, overflow: 'auto' },
-            children: lobby.lines.length
-              ? lobby.lines.slice(-8).map((item, index) => {
-                  const timestamp = item.at ? new Date(item.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                  return jsxs('div', {
-                    style: { display: 'flex', gap: 6, fontSize: 11 },
-                    children: [
-                      jsx('span', { style: { color: text.tertiary, whiteSpace: 'nowrap', minWidth: 40 }, children: timestamp }),
-                      jsx('span', { style: { fontWeight: 650 }, children: `${item.name}: ` }),
-                      jsx('span', { children: item.text, style: { flex: 1, minWidth: 0, wordWrap: 'break-word' } })
-                    ]
-                  }, index);
-                })
-              : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' })
-          }),
-          jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
-            field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
-            button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
-          ] })
+            whoLine
+              ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: whoLine })
+              : jsxs('div', {
+                  style: { display: 'flex', gap: 6 },
+                  children: [
+                    field(name, setName, 'Your name', () => { say(`name ${name.trim()}`); setName('') }),
+                    button('Set', () => { say(`name ${name.trim()}`); setName('') }, { disabled: !name.trim() })
+                  ]
+                }),
+            jsx('div', {
+              style: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: text.secondary, maxHeight: 140, overflow: 'auto' },
+              children: lobby.lines.length
+                ? lobby.lines.slice(-8).map((item, index) => {
+                    const timestamp = item.at ? new Date(item.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    return jsxs('div', {
+                      style: { display: 'flex', gap: 6, fontSize: 11 },
+                      children: [
+                        jsx('span', { style: { color: text.tertiary, whiteSpace: 'nowrap', minWidth: 40 }, children: timestamp }),
+                        jsx('span', { style: { fontWeight: 650 }, children: `${item.name}: ` }),
+                        jsx('span', { children: item.text, style: { flex: 1, minWidth: 0, wordWrap: 'break-word' } })
+                      ]
+                    }, index);
+                  })
+                : jsx('div', { style: { color: text.tertiary }, children: 'No messages yet.' })
+            }),
+            jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
+              field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
+              button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
+            ] })
           ] })
         ]
       }),
@@ -22268,7 +22276,9 @@ function WaitPane({ ctx }) {
   // is the board, and it is not a local game, so the quick-game controls step aside entirely. The
   // pane's own header stays: × and – must not disappear just because a table is open.
   const hereRoom = onlineRoom || serverOnlineRoom(view)
-  if (hereRoom) {
+  if (hereRoom && tab === 'game') {
+    const seatGame = hereRoom === ONLINE_ROOM.roomId ? ONLINE_ROOM.gameId : serverOnlineGame(view)
+    const tableGame = seatGame ? { id: seatGame, title: lobbyTitle(seatGame) } : game
     return jsxs('div', {
       className: 'games-wait-pane',
       ref: paneRef,
@@ -22282,7 +22292,7 @@ function WaitPane({ ctx }) {
           : jsx('div', {
               style: { flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', minWidth: 0 },
               children: jsx(OnlineTable, {
-                game, view, ctx, roomId: hereRoom, height: boardH,
+                game: tableGame, view, ctx, roomId: hereRoom, height: boardH,
                 onBack: () => setOnlineRoom(''),
                 onClose: () => setOnlineRoom('')
               })
@@ -22304,11 +22314,11 @@ function WaitPane({ ctx }) {
         'data-pane-scroll': '1',
         style: { display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'auto' },
         children: settings ? [header, settingsView] : [
-        header,
-        agentRow(agentNotice(busy, finished, approval), ctx),
-        problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
-        noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,
-        tab === 'lobby' ? lobbyTab : gameTab
+          header,
+          agentRow(agentNotice(busy, finished, approval), ctx),
+          problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
+          noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,
+          tab === 'people' ? peopleTab : gameTab
         ]
       })
     ]
@@ -23199,6 +23209,7 @@ function PlayWithPeople({ ctx, view }) {
     })
   }, [ctx, online.on])
 
+  const offerSurface = useInviteSurface('card')
   // Online play off: there is nothing to accept and nobody to ask, so the card is not drawn.
   if (!online.on) return null
 
@@ -23444,6 +23455,7 @@ function PlayWithPeople({ ctx, view }) {
       // An offer that came in: the same sentence the Hall uses, and the same dialog it opens.
       comingOffer
         ? jsx('div', {
+            ref: comingOffer === inviteOf(snap) ? offerSurface : undefined,
             'data-people-offer': String(comingOffer.id), role: 'status', 'aria-live': 'polite',
             style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
             children: `${lobbyOfferLine((comingOffer.from && comingOffer.from.name) || '', comingOffer.game)} — Join or Not now on the dialog.`
@@ -24570,9 +24582,10 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
 // A match offer. Find match made it, so neither person sent it: the person asked
 // is the one who can answer it (the server refuses anyone else), so the dialog is
 // drawn only for them. The asker waits, with the seconds left and a way to take it back.
-function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote }) {
+function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote, surface }) {
   const title = lobbyOfferLine(otherName, card.game)
   return jsx('div', {
+    ref: surface,
     'data-lobby-offer': String(card.id),
     role: 'dialog', 'aria-modal': 'true', 'aria-label': title,
     style: {
@@ -24673,6 +24686,8 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     setStale(Boolean(error))
   }), [ctx])
 
+  const inviteSurface = useInviteSurface('hall')
+  const incoming = inviteOf(snap)
   const state = snap ? String(snap.state || '') : 'connecting'
   const you = (snap && snap.you) || {}
   const prefs = (snap && snap.prefs) || { open: false, games: {} }
@@ -24947,7 +24962,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const inbound = requests.filter(req => req.state === 'pending' && !req.offer && req.to && String(req.to.id) === String(you.id))
   const outbound = requests.filter(req => req.state === 'pending' && !req.offer && req.from && String(req.from.id) === String(you.id))
   const requestCards = [
-    ...inbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
+    ...inbound.map(req => jsxs('div', { ref: req === incoming ? inviteSurface : undefined, 'data-hall-request': String(req.id), style: cardStyle, children: [
       jsx('span', { style: { flex: 1, minWidth: 120 }, children: lobbyOfferLine(req.from.name, req.game) }),
       button('Accept', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: true }),
         { primary: true, ...held(`Accept and sit down with ${req.from.name}.`) }),
@@ -25004,6 +25019,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     requestCards.length ? jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: requestCards }) : null,
     ack ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { ...muted, color: text.secondary }, children: ack }) : null,
     offer ? jsx(LobbyOfferDialog, {
+      surface: offer === incoming ? inviteSurface : undefined,
       card: offer, other: offerOther, otherName: String(offerOther.name || 'Someone'),
       busy: Boolean(pending), busyNote: HALL_BUSY_NOTE,
       onJoin: () => post(`offer:${offer.id}`, '/online/hall/respond', { id: offer.id, accept: true }),
@@ -25952,7 +25968,7 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
 // snapshots. A hidden window can still deliver a silent notice.
 //
 // THE SYSTEM NOTIFICATION. ctx.os.notify is the SDK's own notice. One silent notice is sent per
-// request id, only while "Open to invites" is on, and only when none of the three surfaces that
+// request id, only while "Open to invites" is on, and only when none of the surfaces that
 // draw an invite is on screen. A surface reports itself a moment after it mounts, so the notice
 // waits INVITE_NOTICE_WAIT_MS before it decides.
 const INVITE_POLL_PENDING_MS = 3000
@@ -26055,7 +26071,7 @@ function inviteBellDrop(id) {
 // draws its own line on every tab and in its strip.
 function inviteBellShown() {
   const seen = INVITE_BELL.seen || {}
-  return !inviteBellHidden() && Boolean(seen.statusbar || seen.titlebar || seen.pane)
+  return !inviteBellHidden() && Object.values(seen).some(Boolean)
 }
 
 // The notice for one request, decided INVITE_NOTICE_WAIT_MS after the read that found it, so a
@@ -26256,28 +26272,22 @@ function inviteBellInSight(entry) {
 // a host with no IntersectionObserver keeps that answer.
 function useInviteSurface(where) {
   const held = useRef({ node: null, observer: null })
-  useEffect(() => {
-    inviteBellSeen(where, true)
-    const watch = held.current
-    return () => {
-      if (watch.observer) { try { watch.observer.disconnect() } catch { /* already gone */ } }
-      watch.observer = null
-      watch.node = null
-      inviteBellSeen(where, false)
-    }
-  }, [where])
   return useCallback(node => {
     const watch = held.current
     if (watch.node === node) return
     if (watch.observer) { try { watch.observer.disconnect() } catch { /* already gone */ } }
     watch.observer = null
     watch.node = node || null
+    inviteBellSeen(where, Boolean(node))
     if (!node || typeof IntersectionObserver === 'undefined') return
     try {
       watch.observer = new IntersectionObserver(entries => {
         const list = Array.isArray(entries) ? entries : []
-        if (list.length) inviteBellSeen(where, inviteBellInSight(list[list.length - 1]))
-      }, { threshold: [0, 1] })
+        if (watch.node !== node || !list.length) return
+        const entry = list[list.length - 1]
+        const visible = !watch.observer.trackVisibility || entry.isVisible !== false
+        inviteBellSeen(where, visible && inviteBellInSight(entry))
+      }, { threshold: [0, 1], trackVisibility: true, delay: 100 })
       watch.observer.observe(node)
     } catch {
       watch.observer = null

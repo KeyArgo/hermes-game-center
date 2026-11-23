@@ -7747,6 +7747,7 @@ async function inviteBellContract() {
     sandbox.inviteProps = value
     cursor = 0
     const tree = evaluate('InviteBell(inviteProps)')
+    tree.props.ref({})
     const pending = effects
     effects = []
     pending.forEach(effect => effect())

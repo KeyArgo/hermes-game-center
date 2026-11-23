@@ -302,6 +302,7 @@ function PlayWithPeople({ ctx, view }) {
     })
   }, [ctx, online.on])
 
+  const offerSurface = useInviteSurface('card')
   // Online play off: there is nothing to accept and nobody to ask, so the card is not drawn.
   if (!online.on) return null
 
@@ -547,6 +548,7 @@ function PlayWithPeople({ ctx, view }) {
       // An offer that came in: the same sentence the Hall uses, and the same dialog it opens.
       comingOffer
         ? jsx('div', {
+            ref: comingOffer === inviteOf(snap) ? offerSurface : undefined,
             'data-people-offer': String(comingOffer.id), role: 'status', 'aria-live': 'polite',
             style: { ...muted, color: text.secondary, whiteSpace: 'normal' },
             children: `${lobbyOfferLine((comingOffer.from && comingOffer.from.name) || '', comingOffer.game)} — Join or Not now on the dialog.`

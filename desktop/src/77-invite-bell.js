@@ -25,7 +25,7 @@
 // snapshots. A hidden window can still deliver a silent notice.
 //
 // THE SYSTEM NOTIFICATION. ctx.os.notify is the SDK's own notice. One silent notice is sent per
-// request id, only while "Open to invites" is on, and only when none of the three surfaces that
+// request id, only while "Open to invites" is on, and only when none of the surfaces that
 // draw an invite is on screen. A surface reports itself a moment after it mounts, so the notice
 // waits INVITE_NOTICE_WAIT_MS before it decides.
 const INVITE_POLL_PENDING_MS = 3000
@@ -128,7 +128,7 @@ function inviteBellDrop(id) {
 // draws its own line on every tab and in its strip.
 function inviteBellShown() {
   const seen = INVITE_BELL.seen || {}
-  return !inviteBellHidden() && Boolean(seen.statusbar || seen.titlebar || seen.pane)
+  return !inviteBellHidden() && Object.values(seen).some(Boolean)
 }
 
 // The notice for one request, decided INVITE_NOTICE_WAIT_MS after the read that found it, so a
@@ -329,28 +329,22 @@ function inviteBellInSight(entry) {
 // a host with no IntersectionObserver keeps that answer.
 function useInviteSurface(where) {
   const held = useRef({ node: null, observer: null })
-  useEffect(() => {
-    inviteBellSeen(where, true)
-    const watch = held.current
-    return () => {
-      if (watch.observer) { try { watch.observer.disconnect() } catch { /* already gone */ } }
-      watch.observer = null
-      watch.node = null
-      inviteBellSeen(where, false)
-    }
-  }, [where])
   return useCallback(node => {
     const watch = held.current
     if (watch.node === node) return
     if (watch.observer) { try { watch.observer.disconnect() } catch { /* already gone */ } }
     watch.observer = null
     watch.node = node || null
+    inviteBellSeen(where, Boolean(node))
     if (!node || typeof IntersectionObserver === 'undefined') return
     try {
       watch.observer = new IntersectionObserver(entries => {
         const list = Array.isArray(entries) ? entries : []
-        if (list.length) inviteBellSeen(where, inviteBellInSight(list[list.length - 1]))
-      }, { threshold: [0, 1] })
+        if (watch.node !== node || !list.length) return
+        const entry = list[list.length - 1]
+        const visible = !watch.observer.trackVisibility || entry.isVisible !== false
+        inviteBellSeen(where, visible && inviteBellInSight(entry))
+      }, { threshold: [0, 1], trackVisibility: true, delay: 100 })
       watch.observer.observe(node)
     } catch {
       watch.observer = null

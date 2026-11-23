@@ -375,9 +375,10 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
 // A match offer. Find match made it, so neither person sent it: the person asked
 // is the one who can answer it (the server refuses anyone else), so the dialog is
 // drawn only for them. The asker waits, with the seconds left and a way to take it back.
-function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote }) {
+function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote, surface }) {
   const title = lobbyOfferLine(otherName, card.game)
   return jsx('div', {
+    ref: surface,
     'data-lobby-offer': String(card.id),
     role: 'dialog', 'aria-modal': 'true', 'aria-label': title,
     style: {
@@ -478,6 +479,8 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     setStale(Boolean(error))
   }), [ctx])
 
+  const inviteSurface = useInviteSurface('hall')
+  const incoming = inviteOf(snap)
   const state = snap ? String(snap.state || '') : 'connecting'
   const you = (snap && snap.you) || {}
   const prefs = (snap && snap.prefs) || { open: false, games: {} }
@@ -752,7 +755,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const inbound = requests.filter(req => req.state === 'pending' && !req.offer && req.to && String(req.to.id) === String(you.id))
   const outbound = requests.filter(req => req.state === 'pending' && !req.offer && req.from && String(req.from.id) === String(you.id))
   const requestCards = [
-    ...inbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
+    ...inbound.map(req => jsxs('div', { ref: req === incoming ? inviteSurface : undefined, 'data-hall-request': String(req.id), style: cardStyle, children: [
       jsx('span', { style: { flex: 1, minWidth: 120 }, children: lobbyOfferLine(req.from.name, req.game) }),
       button('Accept', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: true }),
         { primary: true, ...held(`Accept and sit down with ${req.from.name}.`) }),
@@ -809,6 +812,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     requestCards.length ? jsx('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: requestCards }) : null,
     ack ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { ...muted, color: text.secondary }, children: ack }) : null,
     offer ? jsx(LobbyOfferDialog, {
+      surface: offer === incoming ? inviteSurface : undefined,
       card: offer, other: offerOther, otherName: String(offerOther.name || 'Someone'),
       busy: Boolean(pending), busyNote: HALL_BUSY_NOTE,
       onJoin: () => post(`offer:${offer.id}`, '/online/hall/respond', { id: offer.id, accept: true }),

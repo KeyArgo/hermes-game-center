@@ -459,6 +459,9 @@ check('notifyOncePerRequest', async () => {
   world.hall.requests = [inviteFrom(world, { id: 'q2' })]
   await env.advance(12000)
   assert.equal(world.notified.length, 2, 'a new request id is a new notice')
+  world.hall.requests = [inviteFrom(world)]
+  await env.advance(12000)
+  assert.equal(world.notified.length, 2, 'a previously notified id stays quiet after a different id')
   // "Open to invites" off: no notice.
   world.hall.prefs.open = false
   world.hall.requests = [inviteFrom(world, { id: 'q3' })]
@@ -500,6 +503,15 @@ check('onePollAndStopsOnDispose', async () => {
   const unmounted = hallReads(world)
   await env.advance(40000)
   assert.ok(hallReads(world) - unmounted >= 4, 'unmounting the bells does not stop the poll')
+  const card = env.mount(env.sandbox.PlayWithPeople, () => ({ ctx: world.ctx, view: world.view }))
+  const hall = env.mount(env.sandbox.LobbyHall, () => ({ ctx: world.ctx, view: world.view }))
+  await card.settle()
+  await hall.settle()
+  const fullPage = hallReads(world)
+  await env.advance(30000)
+  assert.equal(hallReads(world) - fullPage, 10, 'both Games views share one 3 s poll with the pane')
+  card.unmount()
+  hall.unmount()
   pane.unmount()
   assert.ok(world.disposers.length >= 1, 'registration hands the host a disposer')
   world.disposers.forEach(fn => fn())
@@ -611,6 +623,7 @@ check('panePeopleUsesHallEndToEnd', async () => {
   const table = nodes(tree).find(node => node.type && node.type.name === 'OnlineTable')
   assert.ok(table, 'and its table is drawn in the pane')
   assert.equal(table.props.roomId, 'room-5')
+  assert.equal(table.props.game.title, 'Chess', 'the seat names the game, even with Connect Four selected locally')
   assert.deepEqual(env.navigated, [], 'the person never leaves for the Games page')
   // Never the old doors.
   assert.equal(world.asked.filter(item => String(item[0]).startsWith('/online/queue')).length, 0, 'never /online/queue')
