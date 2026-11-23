@@ -114,6 +114,7 @@ function inviteBellFeed(snap) {
   const request = inviteOf(snap)
   inviteBellPublish({ request })
   if (request) inviteBellNotice(request)
+  invitePaneFollow(snap)
   inviteBellSchedule()
 }
 

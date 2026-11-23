@@ -11,12 +11,6 @@ const PANE_LADDER_OFF = true
 // leaves Hermes for the browser and the pane is not where a league belongs. The block is kept
 // whole; this line hides it on the pane (it is the only surface that mounts it).
 const PANE_LEAGUES_OFF = true
-// FUTURE(2026-11-11): the online-alert checkbox on the pane — remove if never built.
-// "Tell me when someone online wants this game" saves its flag, but the system notification it
-// promises returns immediately, so the switch would promise an alert nothing raises. Kept whole;
-// this line hides it.
-const PANE_ONLINE_ALERT_OFF = true
-
 // The pane's own stylesheet. It sits in the pane so every rule can follow the pane's width - a
 // container query on the pane root - rather than the window's: the frame is dragged from 300 px to
 // 1200 px, and the lobby and the board fill whatever frame they are given. Only the classes this
@@ -38,6 +32,103 @@ const PANE_CSS = `
     .games-pane-board { grid-template-columns: minmax(0, 1fr) minmax(140px, 24%); grid-template-areas: 'board status' 'board who'; }
   }
 `
+
+// Matchmaking in the pane uses the registration poll's Hall snapshot.
+function PanePeople({ ctx, bell, playHere }) {
+  const [editing, setEditing] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [note, setNote] = useState('')
+  const [, redraw] = useState(0)
+  const choices = useRef({})
+  const sending = useRef(false)
+  useEffect(() => {
+    inviteBellEager(true)
+    return () => inviteBellEager(false)
+  }, [])
+  const snap = bell.snap || {}
+  const prefs = snap.prefs || {}
+  const you = snap.you || {}
+  const games = LOBBY_GAME_IDS.filter(id => prefs.games && prefs.games[id])
+  const looking = you.looking || []
+  const outgoing = (snap.requests || []).filter(row => row.from && row.from.id === you.id)
+  const asking = outgoing.find(row => row.state === 'pending')
+  const last = outgoing[outgoing.length - 1]
+  useEffect(() => {
+    if (!asking) return
+    const timer = setInterval(() => redraw(count => count + 1), 1000)
+    return () => clearInterval(timer)
+  }, [asking && asking.id])
+
+  const post = async (action, body = {}) => {
+    if (sending.current) return
+    sending.current = true
+    setPending(true)
+    setNote('')
+    try {
+      const answer = await ctx.rest('/online/hall/' + action, { method: 'POST', body })
+      if (answer && answer.ok === false) setNote(answer.text || 'That did not work.')
+      await inviteBellRefresh()
+    } catch {
+      setNote('That did not reach Game Center. Try again.')
+    } finally {
+      sending.current = false
+      setPending(false)
+    }
+  }
+  const rowStyle = { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }
+  if (snap.state !== 'live' || bell.error) return jsxs('div', {
+    style: rowStyle, children: [note || bell.error || 'Connecting to the lobby…', button('Reconnect', () => post('retry'), { disabled: pending })]
+  })
+  const people = (snap.roster || []).filter(person => person.id !== you.id)
+  const personRow = person => {
+    const shared = games.filter(id => (person.games || []).includes(id))
+    const chosen = () => shared.includes(choices.current[person.id]) ? choices.current[person.id] : shared[0]
+    return jsxs('div', { 'data-pane-person': person.id, style: rowStyle, children: [
+      jsx('span', { style: { flex: 1, overflowWrap: 'anywhere' }, children: person.name }),
+      shared.length > 1 ? jsx('select', {
+        'aria-label': 'Game to ask ' + person.name + ' for', value: chosen(),
+        onChange: event => { choices.current[person.id] = event.target.value; redraw(count => count + 1) },
+        children: shared.map(id => jsx('option', { value: id, children: lobbyTitle(id) }, id))
+      }) : jsx('span', { children: shared.length ? lobbyTitle(shared[0]) : 'No shared games' }),
+      button('Ask', () => post('request', { to: person.id, game: chosen() }), {
+        disabled: pending || Boolean(asking) || !shared.length || person.status !== 'online',
+        label: 'Ask ' + person.name + ' to play'
+      })
+    ] }, person.id)
+  }
+  const seat = inviteSeatOf(snap)
+  return jsxs('section', { style: { display: 'grid', gap: 8, minWidth: 0, fontSize: 13 }, children: [
+    jsxs('label', { style: rowStyle, children: [
+      jsx('input', { type: 'checkbox', role: 'switch', checked: Boolean(prefs.open), disabled: pending,
+        onChange: event => post('prefs', { open: event.target.checked }) }),
+      'Open to invites'
+    ] }),
+    jsxs('div', { style: rowStyle, children: [
+      'Games: ' + (games.map(lobbyTitle).join(', ') || 'None'),
+      button(editing ? 'Done' : 'Edit', () => setEditing(!editing))
+    ] }),
+    editing ? jsx('div', { style: rowStyle, children: LOBBY_GAMES.map(([id, title]) => jsx('button', {
+      type: 'button', 'data-pane-game-pick': id, 'aria-pressed': games.includes(id),
+      style: { color: games.includes(id) ? accent : text.secondary, background: fill, border: '1px solid ' + stroke, borderRadius: 6, padding: '4px 8px' },
+      disabled: pending, onClick: () => post('prefs', lobbyAcceptBody(id, !games.includes(id))), children: title
+    }, id)) }) : null,
+    jsx('div', { style: rowStyle, children: looking.length ? [
+      'Looking for ' + looking.map(lobbyTitle).join(', ') + ' ·',
+      button('Stop', () => post('looking', lobbyLookingBody([])), { disabled: pending })
+    ] : games.length ? button('Find a match', () => post('looking', lobbyLookingBody(games)), { primary: true, disabled: pending })
+      : button('Choose games', () => setEditing(true)) }),
+    asking ? jsxs('div', { style: rowStyle, children: [
+      `Asking ${asking.to.name} to play ${lobbyTitle(asking.game)} · ${Math.max(0, Math.ceil(asking.expires - Date.now() / 1000))}s ·`,
+      button('Cancel', () => post('cancel', { id: asking.id }), { disabled: pending })
+    ] }) : null,
+    last && last.state === 'declined' ? jsx('div', { role: 'status', children: `${last.to.name} passed on ${lobbyTitle(last.game)}.` }) : null,
+    last && last.state === 'expired' ? jsx('div', { role: 'status', children: `${last.to.name} didn't answer.` }) : null,
+    seat ? button('Open table', () => playHere(seat), { disabled: pending }) : null,
+    note ? jsx('div', { role: 'status', children: note }) : null,
+    jsx('strong', { children: 'Here now' }),
+    people.length ? people.map(personRow) : 'Nobody else online.'
+  ] })
+}
 
 function WaitPane({ ctx }) {
   // The pane is a Game Center surface too: the same watch, the same log route.
@@ -525,9 +616,6 @@ function WaitPane({ ctx }) {
     return () => { live = false }
   }, [restarting, dealWho, modelRoutes.length, ctx])
   const lobby = (view && view.lobby) || { lines: [], looking: [] }
-  const myName = (view && view.player && view.player.name) || ''
-  const found = current ? othersLooking(lobby, current, myName) : []
-
   const inviteBar = paneInviteBlock(ctx, inviteBell.request, inviteBusy, inviteNote, async accept => {
     if (inviteBusy || !inviteBell.request) return
     setInviteBusy(true)
@@ -969,9 +1057,6 @@ function WaitPane({ ctx }) {
     ]
   })
 
-  // The online source, under the local lobby. Both are behind the same two
-  // buttons (Find a match, Stop looking); this one only appears once the person
-  // has turned it on, and every action is one of the /online doors.
   const online = onlineView(view)
   const title = (game && game.title) || current || ''
   const ladderStatus = online.ladder || {}
@@ -1017,29 +1102,7 @@ function WaitPane({ ctx }) {
             ] }),
             jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: 'Live tables are held by the lobby server; press Play here to play this one inside Hermes.' })
           ]
-        }) : jsxs('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 }, children: [
-          jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
-            online.game
-              ? button('Stop looking online', () => onlineCall('/online/queue/stop'), { disabled: onlineBusy })
-              : button(`Find a match online${title ? `: ${title}` : ''}`, () => onlineCall('/online/queue', { game: current }), { primary: true, disabled: onlineBusy || !current })
-          ] }),
-          online.waitingNames.length
-            ? jsx('div', { style: { fontSize: 11, color: text.tertiary }, children: `Waiting for this game now: ${online.waitingNames.join(', ')}.` })
-            : null,
-          // FUTURE(2026-11-11): the online-alert checkbox — remove if never built.
-          // "Tell me when someone online wants this game" writes its flag, but the system
-          // notification behind it returns immediately, so the switch would promise an alert
-          // nothing raises. The row is kept below the gate; PANE_ONLINE_ALERT_OFF hides it.
-          PANE_ONLINE_ALERT_OFF ? null : jsxs('label', { style: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: text.secondary }, children: [
-            jsx('input', {
-              type: 'checkbox',
-              checked: Boolean(current && online.alerts[current]),
-              disabled: !current || onlineBusy,
-              onChange: event => onlineCall('/online/alerts', { game: current, enabled: event.target.checked })
-            }),
-            jsx('span', { children: 'Tell me when someone online wants this game (at most once every ten minutes, never during a match)' })
-          ] })
-        ] })
+        }) : null
       ] }) : null
     ]
   })
@@ -1107,6 +1170,9 @@ function WaitPane({ ctx }) {
         className: 'games-pane-column games-pane-lobby',
         style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 },
         children: [
+          online.on && online.linked ? jsx(PanePeople, { ctx, bell: inviteBell, playHere }) : null,
+          jsxs('details', { children: [
+            jsx('summary', { children: '#games chat' }),
           whoLine
             ? jsx('div', { style: { fontSize: 12, color: text.tertiary }, children: whoLine })
             : jsxs('div', {
@@ -1116,25 +1182,6 @@ function WaitPane({ ctx }) {
                   button('Set', () => { say(`name ${name.trim()}`); setName('') }, { disabled: !name.trim() })
                 ]
               }),
-          jsx('div', { style: { fontWeight: 650, fontSize: 13 }, children: `Find a match${current ? `: ${(game && game.title) || current}` : ''}` }),
-          jsx('div', {
-            style: { fontSize: 12, color: text.secondary },
-            children: isLooking(lobby, current, myName)
-              ? 'Looking. This keeps searching while you use Hermes; you will be told when someone wants this game.'
-              : 'Ask to be listed, then play while Hermes works. Nothing interrupts you.'
-          }),
-          jsxs('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' }, children: [
-            isLooking(lobby, current, myName)
-              ? button('Stop looking', () => say('looking stop'), { disabled: working || !current })
-              : button('Find a match', () => say(`looking ${current}`), { primary: true, disabled: working || !current || !myName })
-          ] }),
-          found.length
-            ? jsx('div', {
-                role: 'status', 'aria-live': 'polite',
-                style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px' },
-                children: `Match found: ${found.map(row => row.name).join(', ')} wants ${(game && game.title) || current}. Say hello below.`
-              })
-            : null,
           jsx('div', {
             style: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: text.secondary, maxHeight: 140, overflow: 'auto' },
             children: lobby.lines.length
@@ -1154,6 +1201,7 @@ function WaitPane({ ctx }) {
           jsxs('div', { style: { display: 'flex', gap: 6 }, children: [
             field(chat, setChat, view && view.player && view.player.named ? 'Say something' : 'Set a name first', () => { if (chat.trim()) { say(`chat say ${chat.trim()}`); setChat('') } }),
             button('Send', () => { say(`chat say ${chat.trim()}`); setChat('') }, { disabled: !chat.trim() || !(view && view.player && view.player.named) })
+          ] })
           ] })
         ]
       }),
