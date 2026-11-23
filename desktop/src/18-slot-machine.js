@@ -1061,6 +1061,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
 
   const closeButton = jsx('button', {
     type: 'button',
+    'data-sm-close': '1',
     'aria-label': 'Close',
     onClick: () => onClose && onClose(),
     style: {
@@ -1069,6 +1070,26 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       fontSize: SM_px(16), lineHeight: `${SM_px(24)}px`, textAlign: 'center', cursor: 'pointer', pointerEvents: 'auto'
     },
     children: '×'
+  })
+
+  // The see-through copy's sound switch: the same games-wide setting the other machine's 🔊 flips.
+  const [soundOn, setSoundOn] = useState(() => (typeof gamesSoundOn === 'function' ? gamesSoundOn() : true))
+  const soundButton = jsx('button', {
+    type: 'button',
+    'data-sm-sound': soundOn ? 'on' : 'off',
+    'aria-label': soundOn ? 'Mute the machine' : 'Unmute the machine',
+    title: soundOn ? 'Sound on - click to mute' : 'Sound off - click to switch it on',
+    onClick: () => {
+      const next = !soundOn
+      if (typeof gamesSoundSet === 'function') gamesSoundSet(next)
+      setSoundOn(next)
+    },
+    style: {
+      position: 'absolute', top: -SM_px(10), right: SM_px(20), width: SM_px(24), height: SM_px(24), padding: 0,
+      borderRadius: '50%', border: 'none', background: 'rgba(15,10,30,0.92)', color: '#f8fafc',
+      fontSize: SM_px(12), lineHeight: `${SM_px(24)}px`, textAlign: 'center', cursor: 'pointer', pointerEvents: 'auto'
+    },
+    children: soundOn ? '🔊' : '🔇'
   })
 
   const showToggle = jsxs('label', {
@@ -1233,7 +1254,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           }),
           // The way out at any moment: a jackpot is allowed five minutes of rain, and the person
           // should never have to sit through it.
-          jsx('button', {
+          chat ? null : jsx('button', {
             type: 'button',
             'data-sm-stop': '1',
             title: 'Stop the coins',
@@ -1248,7 +1269,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           })
         ]
       }) : null,
-      (!bare || chat) && (machines || []).length > 1 ? jsx('div', {
+      !bare && !chat && (machines || []).length > 1 ? jsx('div', {
         role: 'group',
         'aria-label': 'Pick a machine',
         style: {
@@ -1551,7 +1572,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                 style: { opacity: 0.75 },
                 children: `· ${SM_chips(rewardInfo.reward)} old reward chips`
               }) : null,
-              jsx('button', {
+              chat ? null : jsx('button', {
                 type: 'button',
                 'data-sm-cashin': '1',
                 disabled: rewardInfo.reward <= 0 || cashBusy,
@@ -1568,7 +1589,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               // The way back from a bad run: points never depend on the cards or the reels, so a
               // losing streak cannot lock the person out of the machines.
               // How much of the score to spend is the person's call.
-              jsxs('span', {
+              chat ? null : jsxs('span', {
                 'data-sm-cash-share': '1',
                 style: { display: 'inline-flex', alignItems: 'center', gap: SM_px(3) },
                 children: [
@@ -1591,7 +1612,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                   }, `share-${share}`))
                 ]
               }),
-              jsx('button', {
+              chat ? null : jsx('button', {
                 type: 'button',
                 'data-sm-points-cash': '1',
                 disabled: cashWant < 4 || cashBusy,
@@ -1622,7 +1643,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           // the stack; a streak that grows on returning another day, and ten premium spins after.
           (() => {
             const bo = rewards && rewards.bailout
-            if (!bo) return null
+            // A game of its own: never on the watch-only copy over the chat.
+            if (!bo || chat) return null
             const broke = Number(chips) < Number(bo.broke_below || 25)
             if (!broke) return null
             const nowSec = Math.floor(Date.now() / 1000)
@@ -1714,10 +1736,13 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           jsx('div', { style: { margin: `${SM_px(10)}px auto 0`, width: '60%', height: SM_px(12), borderRadius: `0 0 ${SM_px(10)}px ${SM_px(10)}px`, background: smLook('lever', SM_CHROME) } }),
           coinLayer,
           (bare || chat) ? closeButton : null,
-          (bare || chat) ? showToggle : null
+          bare && !chat ? showToggle : null,
+          chat ? soundButton : null
         ]
       }),
-      (!bare || chat) ? jsxs('div', {
+      // Over the chat the machine is to watch: only its X and its sound switch take a click there, so
+      // the spin button, the switches and the backdrop's own settings are not drawn on it at all.
+      !bare && !chat ? jsxs('div', {
         style: { display: 'flex', alignItems: 'center', gap: SM_px(12), flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'auto' },
         children: [
           jsx('button', {
@@ -1810,7 +1835,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       // A table that cannot spin has to say why and offer the way out. The wallet below the smallest
       // bet used to leave SPIN and every rung greyed with nothing on screen to explain it. Points
       // convert at four to three chips, so this asks for just enough to cover one spin.
-      (!bare || chat) ? (() => {
+      !bare && !chat ? (() => {
         const stake = Number(bet) || Number((bets || [])[0]) || 25
         if (Number(chips) >= stake) return null
         const pointsNow = Number(rewardInfo && rewardInfo.points) || 0
@@ -1847,7 +1872,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           ]
         })
       })() : null,
-      (!bare || chat) && (bets || []).length ? jsxs('div', {
+      !bare && !chat && (bets || []).length ? jsxs('div', {
         style: { display: 'flex', gap: SM_px(6), flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', pointerEvents: 'auto', maxWidth: '100%' },
         children: [
           jsx('span', { style: { fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary) }, children: 'Bet' }, 'bet-label'),
@@ -1877,7 +1902,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       }) : null,
       // With auto-bet on, the whole ladder is greyed: say so in the open rather than only on hover,
       // because a locked ladder with no visible reason reads as a broken machine.
-      (!bare || chat) && autobetShown ? jsx('div', {
+      !bare && !chat && autobetShown ? jsx('div', {
         'data-sm-bet-hint': '1',
         style: {
           fontSize: SM_px(10), textAlign: 'center', maxWidth: '100%', overflowWrap: 'anywhere',
@@ -1893,7 +1918,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         style: { fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary), textAlign: 'center', maxWidth: '100%', overflowWrap: 'anywhere' },
         children: 'Every spin costs the bet. Chips are play money and never become anything else.'
       }) : null,
-      (!bare || chat) && (paytable || []).length ? jsxs('div', {
+      !bare && !chat && (paytable || []).length ? jsxs('div', {
         style: { fontSize: SM_px(12), pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: SM_px(4), maxWidth: '100%' },
         children: [
           jsx('button', {

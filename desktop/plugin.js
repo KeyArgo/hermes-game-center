@@ -5856,7 +5856,8 @@ function JackpotMachine(props) {
                   // shown anywhere on either machine. What is here instead is the pay table: every
                   // combination and its payout, opened over the reels. It sits in the header so it
                   // costs the cabinet no height.
-                  paytable.length ? jsx('button', {
+                  // Over the chat the cabinet is to watch: no control it cannot use is drawn there.
+                  paytable.length && !watch ? jsx('button', {
                     type: 'button',
                     'data-jp2-pays-open': paysOpen ? 'on' : 'off',
                     'aria-expanded': paysOpen,
@@ -5912,7 +5913,8 @@ function JackpotMachine(props) {
             ]
           }, 'counters'),
           // The controls: the button, then the switches that are settings rather than moves.
-          jsx('div', {
+          // Not over the chat: there only the sound switch and the X take a click.
+          watch ? null : jsx('div', {
             style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, pointerEvents: 'auto' },
             children: [
               spinButton,
@@ -5930,7 +5932,7 @@ function JackpotMachine(props) {
           // one press to float the cabinet over the conversation, with how big and how see-through
           // beside it. Guarded by name so a bundle built without the layer part still draws a
           // cabinet (the layer part is where the hooks and the controls live).
-          typeof Jackpot2OverChatControls === 'function'
+          typeof Jackpot2OverChatControls === 'function' && !watch
             ? jsx('div', {
               'data-jp2': 'overchat-row',
               style: { display: 'flex', justifyContent: 'center', pointerEvents: 'auto' },
@@ -5938,7 +5940,7 @@ function JackpotMachine(props) {
             }, 'overchat')
             : null,
           // The machine picker: the same session, chosen here.
-          machines.length > 1 ? jsx('div', {
+          machines.length > 1 && !watch ? jsx('div', {
             role: 'group',
             'aria-label': 'Pick a machine',
             style: {
@@ -6010,7 +6012,7 @@ function JackpotMachine(props) {
                     jsx('span', {
                       children: `${jp2Chips(chips)} chips — a spin costs ${jp2Chips(stake)}.`
                     }, 'broke-why'),
-                    gain > 0 ? jsx('button', {
+                    gain > 0 && !watch ? jsx('button', {
                       type: 'button',
                       'data-jp2-broke-cash': '1',
                       disabled: cashBusy,
@@ -6045,8 +6047,8 @@ function JackpotMachine(props) {
               // The cash-in control: HOW MANY points to turn into chips is the person's choice - a
               // slider, a number and Max - at the rate the shelf actually plays (4 points buy 3 chips
               // there; the number is read off its answer, not typed in here). Points are the ranking,
-              // so spending them is a choice with a cost, and the line says so plainly.
-              jsxs('div', {
+              // so spending them is a choice with a cost, and the line says so plainly. Not over the chat.
+              watch ? null : jsxs('div', {
                 'data-jp2-points-control': '1',
                 role: 'group',
                 'aria-label': 'Turn points into chips',
@@ -7279,6 +7281,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
 
   const closeButton = jsx('button', {
     type: 'button',
+    'data-sm-close': '1',
     'aria-label': 'Close',
     onClick: () => onClose && onClose(),
     style: {
@@ -7287,6 +7290,26 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       fontSize: SM_px(16), lineHeight: `${SM_px(24)}px`, textAlign: 'center', cursor: 'pointer', pointerEvents: 'auto'
     },
     children: '×'
+  })
+
+  // The see-through copy's sound switch: the same games-wide setting the other machine's 🔊 flips.
+  const [soundOn, setSoundOn] = useState(() => (typeof gamesSoundOn === 'function' ? gamesSoundOn() : true))
+  const soundButton = jsx('button', {
+    type: 'button',
+    'data-sm-sound': soundOn ? 'on' : 'off',
+    'aria-label': soundOn ? 'Mute the machine' : 'Unmute the machine',
+    title: soundOn ? 'Sound on - click to mute' : 'Sound off - click to switch it on',
+    onClick: () => {
+      const next = !soundOn
+      if (typeof gamesSoundSet === 'function') gamesSoundSet(next)
+      setSoundOn(next)
+    },
+    style: {
+      position: 'absolute', top: -SM_px(10), right: SM_px(20), width: SM_px(24), height: SM_px(24), padding: 0,
+      borderRadius: '50%', border: 'none', background: 'rgba(15,10,30,0.92)', color: '#f8fafc',
+      fontSize: SM_px(12), lineHeight: `${SM_px(24)}px`, textAlign: 'center', cursor: 'pointer', pointerEvents: 'auto'
+    },
+    children: soundOn ? '🔊' : '🔇'
   })
 
   const showToggle = jsxs('label', {
@@ -7451,7 +7474,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           }),
           // The way out at any moment: a jackpot is allowed five minutes of rain, and the person
           // should never have to sit through it.
-          jsx('button', {
+          chat ? null : jsx('button', {
             type: 'button',
             'data-sm-stop': '1',
             title: 'Stop the coins',
@@ -7466,7 +7489,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           })
         ]
       }) : null,
-      (!bare || chat) && (machines || []).length > 1 ? jsx('div', {
+      !bare && !chat && (machines || []).length > 1 ? jsx('div', {
         role: 'group',
         'aria-label': 'Pick a machine',
         style: {
@@ -7769,7 +7792,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                 style: { opacity: 0.75 },
                 children: `· ${SM_chips(rewardInfo.reward)} old reward chips`
               }) : null,
-              jsx('button', {
+              chat ? null : jsx('button', {
                 type: 'button',
                 'data-sm-cashin': '1',
                 disabled: rewardInfo.reward <= 0 || cashBusy,
@@ -7786,7 +7809,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
               // The way back from a bad run: points never depend on the cards or the reels, so a
               // losing streak cannot lock the person out of the machines.
               // How much of the score to spend is the person's call.
-              jsxs('span', {
+              chat ? null : jsxs('span', {
                 'data-sm-cash-share': '1',
                 style: { display: 'inline-flex', alignItems: 'center', gap: SM_px(3) },
                 children: [
@@ -7809,7 +7832,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
                   }, `share-${share}`))
                 ]
               }),
-              jsx('button', {
+              chat ? null : jsx('button', {
                 type: 'button',
                 'data-sm-points-cash': '1',
                 disabled: cashWant < 4 || cashBusy,
@@ -7840,7 +7863,8 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           // the stack; a streak that grows on returning another day, and ten premium spins after.
           (() => {
             const bo = rewards && rewards.bailout
-            if (!bo) return null
+            // A game of its own: never on the watch-only copy over the chat.
+            if (!bo || chat) return null
             const broke = Number(chips) < Number(bo.broke_below || 25)
             if (!broke) return null
             const nowSec = Math.floor(Date.now() / 1000)
@@ -7932,10 +7956,13 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           jsx('div', { style: { margin: `${SM_px(10)}px auto 0`, width: '60%', height: SM_px(12), borderRadius: `0 0 ${SM_px(10)}px ${SM_px(10)}px`, background: smLook('lever', SM_CHROME) } }),
           coinLayer,
           (bare || chat) ? closeButton : null,
-          (bare || chat) ? showToggle : null
+          bare && !chat ? showToggle : null,
+          chat ? soundButton : null
         ]
       }),
-      (!bare || chat) ? jsxs('div', {
+      // Over the chat the machine is to watch: only its X and its sound switch take a click there, so
+      // the spin button, the switches and the backdrop's own settings are not drawn on it at all.
+      !bare && !chat ? jsxs('div', {
         style: { display: 'flex', alignItems: 'center', gap: SM_px(12), flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'auto' },
         children: [
           jsx('button', {
@@ -8028,7 +8055,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       // A table that cannot spin has to say why and offer the way out. The wallet below the smallest
       // bet used to leave SPIN and every rung greyed with nothing on screen to explain it. Points
       // convert at four to three chips, so this asks for just enough to cover one spin.
-      (!bare || chat) ? (() => {
+      !bare && !chat ? (() => {
         const stake = Number(bet) || Number((bets || [])[0]) || 25
         if (Number(chips) >= stake) return null
         const pointsNow = Number(rewardInfo && rewardInfo.points) || 0
@@ -8065,7 +8092,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
           ]
         })
       })() : null,
-      (!bare || chat) && (bets || []).length ? jsxs('div', {
+      !bare && !chat && (bets || []).length ? jsxs('div', {
         style: { display: 'flex', gap: SM_px(6), flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', pointerEvents: 'auto', maxWidth: '100%' },
         children: [
           jsx('span', { style: { fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary) }, children: 'Bet' }, 'bet-label'),
@@ -8095,7 +8122,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
       }) : null,
       // With auto-bet on, the whole ladder is greyed: say so in the open rather than only on hover,
       // because a locked ladder with no visible reason reads as a broken machine.
-      (!bare || chat) && autobetShown ? jsx('div', {
+      !bare && !chat && autobetShown ? jsx('div', {
         'data-sm-bet-hint': '1',
         style: {
           fontSize: SM_px(10), textAlign: 'center', maxWidth: '100%', overflowWrap: 'anywhere',
@@ -8111,7 +8138,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
         style: { fontSize: SM_px(11), color: smLook('footer', compact ? '#e7e5e4' : text.tertiary), textAlign: 'center', maxWidth: '100%', overflowWrap: 'anywhere' },
         children: 'Every spin costs the bet. Chips are play money and never become anything else.'
       }) : null,
-      (!bare || chat) && (paytable || []).length ? jsxs('div', {
+      !bare && !chat && (paytable || []).length ? jsxs('div', {
         style: { fontSize: SM_px(12), pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: SM_px(4), maxWidth: '100%' },
         children: [
           jsx('button', {
@@ -26416,7 +26443,13 @@ const OVERCHAT_SPOT = { left: 0, width: 0, anchored: false, stage: 'none', drawe
 const OVERCHAT_NO_CLICKS = '[data-overchat="stage"], [data-overchat="stage"] *, [data-overchat="strip"], [data-overchat="strip"] *, ' +
   '[data-overchat] [data-jp2-stage] .jp2-machine [data-jp2="overchat-row"] button, [data-overchat] [data-jp2-stage] [data-jp2-control] ' +
   '{ pointer-events: none !important; cursor: default !important; }'
-const overchatNoClicks = () => jsx('style', { 'data-overchat': 'no-clicks', children: OVERCHAT_NO_CLICKS }, 'no-clicks')
+// The two exceptions (owner, 2026-11-22): each machine's X, which turns "Show as backdrop" off everywhere,
+// and its sound switch. Nothing else on the backdrop is drawn as a control at all. The doubled attribute
+// out-ranks every selector in OVERCHAT_NO_CLICKS.
+const OVERCHAT_CLICKABLE = ['data-jp2-close', 'data-jp2-sound', 'data-sm-close', 'data-sm-sound']
+  .map(name => `[data-overchat][data-overchat] [data-jp2-stage] [${name}][${name}], [data-overchat][data-overchat] [${name}][${name}]`)
+  .join(', ') + ' { pointer-events: auto !important; cursor: pointer !important; }'
+const overchatNoClicks = () => jsx('style', { 'data-overchat': 'no-clicks', children: `${OVERCHAT_NO_CLICKS}\n${OVERCHAT_CLICKABLE}` }, 'no-clicks')
 
 // Which stage draws: the first in this list that is mounted and not trapped.
 const OVERCHAT_STAGE_ORDER = ['statusbar', 'titlebar']

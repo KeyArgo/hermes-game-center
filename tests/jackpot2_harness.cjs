@@ -348,6 +348,18 @@ console.log('jackpot2: the full view fits 1400x900 and 900x500 without clipping:
   assert.ok(close, 'the copy has its own close control')
   close.props.onClick()
   assert.equal(store['jackpot2.overchat'], false, 'and closing it turns the switch off')
+  // Over the chat the cabinet is to watch (owner, 2026-11-22): the X and the sound switch are the only
+  // controls on it. No spin, no switches, no machine picker, no backdrop settings.
+  reset()
+  sandbox.jp2watchProps = { ctx: makeCtx(), mode: 'overlay' }
+  const watching = draw('JackpotMachine(jp2watchProps)')
+  const controls = nodes(watching).filter(node => ['button', 'input', 'select', 'label'].includes(node.type)
+    || (node.type && node.type.name === 'Jackpot2OverChatControls'))
+  const named = controls.map(node => (node.type && node.type.name) || Object.keys(node.props || {}).find(key => key.startsWith('data-jp2')) || node.type)
+  // The lever stays: it is the cabinet's arm and moves with every spin; over the chat it takes no click.
+  assert.deepEqual(named.filter(name => name !== 'data-jp2-lever'), ['data-jp2-sound'],
+    `only the sound switch inside the watched cabinet (the X is the stage's), found: ${named.join(', ')}`)
+  reset()
   console.log('jackpot2: the stage holds the cabinet, and its rules live in our own tree: passed')
 }
 // ---- 6. the old machine keeps its mechanics and prints no odds numbers -------

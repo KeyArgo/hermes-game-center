@@ -423,6 +423,15 @@ function drawCopy(width) {
   sandbox.overSlotProps = bareSlot.props
   const completeMachine = draw('SlotMachine(overSlotProps)')
   assert.equal(completeMachine.props.ref, bareSlot.props.cabinetRef, 'frame fitting measures the full machine height')
+  // Over the chat the copy is to watch (owner, 2026-11-22): the X (which turns "Show as backdrop" off)
+  // and the sound switch are the only controls drawn on it. No spin, no switches, no backdrop settings.
+  const controls = nodes(completeMachine).filter(node => ['button', 'input', 'select', 'label'].includes(node.type))
+  const named = controls.map(node => Object.keys(node.props || {}).find(key => key.startsWith('data-sm-')) || `${node.type}:${words(node)}`)
+  assert.deepEqual(named.sort(), ['data-sm-close', 'data-sm-sound'], `only X and sound over the chat, found: ${named.join(', ')}`)
+  const close = controls.find(node => node.props['data-sm-close'])
+  close.props.onClick()
+  assert.equal(evaluate('SM_OVERCHAT.on'), false, 'the X turns Show as backdrop off')
+  evaluate('smSetOverchat(true)')
   reset()
   // The switch is still the one the table and the status chip draw: off takes the copy out of the slot.
   evaluate('smSetOverchat(false)')

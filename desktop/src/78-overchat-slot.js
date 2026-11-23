@@ -143,7 +143,13 @@ const OVERCHAT_SPOT = { left: 0, width: 0, anchored: false, stage: 'none', drawe
 const OVERCHAT_NO_CLICKS = '[data-overchat="stage"], [data-overchat="stage"] *, [data-overchat="strip"], [data-overchat="strip"] *, ' +
   '[data-overchat] [data-jp2-stage] .jp2-machine [data-jp2="overchat-row"] button, [data-overchat] [data-jp2-stage] [data-jp2-control] ' +
   '{ pointer-events: none !important; cursor: default !important; }'
-const overchatNoClicks = () => jsx('style', { 'data-overchat': 'no-clicks', children: OVERCHAT_NO_CLICKS }, 'no-clicks')
+// The two exceptions (owner, 2026-11-22): each machine's X, which turns "Show as backdrop" off everywhere,
+// and its sound switch. Nothing else on the backdrop is drawn as a control at all. The doubled attribute
+// out-ranks every selector in OVERCHAT_NO_CLICKS.
+const OVERCHAT_CLICKABLE = ['data-jp2-close', 'data-jp2-sound', 'data-sm-close', 'data-sm-sound']
+  .map(name => `[data-overchat][data-overchat] [data-jp2-stage] [${name}][${name}], [data-overchat][data-overchat] [${name}][${name}]`)
+  .join(', ') + ' { pointer-events: auto !important; cursor: pointer !important; }'
+const overchatNoClicks = () => jsx('style', { 'data-overchat': 'no-clicks', children: `${OVERCHAT_NO_CLICKS}\n${OVERCHAT_CLICKABLE}` }, 'no-clicks')
 
 // Which stage draws: the first in this list that is mounted and not trapped.
 const OVERCHAT_STAGE_ORDER = ['statusbar', 'titlebar']

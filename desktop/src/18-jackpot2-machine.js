@@ -1410,7 +1410,8 @@ function JackpotMachine(props) {
                   // shown anywhere on either machine. What is here instead is the pay table: every
                   // combination and its payout, opened over the reels. It sits in the header so it
                   // costs the cabinet no height.
-                  paytable.length ? jsx('button', {
+                  // Over the chat the cabinet is to watch: no control it cannot use is drawn there.
+                  paytable.length && !watch ? jsx('button', {
                     type: 'button',
                     'data-jp2-pays-open': paysOpen ? 'on' : 'off',
                     'aria-expanded': paysOpen,
@@ -1466,7 +1467,8 @@ function JackpotMachine(props) {
             ]
           }, 'counters'),
           // The controls: the button, then the switches that are settings rather than moves.
-          jsx('div', {
+          // Not over the chat: there only the sound switch and the X take a click.
+          watch ? null : jsx('div', {
             style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, pointerEvents: 'auto' },
             children: [
               spinButton,
@@ -1484,7 +1486,7 @@ function JackpotMachine(props) {
           // one press to float the cabinet over the conversation, with how big and how see-through
           // beside it. Guarded by name so a bundle built without the layer part still draws a
           // cabinet (the layer part is where the hooks and the controls live).
-          typeof Jackpot2OverChatControls === 'function'
+          typeof Jackpot2OverChatControls === 'function' && !watch
             ? jsx('div', {
               'data-jp2': 'overchat-row',
               style: { display: 'flex', justifyContent: 'center', pointerEvents: 'auto' },
@@ -1492,7 +1494,7 @@ function JackpotMachine(props) {
             }, 'overchat')
             : null,
           // The machine picker: the same session, chosen here.
-          machines.length > 1 ? jsx('div', {
+          machines.length > 1 && !watch ? jsx('div', {
             role: 'group',
             'aria-label': 'Pick a machine',
             style: {
@@ -1564,7 +1566,7 @@ function JackpotMachine(props) {
                     jsx('span', {
                       children: `${jp2Chips(chips)} chips — a spin costs ${jp2Chips(stake)}.`
                     }, 'broke-why'),
-                    gain > 0 ? jsx('button', {
+                    gain > 0 && !watch ? jsx('button', {
                       type: 'button',
                       'data-jp2-broke-cash': '1',
                       disabled: cashBusy,
@@ -1599,8 +1601,8 @@ function JackpotMachine(props) {
               // The cash-in control: HOW MANY points to turn into chips is the person's choice - a
               // slider, a number and Max - at the rate the shelf actually plays (4 points buy 3 chips
               // there; the number is read off its answer, not typed in here). Points are the ranking,
-              // so spending them is a choice with a cost, and the line says so plainly.
-              jsxs('div', {
+              // so spending them is a choice with a cost, and the line says so plainly. Not over the chat.
+              watch ? null : jsxs('div', {
                 'data-jp2-points-control': '1',
                 role: 'group',
                 'aria-label': 'Turn points into chips',

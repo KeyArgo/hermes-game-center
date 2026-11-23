@@ -6,6 +6,10 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **The see-through slot machines over the chat show only their X and sound switch.** The spin button,
+  the switches, the machine picker and the backdrop's own settings were drawn there but could not be
+  used. They now live only where they work (the Games page, Settings). The X turns "Show as backdrop"
+  off everywhere, and the X and the sound switch now take a click over the chat.
 - **An invite reaches the person wherever they are.** A play request was only visible on the Games page
   (the Hall's request cards) and in the Play with people card, so somebody reading their chat had no way
   to know a person had asked them to play until they went looking (owner, 2026-11-19: *"make sure it
