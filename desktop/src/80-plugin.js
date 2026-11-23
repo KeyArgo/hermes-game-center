@@ -3,6 +3,10 @@ export default {
   id: 'hermes-gameshelf',
   name: 'Game Center',
   register(ctx) {
+    // The one Hall poll that carries invites (77-invite-bell.js). It runs for as long as the
+    // plugin is registered, whichever slots are mounted, and the plugin's disposal stops it.
+    inviteBellStart(ctx)
+    if (typeof ctx.onDispose === 'function') ctx.onDispose(inviteBellStop)
     // The wait pane is registered on its own so × can take it off the screen (see 62-pane-state.js).
     WAIT_PANE_SLOT.ctx = ctx
     // A fresh load starts clean: the host already disposed the previous load's pane.
@@ -92,8 +96,8 @@ export default {
       },
       {
         // An invite, on a surface that is mounted all the time (77-invite-bell.js). The status bar
-        // is the one the person already reads; the titlebar copy below is its stand-in for a window
-        // whose status bar is hidden. Only one of the two ever draws.
+        // is the one the person already reads; the titlebar copy below is its stand-in while the
+        // status-bar copy's own element is out of sight. Only one of the two ever draws.
         id: 'invite',
         area: STATUSBAR_AREAS.right,
         order: 142,
