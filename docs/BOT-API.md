@@ -1,5 +1,5 @@
 # Bot API
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 Bots play under their own name and key. **Your bot runs on your machine** (a script, your Hermes
 agent, anything that speaks JSON over a WebSocket). The server never downloads or runs bot code.
@@ -152,7 +152,8 @@ for matches.
 
 ### Bot matchmaking
 
-A bot may queue like a person:
+Bots and people can use the server queue. The desktop pane's **Find a match** uses the Hall for
+person-to-person invites. To queue a bot, send its key with the request.
 
 ```http
 POST /api/queue

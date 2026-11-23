@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -55,7 +55,7 @@ In chat: `/games <game> lesson`, then `/games <game> lesson next`.
 ## Play a person
 
 - **Same screen:** choose **Two players** on the game screen. The second person takes the other seat.
-- **Online:** the Games page's **Get online** card is the way in: turn **Online play** on, pick a name (**Create my player** / **Suggest a name**) or sign in with the one you have (**I have a player**), then use the Hall's roster, chat and play requests. The person who receives a request sees *"X wants to play … — Join / Not now"*. Join seats both at a private table. If the lobby refuses your saved sign-in, the Hall says so (nobody can see you until you sign in again with your name and recovery key, **I have a player**) instead of telling you to turn online play on.
+- **Online:** the Games page's **Get online** card is the way in: turn **Online play** on, pick a name (**Create my player** / **Suggest a name**) or sign in with the one you have (**I have a player**), then use the Hall's roster, chat and play requests. Accepting a request seats both people at a private table. If the lobby refuses your saved sign-in, the Hall says so (nobody can see you until you sign in again with your name and recovery key, **I have a player**) instead of telling you to turn online play on.
 
 A move never silently takes a seat. The other person must type `/games <game> join` or take the free seat before moving. `resign` ends your seat, `leave` opens it before play, `abandon` ends the table without a win, and `draw` / `draw accept` offer and accept a draw.
 
@@ -154,12 +154,14 @@ The wording comes from the table's refusal path in `kit.py`; the page draws it f
 The pane on the right of the conversation is its own small Games screen. Open it from the Games header, from the status bar item, or with its command in the palette.
 
 - The pane is always on the right of the chat. Its dock hint is enforced, so the host re-homes it there on every start: a pane that was once dragged somewhere else, or moved by a host update, goes back to the right instead of staying wrong for good.
+- Open **Play with people** to use the Hall. Turn on **Open to invites**, choose **Edit** beside **Games**, then press **Find a match** to search for those games. To invite someone directly, press **Ask** beside their name under **Here now**. Expand **#games chat** to join the conversation.
+- An invite stays at the top of every tab until it is answered or expires. **Accept** opens the table beside your chat. The status bar also offers **Accept** and **Decline**, with the titlebar taking over when the status bar is out of sight. If the invite is out of sight everywhere and **Open to invites** is on, you get one silent desktop notice.
 - The pane opens at 368 px. Drag its edge: it goes down to 300 px and out to 1200 px.
 - Everything inside answers to that width. The game list fills the row it is in, and the pane's sections (the game list, online play, alerts) sit two abreast once there is room, then stack again when the pane is narrow.
 - A game in the pane draws its board as large as the pane allows, capped by the pane's height so the turn line stays in view, and puts the turn beside the board when there is room for both. Nothing scrolls sideways, down to 300 px.
 
 ## Online play
 
-Online play is off until you turn it on in the lobby. With it on, you get the Hall (roster, `#games` chat and play requests), optional match alerts and the bot ladder. The exact list of what is sent is in [ONLINE-PLAY.md](ONLINE-PLAY.md); the one-sentence disclosure is on the dock's **Lobby** tab before you switch it on.
+Online play is off until you turn it on in the lobby. With it on, you get the Hall (roster, `#games` chat and play requests), optional match alerts and the bot ladder. The exact list of what is sent is in [ONLINE-PLAY.md](ONLINE-PLAY.md); the one-sentence disclosure is on the dock's **Play with people** tab before you switch it on.
 
 Back to [docs/README.md](README.md).

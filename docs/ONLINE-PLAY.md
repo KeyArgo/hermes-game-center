@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -35,7 +35,7 @@ meets it:
    Hermes says **“This window runs Game Center on <name>”** and offers **Open connection settings**
    (Settings → Gateways, where the connections are listed): to play as this computer, switch the
    connection to **This device**.
-2. **Turn online play on** — the same switch as the dock's Lobby tab, and the same disclosure first.
+2. **Turn online play on** — the same switch as the dock's **Play with people** tab, and the same disclosure first.
 3. **A name**, or the player you already have: **Create my player** (the name box starts empty; **Suggest
    a name** fills it with one nobody has taken, when this build has the generator), or **I have a player**
    with the name and key you saved.
@@ -54,7 +54,7 @@ name: an empty box creates nothing, and nothing is ever auto-created on the serv
 
 ## Turning it on, and the address
 
-The switch lives in the dock's **Lobby** tab (Game Center, beside the chat): **Play with people online →
+The switch lives in the dock's **Play with people** tab (Game Center, beside the chat): **Play with people online →
 Turn on online play**. **Turn online play off** is in the same place and stops everything immediately.
 
 The address is a setting — **Plugins → Game Center → Online lobby address** (`lobby_url`), default
@@ -62,13 +62,12 @@ The address is a setting — **Plugins → Game Center → Online lobby address*
 running one from `online/`) and the dock uses that instead; a bad or empty address falls back to the
 default rather than breaking the page.
 
-Nothing is polled and nothing is sent while the switch is off.
+Game Center sends nothing to the lobby server while the switch is off.
 
 ## The Hall
 
 While online play is on, Game Center keeps **one lobby connection** open — even with the lobby panel
-closed, and even while you are playing — so other people can see you are online, and so a play request
-reaches you the moment it is sent. It is the socket at `/api/lobby/socket`, and it carries only what the
+closed, and even while you are playing — so other people can see you are online and send you a play request. It is the socket at `/api/lobby/socket`, and it carries only what the
 roster needs: your display name, which games you will accept a challenge in (your **prefs**), whether you
 are appearing offline, which games **find match** is on for, and the requests you send or answer. It never
 carries your recovery key beyond the one sign-in frame, and it opens only after you have turned online
@@ -95,25 +94,22 @@ the master switch off yourself is left alone.
 only while online play is on, you are signed in and the Hall's socket is live. When it is held, the sentence
 beside it says why: **Sign in above first.** or **Lobby not connected — Retry**. Press **Retry** to dial the
 lobby again at once; a sign-in, a Retry and opening the Games page all redial immediately. This is the same
-choice as the Hall's **Take game requests** master switch — the two surfaces write one setting, so they
-cannot disagree.
+choice as **Take game requests** in the Hall and **Open to invites** in the side pane.
 
 The Hall is what makes **ask a person to play** work: you set which games you are open to, someone on
 your roster asks you for a game (**Ask**, offered only to someone online who accepts a game you also
 take), you accept, and both of you are seated at a private table — no code to paste. When you are not
 signed in, or online play is off, the Hall is simply closed and the roster empty.
 
-**An invite reaches you wherever you are.** A play request — a person's **Ask**, or a find-match offer —
-is also drawn in the **status bar**, beside the Games item: *"Ada invites you to Connect 4"* with
-**Accept** and **Decline** on the same line. That item is mounted for as long as the window is open, so
-the request reaches you while you are reading a chat or working on another screen, and it does not ask
-you to open Game Center to see or answer it. **Accept** answers the request, seats you both and opens the
-table; **Decline** answers no. Only one copy is drawn: the status bar first, and the titlebar's right
-cluster only when the status bar is not there (Simple mode rests it hidden). The read behind it is the
-Hall's own: every 3 seconds while a request is waiting, every 8 seconds when none is, and nothing at all
-while the window is hidden — and while the Hall is on screen its poll feeds the same line, so the lobby
-is asked once. A system notification goes out once per invite, and only for a game whose **Tell me when
-someone wants a match** switch is on.
+**An invite reaches you wherever you are.** A direct ask or a match offer stays above the scrolling
+part of every side-pane tab. The line says *“Ada asks to play Chess”* with **Accept** and **Decline**.
+Accept opens the private table in the pane beside your chat. You can also answer from the status bar,
+or from the right of the titlebar when the status bar is out of sight. Accept there opens Games.
+
+One poll reads the local Hall for all these views, even with Games closed or the window hidden.
+It reads every three seconds while a request is pending in either direction, a search is running or
+a Hall view is open, and every eight seconds otherwise. With **Open to invites** on, a pending invite
+gets one silent desktop notice if no invite is visible. The notice names the person and game.
 
 The lobby is a **side panel** with the panels it needs and no more: on the Games screen it is
 `minmax(220px, 280px)` wide, enough to type a sentence in its chat box, and the game cards use
@@ -121,7 +117,12 @@ The lobby is a **side panel** with the panels it needs and no more: on the Games
 
 ## Find a match
 
-**Find match** is in the lobby panel, and it is **chips, not a button that guesses**: one chip per game
+In the side pane, open **Play with people**. Use **Open to invites** to take requests and **Edit** beside
+**Games** to choose what you play. **Find a match** searches the Hall for those games. Press **Stop**
+to end the search. Under **Here now**, choose a shared game and press **Ask** to invite someone directly.
+Expand **#games chat** to read or write in the lobby.
+
+On the Games page, **Find match** has one chip per game
 plus **All games**, and nothing is picked for you. Press the games you want (one, several, or All games)
 and the lobby starts looking for exactly those; press a chip again to stop looking for that game, press
 **Stop looking** to stop altogether. The chips read back what the server is looking for, so a chip can
@@ -136,8 +137,11 @@ looking too but has since turned the game off is not, and nobody seated in a gam
 one, where they stay listed as *playing*. If the person declines, or the sixty seconds run out, the next
 one is asked straight away, and nobody is asked twice in the same search. When there is nobody left it
 says so — *"Nobody is free for Chess right now — still looking"* — and asks whoever comes online next,
-for as long as the search lasts: twenty minutes, or until you press **Stop looking**. A person who
-declined a game is left alone for ten minutes.
+for as long as the search lasts: twenty minutes, or until you stop it. When Ada declines a Chess offer, the search says
+*“Ada passed on Chess. Still looking.”* and continues. For two minutes after a decline, the asker
+must wait before asking that person for the same game. They can ask for another game, and the person
+who declined can ask back at once. Automatic matching skips that pair for that game in either
+direction for those two minutes.
 
 The offer names the person and the game — *"Ada wants to play Chess"* — with a grey line beside the
 roster saying the same thing (Game Center draws that line itself: it is **not** a chat message and is
@@ -189,17 +193,10 @@ renames your lobby account; use **Change my name** under **Get online** for that
 
 ## Find a match online: the rated queue
 
-This is the other way into a game with a person, and it is the **wait pane's** own path, not the lobby's:
-**Find a match online: <game>** puts you in the server's queue for the game the pane is on. The pane then
-says "Looking for a … match" and keeps looking while you use Hermes.
-
-When someone else is waiting for the same game, the dock says **"Your table is ready"**, names the
-opponent and your colour, and **Play here** opens that room inside Hermes — the board is the one the
-lobby server sends for your seat, you move by clicking it, and every move goes back to the server as
-that table's own command. There is no local game behind it and nothing here guesses a move: the board
-shows what the table has taken. **Open in browser** stays beside it as a small link to the same room on
-the website, where the clock lives. **Not now** dismisses the line on this computer (the table itself
-stays open on the server).
+The server also offers a rated queue through `/api/queue`. The pane's **Find a match** starts a
+Hall search for a private, unrated table. If you already have a match from the queue, the pane
+says **Your table is ready** and names your opponent and colour. **Play here** opens the server's
+board for your seat. **Not now** dismisses the line on this computer and leaves the room open.
 
 ## The table's chat
 
@@ -255,10 +252,10 @@ Per game, off by default: *"Tell me when someone online wants this game"*.
   ten minutes even if the queue keeps filling.
 - The dock also refuses to tell you **twice for the same alert**, and suppresses alerts entirely while
   you have a table waiting or a game running.
-- The alert appears as one line on the Lobby tab and one silent system notification, and the line clears
+- A queue alert appears on **Play with people** and clears
   when nobody is waiting for that game any more.
-- Polling only happens while the page (or the dock's badge) is open: the lobby every 15 seconds, the queue
-  every 15 seconds while you are queued, alerts every 15 seconds while at least one game has them on.
+- The queue and alert checks run separately from the shared Hall poll. The dock checks the queue every
+  15 seconds while you are queued and checks alerts every 15 seconds while any game has them on.
   After a failure it waits 15, then 30, then 60, then 120 seconds before trying again.
 
 ## Your chips and points
@@ -305,7 +302,7 @@ What runs where:
 - **Rated** games need two bots from **different owners**; the same pair can play three rated games a day;
   a game needs at least two plies to be rated, and it is rated as a **pair** (two legs, seats swapped).
   If no other bot turns up within ten minutes, nothing is played and nothing is used up.
-- **Enter the open league** from the Lobby's Bots and leagues area instead, and the same game is played
+- In the **open league**, the same game is played
   with a thirty-second clock and the **self-hosted, unverified** label.
 
 ## Ranked games, and why they are played twice
@@ -323,15 +320,10 @@ yourself — is a friendly game and never rated.
 The dock says where you are: *"Leg 1 of 2 · same deal, seats swapped"* on the table, and the ladder plays
 both legs by itself. If you leave one leg unfinished, the pair simply never rates.
 
-## Bots and leagues, in the Lobby tab
+## Bots and leagues
 
-> **Off the pane for now (2026-11-11).** The pane's Lobby tab no longer draws this area — leagues, watching
-> a live table and bot passports all work against the lobby server, but watching leaves Hermes for the
-> browser. The **Stock league**'s **Read the design** is hidden with it. Both are UI gates
-> (`PANE_LEAGUES_OFF`, `STOCK_LEAGUE_OFF`) with the blocks kept in the bundle, so the lobby server answers
-> exactly as described below and bringing the area back is flipping one line.
-
-The Lobby tab carries a **Bots and leagues** area (badged *Labs · experiment* in Phase 1):
+The lobby server supports the following **Bots and leagues** features. The side pane hides this
+area and the Stock league design under `PANE_LEAGUES_OFF` and `STOCK_LEAGUE_OFF`.
 
 - **Waiting for your bot** — invitations someone sent your bot, with **Decline**. Accepting means bringing
   your bot to the table from its passport.

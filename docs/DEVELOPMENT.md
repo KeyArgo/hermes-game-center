@@ -1,6 +1,6 @@
 # Development
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 Repo layout, how to build the Desktop bundle, how to run each suite, and what CI does.
 
@@ -33,6 +33,10 @@ python3 tools/build_plugin.py --check  # fail if the committed bundle is stale
 
 Only `desktop/src/00-header.js` may carry imports, and only the last part may export. `tests/test_plugin_bundle.py` runs `--check` on every test run.
 
+The plugin starts one poll of the local `/online/hall` endpoint at registration and stops it on
+disposal. The Games page, side pane, status bar and titlebar share the snapshot from
+`desktop/src/77-invite-bell.js`. The side pane sends its searches and requests through the Hall.
+
 ## Run the suites
 
 CI installs the test dependencies with:
@@ -47,6 +51,7 @@ Then:
 python -m pytest tests -q -p no:cacheprovider   # the Python suite
 python3 tools/build_plugin.py                    # the bundle CI grades
 node tests/table_ui_harness.cjs                  # Desktop page state machine
+node tests/invite_rework_harness.cjs             # shared Hall poll, pane invites and matching
 node tests/jackpot_overlay_harness.cjs           # over-chat slot cabinet
 # the backdrop stage is drawn from the status bar, or from TITLEBAR_AREAS.right when the bar is hidden
 # (78-overchat-slot.js OVERCHAT_STAGE_ORDER); the two-Hermes Hall case is tests/test_online_hall.py

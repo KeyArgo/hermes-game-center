@@ -1,5 +1,5 @@
 # SECURITY
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 What this plugin does to your machine and your network, and how to stop it. Sourced from
 README.md ("What this plugin does on your machine"), `plugin.yaml`, and the Desktop table code.
@@ -50,8 +50,9 @@ do not open a public issue with a working exploit in it.
 - A lobby server you host yourself reads a game's `HERMES-REMOVE.txt` from
   `https://raw.githubusercontent.com` when someone asks to remove a tile; that request is made by the
   server, never by this plugin on your machine.
-- Polling happens only while the Game Center page or the dock's alerts are active, backing off
-  15 → 30 → 60 → 120 s after a miss. Nothing is polled while online play is off.
+- One shared poll reads the local Hall while the plugin is loaded, even with Games closed or the window
+  hidden. With **Open to invites** on, a pending request can show one silent desktop notice naming the
+  asker and game if no invite is visible. Turning online play off closes the remote lobby connection.
 - **Community creations** cards only hand an HTTPS URL to your browser when you press **Open**. The
   plugin never fetches, previews or embeds those sites; there are no iframes.
 - **Launch cards** start a program already installed on this machine, detached, from an argument
@@ -89,9 +90,8 @@ do not open a public issue with a working exploit in it.
 
 ## How to stop it
 
-1. **Turn online play off** — one press in the Game Center dock's **Lobby** tab. Nothing is sent
-   and nothing is polled afterwards. Turn alerts off the same way; they are per game and off by
-   default.
+1. **Turn online play off** — one press in the Game Center dock's **Play with people** tab. Game Center then
+   sends nothing to the lobby server.
 2. **Turn AI seats off** — set the profile setting `allow_ai: false`. No game may seat an AI; people
    keep playing each other.
 3. **Change or self-host the lobby** — set `lobby_url` to your own address so nothing goes to the

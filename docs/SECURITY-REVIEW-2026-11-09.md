@@ -1,5 +1,5 @@
 # Security review — 2026-11-09
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 Scope: the whole tree, six areas. Every "clean" line below
 is a check that was **run**, not an assumption; every "fixed" line names the test that failed before

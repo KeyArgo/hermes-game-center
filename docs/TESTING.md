@@ -1,6 +1,6 @@
 # Testing
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-22 (8c553e5c)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
 
 How to run every suite, what each one covers, and the counts measured on this commit.
 
@@ -10,6 +10,7 @@ How to run every suite, what each one covers, and the counts measured on this co
 python3 -m pytest tests -q -p no:cacheprovider   # the Python suite, offline
 python3 tools/build_plugin.py                    # the committed bundle must match desktop/src/
 node tests/table_ui_harness.cjs                  # the Desktop page's state machine
+node tests/invite_rework_harness.cjs             # invite delivery and matching in the side pane
 node tests/jackpot_overlay_harness.cjs           # the over-chat slot cabinet
 node tests/jackpot_overlay_poll_harness.cjs      # how often the over-chat machine asks the shelf
 node tests/jackpot2_harness.cjs                  # the Jackpot v2 copy, its switch and the fit
@@ -46,6 +47,7 @@ The pane fill check adds one Python test and one Desktop-harness contract to the
 
 - **Python suite (`tests/`).** The rules engines, the referee and refusals, the table lifecycle, seats and consent, the wallet and points arithmetic, the jackpot and slot odds, lessons and tutorials, the catalogue and curated list, the ship gate, the online client and server, the talking tables, the dashboard API, the page's data contracts, docs stamps and the bundle build. It is offline: no model, no network, no GPU. Three files keep the shelf's own promises: `tests/test_catalog_review_guards.py` (the catalog review's five fixes, each a scan or a seam that fails if the defect returns), `tests/test_corrupt_state.py` (a state file that is not UTF-8, or holds the right keys with the wrong types) and `tests/test_resilience.py` (random legal play in every turn-based game, hostile input to every game, four threads on one table, and a scan that no state file is written in place).
 - **Desktop page harness (`tests/table_ui_harness.cjs`).** The built `desktop/plugin.js` is imported and its pure helpers and rendered contracts are checked: shelves, seats, referee badges, talking tables, the lobby, the model picker, the library and the version chip.
+- **Hall invites (`tests/invite_rework_harness.cjs`).** A virtual clock checks that one poll serves the Games views and stops on disposal. The harness checks invite delivery when the pane first opens, the titlebar fallback, one silent notice when the invite is out of sight, and asking and finding a match through **Play with people**. `tests/test_invite_rework.py` runs each of the five checks separately and skips when Node is unavailable.
 - **Over-chat slot harness (`tests/jackpot_overlay_harness.cjs`).** The see-through cabinet is drawn only over the conversation, its settings persist, the size slider scales, there is one centered layer, and only its × and sound switch are drawn on it (`tests/jackpot2_harness.cjs` checks the same for the Jackpot cabinet).
 - **Over-chat poll harness (`tests/jackpot_overlay_poll_harness.cjs`).** Mounts the status chip on a fake clock with a fake host that can say whether the focused chat is working, and counts the reads instead of waiting for them: a resting 5 s while nothing happens, 600 ms while a turn runs (and one read the moment it starts), the same 600 ms for three seconds after the turn ends, no reads at all while the window is hidden, one read the moment it comes back, the unchanged `message.start` pull and its 400 ms follow-up, a new spin on the feed watched while the reels run, no timer or visibility listener left behind on close, and exactly the old 600 ms on a host with no busy state.
 - **Inference Slot Machine harness (`tests/inference_autoplay_harness.cjs`, run by `tests/test_inference_autoplay.py`).** The Games page draws the button above the Play shelf, one press posts `/jackpot/autoplay` on and sets the `jackpot2.overchat` switch, a second press turns both off, a refused request leaves the button in its real state with a one-line note, and the button is on only while both switches are. It also pins the backdrop's room (60% of a 1000 px window is 600 px), that 100% draws 640 px (twice the old 320 px copy) and 50% the old size, that 160% draws a taller one, and that Small / Medium / Large set 0.5 / 1 / 1.6. The same module scans `desktop/src` for the old over-chat wording.
