@@ -25887,49 +25887,56 @@ function onlineChatPanel({ lines, draft, problem, canType, sending, log, onDraft
 //
 // WHAT THIS IS. One contribution to the status bar and one to the titlebar's right cluster —
 // the two areas this plugin already renders into (78-overchat-slot.js draws its stage from
-// exactly this pair, for the same reason: they are mounted for as long as the window is open).
-// An invite drawn there is drawn wherever the person is in Hermes. Nothing here reads, writes or
-// styles the host's markup: the invite is a component in a slot the host owns, and every press
-// goes out through the same four doors the Hall uses.
+// exactly this pair, for the same reason: they are mounted for as long as the window is open) —
+// and the fixed line at the top of the side pane (65-wait-pane.js). Nothing here reads, writes
+// or styles the host's markup: the invite is a component in a slot the host owns, and every
+// press goes out through the same four doors the Hall uses.
 //
-// ONE OF THE TWO DRAWS. The titlebar copy is the stand-in for a window whose status bar is not
-// there (Simple mode rests it hidden, and anyone may hide it). Both mount, only the first in
-// INVITE_SURFACE_ORDER that is on screen draws, so the person never sees the same invite twice.
+// ONE OF THE TWO DRAWS. The titlebar copy is the stand-in for a status bar that is not on
+// screen (Simple mode rests it hidden, a narrow window clips it, anyone may hide it). Each copy
+// watches its OWN element with an IntersectionObserver (useInviteSurface); the status-bar copy
+// draws while its element is in sight, and the titlebar copy draws while it is not. No host
+// element is ever looked up.
 //
-// THE POLL IS ONE READ, SHARED. Both surfaces subscribe to one store, and the store owns one
-// timer: the first surface to mount starts it and the last to leave stops it. It reads
-// /online/hall — the door the Hall itself reads — every 3 s while a request is pending and every
-// 8 s (the alert line's own rhythm) when nothing is, and it does not read at all while the
+// THE POLL IS ONE READ, SHARED, AND IT BELONGS TO THE PLUGIN. Registration starts it
+// (80-plugin.js) and the plugin's disposal stops it, so which slots happen to be mounted never
+// decides whether an invite arrives. It reads /online/hall — the door the Hall itself reads —
+// every 3 s while something is moving (a request either way, a search, the pane's Play with
+// people tab on screen) and every 8 s when nothing is, and it does not read at all while the
 // window is hidden: a minimised Hermes asks the lobby nothing. The Hall's own 3 s read feeds
 // this store as well (inviteBellFeed), and a feed younger than INVITE_FEED_FRESH_MS is what the
 // timer counts as its own answer, so on the Games page there is one read, not two.
 //
-// THE SYSTEM NOTIFICATION. ctx.os.notify is the SDK's own notice. One is sent per invite, and
-// only under the switch that already means "tell me when someone wants a match" for that game
-// (alertsOn in 62-pane-state.js): the person asked for a notice about that game, so they get
-// one. With that switch off nothing pops up over their work — the callout above is still there,
-// which is the surface that has to carry it.
+// THE SYSTEM NOTIFICATION. ctx.os.notify is the SDK's own notice. One silent notice is sent per
+// request id, only while "Open to invites" is on, and only when none of the three surfaces that
+// draw an invite is on screen. A surface reports itself a moment after it mounts, so the notice
+// waits INVITE_NOTICE_WAIT_MS before it decides.
 const INVITE_POLL_PENDING_MS = 3000
 const INVITE_POLL_IDLE_MS = 8000
 // A Hall feed younger than this is the answer the timer would have asked for.
 const INVITE_FEED_FRESH_MS = 2000
+// How long a new request waits for a surface to say it is on screen before the notice goes out.
+const INVITE_NOTICE_WAIT_MS = 1500
 
-// The order the two surfaces are offered in: the status bar first (it is the one in the chrome
-// the person already reads), the titlebar as its stand-in.
+// The order the two chrome surfaces are offered in: the status bar first (it is the one in the
+// chrome the person already reads), the titlebar as its stand-in.
 const INVITE_SURFACE_ORDER = ['statusbar', 'titlebar']
 
-// The one store both surfaces read. `request` is the pending ask addressed to this person, or
-// null when nobody is asking.
+// The one store every surface reads. `request` is the pending ask addressed to this person, or
+// null when nobody is asking. `seen` is which surfaces are on screen right now, by name.
 const INVITE_BELL = {
   request: null,
   snap: null,
   error: '',
   ctx: null,
   fresh: 0,
-  notified: '',
+  notified: new Set(),
+  readGeneration: 0,
+  noticeTimer: null,
   watching: false,
   timer: null,
-  surfaces: {},
+  eager: 0,
+  seen: {},
   listeners: new Set()
 }
 
@@ -25987,10 +25994,7 @@ function inviteBellFeed(snap) {
   inviteBellPublish({ snap, error: '' })
   const request = inviteOf(snap)
   inviteBellPublish({ request })
-  if (request) inviteBellNotify(request, snap)
-  // The side pane follows the same snapshot. No second poll: this is the read the
-  // Hall, the Games card and the bell already share.
-  if (typeof invitePaneFollow === 'function') invitePaneFollow(snap)
+  if (request) inviteBellNotice(request)
   inviteBellSchedule()
 }
 
@@ -26001,18 +26005,39 @@ function inviteBellDrop(id) {
   if (current && String(current.id) === String(id)) inviteBellPublish({ request: null })
 }
 
-// The notice, once per invite, and only for a game the person asked to hear about.
-function inviteBellNotify(request, snap) {
-  if (!request || !inviteBellRemembered(request)) return
-  const ctx = INVITE_BELL.ctx
-  if (!ctx || typeof alertsOn !== 'function') return
-  const prefs = (snap && snap.prefs) || {}
+// Is any surface that draws an invite on screen? The status bar and the titlebar between them
+// always draw one (the titlebar stands in when the status bar is out of sight), and the pane
+// draws its own line on every tab and in its strip.
+function inviteBellShown() {
+  const seen = INVITE_BELL.seen || {}
+  return Boolean(seen.statusbar || seen.titlebar || seen.pane)
+}
+
+// The notice for one request, decided INVITE_NOTICE_WAIT_MS after the read that found it, so a
+// surface that has just mounted has had the moment it needs to say whether it is on screen.
+function inviteBellNotice(request) {
+  const id = String((request && request.id) || '')
+  if (!id || INVITE_BELL.notified.has(id) || INVITE_BELL.noticeTimer) return
+  INVITE_BELL.noticeTimer = setTimeout(() => {
+    INVITE_BELL.noticeTimer = null
+    inviteBellNotify(id)
+  }, INVITE_NOTICE_WAIT_MS)
+}
+
+// The notice itself: still the request on screen, invitations still open, nothing showing it,
+// and never twice for one request id.
+function inviteBellNotify(id) {
+  const request = INVITE_BELL.request
+  if (!request || String(request.id) !== id || INVITE_BELL.notified.has(id)) return
+  const prefs = (INVITE_BELL.snap && INVITE_BELL.snap.prefs) || {}
   // Nobody can ask a person who has invitations off; a request that arrived before the switch
-  // went off is still shown and still answerable, and it still makes no sound.
+  // went off is still shown and still answerable, and it makes no notice.
   if (!prefs.open) return
-  if (!alertsOn(ctx, request.game)) return
+  if (inviteBellShown()) return
+  const ctx = INVITE_BELL.ctx
+  if (!ctx || !ctx.os || typeof ctx.os.notify !== 'function') return
+  INVITE_BELL.notified.add(id)
   try {
-    if (!ctx.os || typeof ctx.os.notify !== 'function') return
     ctx.os.notify({
       title: 'Someone wants to play',
       body: inviteBellLine(request),
@@ -26024,25 +26049,30 @@ function inviteBellNotify(request, snap) {
   }
 }
 
-// One notice per request id, so a 3 s read cannot ring the same bell twice.
-function inviteBellRemembered(request) {
-  const id = String(request.id || '')
-  if (!id || INVITE_BELL.notified === id) return false
-  INVITE_BELL.notified = id
-  return true
-}
-
-// Where an accepted invite goes: the Games screen, which draws the table the lobby just seated.
+// Where an accepted invite goes from the chrome: the Games screen, which draws the table the
+// lobby just seated.
 function inviteBellOpen() {
   if (typeof host !== 'undefined' && host && typeof host.navigate === 'function') host.navigate(ROUTE)
 }
 
-function inviteBellNextDelay() {
-  return INVITE_BELL.request ? INVITE_POLL_PENDING_MS : INVITE_POLL_IDLE_MS
+// Something is moving: a request either way, a search, or a surface that asked for the quick
+// rhythm (the pane's Play with people tab).
+function inviteBellLively() {
+  if (INVITE_BELL.request || INVITE_BELL.eager > 0) return true
+  const snap = INVITE_BELL.snap || {}
+  const you = snap.you || {}
+  if (Array.isArray(you.looking) && you.looking.length) return true
+  const mine = String(you.id || '')
+  const rows = Array.isArray(snap.requests) ? snap.requests : []
+  return Boolean(mine) && rows.some(row => row && row.state === 'pending' && row.from && String(row.from.id) === mine)
 }
 
-// The timer is re-armed after every read, so the cadence follows the news: 3 s while somebody is
-// waiting on an answer, the alert line's 8 s otherwise.
+function inviteBellNextDelay() {
+  return inviteBellLively() ? INVITE_POLL_PENDING_MS : INVITE_POLL_IDLE_MS
+}
+
+// The timer is re-armed after every read, so the cadence follows the news: 3 s while something
+// is moving, 8 s otherwise.
 function inviteBellSchedule() {
   if (!INVITE_BELL.watching) return
   if (INVITE_BELL.timer) { clearTimeout(INVITE_BELL.timer); INVITE_BELL.timer = null }
@@ -26053,13 +26083,21 @@ function inviteBellSchedule() {
 async function inviteBellRead(ctx) {
   if (!ctx || typeof ctx.rest !== 'function') return
   try {
+    const generation = ++INVITE_BELL.readGeneration
     const answer = await ctx.rest('/online/hall')
+    if (generation !== INVITE_BELL.readGeneration) return
     if (answer && typeof answer === 'object') inviteBellFeed(answer)
     else inviteBellPublish({ error: '' })
   } catch {
     // The last invite stays on screen: a read that failed is not an invite that went away.
     inviteBellPublish({ error: 'The lobby could not be read just now.' })
   }
+}
+
+// A read now, for a surface that has just changed something on the lobby (a search, an ask) and
+// wants its answer drawn without waiting for the timer. The read re-arms the one timer.
+function inviteBellRefresh() {
+  return inviteBellRead(INVITE_BELL.ctx)
 }
 
 async function inviteBellTick() {
@@ -26086,36 +26124,95 @@ function inviteBellWatch() {
   const doc = inviteBellDocument()
   if (doc && typeof doc.addEventListener === 'function') doc.addEventListener('visibilitychange', inviteBellVisibility)
   // The first look is now, not after a delay: a request that arrived while this window was
-  // elsewhere is on screen the moment the surface mounts.
+  // closed is on screen the moment the plugin is up.
   inviteBellTick()
 }
 
 function inviteBellUnwatch() {
   INVITE_BELL.watching = false
   if (INVITE_BELL.timer) { clearTimeout(INVITE_BELL.timer); INVITE_BELL.timer = null }
+  if (INVITE_BELL.noticeTimer) { clearTimeout(INVITE_BELL.noticeTimer); INVITE_BELL.noticeTimer = null }
   const doc = inviteBellDocument()
   if (doc && typeof doc.removeEventListener === 'function') doc.removeEventListener('visibilitychange', inviteBellVisibility)
 }
 
-// One surface on screen at a time: the first in INVITE_SURFACE_ORDER whose host mounted it.
+// The plugin's poll: started once at registration, stopped by the plugin's disposal.
+function inviteBellStart(ctx) {
+  INVITE_BELL.ctx = ctx || INVITE_BELL.ctx
+  if (!INVITE_BELL.watching) inviteBellWatch()
+  return inviteBellStop
+}
+
+function inviteBellStop() {
+  INVITE_BELL.readGeneration += 1
+  inviteBellUnwatch()
+}
+
+// The quick rhythm, while a surface that shows the lobby live is on screen. Still the one timer.
+function inviteBellEager(on) {
+  INVITE_BELL.eager = Math.max(0, Number(INVITE_BELL.eager || 0) + (on ? 1 : -1))
+  if (on && INVITE_BELL.watching && INVITE_BELL.timer) inviteBellSchedule()
+}
+
+// One chrome surface draws at a time: the first in INVITE_SURFACE_ORDER whose element is on
+// screen, or the stand-in at the end of the list when none is.
 function inviteBellDraws(where) {
-  for (const name of INVITE_SURFACE_ORDER) {
-    if (Number(INVITE_BELL.surfaces[name] || 0) > 0) return name === where
-  }
-  return false
+  const first = INVITE_SURFACE_ORDER.find(name => INVITE_BELL.seen[name])
+  return (first || INVITE_SURFACE_ORDER[INVITE_SURFACE_ORDER.length - 1]) === where
 }
 
-function inviteBellMark(where, on) {
-  const surfaces = { ...INVITE_BELL.surfaces }
-  const count = Number(surfaces[where] || 0) + (on ? 1 : -1)
-  if (count > 0) surfaces[where] = count
-  else delete surfaces[where]
-  inviteBellPublish({ surfaces })
+function inviteBellSeen(where, on) {
+  const seen = { ...INVITE_BELL.seen }
+  if (on) seen[where] = true
+  else delete seen[where]
+  if (Boolean(INVITE_BELL.seen[where]) !== Boolean(on)) inviteBellPublish({ seen })
 }
 
-// The store, as a component reads it: re-render on every change, and stand the shared poll up
-// while at least one surface is mounted.
-function useInviteBell(ctx, watch = true) {
+// What an observer entry says: on screen only with some of the element actually in view, so a bar
+// clipped to nothing counts as out of sight.
+function inviteBellInSight(entry) {
+  if (!entry || !entry.isIntersecting) return false
+  const box = entry.intersectionRect
+  return !box || (Number(box.width) > 0 && Number(box.height) > 0)
+}
+
+// A surface's own element, watched. The returned callback is the element's ref: it observes that
+// element and nothing else. A mounted surface counts as on screen until its observer answers, and
+// a host with no IntersectionObserver keeps that answer.
+function useInviteSurface(where) {
+  const held = useRef({ node: null, observer: null })
+  useEffect(() => {
+    inviteBellSeen(where, true)
+    const watch = held.current
+    return () => {
+      if (watch.observer) { try { watch.observer.disconnect() } catch { /* already gone */ } }
+      watch.observer = null
+      watch.node = null
+      inviteBellSeen(where, false)
+    }
+  }, [where])
+  return useCallback(node => {
+    const watch = held.current
+    if (watch.node === node) return
+    if (watch.observer) { try { watch.observer.disconnect() } catch { /* already gone */ } }
+    watch.observer = null
+    watch.node = node || null
+    if (!node || typeof IntersectionObserver === 'undefined') return
+    try {
+      watch.observer = new IntersectionObserver(entries => {
+        const list = Array.isArray(entries) ? entries : []
+        if (list.length) inviteBellSeen(where, inviteBellInSight(list[list.length - 1]))
+      }, { threshold: [0, 1] })
+      watch.observer.observe(node)
+    } catch {
+      watch.observer = null
+    }
+  }, [where])
+}
+
+// The store, as a component reads it: re-render on every change. Reading never starts or stops
+// the poll; that is the plugin's (inviteBellStart).
+function useInviteBell(ctx) {
   const [, setTick] = useState(0)
   useEffect(() => {
     const listener = () => setTick(count => count + 1)
@@ -26123,31 +26220,29 @@ function useInviteBell(ctx, watch = true) {
     INVITE_BELL.ctx = ctx || INVITE_BELL.ctx
     return () => { INVITE_BELL.listeners.delete(listener) }
   }, [ctx])
-  useEffect(() => {
-    // A surface that only draws the shared store (the side pane) must not start
-    // a second poll. The bell's own surfaces are the ones that watch.
-    if (!watch) return undefined
-    if (!INVITE_BELL.watching) inviteBellWatch()
-    return () => { if (!INVITE_BELL.listeners.size) inviteBellUnwatch() }
-  }, [watch])
   return INVITE_BELL
 }
 
-// The invite at the top of the side pane. The words, the countdown and the two
-// answers are the bell's; this only places them. The system notice, when the
-// person asked for one, is ctx.os.notify inside inviteBellNotify — one notice,
-// not a second, and nothing here touches the host's page.
+// "Bea asks to play Chess": the pane's own words for an invite, short enough for one line at the
+// pane's narrowest.
+function paneInviteWords(request) {
+  if (!request) return ''
+  const name = String((request.from && request.from.name) || 'Someone')
+  return `${name} asks to play ${lobbyTitle(request.game)}`
+}
+
+// The fixed line at the top of the side pane: "Bea asks to play Chess · Accept · Decline". The
+// pane draws it above its scrolling body on every tab, so it cannot scroll away. The words and
+// the two answers are the bell's; this only places them.
 function paneInviteBlock(ctx, request, busy, note, onAnswer) {
   if (!request) return null
-  const line = inviteBellLine(request)
-  const left = Math.max(0, Math.round(Number(request.expires || 0) - Date.now() / 1000))
   const name = String((request.from && request.from.name) || 'them')
   const title = lobbyTitle(request.game)
   const press = primary => ({
     type: 'button',
     disabled: Boolean(busy),
     style: {
-      fontSize: 12, padding: '3px 10px', borderRadius: 999, cursor: busy ? 'default' : 'pointer',
+      fontSize: 12, padding: '2px 10px', borderRadius: 999, cursor: busy ? 'default' : 'pointer', flex: '0 0 auto',
       border: `1px solid ${primary ? accent : stroke}`,
       background: primary ? accent : 'transparent',
       color: primary ? 'var(--ui-text-on-accent, white)' : text.secondary
@@ -26158,14 +26253,14 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
     role: 'status',
     'aria-live': 'polite',
     style: {
-      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0,
-      border: `1px solid ${accent}`, borderRadius: 10, padding: '8px 10px', background: fill
+      flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0,
+      borderBottom: `1px solid ${accent}`, padding: '8px 10px', background: fill
     },
     children: [
       jsx('span', {
         'data-pane-invite-line': '1',
-        style: { flex: '1 1 160px', minWidth: 0, fontSize: 13, fontWeight: 650, lineHeight: 1.4 },
-        children: `${line} — ${left} s`
+        style: { flex: '1 1 150px', minWidth: 0, fontSize: 13, fontWeight: 650, lineHeight: 1.4 },
+        children: paneInviteWords(request)
       }),
       jsx('button', {
         ...press(true),
@@ -26181,63 +26276,81 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
         onClick: () => onAnswer(false),
         children: 'Decline'
       }),
-      note ? jsx('span', { 'data-pane-invite-note': '1', style: { fontSize: 11, color: text.secondary }, children: note }) : null
+      note ? jsx('span', { 'data-pane-invite-note': '1', style: { flexBasis: '100%', fontSize: 11, color: text.secondary }, children: note }) : null
     ]
   })
 }
 
-// The answer, from this surface: the same POST the Hall's own Accept and Decline send, so both
-// screens answer one request the same way. Accept then opens the table the lobby seated: the room
-// is opened here and the Games screen paints it, which is what "Accept" means to the person.
-async function inviteBellAnswer(ctx, request, accept) {
+// The answer, from any surface: the same POST the Hall's own Accept and Decline send, so every
+// screen answers one request the same way. Accept then opens the table the lobby seated. From the
+// chrome the Games screen paints it; with `here` (the side pane) nothing navigates and the seat is
+// handed back, so the pane draws the table itself. A seat that has not arrived yet comes back as
+// null, and the pane opens it from a later read.
+async function inviteBellAnswer(ctx, request, accept, options = {}) {
   if (!ctx || typeof ctx.rest !== 'function') return { ok: false, text: 'Game Center cannot be reached.' }
   try {
     const answer = await ctx.rest('/online/hall/respond', { method: 'POST', body: { id: request.id, accept: Boolean(accept) } })
     if (answer && answer.ok === false) return { ok: false, text: String(answer.text || 'The lobby did not take that answer.') }
     inviteBellDrop(request.id)
-    if (accept) {
-      const seat = await inviteBellSeat(ctx, request)
-      if (seat) await openOnlineTable(ctx, seat.room_id, seat.game)
-      inviteBellOpen()
+    if (!accept) return answer || { ok: true }
+    const seat = await inviteBellSeat(ctx, request)
+    if (options.here) {
+      if (seat) {
+        const opened = await openOnlineTable(ctx, seat.room_id, seat.game)
+        if (opened && opened.ok === false) return { ok: false, text: String(opened.text || 'That table would not open.') }
+      }
+      return { ...(answer || { ok: true }), seat: seat || null }
     }
+    if (seat) await openOnlineTable(ctx, seat.room_id, seat.game)
+    inviteBellOpen()
     return answer || { ok: true }
   } catch {
     return { ok: false, text: 'That did not reach Game Center. Try again.' }
   }
 }
 
+// The seat a snapshot carries for an accepted request, if it is one to open: not a room this
+// person already left, and not a seat made for another request.
+function inviteSeatOf(snap, requestId) {
+  const seated = (snap && snap.seated) || null
+  if (!seated || !seated.room_id) return null
+  if (HALL_LEFT.has(String(seated.room_id))) return null
+  const wanted = requestId ? String(requestId) : ''
+  const got = seated.request_id ? String(seated.request_id) : ''
+  if (wanted && got && wanted !== got) return null
+  return seated
+}
+
 // The seat the lobby just made, read once. A read that lands before the lobby's own "seated"
-// frame simply finds nothing; the Games screen opens the table on its next look.
+// frame simply finds nothing; the surface opens the table from a later read.
 async function inviteBellSeat(ctx, request) {
   try {
     const snap = await ctx.rest('/online/hall')
     if (!snap || typeof snap !== 'object') return null
     inviteBellFeed(snap)
-    const seated = snap.seated || null
-    if (!seated || !seated.room_id) return null
-    if (HALL_LEFT.has(String(seated.room_id))) return null
-    const wanted = request && request.id ? String(request.id) : ''
-    const got = seated.request_id ? String(seated.request_id) : ''
-    if (wanted && got && wanted !== got) return null
-    return seated
+    return inviteSeatOf(snap, request && request.id)
   } catch {
     return null
   }
 }
 
-// One surface's copy of the invite: who it is from, what game, and the two answers.
+// One chrome surface's copy of the invite: who it is from, what game, and the two answers. Its
+// element is always there (empty while nobody asks) so it can watch itself: an observer on its own
+// element says whether this copy is on screen.
 function InviteBell({ ctx, where = 'statusbar' }) {
   const bell = useInviteBell(ctx)
+  const surface = useInviteSurface(where)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
-  // This copy says it is on screen once, for as long as it is mounted: `where` is the surface the
-  // registration names and never changes under a mounted component.
-  useEffect(() => {
-    inviteBellMark(where, true)
-    return () => inviteBellMark(where, false)
-  }, [])
   const request = bell.request
-  if (!request || !inviteBellDraws(where)) return null
+  const drawing = Boolean(request) && inviteBellDraws(where)
+  const anchor = children => jsx('span', {
+    ref: surface,
+    'data-invite-surface': where,
+    style: { display: 'inline-flex', alignItems: 'center', minWidth: 1, minHeight: 1 },
+    children
+  })
+  if (!drawing) return anchor(null)
   const line = inviteBellLine(request)
   const name = String((request.from && request.from.name) || 'them')
   const title = lobbyTitle(request.game)
@@ -26259,7 +26372,7 @@ function InviteBell({ ctx, where = 'statusbar' }) {
     color: primary ? 'var(--ui-text-on-accent, white)' : text.secondary,
     whiteSpace: 'nowrap'
   })
-  return jsxs('span', {
+  return anchor(jsxs('span', {
     'data-invite-bell': where,
     role: 'status',
     'aria-live': 'polite',
@@ -26295,7 +26408,7 @@ function InviteBell({ ctx, where = 'statusbar' }) {
       }),
       note ? jsx('span', { 'data-invite-note': '1', style: { color: text.secondary }, children: note }) : null
     ]
-  })
+  }))
 }
 
 // ---- 78-overchat-slot.js: the see-through machines, anchored in the composer's own slot
@@ -26793,6 +26906,10 @@ export default {
   id: 'hermes-gameshelf',
   name: 'Game Center',
   register(ctx) {
+    // The one Hall poll that carries invites (77-invite-bell.js). It runs for as long as the
+    // plugin is registered, whichever slots are mounted, and the plugin's disposal stops it.
+    inviteBellStart(ctx)
+    if (typeof ctx.onDispose === 'function') ctx.onDispose(inviteBellStop)
     // The wait pane is registered on its own so × can take it off the screen (see 62-pane-state.js).
     WAIT_PANE_SLOT.ctx = ctx
     // A fresh load starts clean: the host already disposed the previous load's pane.
@@ -26882,8 +26999,8 @@ export default {
       },
       {
         // An invite, on a surface that is mounted all the time (77-invite-bell.js). The status bar
-        // is the one the person already reads; the titlebar copy below is its stand-in for a window
-        // whose status bar is hidden. Only one of the two ever draws.
+        // is the one the person already reads; the titlebar copy below is its stand-in while the
+        // status-bar copy's own element is out of sight. Only one of the two ever draws.
         id: 'invite',
         area: STATUSBAR_AREAS.right,
         order: 142,

@@ -49,7 +49,8 @@ const INVITE_BELL = {
   error: '',
   ctx: null,
   fresh: 0,
-  notified: '',
+  notified: new Set(),
+  readGeneration: 0,
   noticeTimer: null,
   watching: false,
   timer: null,
@@ -113,9 +114,6 @@ function inviteBellFeed(snap) {
   const request = inviteOf(snap)
   inviteBellPublish({ request })
   if (request) inviteBellNotice(request)
-  // The side pane follows the same snapshot. No second poll: this is the read the
-  // Hall, the Games card and the bell already share.
-  if (typeof invitePaneFollow === 'function') invitePaneFollow(snap)
   inviteBellSchedule()
 }
 
@@ -138,7 +136,7 @@ function inviteBellShown() {
 // surface that has just mounted has had the moment it needs to say whether it is on screen.
 function inviteBellNotice(request) {
   const id = String((request && request.id) || '')
-  if (!id || INVITE_BELL.notified === id || INVITE_BELL.noticeTimer) return
+  if (!id || INVITE_BELL.notified.has(id) || INVITE_BELL.noticeTimer) return
   INVITE_BELL.noticeTimer = setTimeout(() => {
     INVITE_BELL.noticeTimer = null
     inviteBellNotify(id)
@@ -149,7 +147,7 @@ function inviteBellNotice(request) {
 // and never twice for one request id.
 function inviteBellNotify(id) {
   const request = INVITE_BELL.request
-  if (!request || String(request.id) !== id || INVITE_BELL.notified === id) return
+  if (!request || String(request.id) !== id || INVITE_BELL.notified.has(id)) return
   const prefs = (INVITE_BELL.snap && INVITE_BELL.snap.prefs) || {}
   // Nobody can ask a person who has invitations off; a request that arrived before the switch
   // went off is still shown and still answerable, and it makes no notice.
@@ -157,7 +155,7 @@ function inviteBellNotify(id) {
   if (inviteBellShown()) return
   const ctx = INVITE_BELL.ctx
   if (!ctx || !ctx.os || typeof ctx.os.notify !== 'function') return
-  INVITE_BELL.notified = id
+  INVITE_BELL.notified.add(id)
   try {
     ctx.os.notify({
       title: 'Someone wants to play',
@@ -204,7 +202,9 @@ function inviteBellSchedule() {
 async function inviteBellRead(ctx) {
   if (!ctx || typeof ctx.rest !== 'function') return
   try {
+    const generation = ++INVITE_BELL.readGeneration
     const answer = await ctx.rest('/online/hall')
+    if (generation !== INVITE_BELL.readGeneration) return
     if (answer && typeof answer === 'object') inviteBellFeed(answer)
     else inviteBellPublish({ error: '' })
   } catch {
@@ -263,6 +263,7 @@ function inviteBellStart(ctx) {
 }
 
 function inviteBellStop() {
+  INVITE_BELL.readGeneration += 1
   inviteBellUnwatch()
 }
 
