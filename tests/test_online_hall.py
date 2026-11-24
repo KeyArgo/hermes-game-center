@@ -1261,3 +1261,70 @@ def test_a_seat_expires_and_a_reconnect_drops_it_unless_the_table_is_live(tmp_pa
         "prefs": {"open": False, "games": {}}, "roster": [], "requests": [],
     })
     assert hall.snapshot()["seated"]["room_id"] == "r1", "and a reconnect keeps it while that socket is live"
+
+
+def test_live_hall_reconnects_when_account_changes(monkeypatch):
+    from shelf import online_hall
+
+    class Source:
+        on = True
+        url = "https://games.example"
+        player = "Ada"
+
+        def key(self):
+            return self.player
+
+    class Socket:
+        def __init__(self, url, timeout):
+            self.closed = False
+            self.url = url
+            sockets.append(self)
+
+        def send_json(self, frame):
+            if frame["t"] == "auth":
+                self.player = frame["token"]
+
+        def receive(self, timeout):
+            if hasattr(self, "player"):
+                name = self.player
+                del self.player
+                return {"t": "hello", "you": {"name": name}}
+            time.sleep(0.01)
+
+        def close(self):
+            self.closed = True
+
+    sockets = []
+    monkeypatch.setattr(online_hall.wsmod, "Socket", Socket)
+    source = Source()
+    hall = Hall(source)
+    try:
+        hall.start()
+        run(wait_snapshot(hall, lambda s: s["you"]["name"] == "Ada"))
+        source.player = "Bea"
+        hall.start()
+        assert sockets[0].closed
+        run(wait_snapshot(hall, lambda s: s["you"]["name"] == "Bea"))
+        source.url = "https://other.example"
+        assert hall.retry()["you"]["name"] == "Bea"
+        assert sockets[1].closed and "other.example" in sockets[2].url
+        source.player = ""
+        hall.start()
+        assert sockets[2].closed and hall.snapshot()["state"] == "off"
+    finally:
+        hall.stop()
+
+
+def test_hall_keeps_latest_status_until_search_ends(monkeypatch):
+    hall = Hall(None)
+    monkeypatch.setattr(hall, "send", lambda frame: {"ok": True})
+    for end in (lambda: hall.looking(on=False), lambda: hall.prefs(invisible=True),
+                lambda: hall._apply({"t": "seated"}), lambda: hall._apply({"t": "looking_state", "looking": []})):
+        hall._apply({"t": "hello", "you": {"looking": ["chessboard"]}})
+        for text in ("Asking Bea", "Bea passed on Chess. Still looking."):
+            hall._apply({"t": "looking_status", "game": "chessboard", "asking": None, "text": text})
+            assert hall.snapshot()["you"].get("looking_text") == text
+        end()
+        assert hall.snapshot()["you"]["looking_text"] == ""
+    hall.stop()
+    assert hall.snapshot()["you"]["looking_text"] == ""

@@ -779,3 +779,39 @@ def test_a_looking_ack_carries_the_prefs_it_changed(world):
         assert gone["games"]["hex"] is False and gone["until"] == {}
 
     run(scenario())
+
+
+def test_search_expiry_clears_connected_hall(world):
+    from shelf.online_hall import Hall
+
+    _store, _rooms, people, clock, hub, service = world
+    ada = people["Ada"]
+    here(hub, ada)
+    assert run(look(service, ada, ["go"]))["ok"]
+    hall = Hall(None)
+    hall._apply({"t": "hello", "you": {"id": ada["id"], "looking": service.looking(ada["id"])}})
+    assert hall.snapshot()["you"]["looking"] == ["go"]
+    hub.sent.clear()
+    clock.now += TEMP_SECONDS + 1
+    run(service.pair_looking())
+    for pid, frame in hub.sent:
+        if pid == ada["id"]:
+            hall._apply(frame)
+    assert hall.snapshot()["you"]["looking"] == []
+
+
+def test_appearing_offline_withdraws_match_offer(world):
+    _store, _rooms, people, _clock, hub, service = world
+    ada, bea = people["Ada"], people["Bea"]
+    here(hub, ada, bea)
+    run(accepts(service, bea, "go"))
+    assert run(look(service, ada, ["go"]))["ok"]
+    card = asked_card(hub)
+    hub.sent.clear()
+    assert run(service.handle(ada, {"t": "prefs", "invisible": True}))["ok"]
+    assert any(pid == bea["id"] and frame["t"] == "request_update"
+               and frame["request"]["id"] == card["id"] and frame["request"]["state"] == "cancelled"
+               for pid, frame in hub.sent)
+    assert run(service.handle(ada, {"t": "prefs", "invisible": False}))["ok"]
+    assert not run(service.handle(bea, {"t": "respond", "id": card["id"], "accept": True}))["ok"]
+    assert not seated(hub)

@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -442,18 +443,38 @@ class Online:
         if not name:
             return {"ok": False, "text": "Sign in first, so the file knows whose account it is."}
         folder = Path(folder)
-        path = folder / f"GameCenter-{_file_safe(name)}.json"
+        stem = f"GameCenter-{_file_safe(name)}"
+        path = folder / f"{stem}.json"
+        temporary = None
+        reserved = False
         try:
             folder.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps({"name": name, "key": self.key(), "server": self.url,
-                                             "saved_at": int(self.clock())}), encoding="utf-8")
+            number = 1
+            while True:
+                try:
+                    path.touch(mode=0o600, exist_ok=False)
+                    reserved = True
+                    break
+                except FileExistsError:
+                    number += 1
+                    path = folder / f"{stem} ({number}).json"
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=folder,
+                                             suffix=".json.tmp", delete=False) as out:
+                temporary = Path(out.name)
+                json.dump({"name": name, "key": self.key(), "server": self.url,
+                           "saved_at": int(self.clock())}, out)
             filelock.replace(temporary, path)
+            reserved = False
         except OSError:
             log.warning("the account file could not be written", exc_info=True)
             return {"ok": False,
                     "text": f"Your account file could not be written to {folder}. Show my key still works; "
                             "copy it somewhere safe."}
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            if reserved:
+                path.unlink(missing_ok=True)
         return {"ok": True, "path": str(path), "text": f"Saved in {folder} as {path.name}."}
 
     def ensure_account(self, seed: str = "") -> dict:

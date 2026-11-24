@@ -198,10 +198,16 @@ class Service:
             text = self._apply_prefs(player["id"], frame)
             if text:
                 return self._ack(frame, False, text)
+            frames = []
+            if frame.get("invisible"):
+                for row in self._stop_looking(player["id"]):
+                    frames.extend(self._updates(self._card(row)))
             # Someone opening up can be the match a waiting person was looking for.
-            frames = self._pair_locked(float(self.clock()))
+            frames.extend(self._pair_locked(float(self.clock())))
+            ack = self._ack(frame, True, "Saved.")
+            ack["prefs"] = self.prefs(player["id"])
         await self._emit(frames)
-        return self._ack(frame, True, "Saved.")
+        return ack
 
     def _apply_prefs(self, player_id: str, frame: dict) -> str:
         if "open" in frame and not isinstance(frame.get("open"), bool):
@@ -248,10 +254,6 @@ class Service:
         self.store.save_availability(player_id, open_flag, merged, float(self.clock()), windows)
         if "invisible" in frame:
             self.store.save_invisible(player_id, bool(frame["invisible"]), float(self.clock()))
-            if frame["invisible"]:
-                # Somebody who is not in the lobby is not looking for a match in it.
-                self.store.clear_looking(player_id)
-                self._forget(player_id)
         return ""
 
     # Find match ---------------------------------------------------------------
@@ -279,9 +281,7 @@ class Service:
     def _apply_looking(self, player_id: str, frame: dict) -> tuple[str, list[dict], list[str]]:
         """(refusal, the offers withdrawn, the games just put on a twenty-minute window)."""
         if frame.get("on") is False or frame.get("stop") is True:
-            self.store.clear_looking(player_id)
-            self._forget(player_id)
-            return "", self._withdraw_offers(player_id), []
+            return "", self._stop_looking(player_id), []
         all_games = frame.get("all")
         if all_games is not None and not isinstance(all_games, bool):
             return "Say whether to look for every game.", [], []
@@ -317,6 +317,11 @@ class Service:
         self.store.set_game_window(player_id, game, now + TEMP_SECONDS, now)
         return True
 
+    def _stop_looking(self, player_id: str) -> list[dict]:
+        self.store.clear_looking(player_id)
+        self._forget(player_id)
+        return self._withdraw_offers(player_id)
+
     def _withdraw_offers(self, player_id: str, games=None) -> list[dict]:
         """Stopping takes the offer that is out back, so nobody is seated by mistake.
 
@@ -348,6 +353,13 @@ class Service:
             return f"Looking for {self._title(games[0])}."
         return f"Looking for {len(games)} games."
 
+    def _expire_searches(self, now: float) -> list[tuple[str, dict]]:
+        frames = []
+        for pid in self.store.clear_looking_expired(now - LOOKING_SECONDS):
+            self._forget(pid)
+            frames.append((pid, {"t": "looking_state", "looking": self.looking(pid)}))
+        return frames
+
     def _pair_locked(self, now: float) -> list[tuple[str, dict]]:
         """One person at a time, longest wait first: the owner's matchmaking.
 
@@ -355,18 +367,17 @@ class Service:
         nobody is left it says so and keeps looking, so whoever comes online later is
         asked on a later pass. A search lasts as long as its twenty-minute window.
         """
-        self.store.clear_looking_expired(now - LOOKING_SECONDS)
+        frames = self._expire_searches(now)
         looking: dict[str, dict[str, float]] = {}
         for row in self.store.all_looking():
             looking.setdefault(str(row["player_id"]), {})[str(row["game"])] = float(row["created"])
         if not looking:
-            return []
+            return frames
         connected = self.hub.online_players() if callable(getattr(self.hub, "online_players", None)) else None
         busy = self.store.pending_offer_players()
         behind = self.store.last_game_ends(list(looking))
         # Whoever has waited longest since a game is asked first.
         order = sorted(looking, key=lambda pid: (behind.get(pid, 0.0), pid))
-        frames: list[tuple[str, dict]] = []
         for looker in order:
             if looker in busy or not self._may_be_offered(looker, connected):
                 continue
@@ -514,17 +525,26 @@ class Service:
         if row["state"] != "pending":
             return self._ack(frame, False, "That request is no longer open."), []
         now = float(self.clock())
+        if row["expires"] <= now:
+            return self._expired_response(row, frame, now)
         saved = self.store.decline_play_request(row["id"], now)
         card = self._card(saved or row)
         frames = self._updates(card)
         if card["offer"]:
-            self.store.clear_looking_expired(now - LOOKING_SECONDS)
+            frames.extend(self._expire_searches(now))
             if card["game"] in self.looking(card["from_id"]):
                 title = self._title(card["game"])
                 text = f"{card['to']['name']} passed on {title}. Still looking."
                 frames.append((card["from_id"], {"t": "looking_status", "game": card["game"],
                                                  "title": title, "asking": None, "text": text}))
         return self._ack(frame, True, "Declined."), frames
+
+    def _expired_response(self, row: dict, frame: dict, now: float) -> tuple[dict, list]:
+        saved = self.store.set_play_state(row["id"], "expired")
+        frames = self._updates(self._card(saved or row))
+        if row.get("offer"):
+            frames.extend(self._pair_locked(now))
+        return self._ack(frame, False, "That request is no longer open."), frames
 
     @staticmethod
     def _may_answer(player_id: str, row: dict) -> bool:
@@ -549,9 +569,9 @@ class Service:
             return self._ack(frame, True, "You are seated."), self._seated_notice(row)
         if row["state"] != "pending":
             return self._ack(frame, False, "That request is no longer open."), []
-        if row["expires"] <= float(self.clock()):
-            saved = self.store.set_play_state(row["id"], "expired")
-            return self._ack(frame, False, "That request is no longer open."), self._updates(self._card(saved or row))
+        now = float(self.clock())
+        if row["expires"] <= now:
+            return self._expired_response(row, frame, now)
         sender = self.store.player(row["from_id"]) or {"id": row["from_id"], "name": "", "bot": False}
         text = self._screen(sender, row["to_id"], row["game"], creating=False, offer=bool(row.get("offer")))
         if text:

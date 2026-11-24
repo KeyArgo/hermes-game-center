@@ -1483,9 +1483,10 @@ class Store:
     def clear_looking(self, player_id: str) -> int:
         return self.db.execute("DELETE FROM looking WHERE player_id = ?", (player_id,)).rowcount
 
-    def clear_looking_expired(self, before: float) -> int:
+    def clear_looking_expired(self, before: float) -> set[str]:
         """Drop searches whose twenty-minute window has run out."""
-        return self.db.execute("DELETE FROM looking WHERE created <= ?", (float(before),)).rowcount
+        rows = self.db.execute("DELETE FROM looking WHERE created <= ? RETURNING player_id", (float(before),))
+        return {row["player_id"] for row in rows}
 
     def all_looking(self) -> list[dict]:
         """Every account still looking, with the game and when it started."""
@@ -1538,7 +1539,7 @@ class Store:
 
     def requests_sent_since(self, player_id: str, since: float) -> int:
         return int(self.db.execute(
-            "SELECT COUNT(*) FROM play_requests WHERE from_id = ? AND created > ?",
+            "SELECT COUNT(*) FROM play_requests WHERE from_id = ? AND offer = 0 AND created > ?",
             (player_id, since),
         ).fetchone()[0])
 

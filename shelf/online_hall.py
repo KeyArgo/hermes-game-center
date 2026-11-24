@@ -47,7 +47,7 @@ def _blank_prefs() -> dict:
 
 
 def _blank_you() -> dict:
-    return {"id": "", "name": "", "invisible": False, "looking": []}
+    return {"id": "", "name": "", "invisible": False, "looking": [], "looking_text": ""}
 
 
 def _is_rejected_upgrade(exc: Exception) -> bool:
@@ -161,12 +161,14 @@ class Hall:
                 self._say("not opened: online play is off")
                 return
             key = self.online.key()
+            url = self.online.url
+            if self._thread and not self._stop.is_set() and (self._key != key or self._url != url):
+                self.stop()
             if not key:
                 self._say("not opened: this computer has no sign-in key")
                 return
             # Hermes gives out a secret only inside the request's profile scope, and a thread does
             # not inherit it: keep the key this request could read for the worker to dial with.
-            self._key = key
             if self._thread is not None and self._thread.is_alive():
                 with self._lock:
                     if wake and self._state != "live":
@@ -175,6 +177,8 @@ class Hall:
                         self._dial.set()
                 return
             with self._lock:
+                self._key = key
+                self._url = url
                 self._stop = threading.Event()
                 self._dial = threading.Event()
                 self._out = queue.Queue()
@@ -246,10 +250,8 @@ class Hall:
         with self._lock:
             live = self._state == "live"
             talking = self._socket is not None
-        if live:
-            return self.snapshot()
         self._unsaid()
-        if talking:
+        if talking and not live:
             # A session that is not answering must be let go, not merely woken.
             self.stop()
         self.start()
@@ -387,7 +389,7 @@ class Hall:
         has to be told.
         """
         with self._lock:
-            if self._state != "live":
+            if self._state != "live" or self._stop.is_set():
                 return {"ok": False, "text": NOT_CONNECTED}
             self._ref += 1
             op = f"h{self._ref}"
@@ -435,9 +437,17 @@ class Hall:
             return {"ok": False, "text": "Nothing to change."}
         answer = self.send(frame)
         if answer.get("ok"):
-            # The server does not push a prefs frame back, so reflect the change
-            # locally for exactly the fields that were set.
             with self._lock:
+                if "invisible" in frame:
+                    self._you["invisible"] = frame["invisible"]
+                    if frame["invisible"]:
+                        # Appearing offline ends find match: nothing is looking for you.
+                        self._you["looking"] = []
+                        self._you["looking_text"] = ""
+                if isinstance(answer.get("prefs"), dict):
+                    self._prefs = self._clean_prefs(answer["prefs"])
+                    return answer
+                # Older servers only acknowledge the edit.
                 if "open" in frame:
                     self._prefs["open"] = frame["open"]
                 for game, enabled in frame.get("games", {}).items():
@@ -459,11 +469,6 @@ class Hall:
                     self._prefs.setdefault("until", {}).pop(game, None)
                     if enabled:
                         self._prefs["open"] = True
-                if "invisible" in frame:
-                    self._you["invisible"] = frame["invisible"]
-                    if frame["invisible"]:
-                        # Appearing offline ends find match: nothing is looking for you.
-                        self._you["looking"] = []
         return answer
 
     def looking(self, games=None, *, all_games=False, on=True) -> dict:
@@ -490,6 +495,7 @@ class Hall:
             with self._lock:
                 if not on:
                     self._you["looking"] = []
+                    self._you["looking_text"] = ""
                 elif all_games is True:
                     self._you["looking"] = list(REQUESTABLE)
                 else:
@@ -545,7 +551,7 @@ class Hall:
 
     def _run(self, stop: threading.Event, dial: threading.Event) -> None:
         while not stop.is_set():
-            key = self.online.key() or getattr(self, "_key", "")
+            key = self._key
             if not key:
                 self._say("stopped: no sign-in key could be read")
                 with self._lock:
@@ -558,7 +564,7 @@ class Hall:
                 self._state = "connecting"
             sock = None
             try:
-                sock = wsmod.Socket(wsmod.socket_url(self.online.url, "/api/lobby/socket"), timeout=5)
+                sock = wsmod.Socket(wsmod.socket_url(self._url, "/api/lobby/socket"), timeout=5)
             except wsmod.SocketError as exc:
                 slow = _is_rejected_upgrade(exc)
                 diagnostics.log.info("lobby connect failed: %s", exc)
@@ -736,6 +742,7 @@ class Hall:
                     "id": str(you.get("id") or ""),
                     "name": str(you.get("name") or ""),
                     "invisible": bool(you.get("invisible")),
+                    "looking_text": "",
                     "looking": [str(game) for game in (you.get("looking") or []) if isinstance(game, str)],
                 }
                 self._prefs = self._clean_prefs(message.get("prefs"))
@@ -761,6 +768,12 @@ class Hall:
                         learn(self._you["name"])
                     except Exception:
                         log.warning("the lobby's name for this account could not be kept", exc_info=True)
+            elif kind == "looking_status":
+                self._you["looking_text"] = str(message.get("text") or "")
+            elif kind == "looking_state":
+                self._you["looking"] = list(message.get("looking") or [])
+                if not self._you["looking"]:
+                    self._you["looking_text"] = ""
             elif kind == "presence":
                 row = message.get("row") or {}
                 if isinstance(row, dict) and row.get("id"):
@@ -774,6 +787,7 @@ class Hall:
             elif kind == "seated":
                 # A seat is the end of find match: the person is at a table now.
                 self._you["looking"] = []
+                self._you["looking_text"] = ""
                 self._seated = {
                     "room_id": message.get("room_id"),
                     "game": message.get("game"),
