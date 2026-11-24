@@ -1,6 +1,6 @@
 # Testing
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-23 (961c0389)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-24 (dc8be50a)_
 
 How to run every suite, what each one covers, and the counts measured on this commit.
 

@@ -6,6 +6,27 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- **Bug hunt 3: 23 fixes, each with a regression test that fails on 6e59ea7.**
+  - *Online lobby and account (shelf/, online/):* a changed sign-in key or server reopens the Hall
+    session instead of keeping the old one; exporting two accounts with the same name keeps both files,
+    and a failed export leaves no `.json.tmp` key behind; a search that runs out, or appearing offline,
+    ends the search and withdraws its match offers; declining after the deadline expires the request
+    instead of stamping a cooldown; match offers no longer count toward the eight-an-hour invite limit;
+    the first open syncs the Hall's game choices from the server; the lobby's search line ("Bea passed
+    on Chess. Still looking.") reaches the Hall snapshot as `you.looking_text`; a slots spin reports the
+    row the wallet saved, comeback bonus included. Guards in `tests/test_online_*.py`, `test_bailout.py`.
+  - *Games:* blackjack hints no longer split fours or fives; a shoe rebuilt mid-hand leaves out the
+    cards on the table; mafia bots never vote for themselves or a known partner, and a typed `3` picks
+    Player 3; the slots pay table is priced at the bet on screen. Guards in
+    `tests/test_blackjack_reshuffle.py`, `test_blackjack_hint_pairs.py`, `test_mafia_bot_votes.py`,
+    `test_slots_paytable_bet.py`.
+  - *Desktop:* the pane poll never stacks reads and slows to every 5 s while hidden; an invite still
+    notifies while searching or inside a game's twenty-minute window; answering in the Hall clears the
+    status-bar invite at once; the search line is drawn under the search; one failed read is a small
+    line, not a blank pane; the two sound switches and Settings agree; an error note stays with the
+    invite it was about; the version chip reads version · commit · date. Guards in
+    `tests/invite_rework_harness.cjs` and `tests/test_about_version.py`.
+
 - **The see-through slot machines over the chat show only their X and sound switch.** The spin button,
   the switches, the machine picker and the backdrop's own settings were drawn there but could not be
   used. They now live only where they work (the Games page, Settings). The X turns "Show as backdrop"

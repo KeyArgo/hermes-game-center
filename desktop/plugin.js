@@ -594,8 +594,25 @@ function gamesSoundOn() {
   }
 }
 
+// Every switch that draws this setting (both backdrop machines and Settings) hears a flip made on
+// any of them, so no copy is left showing the old state.
+const SOUND_EVENT = 'hermes-games-sound'
+
 function gamesSoundSet(on) {
   try { window.localStorage.setItem(SOUND_KEY, on ? 'on' : 'off') } catch { /* nothing to save to */ }
+  try { window.dispatchEvent(new CustomEvent(SOUND_EVENT)) } catch { /* nobody to tell */ }
+}
+
+// The sound setting as a switch draws it: one source (storage), redrawn when any copy flips it.
+function useGamesSoundOn() {
+  const [on, setOn] = useState(gamesSoundOn)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined
+    const follow = () => setOn(gamesSoundOn())
+    window.addEventListener(SOUND_EVENT, follow)
+    return () => window.removeEventListener(SOUND_EVENT, follow)
+  }, [])
+  return [on, setOn]
 }
 
 let soundStack = null
@@ -869,7 +886,7 @@ function gamesSound(kind, options) {
 
 // The switch, in Settings: one row, remembered on this machine.
 function SoundSetting() {
-  const [on, setOn] = useState(gamesSoundOn())
+  const [on, setOn] = useGamesSoundOn()
   const [volume, setVolume] = useState(() => Math.round(gamesVolume() * 100))
   const row = toggleRow({
     title: 'Table sounds',
@@ -4940,7 +4957,7 @@ function JackpotMachine(props) {
   const [picked, setPicked] = useState('')
   const [autoplayLocal, setAutoplayLocal] = useState(null)
   const [autobetLocal, setAutobetLocal] = useState(null)
-  const [soundOn, setSoundOn] = useState(() => (typeof gamesSoundOn === 'function' ? gamesSoundOn() : true))
+  const [soundOn, setSoundOn] = useGamesSoundOn()
   const [spinPress, setSpinPress] = useState(false)
   const [lever, setLever] = useState(false)
   const [cashFlash, setCashFlash] = useState('')
@@ -7293,7 +7310,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   })
 
   // The see-through copy's sound switch: the same games-wide setting the other machine's 🔊 flips.
-  const [soundOn, setSoundOn] = useState(() => (typeof gamesSoundOn === 'function' ? gamesSoundOn() : true))
+  const [soundOn, setSoundOn] = useGamesSoundOn()
   const soundButton = jsx('button', {
     type: 'button',
     'data-sm-sound': soundOn ? 'on' : 'off',
@@ -21141,6 +21158,12 @@ function PanePeople({ ctx, bell, playHere }) {
       button('Stop', () => post('looking', lobbyLookingBody([])), { disabled: pending })
     ] : games.length ? button('Find a match', () => post('looking', lobbyLookingBody(games)), { primary: true, disabled: pending })
       : button('Choose games', () => setEditing(true)) }),
+    // The lobby's own word on the search ("Bea passed on Chess. Still looking."), one calm line.
+    you.looking_text ? jsx('div', {
+      'data-pane-looking-text': '1', role: 'status', title: String(you.looking_text),
+      style: { fontSize: 12, color: text.tertiary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+      children: String(you.looking_text)
+    }) : null,
     asking ? jsxs('div', { style: rowStyle, children: [
       `Asking ${asking.to.name} to play ${lobbyTitle(asking.game)} · ${Math.max(0, Math.ceil(asking.expires - Date.now() / 1000))}s ·`,
       button('Cancel', () => post('cancel', { id: asking.id }), { disabled: pending })
@@ -21160,7 +21183,8 @@ function WaitPane({ ctx }) {
   const inviteBell = useInviteBell(ctx)
   const observePane = useInviteSurface('pane')
   const [inviteBusy, setInviteBusy] = useState(false)
-  const [inviteNote, setInviteNote] = useState('')
+  // A refused answer's note, kept with the id it was about: the next invite never wears it.
+  const [inviteNoteFor, setInviteNote] = useState({ id: '', text: '' })
   const [waitingForSeat, setWaitingForSeat] = useState('')
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
@@ -21174,6 +21198,8 @@ function WaitPane({ ctx }) {
   const [jackpot, setJackpot] = useState(false)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
+  // A game the pane had to set aside, said for ten seconds: the next good read must not wipe it.
+  const [asideNote, setAsideNote] = useState(null)
   const [chat, setChat] = useState('')
   const [name, setName] = useState('')
   const [alerts, setAlerts] = useState(() => paneAlerts(ctx))
@@ -21337,7 +21363,8 @@ function WaitPane({ ctx }) {
             paneWatch.game = ''
             storeValue(ctx, PANE_GAME_KEY, '')
             setBoard({ text: '', picture: null })
-            setError(`${chosen} could not load, so the pane moved to another game. It will try ${chosen} again in a minute.`)
+            const title = (((next && next.play) || []).find(item => item.id === chosen) || {}).title || chosen
+            setAsideNote({ text: `${title} could not load, so the pane moved to another game. It will try ${title} again in a minute.`, until: Date.now() + 10000 })
           }
           return
         }
@@ -21360,9 +21387,18 @@ function WaitPane({ ctx }) {
   useEffect(() => {
     load()
     // The waiting pane is watched, not glanced at: a three-second poll is why the machine in it
-    // moved a beat behind the person. It now reads every second, and the board itself only when the
-    // game changed or three seconds have passed, so the extra reads stay cheap.
-    const timer = setInterval(() => load(), 1000)
+    // moved a beat behind the person. It now reads /view and the board every second, but never
+    // starts a tick while the last one is still out (a slow shelf would pile reads up), and only
+    // every five seconds while the window is hidden.
+    let polling = false
+    let polledAt = 0
+    const timer = setInterval(() => {
+      if (polling) return
+      if (typeof document !== 'undefined' && document && document.hidden && Date.now() - polledAt < 5000) return
+      polling = true
+      polledAt = Date.now()
+      load().finally(() => { polling = false })
+    }, 1000)
     return () => clearInterval(timer)
   }, [load])
 
@@ -21644,10 +21680,11 @@ function WaitPane({ ctx }) {
     return () => { live = false }
   }, [restarting, dealWho, modelRoutes.length, ctx])
   const lobby = (view && view.lobby) || { lines: [], looking: [] }
+  const inviteNote = inviteBell.request && inviteNoteFor && inviteNoteFor.id === String(inviteBell.request.id) ? inviteNoteFor.text : ''
   const inviteBar = paneInviteBlock(ctx, inviteBell.request, inviteBusy, inviteNote, async accept => {
     if (inviteBusy || !inviteBell.request) return
     setInviteBusy(true)
-    setInviteNote('')
+    setInviteNote({ id: '', text: '' })
     try {
       const id = inviteBell.request.id
       const reply = await inviteBellAnswer(ctx, inviteBell.request, accept, { here: true })
@@ -21660,7 +21697,7 @@ function WaitPane({ ctx }) {
       }
       if (reply && reply.ok === false) {
         const message = String(reply.text || 'The lobby did not take that answer.')
-        if (INVITE_BELL.request) setInviteNote(message)
+        if (INVITE_BELL.request) setInviteNote({ id: String(id), text: message })
         else setProblem(message)
       }
     } finally {
@@ -21700,9 +21737,14 @@ function WaitPane({ ctx }) {
     })
   }
 
-  if (error) {
-    return jsxs('div', { ref: paneRef, children: [inviteBar, jsx('div', { role: 'alert', style: { padding: 12 }, children: error })] })
-  }
+  // A failed read is one small line under the header: the last good view, an open table and the
+  // pane's own × and – all stay.
+  const failLines = [
+    error ? jsx('div', { role: 'alert', 'data-pane-error': '1', style: { fontSize: 12, color: text.secondary }, children: error }) : null,
+    asideNote && asideNote.until > Date.now()
+      ? jsx('div', { role: 'alert', 'data-pane-aside': '1', style: { fontSize: 12, color: text.secondary }, children: asideNote.text })
+      : null
+  ]
 
   const iconTitles = {
     'Full screen': 'Open this game in Game Center full screen. The pane closes.',
@@ -22287,6 +22329,7 @@ function WaitPane({ ctx }) {
         jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
         inviteBar,
         header,
+        ...failLines,
         settings
           ? settingsView
           : jsx('div', {
@@ -22313,8 +22356,9 @@ function WaitPane({ ctx }) {
       jsxs('div', {
         'data-pane-scroll': '1',
         style: { display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'auto' },
-        children: settings ? [header, settingsView] : [
+        children: settings ? [header, ...failLines, settingsView] : [
           header,
+          ...failLines,
           agentRow(agentNotice(busy, finished, approval), ctx),
           problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
           noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,
@@ -24473,7 +24517,7 @@ function Avatar({ name, pet, kind }) {
 // answer, so a chip can never claim to be looking for a game the lobby was not told
 // about. Nothing is picked by default: pressing Find match yourself turns one on, and
 // pressing the last one off (or Stop) turns it off.
-function LobbyFindMatch({ looking, post, pending, busyNote }) {
+function LobbyFindMatch({ looking, lookingText, post, pending, busyNote }) {
   const mine = LOBBY_GAME_IDS.filter(id => (looking || []).includes(id))
   const all = mine.length === LOBBY_GAME_IDS.length
   // The pill that was just pressed stays lit. The others wait, so a second search cannot
@@ -24531,7 +24575,13 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
       ...LOBBY_GAMES.map(([id, label]) => chip(id, label, mine.includes(id))),
       allChip
     ] }),
-    jsx('div', { style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }, children: wanted })
+    jsx('div', { style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }, children: wanted }),
+    // The lobby's own word on the search ("Bea passed on Chess. Still looking."), one calm line.
+    lookingText ? jsx('div', {
+      'data-lobby-looking-text': '1', role: 'status', 'aria-live': 'polite', title: String(lookingText),
+      style: { fontSize: 11, color: text.secondary, lineHeight: 1.45, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      children: String(lookingText)
+    }) : null
   ] })
 }
 
@@ -24785,6 +24835,12 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       // stay, exactly as the Games page's Play button does: one question per granted game.
       const granted = lobbyAlwaysAsk(answer, body, askedAlways)
       if (alive.current && granted.length) setAskAlways(queue => queue.concat(granted))
+      // An answered invite leaves the status bar and this card at the press, and a read now
+      // brings the lobby's own word, rather than leaving live buttons up until the next poll.
+      if (path === '/online/hall/respond' && answer && answer.ok !== false && body) {
+        inviteBellDrop(body.id)
+        await inviteBellRead(ctx)
+      }
       return answer || { ok: true }
     } catch (error) {
       if (alive.current) {
@@ -24983,7 +25039,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       style: { ...muted, color: text.secondary },
       children: 'Reconnecting… the list below is the last one this computer saw.'
     }) : null,
-    jsx(LobbyFindMatch, { looking: shownLooking, post, pending, busyNote: HALL_BUSY_NOTE }),
+    jsx(LobbyFindMatch, { looking: shownLooking, lookingText: you.looking_text, post, pending, busyNote: HALL_BUSY_NOTE }),
     lobbyAlwaysBlock(askAlways[0], {
       post, pending, busyNote: HALL_BUSY_NOTE,
       onDone: () => setAskAlways(queue => queue.slice(1))
@@ -26063,6 +26119,8 @@ function inviteBellFeed(snap) {
 // the next read. The server's own update follows and keeps it away.
 function inviteBellDrop(id) {
   const current = INVITE_BELL.request
+  // A read already on its way was asked before the answer: it must not put the request back.
+  INVITE_BELL.readGeneration += 1
   if (current && String(current.id) === String(id)) inviteBellPublish({ request: null })
 }
 
@@ -26091,9 +26149,14 @@ function inviteBellNotify(id) {
   const request = INVITE_BELL.request
   if (!request || String(request.id) !== id || INVITE_BELL.notified.has(id)) return
   const prefs = (INVITE_BELL.snap && INVITE_BELL.snap.prefs) || {}
+  const you = (INVITE_BELL.snap && INVITE_BELL.snap.you) || {}
   // Nobody can ask a person who has invitations off; a request that arrived before the switch
-  // went off is still shown and still answerable, and it makes no notice.
-  if (!prefs.open) return
+  // went off is still shown and still answerable, and it makes no notice. A Play press (its
+  // twenty-minute window) or a search for the game still takes requests with the switch off, so
+  // those are told.
+  const asking = Number((prefs.until || {})[request.game]) > Date.now() / 1000
+    || (Array.isArray(you.looking) && you.looking.includes(request.game))
+  if (!prefs.open && !asking) return
   if (inviteBellShown()) return
   const ctx = INVITE_BELL.ctx
   if (!ctx || !ctx.os || typeof ctx.os.notify !== 'function') return
@@ -26418,8 +26481,10 @@ function InviteBell({ ctx, where = 'statusbar' }) {
   const bell = useInviteBell(ctx)
   const surface = useInviteSurface(where)
   const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState('')
+  // A refused answer's note, kept with the id it was about: the next invite never wears it.
+  const [noteFor, setNote] = useState({ id: '', text: '' })
   const request = bell.request
+  const note = request && noteFor && noteFor.id === String(request.id) ? noteFor.text : ''
   const drawing = Boolean(request) && inviteBellDraws(where)
   const anchor = children => jsx('span', {
     ref: surface,
@@ -26434,10 +26499,10 @@ function InviteBell({ ctx, where = 'statusbar' }) {
   const answer = async accept => {
     if (busy) return
     setBusy(true)
-    setNote('')
+    setNote({ id: '', text: '' })
     try {
       const reply = await inviteBellAnswer(ctx, request, accept)
-      if (reply && reply.ok === false) setNote(String(reply.text || 'The lobby did not take that answer.'))
+      if (reply && reply.ok === false) setNote({ id: String(request.id), text: String(reply.text || 'The lobby did not take that answer.') })
     } finally {
       setBusy(false)
     }
@@ -26924,10 +26989,10 @@ function GamesVersionChip({ ctx, style }) {
   // A chip that leaves the screen mid-breath must not leave a timer behind.
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   if (!build) return null
-  // version · build date · short commit — the same line `--version` prints.
+  // version · short commit · commit date — the same order `--version` prints.
   const parts = ['v' + build.version]
-  if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
   if (build.commit_short || build.commit) parts.push(String(build.commit_short || build.commit).slice(0, 8))
+  if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
   const line = parts.join(' · ') + (build.dirty ? ' · modified' : '')
   const explain = [
     'Game Center ' + build.version,
