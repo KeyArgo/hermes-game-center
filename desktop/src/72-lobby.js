@@ -266,7 +266,7 @@ function Avatar({ name, pet, kind }) {
 // answer, so a chip can never claim to be looking for a game the lobby was not told
 // about. Nothing is picked by default: pressing Find match yourself turns one on, and
 // pressing the last one off (or Stop) turns it off.
-function LobbyFindMatch({ looking, post, pending, busyNote }) {
+function LobbyFindMatch({ looking, lookingText, post, pending, busyNote }) {
   const mine = LOBBY_GAME_IDS.filter(id => (looking || []).includes(id))
   const all = mine.length === LOBBY_GAME_IDS.length
   // The pill that was just pressed stays lit. The others wait, so a second search cannot
@@ -324,7 +324,13 @@ function LobbyFindMatch({ looking, post, pending, busyNote }) {
       ...LOBBY_GAMES.map(([id, label]) => chip(id, label, mine.includes(id))),
       allChip
     ] }),
-    jsx('div', { style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }, children: wanted })
+    jsx('div', { style: { fontSize: 11, color: text.tertiary, lineHeight: 1.45 }, children: wanted }),
+    // The lobby's own word on the search ("Bea passed on Chess. Still looking."), one calm line.
+    lookingText ? jsx('div', {
+      'data-lobby-looking-text': '1', role: 'status', 'aria-live': 'polite', title: String(lookingText),
+      style: { fontSize: 11, color: text.secondary, lineHeight: 1.45, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      children: String(lookingText)
+    }) : null
   ] })
 }
 
@@ -578,6 +584,12 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       // stay, exactly as the Games page's Play button does: one question per granted game.
       const granted = lobbyAlwaysAsk(answer, body, askedAlways)
       if (alive.current && granted.length) setAskAlways(queue => queue.concat(granted))
+      // An answered invite leaves the status bar and this card at the press, and a read now
+      // brings the lobby's own word, rather than leaving live buttons up until the next poll.
+      if (path === '/online/hall/respond' && answer && answer.ok !== false && body) {
+        inviteBellDrop(body.id)
+        await inviteBellRead(ctx)
+      }
       return answer || { ok: true }
     } catch (error) {
       if (alive.current) {
@@ -776,7 +788,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
       style: { ...muted, color: text.secondary },
       children: 'Reconnecting… the list below is the last one this computer saw.'
     }) : null,
-    jsx(LobbyFindMatch, { looking: shownLooking, post, pending, busyNote: HALL_BUSY_NOTE }),
+    jsx(LobbyFindMatch, { looking: shownLooking, lookingText: you.looking_text, post, pending, busyNote: HALL_BUSY_NOTE }),
     lobbyAlwaysBlock(askAlways[0], {
       post, pending, busyNote: HALL_BUSY_NOTE,
       onDone: () => setAskAlways(queue => queue.slice(1))

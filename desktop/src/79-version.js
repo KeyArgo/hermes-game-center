@@ -59,10 +59,10 @@ function GamesVersionChip({ ctx, style }) {
   // A chip that leaves the screen mid-breath must not leave a timer behind.
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   if (!build) return null
-  // version · build date · short commit — the same line `--version` prints.
+  // version · short commit · commit date — the same order `--version` prints.
   const parts = ['v' + build.version]
-  if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
   if (build.commit_short || build.commit) parts.push(String(build.commit_short || build.commit).slice(0, 8))
+  if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
   const line = parts.join(' · ') + (build.dirty ? ' · modified' : '')
   const explain = [
     'Game Center ' + build.version,

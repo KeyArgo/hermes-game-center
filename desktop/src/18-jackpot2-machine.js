@@ -494,7 +494,7 @@ function JackpotMachine(props) {
   const [picked, setPicked] = useState('')
   const [autoplayLocal, setAutoplayLocal] = useState(null)
   const [autobetLocal, setAutobetLocal] = useState(null)
-  const [soundOn, setSoundOn] = useState(() => (typeof gamesSoundOn === 'function' ? gamesSoundOn() : true))
+  const [soundOn, setSoundOn] = useGamesSoundOn()
   const [spinPress, setSpinPress] = useState(false)
   const [lever, setLever] = useState(false)
   const [cashFlash, setCashFlash] = useState('')

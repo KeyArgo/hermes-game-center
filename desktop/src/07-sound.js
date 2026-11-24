@@ -36,8 +36,25 @@ function gamesSoundOn() {
   }
 }
 
+// Every switch that draws this setting (both backdrop machines and Settings) hears a flip made on
+// any of them, so no copy is left showing the old state.
+const SOUND_EVENT = 'hermes-games-sound'
+
 function gamesSoundSet(on) {
   try { window.localStorage.setItem(SOUND_KEY, on ? 'on' : 'off') } catch { /* nothing to save to */ }
+  try { window.dispatchEvent(new CustomEvent(SOUND_EVENT)) } catch { /* nobody to tell */ }
+}
+
+// The sound setting as a switch draws it: one source (storage), redrawn when any copy flips it.
+function useGamesSoundOn() {
+  const [on, setOn] = useState(gamesSoundOn)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined
+    const follow = () => setOn(gamesSoundOn())
+    window.addEventListener(SOUND_EVENT, follow)
+    return () => window.removeEventListener(SOUND_EVENT, follow)
+  }, [])
+  return [on, setOn]
 }
 
 let soundStack = null
@@ -311,7 +328,7 @@ function gamesSound(kind, options) {
 
 // The switch, in Settings: one row, remembered on this machine.
 function SoundSetting() {
-  const [on, setOn] = useState(gamesSoundOn())
+  const [on, setOn] = useGamesSoundOn()
   const [volume, setVolume] = useState(() => Math.round(gamesVolume() * 100))
   const row = toggleRow({
     title: 'Table sounds',

@@ -22,6 +22,13 @@ CHECKS = [
     "notifyOncePerRequest",
     "onePollAndStopsOnDispose",
     "panePeopleUsesHallEndToEnd",
+    "panePollWaitsAndSlowsWhenHidden",
+    "noticeWhileSearchingOrWindowOpen",
+    "hallAnswerClearsBell",
+    "lookingTextUnderSearch",
+    "paneKeepsLayoutOnFailedRead",
+    "soundSwitchesAgree",
+    "inviteNoteBelongsToItsRequest",
 ]
 
 

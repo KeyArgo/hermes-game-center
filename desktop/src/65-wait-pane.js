@@ -123,6 +123,12 @@ function PanePeople({ ctx, bell, playHere }) {
       button('Stop', () => post('looking', lobbyLookingBody([])), { disabled: pending })
     ] : games.length ? button('Find a match', () => post('looking', lobbyLookingBody(games)), { primary: true, disabled: pending })
       : button('Choose games', () => setEditing(true)) }),
+    // The lobby's own word on the search ("Bea passed on Chess. Still looking."), one calm line.
+    you.looking_text ? jsx('div', {
+      'data-pane-looking-text': '1', role: 'status', title: String(you.looking_text),
+      style: { fontSize: 12, color: text.tertiary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+      children: String(you.looking_text)
+    }) : null,
     asking ? jsxs('div', { style: rowStyle, children: [
       `Asking ${asking.to.name} to play ${lobbyTitle(asking.game)} · ${Math.max(0, Math.ceil(asking.expires - Date.now() / 1000))}s ·`,
       button('Cancel', () => post('cancel', { id: asking.id }), { disabled: pending })
@@ -142,7 +148,8 @@ function WaitPane({ ctx }) {
   const inviteBell = useInviteBell(ctx)
   const observePane = useInviteSurface('pane')
   const [inviteBusy, setInviteBusy] = useState(false)
-  const [inviteNote, setInviteNote] = useState('')
+  // A refused answer's note, kept with the id it was about: the next invite never wears it.
+  const [inviteNoteFor, setInviteNote] = useState({ id: '', text: '' })
   const [waitingForSeat, setWaitingForSeat] = useState('')
   const saved = useRef(savedPaneGame(ctx))
   const [view, setView] = useState(null)
@@ -156,6 +163,8 @@ function WaitPane({ ctx }) {
   const [jackpot, setJackpot] = useState(false)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
+  // A game the pane had to set aside, said for ten seconds: the next good read must not wipe it.
+  const [asideNote, setAsideNote] = useState(null)
   const [chat, setChat] = useState('')
   const [name, setName] = useState('')
   const [alerts, setAlerts] = useState(() => paneAlerts(ctx))
@@ -319,7 +328,8 @@ function WaitPane({ ctx }) {
             paneWatch.game = ''
             storeValue(ctx, PANE_GAME_KEY, '')
             setBoard({ text: '', picture: null })
-            setError(`${chosen} could not load, so the pane moved to another game. It will try ${chosen} again in a minute.`)
+            const title = (((next && next.play) || []).find(item => item.id === chosen) || {}).title || chosen
+            setAsideNote({ text: `${title} could not load, so the pane moved to another game. It will try ${title} again in a minute.`, until: Date.now() + 10000 })
           }
           return
         }
@@ -342,9 +352,18 @@ function WaitPane({ ctx }) {
   useEffect(() => {
     load()
     // The waiting pane is watched, not glanced at: a three-second poll is why the machine in it
-    // moved a beat behind the person. It now reads every second, and the board itself only when the
-    // game changed or three seconds have passed, so the extra reads stay cheap.
-    const timer = setInterval(() => load(), 1000)
+    // moved a beat behind the person. It now reads /view and the board every second, but never
+    // starts a tick while the last one is still out (a slow shelf would pile reads up), and only
+    // every five seconds while the window is hidden.
+    let polling = false
+    let polledAt = 0
+    const timer = setInterval(() => {
+      if (polling) return
+      if (typeof document !== 'undefined' && document && document.hidden && Date.now() - polledAt < 5000) return
+      polling = true
+      polledAt = Date.now()
+      load().finally(() => { polling = false })
+    }, 1000)
     return () => clearInterval(timer)
   }, [load])
 
@@ -626,10 +645,11 @@ function WaitPane({ ctx }) {
     return () => { live = false }
   }, [restarting, dealWho, modelRoutes.length, ctx])
   const lobby = (view && view.lobby) || { lines: [], looking: [] }
+  const inviteNote = inviteBell.request && inviteNoteFor && inviteNoteFor.id === String(inviteBell.request.id) ? inviteNoteFor.text : ''
   const inviteBar = paneInviteBlock(ctx, inviteBell.request, inviteBusy, inviteNote, async accept => {
     if (inviteBusy || !inviteBell.request) return
     setInviteBusy(true)
-    setInviteNote('')
+    setInviteNote({ id: '', text: '' })
     try {
       const id = inviteBell.request.id
       const reply = await inviteBellAnswer(ctx, inviteBell.request, accept, { here: true })
@@ -642,7 +662,7 @@ function WaitPane({ ctx }) {
       }
       if (reply && reply.ok === false) {
         const message = String(reply.text || 'The lobby did not take that answer.')
-        if (INVITE_BELL.request) setInviteNote(message)
+        if (INVITE_BELL.request) setInviteNote({ id: String(id), text: message })
         else setProblem(message)
       }
     } finally {
@@ -682,9 +702,14 @@ function WaitPane({ ctx }) {
     })
   }
 
-  if (error) {
-    return jsxs('div', { ref: paneRef, children: [inviteBar, jsx('div', { role: 'alert', style: { padding: 12 }, children: error })] })
-  }
+  // A failed read is one small line under the header: the last good view, an open table and the
+  // pane's own × and – all stay.
+  const failLines = [
+    error ? jsx('div', { role: 'alert', 'data-pane-error': '1', style: { fontSize: 12, color: text.secondary }, children: error }) : null,
+    asideNote && asideNote.until > Date.now()
+      ? jsx('div', { role: 'alert', 'data-pane-aside': '1', style: { fontSize: 12, color: text.secondary }, children: asideNote.text })
+      : null
+  ]
 
   const iconTitles = {
     'Full screen': 'Open this game in Game Center full screen. The pane closes.',
@@ -1269,6 +1294,7 @@ function WaitPane({ ctx }) {
         jsx('style', { 'data-pane-css': '1', children: PANE_CSS }),
         inviteBar,
         header,
+        ...failLines,
         settings
           ? settingsView
           : jsx('div', {
@@ -1295,8 +1321,9 @@ function WaitPane({ ctx }) {
       jsxs('div', {
         'data-pane-scroll': '1',
         style: { display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'auto' },
-        children: settings ? [header, settingsView] : [
+        children: settings ? [header, ...failLines, settingsView] : [
           header,
+          ...failLines,
           agentRow(agentNotice(busy, finished, approval), ctx),
           problem ? jsx('div', { role: 'alert', style: { fontSize: 12, color: text.primary, border: `1px solid ${accent}`, borderRadius: 8, padding: '6px 10px', overflowWrap: 'anywhere' }, children: problem }) : null,
           noteLine(reply) ? jsx('div', { role: 'status', 'aria-live': 'polite', style: { fontSize: 12, color: text.secondary }, children: noteLine(reply) }) : null,

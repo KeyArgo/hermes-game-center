@@ -61,7 +61,7 @@ The **Play** shelf is the curated list in [shelf/curated.json](shelf/curated.jso
 
 **Blackjack** (one hand against the house) and **Slots** (the Jackpot cabinet) are the two Play games that are not boards. The four **talking tables**, the two experiments **Doctrine** and **Olympus Arena**, and the workshop prototypes sit behind the small **Experimental** link.
 
-The page opens on **Play** with the lobby beside it, and four links above it: **How to play**, the **Experimental** shelf, **Settings** and **Community creations** (the **Champions** tab beside *Games* is a placeholder — see below). **Settings** carries your name, the per-game match alerts, table sounds and the Jackpot backdrop switch, and shows the **version chip** for this install at the top — `v1.0.0 · 2026-11-11 · <commit>`, click to copy. The same chip is drawn at the top of the Games screen, so the build on screen can be named at a glance.
+The page opens on **Play** with the lobby beside it, and four links above it: **How to play**, the **Experimental** shelf, **Settings** and **Community creations** (the **Champions** tab beside *Games* is a placeholder — see below). **Settings** carries your name, the per-game match alerts, table sounds and the Jackpot backdrop switch, and shows the **version chip** for this install at the top — `v1.0.0-dev.N · <commit> · <date>`, click to copy. The same chip is drawn at the top of the Games screen, so the build on screen can be named at a glance.
 
 ### Playing
 

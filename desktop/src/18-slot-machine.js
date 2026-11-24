@@ -1073,7 +1073,7 @@ const AUTOBET_RULES = 'Turn starting or a tool running: 1x. A reply under 20k to
   })
 
   // The see-through copy's sound switch: the same games-wide setting the other machine's 🔊 flips.
-  const [soundOn, setSoundOn] = useState(() => (typeof gamesSoundOn === 'function' ? gamesSoundOn() : true))
+  const [soundOn, setSoundOn] = useGamesSoundOn()
   const soundButton = jsx('button', {
     type: 'button',
     'data-sm-sound': soundOn ? 'on' : 'off',

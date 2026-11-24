@@ -2343,7 +2343,7 @@ async function paneContract() {
   const versionChip = nodes(draw('GamesVersionChip(chipProps)', sandbox.chipProps))
     .find(node => node.props && node.props['data-games-version'] === 'chip')
   assert.ok(versionChip, 'one reusable chip: GamesVersionChip')
-  assert.equal(words(versionChip), 'v9.9.9 · 2026-11-10 · abcdef12', 'the same line the version stamp prints')
+  assert.equal(words(versionChip), 'v9.9.9 · abcdef12 · 2026-11-10', 'the same line the version stamp prints')
   assert.ok(String(versionChip.props.title).includes('Game Center 9.9.9'), 'and the same hover title')
   assert.equal(versionChip.props.style.fontVariantNumeric, 'tabular-nums', 'muted, small, tabular numbers')
   assert.equal(versionChip.props.style.color, 'var(--ui-text-tertiary)')
@@ -6882,7 +6882,8 @@ async function refereeBadgeContract() {
   // 5 s when nothing is happening, instead of asking 100 times a minute forever (T11).
   assert.ok(source.includes('const JP_POLL_IDLE = 5000'), 'the over-chat machine rests when nothing happens')
   assert.ok(!source.includes('setInterval(load, 600)'), 'and no longer reads every 600 ms forever')
-  assert.ok(source.includes('setInterval(() => load(), 1000)'), 'the waiting pane reads every second')
+  assert.ok(/setInterval\(\(\) => \{[\s\S]{0,400}?load\(\)\.finally\([\s\S]{0,80}?\}, 1000\)/.test(source),
+    'the waiting pane reads every second, one read at a time')
   assert.ok(source.includes("SDK_HOST.onEvent('message.start', () => load())"),
     'a sent message refreshes the waiting pane at once instead of waiting for a tick')
   assert.ok(source.includes("ctx.rest(`/board?game="), 'the pane still reads the board every tick, so a move shows at once')
@@ -7631,7 +7632,7 @@ async function gcextrasContract() {
   sandbox.clearTimeout = clearTimeout
   const copied = []
   sandbox.navigator = { clipboard: { writeText: text => { copied.push(text); return Promise.resolve() } } }
-  const line = 'v1.0.0-dev.7 · 2026-11-11 · abcdef12'
+  const line = 'v1.0.0-dev.7 · abcdef12 · 2026-11-11'
   // The copy goes through the SDK's own clipboard door (ctx.os.writeClipboard) — never a hidden textarea
   // appended to the app's <body>.
   const clip = []

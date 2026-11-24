@@ -120,6 +120,8 @@ function inviteBellFeed(snap) {
 // the next read. The server's own update follows and keeps it away.
 function inviteBellDrop(id) {
   const current = INVITE_BELL.request
+  // A read already on its way was asked before the answer: it must not put the request back.
+  INVITE_BELL.readGeneration += 1
   if (current && String(current.id) === String(id)) inviteBellPublish({ request: null })
 }
 
@@ -148,9 +150,14 @@ function inviteBellNotify(id) {
   const request = INVITE_BELL.request
   if (!request || String(request.id) !== id || INVITE_BELL.notified.has(id)) return
   const prefs = (INVITE_BELL.snap && INVITE_BELL.snap.prefs) || {}
+  const you = (INVITE_BELL.snap && INVITE_BELL.snap.you) || {}
   // Nobody can ask a person who has invitations off; a request that arrived before the switch
-  // went off is still shown and still answerable, and it makes no notice.
-  if (!prefs.open) return
+  // went off is still shown and still answerable, and it makes no notice. A Play press (its
+  // twenty-minute window) or a search for the game still takes requests with the switch off, so
+  // those are told.
+  const asking = Number((prefs.until || {})[request.game]) > Date.now() / 1000
+    || (Array.isArray(you.looking) && you.looking.includes(request.game))
+  if (!prefs.open && !asking) return
   if (inviteBellShown()) return
   const ctx = INVITE_BELL.ctx
   if (!ctx || !ctx.os || typeof ctx.os.notify !== 'function') return
@@ -475,8 +482,10 @@ function InviteBell({ ctx, where = 'statusbar' }) {
   const bell = useInviteBell(ctx)
   const surface = useInviteSurface(where)
   const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState('')
+  // A refused answer's note, kept with the id it was about: the next invite never wears it.
+  const [noteFor, setNote] = useState({ id: '', text: '' })
   const request = bell.request
+  const note = request && noteFor && noteFor.id === String(request.id) ? noteFor.text : ''
   const drawing = Boolean(request) && inviteBellDraws(where)
   const anchor = children => jsx('span', {
     ref: surface,
@@ -491,10 +500,10 @@ function InviteBell({ ctx, where = 'statusbar' }) {
   const answer = async accept => {
     if (busy) return
     setBusy(true)
-    setNote('')
+    setNote({ id: '', text: '' })
     try {
       const reply = await inviteBellAnswer(ctx, request, accept)
-      if (reply && reply.ok === false) setNote(String(reply.text || 'The lobby did not take that answer.'))
+      if (reply && reply.ok === false) setNote({ id: String(request.id), text: String(reply.text || 'The lobby did not take that answer.') })
     } finally {
       setBusy(false)
     }

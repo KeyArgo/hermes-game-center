@@ -19,6 +19,18 @@
 //                                    says the decline and the timeout, and an accepted invite opens
 //                                    its table in the pane when the seat comes on a later poll. Never
 //                                    /online/queue, never the local looking line.
+//   panePollWaitsAndSlowsWhenHidden  the pane never starts a read while the last is out, and reads
+//                                    about every 5 s while the window is hidden.
+//   noticeWhileSearchingOrWindowOpen with "Open to invites" off, a Play window or a search for the
+//                                    game still gets its silent notice.
+//   hallAnswerClearsBell             Accept/Decline in the Hall takes the invite off the status bar
+//                                    and the Hall card at the press.
+//   lookingTextUnderSearch           you.looking_text is one line under the search, in the pane and
+//                                    the Hall; nothing when empty or missing.
+//   paneKeepsLayoutOnFailedRead      one failed /view keeps the header and an online table; a
+//                                    set-aside game is said by title for long enough to read.
+//   soundSwitchesAgree               both backdrop sound switches and Settings show one setting.
+//   inviteNoteBelongsToItsRequest    a refused answer's note does not follow the next invite.
 
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -630,6 +642,222 @@ check('panePeopleUsesHallEndToEnd', async () => {
   const lines = world.asked.filter(item => item[0] === '/command').map(item => String((item[1] || {}).line || ''))
   assert.equal(lines.filter(line => /^looking\b/.test(line)).length, 0, 'never the local looking line: ' + lines.join(' | '))
   pane.unmount()
+})
+
+const viewReads = world => world.asked.filter(item => item[0] === '/view').length
+
+check('panePollWaitsAndSlowsWhenHidden', async () => {
+  const env = boot()
+  const world = makeWorld(env)
+  register(env, world)
+  const pane = env.mount(env.sandbox.WaitPane, () => ({ ctx: world.ctx }))
+  await pane.settle()
+  // A /view that never answers: the one-second tick must not pile reads on top of it.
+  const rest = world.ctx.rest
+  let stalled = true
+  world.ctx.rest = (route, options) => {
+    if (route === '/view' && stalled) { world.asked.push([route, null]); return new Promise(() => {}) }
+    return rest(route, options)
+  }
+  await env.advance(1000)
+  const before = viewReads(world)
+  await env.advance(10000)
+  assert.equal(viewReads(world) - before, 0, `a stuck /view keeps one read in flight: ${viewReads(world) - before} more started`)
+  pane.unmount()
+  // A fresh pane while the window is hidden: a slow poll, about every five seconds.
+  stalled = false
+  const env2 = boot()
+  const world2 = makeWorld(env2)
+  register(env2, world2)
+  env2.sandbox.document.hidden = true
+  const hidden = env2.mount(env2.sandbox.WaitPane, () => ({ ctx: world2.ctx }))
+  await hidden.settle()
+  const start = viewReads(world2)
+  await env2.advance(20000)
+  const reads = viewReads(world2) - start
+  assert.ok(reads >= 3 && reads <= 5, `hidden, the pane reads about every 5 s: ${reads} reads in 20 s`)
+  hidden.unmount()
+})
+
+check('noticeWhileSearchingOrWindowOpen', async () => {
+  // "Open to invites" is off, but the person just pressed Play (a twenty-minute window), or is
+  // searching: the server still lets people ask, so the person is still told.
+  const env = boot()
+  const world = makeWorld(env)
+  register(env, world)
+  world.hall.prefs = { open: false, games: {}, until: { chessboard: world.nowSeconds() + 1200 } }
+  world.hall.requests = [inviteFrom(world, { offer: true })]
+  await env.advance(12000)
+  assert.equal(world.notified.length, 1, 'a notice inside the twenty-minute window: ' + world.notified.length)
+  world.hall.prefs = { open: false, games: {}, until: {} }
+  world.hall.you.looking = ['chessboard']
+  world.hall.requests = [inviteFrom(world, { id: 'q2', offer: true })]
+  await env.advance(12000)
+  assert.equal(world.notified.length, 2, 'and one while searching for that game: ' + world.notified.length)
+  world.hall.you.looking = []
+  world.hall.requests = [inviteFrom(world, { id: 'q3' })]
+  await env.advance(12000)
+  assert.equal(world.notified.length, 2, 'still none with the switch off, no window and no search')
+})
+
+check('hallAnswerClearsBell', async () => {
+  // Accept or Decline in the Hall takes the invite off the status bar and the Hall card at the
+  // press, not on the next poll.
+  const env = boot()
+  const world = makeWorld(env)
+  register(env, world)
+  const status = env.mount(env.sandbox.InviteBell, bellProps(world, 'statusbar'))
+  const hall = env.mount(env.sandbox.LobbyHall, () => ({ ctx: world.ctx, view: world.view }))
+  world.hall.requests = [inviteFrom(world)]
+  await status.settle()
+  await hall.settle()
+  await env.advance(3500)
+  const bell = tree => nodes(tree).find(node => node.props && node.props['data-invite-bell'])
+  const card = tree => nodes(tree).find(node => node.props && node.props['data-hall-request'] === 'q1')
+  assert.ok(bell(status.draw()), 'the status bar draws the invite')
+  const hallCard = card(hall.draw())
+  assert.ok(hallCard, 'and the Hall draws its card')
+  await findButton(hallCard, 'Decline').props.onClick(); await flush()
+  assert.equal(bell(status.draw()), undefined, 'the status bar lets it go at the press')
+  assert.equal(card(hall.draw()), undefined, 'and so does the Hall card')
+  status.unmount()
+  hall.unmount()
+})
+
+check('lookingTextUnderSearch', async () => {
+  // The lobby's own word on a search (you.looking_text) is one line under the search state, in
+  // the pane and in the Hall; nothing when it is empty or missing.
+  const env = boot()
+  const world = makeWorld(env, { hall: { prefs: { open: true, games: { chessboard: true }, until: {} } } })
+  world.hall.you.looking = ['chessboard']
+  world.hall.you.looking_text = 'Bea passed on Chess. Still looking.'
+  register(env, world)
+  const pane = env.mount(env.sandbox.WaitPane, () => ({ ctx: world.ctx }), ['PanePeople'])
+  const hall = env.mount(env.sandbox.LobbyHall, () => ({ ctx: world.ctx, view: world.view }), ['LobbyFindMatch'])
+  await pane.settle()
+  await hall.settle()
+  findButton(pane.draw(), 'Play with people').props.onClick()
+  await env.advance(3500)
+  const line = (tree, key) => nodes(tree).find(node => node.props && node.props[key])
+  const paneLine = line(pane.draw(), 'data-pane-looking-text')
+  assert.ok(paneLine, 'the pane draws the lobby\'s search line')
+  assert.equal(squash(words(paneLine)), 'Bea passed on Chess. Still looking.')
+  const hallLine = line(hall.draw(), 'data-lobby-looking-text')
+  assert.ok(hallLine, 'and so does the Hall')
+  assert.equal(squash(words(hallLine)), 'Bea passed on Chess. Still looking.')
+  world.hall.you.looking_text = ''
+  await env.advance(3500)
+  assert.equal(line(pane.draw(), 'data-pane-looking-text'), undefined, 'an empty line draws nothing in the pane')
+  assert.equal(line(hall.draw(), 'data-lobby-looking-text'), undefined, 'nor in the Hall')
+  delete world.hall.you.looking_text
+  await env.advance(3500)
+  assert.equal(line(pane.draw(), 'data-pane-looking-text'), undefined, 'a missing field draws nothing')
+  assert.equal(line(hall.draw(), 'data-lobby-looking-text'), undefined)
+  pane.unmount()
+  hall.unmount()
+})
+
+check('paneKeepsLayoutOnFailedRead', async () => {
+  // One failed /view keeps the pane as it was: its header (× and –) and an online table stay, and
+  // a small line says it is trying again.
+  const env = boot()
+  const world = makeWorld(env)
+  world.view.online.table = { room_id: 'room-9', game: 'chessboard' }
+  register(env, world)
+  const pane = env.mount(env.sandbox.WaitPane, () => ({ ctx: world.ctx }))
+  await pane.settle()
+  await env.advance(1000)
+  const table = tree => nodes(tree).find(node => node.type && node.type.name === 'OnlineTable')
+  const icon = (tree, label) => nodes(tree).find(node => node.type === 'button' && node.props['aria-label'] === label)
+  assert.ok(table(pane.draw()), 'the online table is drawn')
+  const rest = world.ctx.rest
+  let failView = true
+  world.ctx.rest = (route, options) => {
+    if (route === '/view' && failView) { failView = false; return Promise.reject(new Error('hiccup')) }
+    return rest(route, options)
+  }
+  await env.advance(1000)
+  let tree = pane.draw()
+  assert.ok(nodes(tree).some(node => node.props && node.props.role === 'alert'), 'the failure is said')
+  assert.ok(table(tree), 'the online table stays mounted through one failed read')
+  assert.ok(icon(tree, 'Minimize') && icon(tree, 'Close'), 'and the header keeps – and ×')
+  pane.unmount()
+  // A game whose board fails twice is set aside; the note stays long enough to read, by title.
+  const env2 = boot()
+  const world2 = makeWorld(env2)
+  register(env2, world2)
+  const rest2 = world2.ctx.rest
+  world2.ctx.rest = (route, options) => {
+    if (route.startsWith('/board')) { world2.asked.push([route, null]); return Promise.reject(new Error('no board')) }
+    return rest2(route, options)
+  }
+  const pane2 = env2.mount(env2.sandbox.WaitPane, () => ({ ctx: world2.ctx }))
+  await pane2.settle()
+  await env2.advance(2000)
+  await env2.advance(5000)
+  tree = pane2.draw()
+  const said = squash(words(tree))
+  assert.match(said, /Connect Four could not load/, 'the set-aside note is still shown 5 s later, by title: ' + said)
+  assert.ok(icon(tree, 'Minimize') && icon(tree, 'Close'), 'with the header in place')
+  pane2.unmount()
+})
+
+check('soundSwitchesAgree', async () => {
+  // The two backdrop machines and Settings draw one sound setting: a flip on any of them shows
+  // on the others at their next draw.
+  const env = boot()
+  const world = makeWorld(env)
+  register(env, world)
+  const slots = env.mount(env.sandbox.SlotMachine, () => ({ chat: true, onClose() {}, scaleOverride: 1 }))
+  const jackpot = env.mount(env.sandbox.JackpotMachine, () => ({ ctx: world.ctx, mode: 'overlay' }))
+  const settings = env.mount(env.sandbox.SoundSetting, () => ({}))
+  await slots.settle(); await jackpot.settle(); await settings.settle()
+  const smSound = () => nodes(slots.draw()).find(node => node.props && node.props['data-sm-sound'])
+  const jpSound = () => nodes(jackpot.draw()).find(node => node.props && node.props['data-jp2-sound'])
+  const settingsOn = () => {
+    const tree = settings.draw()
+    return findButton(tree, 'On') ? true : findButton(tree, 'Off') ? false : null
+  }
+  assert.equal(smSound().props['data-sm-sound'], 'on')
+  assert.equal(jpSound().props['data-jp2-sound'], 'on')
+  smSound().props.onClick()
+  assert.equal(smSound().props['data-sm-sound'], 'off', 'the slots switch mutes')
+  assert.equal(jpSound().props['data-jp2-sound'], 'off', 'the jackpot switch follows the slots one')
+  assert.equal(settingsOn(), false, 'and so does Settings')
+  jpSound().props.onClick()
+  assert.equal(jpSound().props['data-jp2-sound'], 'on', 'the jackpot switch unmutes')
+  assert.equal(smSound().props['data-sm-sound'], 'on', 'the slots switch follows the jackpot one')
+  slots.unmount(); jackpot.unmount(); settings.unmount()
+})
+
+check('inviteNoteBelongsToItsRequest', async () => {
+  // A refused answer's note belongs to that request: the next invite comes without it.
+  const env = boot()
+  const world = makeWorld(env)
+  register(env, world)
+  const rest = world.ctx.rest
+  world.ctx.rest = (route, options) => {
+    if (route === '/online/hall/respond') return Promise.resolve({ ok: false, text: 'That request is no longer open.' })
+    return rest(route, options)
+  }
+  const status = env.mount(env.sandbox.InviteBell, bellProps(world, 'statusbar'))
+  const pane = env.mount(env.sandbox.WaitPane, () => ({ ctx: world.ctx }))
+  world.hall.requests = [inviteFrom(world)]
+  await status.settle(); await pane.settle()
+  await env.advance(3500)
+  const bellNote = () => nodes(status.draw()).find(node => node.props && node.props['data-invite-note'])
+  const paneNote = () => nodes(pane.draw()).find(node => node.props && node.props['data-pane-invite-note'])
+  await findButton(status.draw(), 'Accept').props.onClick(); await flush()
+  const paneLine = nodes(pane.draw()).find(node => node.props && node.props['data-pane-invite'])
+  await findButton(paneLine, 'Accept').props.onClick(); await flush()
+  assert.ok(bellNote(), 'the status bar says why the answer did not go')
+  assert.ok(paneNote(), 'and so does the pane')
+  world.hall.requests = [inviteFrom(world, { id: 'q2', from: { id: 'cara', name: 'Cara' } })]
+  await env.advance(9000)
+  assert.match(squash(words(status.draw())), /Cara/, 'Cara\'s invite is up')
+  assert.equal(bellNote(), undefined, 'without the note from the last one in the status bar')
+  assert.equal(paneNote(), undefined, 'nor in the pane')
+  status.unmount(); pane.unmount()
 })
 
 ;(async () => {

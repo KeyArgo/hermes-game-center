@@ -92,3 +92,15 @@ def test_the_version_chip_is_drawn_in_settings_and_the_games_main_screen_only():
     assert "id: 'jackpot'" not in bundle
     assert "id: 'jackpot2'" not in bundle
     assert "area: COMPOSER_AREAS.underside" in bundle
+
+
+def test_chip_order_matches_describe():
+    """The chip prints the line `--version` prints: version · commit · date, and the README shows that format."""
+    chip = (ROOT / "desktop" / "src" / "79-version.js").read_text(encoding="utf-8")
+    commit_at = chip.index("parts.push(String(build.commit_short || build.commit)")
+    date_at = chip.index("parts.push(String(build.commit_date)")
+    assert commit_at < date_at, "the commit comes before the date, as version_stamp.describe() prints it"
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    chips = re.findall(r"version chip\*\*[^`]*`([^`]+)`", readme)
+    assert chips, "the README shows the chip"
+    assert all(re.fullmatch(r"v\d+\.\d+\.\d+-dev\.N · <commit> · <date>", line) for line in chips), chips
