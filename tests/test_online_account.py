@@ -201,3 +201,32 @@ def test_the_account_file_route_writes_into_downloads_and_says_where(monkeypatch
     assert answer["ok"] is True, answer
     assert Path(answer["path"]).parent == tmp_path / "Downloads"
     assert json.loads(Path(answer["path"]).read_text(encoding="utf-8"))["name"] == "Ada"
+
+
+def test_same_name_exports_preserve_both_accounts(tmp_path):
+    folder = tmp_path / "Downloads"
+    paths = []
+    for host in ("first", "second"):
+        source = _pc(tmp_path / host, f"https://{host}.example", host)
+        source._remember({"id": host, "name": "Ada"}, "Ada")
+        answer = source.account_file(folder)
+        assert answer["ok"]
+        paths.append(Path(answer["path"]))
+    assert paths[0] != paths[1]
+    assert [json.loads(path.read_text())["key"] for path in paths] == ["first", "second"]
+
+
+def test_failed_export_removes_temporary_key(tmp_path, monkeypatch):
+    source = _pc(tmp_path / "pc", "https://games.example", "sample")
+    source._remember({"id": "p1", "name": "Ada"}, "Ada")
+    folder = tmp_path / "Downloads"
+    first = Path(source.account_file(folder)["path"])
+    original = first.read_bytes()
+
+    def refuse(temporary, path):
+        raise PermissionError("busy")
+
+    monkeypatch.setattr(online_source.filelock, "replace", refuse)
+    assert not source.account_file(folder)["ok"]
+    assert first.read_bytes() == original
+    assert list(folder.iterdir()) == [first]

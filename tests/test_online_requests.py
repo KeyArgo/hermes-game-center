@@ -625,3 +625,44 @@ def test_a_blackjack_request_is_accepted_and_seats_two_people_against_the_dealer
         assert not (rooms.folder(room["id"]) / "wallet.json").exists(), "a lobby table never opens a wallet"
 
     run(scenario())
+
+
+def test_decline_after_deadline_allows_another_request(world):
+    store, _rooms, people, clock, hub, service = world
+    ada, bea = people["Ada"], people["Bea"]
+    run(open_up(service, hub, ada, bea))
+    assert run(ask(service, ada, bea, "go"))["ok"]
+    card = service.pending_for(bea["id"])[0]
+    clock.now = card["expires"] + 0.1
+    answer = run(service.handle(bea, {"t": "respond", "id": card["id"], "accept": False}))
+    assert not answer["ok"]
+    assert store.play_request(card["id"])["state"] == "expired"
+    assert run(ask(service, ada, bea, "go"))["ok"]
+
+
+def test_match_offers_leave_manual_invite_allowance_intact(world):
+    store, _rooms, people, clock, hub, service = world
+    ada, bea = people["Ada"], people["Bea"]
+    run(open_up(service, hub, ada, bea))
+    for _ in range(8):
+        row = store.create_play_request(ada["id"], bea["id"], "go", clock.now, 60, offer=True)
+        store.set_play_state(row["id"], "cancelled")
+    for _ in range(8):
+        answer = run(ask(service, ada, bea, "go"))
+        assert answer["ok"], answer["text"]
+        card = service.pending_for(ada["id"])[0]
+        assert run(service.handle(ada, {"t": "cancel", "id": card["id"]}))["ok"]
+    ninth = run(ask(service, ada, bea, "go"))
+    assert not ninth["ok"] and "hour" in ninth["text"]
+
+
+def test_first_open_syncs_hall_game_choices(world, monkeypatch):
+    from shelf.online_hall import Hall
+
+    _store, _rooms, people, _clock, _hub, service = world
+    ada = people["Ada"]
+    hall = Hall(None)
+    monkeypatch.setattr(hall, "send", lambda frame: run(service.handle(ada, frame)))
+    assert hall.prefs(open=True)["ok"]
+    assert hall.snapshot()["prefs"] == service.prefs(ada["id"])
+    assert all(hall.snapshot()["prefs"]["games"].values())

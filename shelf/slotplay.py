@@ -173,11 +173,11 @@ def spin(wallet, *, bet: int | None = None, auto: bool = False, machine: str | N
         return None
     row = dict(_outcome(chosen, per_line), machine=chosen, paid_with="chip", bet=stake,
                auto=bool(auto), at=time.time())
-    held = wallet.record_spin(row)
+    row = wallet.record_spin(row)["feed"][0]
     # One line per spin, beside the wallet, so a claim about payouts or odds can be checked instead of
     # argued about. Best-effort: it never raises and never touches a balance.
     spinlog.record(wallet.path, row, row.get("session"))
-    return dict(row, chips=held["chips"])
+    return row
 
 
 def autospin(wallet, kind: str = "turn", tokens: int = 0, session_id: str = "") -> dict | None:

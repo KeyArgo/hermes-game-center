@@ -98,3 +98,20 @@ def test_a_rescue_never_pays_points(tmp_path: Path) -> None:
     before = wallet.read()["bonus"]
     wallet.bailout("perfect", now=DAY * 20_000)
     assert wallet.read()["bonus"] == before, "the rescue buys chips, never rank"
+
+
+def test_spin_reports_the_comeback_premium(tmp_path, monkeypatch):
+    import json
+
+    from shelf import slotplay, spinlog
+
+    wallet = broke(tmp_path)
+    wallet.bailout("perfect", now=DAY * 20_000)
+    before = wallet.read()["chips"]
+    monkeypatch.setattr(slotplay, "_outcome", lambda machine, per_line: {"payout": 200})
+    spun = slotplay.spin(wallet, bet=100)
+    logged = json.loads(spinlog.log_path(wallet.path).read_text())
+    for row in (spun, logged, wallet.read()["feed"][0]):
+        assert row["payout"] == 240
+        assert row["comeback_bonus"] == 40
+        assert row["chips"] == before - 100 + 240
