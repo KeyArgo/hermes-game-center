@@ -629,7 +629,10 @@ def _shoe(state: dict) -> list[str]:
 
 def _draw(state: dict) -> str:
     if not state["deck"]:
-        state["deck"] = _shoe(state)
+        in_play = set(state["dealer"])
+        for hand in state["player_hands"]:
+            in_play.update(hand["cards"])
+        state["deck"] = [card for card in _shoe(state) if card not in in_play]
     return state["deck"].pop()
 
 
@@ -1273,13 +1276,9 @@ def bot(state: dict):
     hand = _live_hand(state)
     cards = list((hand or {}).get("cards") or [])
     total = _hand_value(cards)
-    ranks = [card[:-1] for card in cards]
-    # Basic strategy in one line: split aces and eights, and any pair small enough to improve
-    # on a hit. Tens and fives are played as they are, because standing on 20 and doubling on
-    # 10 are better than splitting them.
-    if "split" in moves and len(cards) == 2:
-        if ranks[0] in {"A", "8"} or _card_value(cards[0]) <= 9:
-            return "split"
+    # Keep fours together to hit, fives to double or hit, and tens to stand.
+    if "split" in moves and cards[0][:-1] in {"A", "2", "3", "6", "7", "8", "9"}:
+        return "split"
     if "double" in moves and 9 <= total <= 11:
         return "double"
     if total >= 17 or "hit" not in moves:

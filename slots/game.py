@@ -237,6 +237,7 @@ def draw(state: dict) -> list[str]:
 
 def picture(state: dict, player=None) -> dict:
     wallet = _wallet.read()
+    bet = int(state.get("bet") or wallet.get("bet") or MIN_BET)
     history = [dict(entry) for entry in state["history"]]
     machine = wallet.get("machine") or slotplay.DEFAULT_MACHINE
     if machine not in slotplay.MACHINES:
@@ -264,12 +265,12 @@ def picture(state: dict, player=None) -> dict:
         "grid": [list(line) for line in (shown.get("grid") or [])] if same else [],
         "wins": list(shown.get("wins") or []) if same else [],
         "bets": list(BETS),
-        "bet": int(state.get("bet") or wallet.get("bet") or MIN_BET),
+        "bet": bet,
         "reels": list(shown.get("reels") or state["reels"]),
         "chips": wallet["chips"],
         "last_win": payout,
         # Quoted at the stake this bet puts on each line.
-        "paytable": slotplay.paytable(machine, max(1, int(state.get("bet") or MIN_BET) // max(1, len(slotplay.MACHINES[machine]["lines"])))),
+        "paytable": slotplay.paytable(machine, max(1, bet // max(1, len(slotplay.MACHINES[machine]["lines"])))),
         "odds": slotplay.odds(machine),
         "theme": dict(slotplay.MACHINES[machine].get("theme") or {}),
         "legal": legal(state),
