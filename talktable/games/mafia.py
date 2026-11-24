@@ -209,7 +209,6 @@ def _wanted_target(text: str) -> int | None:
 
 
 def parse(env, seat: int, text: str, allowed: list[dict], draft=None):
-    del draft
     if can_say(env, seat):
         said = common.clean(text)
         return ("act", said) if said else None
@@ -217,8 +216,11 @@ def parse(env, seat: int, text: str, allowed: list[dict], draft=None):
     for item in allowed:
         if said == str(item["id"]).lower() or said == item["raw"].lower():
             return ("act", item["raw"])
-    # Free text from a model or a typed command: read the last number as a seat.
-    wanted = _wanted_target(text)
+    # Human commands carry a draft and count from one. Model replies use the prompt's indices.
+    if draft is not None and said.isdecimal():
+        wanted = int(said) - 1
+    else:
+        wanted = _wanted_target(text)
     for item in allowed:
         if wanted is not None and item["raw"] == f"[{wanted}]":
             return ("act", item["raw"])
@@ -232,12 +234,14 @@ def bot(env, seat: int, rng: random.Random) -> str:
         other = rng.choice(others) if others else seat
         return rng.choice(_DAY_LINES).format(other=f"Player {other + 1}")
     targets = _targets(env, seat)
+    if name == "Day-Voting":
+        is_mafia = env.player_roles.get(seat) == "Mafia"
+        targets = [pid for pid in targets if pid != seat
+                   and (not is_mafia or env.player_roles.get(pid) != "Mafia")]
     if not targets:
         return ""
     if name == "Night-Mafia":
         # Never name a teammate: the mafia knows its own.
-        return f"[{rng.choice(targets)}]"
-    if name == "Day-Voting" and env.player_roles.get(seat) == "Mafia":
         return f"[{rng.choice(targets)}]"
     if name == "Night-Doctor":
         return f"[{seat if seat in targets else rng.choice(targets)}]"
