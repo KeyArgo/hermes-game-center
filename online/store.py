@@ -1572,6 +1572,13 @@ class Store:
             (a, b, b, a),
         ).fetchone() is not None
 
+    def pair_declined_since(self, a: str, b: str, since: float) -> bool:
+        return self.db.execute(
+            "SELECT 1 FROM play_requests WHERE state = 'declined' AND COALESCE(declined_at, created) > ? "
+            "AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)) LIMIT 1",
+            (since, a, b, b, a),
+        ).fetchone() is not None
+
     def declined_recently(self, from_id: str, to_id: str, game: str, since: float) -> bool:
         """Whether the recipient declined this sender and game after the cutoff."""
         return self.db.execute(

@@ -1,5 +1,5 @@
 # Online play and the bot ladder
-_Applies to Game Center 1.0.0 · last revised 2026-11-24 (dc8be50a)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-27 (555827f1)_
 
 Game Center's nine table games run on your computer. **Games with other people** are the one part that
 leaves it: a separate service at `https://games.hermesnet.xyz`, run by the author. It is **off until you
@@ -118,7 +118,10 @@ The lobby is a **side panel** with the panels it needs and no more: on the Games
 ## Find a match
 
 In the side pane, open **Play with people**. Use **Open to invites** to take requests and **Edit** beside
-**Games** to choose what you play. **Find a match** searches the Hall for those games. Press **Stop**
+**Games** to choose which invitations you accept. The game chips above **Find a match** start with all
+your accepted games selected. Tap a chip to leave that game out of this search, then press **Find a match**.
+When someone accepts, the pane opens your table. With the pane closed, press **Open** beside the
+acceptance in the status bar or titlebar. Press **Stop**
 to end the search. Under **Here now**, choose a shared game and press **Ask** to invite someone directly.
 Expand **#games chat** to read or write in the lobby.
 
@@ -141,7 +144,8 @@ for as long as the search lasts: twenty minutes, or until you stop it. When Ada 
 *“Ada passed on Chess. Still looking.”* and continues. For two minutes after a decline, the asker
 must wait before asking that person for the same game. They can ask for another game, and the person
 who declined can ask back at once. Automatic matching skips that pair for that game in either
-direction for those two minutes.
+direction for those two minutes and waits at least three seconds before offering the pair any other game.
+When one invitation replaces another, the answer buttons pause for 1.5 seconds so you can read the new game.
 
 The offer names the person and the game — *"Ada wants to play Chess"* — with a grey line beside the
 roster saying the same thing (Game Center draws that line itself: it is **not** a chat message and is

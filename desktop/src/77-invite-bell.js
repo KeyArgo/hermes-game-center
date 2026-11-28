@@ -44,6 +44,7 @@ const INVITE_SURFACE_ORDER = ['statusbar', 'titlebar']
 const INVITE_BELL = {
   request: null,
   snap: null,
+  panes: 0,
   error: '',
   ctx: null,
   fresh: 0,
@@ -103,14 +104,55 @@ function inviteBellPublish(patch) {
   if (changed) for (const listener of Array.from(INVITE_BELL.listeners)) listener()
 }
 
+// Keep the last occupants across an empty poll (a decline can clear the line first).
+const inviteSlots = new Map()
+const inviteHolds = new Map()
+let inviteViewer = ''
+
+function trackInviteSlots(snap) {
+  const viewer = String((snap.you || {}).id || '')
+  if (!viewer) return
+  if (viewer !== inviteViewer) {
+    inviteSlots.clear()
+    inviteHolds.clear()
+    inviteViewer = viewer
+  }
+  const rows = Array.isArray(snap.requests) ? snap.requests : []
+  const inbound = rows.filter(row => row && row.state === 'pending' && row.to && String(row.to.id) === viewer)
+  const track = (slot, row) => {
+    if (!row) return
+    const previous = inviteSlots.get(slot)
+    inviteSlots.set(slot, row.id)
+    if (previous && previous !== row.id) inviteHolds.set(row.id, Date.now() + 1500)
+  }
+  track('line', inbound[0])
+  track('offer', inbound.find(row => row.offer))
+  inbound.filter(row => !row.offer).forEach((row, index) => track(index, row))
+}
+
+function inviteHeld(id) {
+  return (inviteHolds.get(id) || 0) > Date.now()
+}
+
+function useInviteHoldTimer() {
+  const [, redraw] = useState(0)
+  const deadline = Math.min(...Array.from(inviteHolds.values()).filter(at => at > Date.now()))
+  useEffect(() => {
+    if (!Number.isFinite(deadline)) return
+    const timer = setTimeout(() => redraw(n => n + 1), Math.max(0, deadline - Date.now()))
+    return () => clearTimeout(timer)
+  }, [deadline])
+}
+
 // One Hall snapshot, from whichever surface read it. The Hall and the Play with people card both
 // hand their own poll over, so the bell paints from the read that already happened.
 function inviteBellFeed(snap) {
   if (!snap || typeof snap !== 'object') return
   INVITE_BELL.fresh = Date.now()
-  inviteBellPublish({ snap, error: '' })
+  for (const [id, at] of inviteHolds) if (at <= Date.now()) inviteHolds.delete(id)
+  trackInviteSlots(snap)
   const request = inviteOf(snap)
-  inviteBellPublish({ request })
+  inviteBellPublish({ snap, request, error: '' })
   if (request) inviteBellNotice(request)
   invitePaneFollow(snap)
   inviteBellSchedule()
@@ -362,6 +404,7 @@ function useInviteSurface(where) {
 // The store, as a component reads it: re-render on every change. Reading never starts or stops
 // the poll; that is the plugin's (inviteBellStart).
 function useInviteBell(ctx) {
+  useInviteHoldTimer()
   const [, setTick] = useState(0)
   useEffect(() => {
     const listener = () => setTick(count => count + 1)
@@ -386,6 +429,8 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
   if (!request) return null
   const name = String((request.from && request.from.name) || 'them')
   const title = lobbyTitle(request.game)
+  const held = inviteHeld(request.id)
+  busy = busy || held
   const press = primary => ({
     type: 'button',
     disabled: Boolean(busy),
@@ -408,7 +453,7 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
       jsx('span', {
         'data-pane-invite-line': '1',
         style: { flex: '1 1 150px', minWidth: 0, fontSize: 13, fontWeight: 650, lineHeight: 1.4 },
-        children: paneInviteWords(request)
+        children: held ? `New: ${title} · ${name}` : paneInviteWords(request)
       }),
       jsx('button', {
         ...press(true),
@@ -435,6 +480,7 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
 // handed back, so the pane draws the table itself. A seat that has not arrived yet comes back as
 // null, and the pane opens it from a later read.
 async function inviteBellAnswer(ctx, request, accept, options = {}) {
+  if (inviteHeld(request.id)) return { ok: false, text: 'The invitation just changed.' }
   if (!ctx || typeof ctx.rest !== 'function') return { ok: false, text: 'Game Center cannot be reached.' }
   try {
     const answer = await ctx.rest('/online/hall/respond', { method: 'POST', body: { id: request.id, accept: Boolean(accept) } })
@@ -444,12 +490,12 @@ async function inviteBellAnswer(ctx, request, accept, options = {}) {
     const seat = await inviteBellSeat(ctx, request)
     if (options.here) {
       if (seat) {
-        const opened = await openOnlineTable(ctx, seat.room_id, seat.game)
+        const opened = await openInviteSeat(ctx, seat)
         if (opened && opened.ok === false) return { ok: false, text: String(opened.text || 'That table would not open.') }
       }
       return { ...(answer || { ok: true }), seat: seat || null }
     }
-    if (seat) await openOnlineTable(ctx, seat.room_id, seat.game)
+    if (seat) await openInviteSeat(ctx, seat)
     inviteBellOpen()
     return answer || { ok: true }
   } catch {
@@ -467,6 +513,32 @@ function inviteSeatOf(snap, requestId) {
   const got = seated.request_id ? String(seated.request_id) : ''
   if (wanted && got && wanted !== got) return null
   return seated
+}
+
+// The Hall, chrome and pane can all see the same handoff. Opening the socket twice
+// disconnects the first table, so share the pending open and its live room.
+let openingInviteSeat = null
+
+async function openInviteSeat(ctx, seat) {
+  const room = String(seat.room_id || '')
+  if (HALL_LEFT.has(room)) return { ok: false, text: 'You left that table.' }
+  if (!seat.request_id) return openOnlineTable(ctx, room, seat.game)
+  if (openingInviteSeat && openingInviteSeat.room === room) return openingInviteSeat.promise
+  if (ONLINE_ROOM.roomId === room) return { ok: true }
+  const opening = { room, promise: openOnlineTable(ctx, room, seat.game) }
+  openingInviteSeat = opening
+  try {
+    return await opening.promise
+  } finally {
+    if (openingInviteSeat === opening) openingInviteSeat = null
+  }
+}
+
+function acceptedSentInvite(snap) {
+  const seat = inviteSeatOf(snap)
+  if (!seat || !seat.request_id || !snap.you || !snap.you.id) return null
+  return (snap.requests || []).find(row => row.state === 'accepted' && row.id === seat.request_id
+    && row.from && row.from.id === snap.you.id)
 }
 
 // The seat the lobby just made, read once. A read that lands before the lobby's own "seated"
@@ -493,10 +565,24 @@ function InviteBell({ ctx, where = 'statusbar' }) {
     style: { display: 'inline-flex', alignItems: 'center', minWidth: 1, minHeight: 1 },
     children
   })
+  const sent = !request && !bell.panes && acceptedSentInvite(bell.snap)
+  if (sent && inviteBellDraws(where)) {
+    const open = async () => {
+      const seat = inviteSeatOf(bell.snap, sent.id)
+      if (!seat) return
+      const result = await openInviteSeat(ctx, seat)
+      if (!result || result.ok !== false) inviteBellOpen()
+    }
+    const name = (sent.to || {}).name || 'Someone'
+    return anchor(jsxs('span', { role: 'status', children: [
+      `${name} accepted ${lobbyTitle(sent.game)} · `, button('Open', open)
+    ] }))
+  }
   if (!drawing) return anchor(null)
-  const line = inviteBellLine(request)
+  const held = inviteHeld(request.id)
   const name = String((request.from && request.from.name) || 'them')
   const title = lobbyTitle(request.game)
+  const line = held ? `New: ${title} · ${name}` : inviteBellLine(request)
   const answer = async accept => {
     if (busy) return
     setBusy(true)
@@ -532,7 +618,7 @@ function InviteBell({ ctx, where = 'statusbar' }) {
         'data-invite-accept': '1',
         'aria-label': `Accept ${name}'s invitation to ${title}`,
         title: `Sit down with ${name} at ${title}.`,
-        disabled: busy,
+        disabled: busy || held,
         autoFocus: false,
         onClick: () => answer(true),
         style: pill(true),
@@ -543,7 +629,7 @@ function InviteBell({ ctx, where = 'statusbar' }) {
         'data-invite-decline': '1',
         'aria-label': `Decline ${name}'s invitation to ${title}`,
         title: `Say no to ${name} for ${title}.`,
-        disabled: busy,
+        disabled: busy || held,
         autoFocus: false,
         onClick: () => answer(false),
         style: pill(false),

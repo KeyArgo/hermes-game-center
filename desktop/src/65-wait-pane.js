@@ -45,6 +45,7 @@ function PanePeople({ ctx, bell, playHere }) {
   const [pending, setPending] = useState(false)
   const [note, setNote] = useState('')
   const [, redraw] = useState(0)
+  const [excluded, setExcluded] = useState([])
   const choices = useRef({})
   const sending = useRef(false)
   useEffect(() => {
@@ -55,6 +56,7 @@ function PanePeople({ ctx, bell, playHere }) {
   const prefs = snap.prefs || {}
   const you = snap.you || {}
   const games = LOBBY_GAME_IDS.filter(id => prefs.games && prefs.games[id])
+  const selected = games.filter(id => !excluded.includes(id))
   const looking = you.looking || []
   const outgoing = (snap.requests || []).filter(row => row.from && row.from.id === you.id)
   const asking = outgoing.find(row => row.state === 'pending')
@@ -118,11 +120,22 @@ function PanePeople({ ctx, bell, playHere }) {
       style: { color: games.includes(id) ? accent : text.secondary, background: fill, border: '1px solid ' + stroke, borderRadius: 6, padding: '4px 8px' },
       disabled: pending, onClick: () => post('prefs', lobbyAcceptBody(id, !games.includes(id))), children: title
     }, id)) }) : null,
+    !looking.length && games.length ? jsx('div', { role: 'group', 'aria-label': 'Games to search', style: rowStyle,
+      children: games.map(id => jsx('button', {
+        type: 'button', 'data-search-game': id, 'aria-pressed': selected.includes(id), disabled: pending,
+        style: { color: selected.includes(id) ? accent : text.secondary, background: fill,
+          border: '1px solid ' + (selected.includes(id) ? accent : stroke), borderRadius: 6, padding: '3px 8px' },
+        onClick: () => setExcluded(prev => prev.includes(id) ? prev.filter(game => game !== id) : [...prev, id]),
+        children: lobbyTitle(id)
+      }, id))
+    }) : null,
     jsx('div', { style: rowStyle, children: looking.length ? [
-      'Looking for ' + looking.map(lobbyTitle).join(', ') + ' ·',
+      'Searching: ' + looking.map(lobbyTitle).join(' · ') + ' ·',
       button('Stop', () => post('looking', lobbyLookingBody([])), { disabled: pending })
-    ] : games.length ? button('Find a match', () => post('looking', lobbyLookingBody(games)), { primary: true, disabled: pending })
-      : button('Choose games', () => setEditing(true)) }),
+    ] : [
+      button('Find a match', () => post('looking', lobbyLookingBody(selected)), { primary: true, disabled: pending || !selected.length }),
+      games.length ? null : button('Choose games', () => setEditing(true))
+    ] }),
     // The lobby's own word on the search ("Bea passed on Chess. Still looking."), one calm line.
     you.looking_text ? jsx('div', {
       'data-pane-looking-text': '1', role: 'status', title: String(you.looking_text),
@@ -227,7 +240,11 @@ function WaitPane({ ctx }) {
 
   useEffect(() => {
     alive.current = true
-    return () => { alive.current = false }
+    inviteBellPublish({ panes: INVITE_BELL.panes + 1 })
+    return () => {
+      alive.current = false
+      inviteBellPublish({ panes: INVITE_BELL.panes - 1 })
+    }
   }, [])
 
   // The status bar and the palette can restore the pane from anywhere; when they
@@ -435,16 +452,18 @@ function WaitPane({ ctx }) {
   // "Play here": open the room on the lobby server, then play it in this pane. It is the same
   // server match the browser would show — the person just does not have to leave Hermes for it.
   const playHere = useCallback(async match => {
-    if (playingHere) return
+    if (playingHere || HALL_LEFT.has(String(match && match.room_id))) return
     setPlayingHere(true)
     setOnlineProblem('')
     try {
-      const answer = await openOnlineTable(ctx, match && match.room_id, match && match.game)
+      const answer = await openInviteSeat(ctx, match || {})
       if (answer && answer.ok === false) {
         if (alive.current) setProblem(String(answer.text || 'That table would not open.'))
         return
       }
       if (alive.current) {
+        if (HALL_LEFT.has(String(match.room_id))) return
+        if (paneChromePref() !== 'open') restoreWaitPane()
         setOnlineRoom(String(match.room_id))
         setTab('game')
         setSettings(false)
@@ -454,10 +473,14 @@ function WaitPane({ ctx }) {
     }
   }, [ctx, playingHere])
 
+  const openedSeat = useRef('')
   useEffect(() => {
-    if (!waitingForSeat) return
-    const seat = inviteSeatOf(inviteBell.snap, waitingForSeat)
-    if (seat && !playingHere) {
+    const sent = acceptedSentInvite(inviteBell.snap)
+    const requestId = sent ? sent.id : waitingForSeat
+    if (!requestId) return
+    const seat = inviteSeatOf(inviteBell.snap, requestId)
+    if (seat && !playingHere && openedSeat.current !== seat.room_id) {
+      openedSeat.current = seat.room_id
       setWaitingForSeat('')
       playHere(seat)
     }

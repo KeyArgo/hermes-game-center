@@ -21080,6 +21080,7 @@ function PanePeople({ ctx, bell, playHere }) {
   const [pending, setPending] = useState(false)
   const [note, setNote] = useState('')
   const [, redraw] = useState(0)
+  const [excluded, setExcluded] = useState([])
   const choices = useRef({})
   const sending = useRef(false)
   useEffect(() => {
@@ -21090,6 +21091,7 @@ function PanePeople({ ctx, bell, playHere }) {
   const prefs = snap.prefs || {}
   const you = snap.you || {}
   const games = LOBBY_GAME_IDS.filter(id => prefs.games && prefs.games[id])
+  const selected = games.filter(id => !excluded.includes(id))
   const looking = you.looking || []
   const outgoing = (snap.requests || []).filter(row => row.from && row.from.id === you.id)
   const asking = outgoing.find(row => row.state === 'pending')
@@ -21153,11 +21155,22 @@ function PanePeople({ ctx, bell, playHere }) {
       style: { color: games.includes(id) ? accent : text.secondary, background: fill, border: '1px solid ' + stroke, borderRadius: 6, padding: '4px 8px' },
       disabled: pending, onClick: () => post('prefs', lobbyAcceptBody(id, !games.includes(id))), children: title
     }, id)) }) : null,
+    !looking.length && games.length ? jsx('div', { role: 'group', 'aria-label': 'Games to search', style: rowStyle,
+      children: games.map(id => jsx('button', {
+        type: 'button', 'data-search-game': id, 'aria-pressed': selected.includes(id), disabled: pending,
+        style: { color: selected.includes(id) ? accent : text.secondary, background: fill,
+          border: '1px solid ' + (selected.includes(id) ? accent : stroke), borderRadius: 6, padding: '3px 8px' },
+        onClick: () => setExcluded(prev => prev.includes(id) ? prev.filter(game => game !== id) : [...prev, id]),
+        children: lobbyTitle(id)
+      }, id))
+    }) : null,
     jsx('div', { style: rowStyle, children: looking.length ? [
-      'Looking for ' + looking.map(lobbyTitle).join(', ') + ' ·',
+      'Searching: ' + looking.map(lobbyTitle).join(' · ') + ' ·',
       button('Stop', () => post('looking', lobbyLookingBody([])), { disabled: pending })
-    ] : games.length ? button('Find a match', () => post('looking', lobbyLookingBody(games)), { primary: true, disabled: pending })
-      : button('Choose games', () => setEditing(true)) }),
+    ] : [
+      button('Find a match', () => post('looking', lobbyLookingBody(selected)), { primary: true, disabled: pending || !selected.length }),
+      games.length ? null : button('Choose games', () => setEditing(true))
+    ] }),
     // The lobby's own word on the search ("Bea passed on Chess. Still looking."), one calm line.
     you.looking_text ? jsx('div', {
       'data-pane-looking-text': '1', role: 'status', title: String(you.looking_text),
@@ -21262,7 +21275,11 @@ function WaitPane({ ctx }) {
 
   useEffect(() => {
     alive.current = true
-    return () => { alive.current = false }
+    inviteBellPublish({ panes: INVITE_BELL.panes + 1 })
+    return () => {
+      alive.current = false
+      inviteBellPublish({ panes: INVITE_BELL.panes - 1 })
+    }
   }, [])
 
   // The status bar and the palette can restore the pane from anywhere; when they
@@ -21470,16 +21487,18 @@ function WaitPane({ ctx }) {
   // "Play here": open the room on the lobby server, then play it in this pane. It is the same
   // server match the browser would show — the person just does not have to leave Hermes for it.
   const playHere = useCallback(async match => {
-    if (playingHere) return
+    if (playingHere || HALL_LEFT.has(String(match && match.room_id))) return
     setPlayingHere(true)
     setOnlineProblem('')
     try {
-      const answer = await openOnlineTable(ctx, match && match.room_id, match && match.game)
+      const answer = await openInviteSeat(ctx, match || {})
       if (answer && answer.ok === false) {
         if (alive.current) setProblem(String(answer.text || 'That table would not open.'))
         return
       }
       if (alive.current) {
+        if (HALL_LEFT.has(String(match.room_id))) return
+        if (paneChromePref() !== 'open') restoreWaitPane()
         setOnlineRoom(String(match.room_id))
         setTab('game')
         setSettings(false)
@@ -21489,10 +21508,14 @@ function WaitPane({ ctx }) {
     }
   }, [ctx, playingHere])
 
+  const openedSeat = useRef('')
   useEffect(() => {
-    if (!waitingForSeat) return
-    const seat = inviteSeatOf(inviteBell.snap, waitingForSeat)
-    if (seat && !playingHere) {
+    const sent = acceptedSentInvite(inviteBell.snap)
+    const requestId = sent ? sent.id : waitingForSeat
+    if (!requestId) return
+    const seat = inviteSeatOf(inviteBell.snap, requestId)
+    if (seat && !playingHere && openedSeat.current !== seat.room_id) {
+      openedSeat.current = seat.room_id
       setWaitingForSeat('')
       playHere(seat)
     }
@@ -24633,7 +24656,7 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
 // is the one who can answer it (the server refuses anyone else), so the dialog is
 // drawn only for them. The asker waits, with the seconds left and a way to take it back.
 function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote, surface }) {
-  const title = lobbyOfferLine(otherName, card.game)
+  const title = inviteHeld(card.id) ? `New: ${lobbyTitle(card.game)}` : lobbyOfferLine(otherName, card.game)
   return jsx('div', {
     ref: surface,
     'data-lobby-offer': String(card.id),
@@ -24737,6 +24760,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   }), [ctx])
 
   const inviteSurface = useInviteSurface('hall')
+  useInviteHoldTimer()
   const incoming = inviteOf(snap)
   const state = snap ? String(snap.state || '') : 'connecting'
   const you = (snap && snap.you) || {}
@@ -24772,7 +24796,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     handled.current.add(room)
     ;(async () => {
       let answer = null
-      try { answer = await openOnlineTable(ctx, room, seated.game) } catch (error) { answer = { ok: false } }
+      try { answer = await openInviteSeat(ctx, seated) } catch (error) { answer = { ok: false } }
       if (!answer || answer.ok === false) {
         handled.current.delete(room)
         const text = String((answer && answer.text) || '') || 'That table would not open. Try again.'
@@ -24798,6 +24822,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // refusal is shown in the server's own words rather than swallowed.
   const post = async (key, path, body) => {
     if (inflight.current || pending) return { ok: false }
+    if (path === '/online/hall/respond' && inviteHeld(body.id)) return { ok: false }
     inflight.current = true
     setPending(key)
     setAck('')
@@ -25019,11 +25044,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const outbound = requests.filter(req => req.state === 'pending' && !req.offer && req.from && String(req.from.id) === String(you.id))
   const requestCards = [
     ...inbound.map(req => jsxs('div', { ref: req === incoming ? inviteSurface : undefined, 'data-hall-request': String(req.id), style: cardStyle, children: [
-      jsx('span', { style: { flex: 1, minWidth: 120 }, children: lobbyOfferLine(req.from.name, req.game) }),
+      jsx('span', { style: { flex: 1, minWidth: 120 }, children: inviteHeld(req.id) ? `New: ${lobbyTitle(req.game)}` : lobbyOfferLine(req.from.name, req.game) }),
       button('Accept', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: true }),
-        { primary: true, ...held(`Accept and sit down with ${req.from.name}.`) }),
+        { primary: true, ...held(`Accept and sit down with ${req.from.name}.`), disabled: Boolean(pending) || inviteHeld(req.id) }),
       button('Decline', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: false }),
-        held('Say no to this request.'))
+        { ...held('Say no to this request.'), disabled: Boolean(pending) || inviteHeld(req.id) })
     ] }, String(req.id))),
     ...outbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
       jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asked ${req.to.name} to play ${lobbyTitle(req.game)}… ` }),
@@ -25077,7 +25102,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     offer ? jsx(LobbyOfferDialog, {
       surface: offer === incoming ? inviteSurface : undefined,
       card: offer, other: offerOther, otherName: String(offerOther.name || 'Someone'),
-      busy: Boolean(pending), busyNote: HALL_BUSY_NOTE,
+      busy: Boolean(pending) || inviteHeld(offer.id), busyNote: HALL_BUSY_NOTE,
       onJoin: () => post(`offer:${offer.id}`, '/online/hall/respond', { id: offer.id, accept: true }),
       onNotNow: () => post(`offer:${offer.id}`, '/online/hall/respond', { id: offer.id, accept: false })
     }) : null
@@ -26043,6 +26068,7 @@ const INVITE_SURFACE_ORDER = ['statusbar', 'titlebar']
 const INVITE_BELL = {
   request: null,
   snap: null,
+  panes: 0,
   error: '',
   ctx: null,
   fresh: 0,
@@ -26102,14 +26128,55 @@ function inviteBellPublish(patch) {
   if (changed) for (const listener of Array.from(INVITE_BELL.listeners)) listener()
 }
 
+// Keep the last occupants across an empty poll (a decline can clear the line first).
+const inviteSlots = new Map()
+const inviteHolds = new Map()
+let inviteViewer = ''
+
+function trackInviteSlots(snap) {
+  const viewer = String((snap.you || {}).id || '')
+  if (!viewer) return
+  if (viewer !== inviteViewer) {
+    inviteSlots.clear()
+    inviteHolds.clear()
+    inviteViewer = viewer
+  }
+  const rows = Array.isArray(snap.requests) ? snap.requests : []
+  const inbound = rows.filter(row => row && row.state === 'pending' && row.to && String(row.to.id) === viewer)
+  const track = (slot, row) => {
+    if (!row) return
+    const previous = inviteSlots.get(slot)
+    inviteSlots.set(slot, row.id)
+    if (previous && previous !== row.id) inviteHolds.set(row.id, Date.now() + 1500)
+  }
+  track('line', inbound[0])
+  track('offer', inbound.find(row => row.offer))
+  inbound.filter(row => !row.offer).forEach((row, index) => track(index, row))
+}
+
+function inviteHeld(id) {
+  return (inviteHolds.get(id) || 0) > Date.now()
+}
+
+function useInviteHoldTimer() {
+  const [, redraw] = useState(0)
+  const deadline = Math.min(...Array.from(inviteHolds.values()).filter(at => at > Date.now()))
+  useEffect(() => {
+    if (!Number.isFinite(deadline)) return
+    const timer = setTimeout(() => redraw(n => n + 1), Math.max(0, deadline - Date.now()))
+    return () => clearTimeout(timer)
+  }, [deadline])
+}
+
 // One Hall snapshot, from whichever surface read it. The Hall and the Play with people card both
 // hand their own poll over, so the bell paints from the read that already happened.
 function inviteBellFeed(snap) {
   if (!snap || typeof snap !== 'object') return
   INVITE_BELL.fresh = Date.now()
-  inviteBellPublish({ snap, error: '' })
+  for (const [id, at] of inviteHolds) if (at <= Date.now()) inviteHolds.delete(id)
+  trackInviteSlots(snap)
   const request = inviteOf(snap)
-  inviteBellPublish({ request })
+  inviteBellPublish({ snap, request, error: '' })
   if (request) inviteBellNotice(request)
   invitePaneFollow(snap)
   inviteBellSchedule()
@@ -26361,6 +26428,7 @@ function useInviteSurface(where) {
 // The store, as a component reads it: re-render on every change. Reading never starts or stops
 // the poll; that is the plugin's (inviteBellStart).
 function useInviteBell(ctx) {
+  useInviteHoldTimer()
   const [, setTick] = useState(0)
   useEffect(() => {
     const listener = () => setTick(count => count + 1)
@@ -26385,6 +26453,8 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
   if (!request) return null
   const name = String((request.from && request.from.name) || 'them')
   const title = lobbyTitle(request.game)
+  const held = inviteHeld(request.id)
+  busy = busy || held
   const press = primary => ({
     type: 'button',
     disabled: Boolean(busy),
@@ -26407,7 +26477,7 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
       jsx('span', {
         'data-pane-invite-line': '1',
         style: { flex: '1 1 150px', minWidth: 0, fontSize: 13, fontWeight: 650, lineHeight: 1.4 },
-        children: paneInviteWords(request)
+        children: held ? `New: ${title} · ${name}` : paneInviteWords(request)
       }),
       jsx('button', {
         ...press(true),
@@ -26434,6 +26504,7 @@ function paneInviteBlock(ctx, request, busy, note, onAnswer) {
 // handed back, so the pane draws the table itself. A seat that has not arrived yet comes back as
 // null, and the pane opens it from a later read.
 async function inviteBellAnswer(ctx, request, accept, options = {}) {
+  if (inviteHeld(request.id)) return { ok: false, text: 'The invitation just changed.' }
   if (!ctx || typeof ctx.rest !== 'function') return { ok: false, text: 'Game Center cannot be reached.' }
   try {
     const answer = await ctx.rest('/online/hall/respond', { method: 'POST', body: { id: request.id, accept: Boolean(accept) } })
@@ -26443,12 +26514,12 @@ async function inviteBellAnswer(ctx, request, accept, options = {}) {
     const seat = await inviteBellSeat(ctx, request)
     if (options.here) {
       if (seat) {
-        const opened = await openOnlineTable(ctx, seat.room_id, seat.game)
+        const opened = await openInviteSeat(ctx, seat)
         if (opened && opened.ok === false) return { ok: false, text: String(opened.text || 'That table would not open.') }
       }
       return { ...(answer || { ok: true }), seat: seat || null }
     }
-    if (seat) await openOnlineTable(ctx, seat.room_id, seat.game)
+    if (seat) await openInviteSeat(ctx, seat)
     inviteBellOpen()
     return answer || { ok: true }
   } catch {
@@ -26466,6 +26537,32 @@ function inviteSeatOf(snap, requestId) {
   const got = seated.request_id ? String(seated.request_id) : ''
   if (wanted && got && wanted !== got) return null
   return seated
+}
+
+// The Hall, chrome and pane can all see the same handoff. Opening the socket twice
+// disconnects the first table, so share the pending open and its live room.
+let openingInviteSeat = null
+
+async function openInviteSeat(ctx, seat) {
+  const room = String(seat.room_id || '')
+  if (HALL_LEFT.has(room)) return { ok: false, text: 'You left that table.' }
+  if (!seat.request_id) return openOnlineTable(ctx, room, seat.game)
+  if (openingInviteSeat && openingInviteSeat.room === room) return openingInviteSeat.promise
+  if (ONLINE_ROOM.roomId === room) return { ok: true }
+  const opening = { room, promise: openOnlineTable(ctx, room, seat.game) }
+  openingInviteSeat = opening
+  try {
+    return await opening.promise
+  } finally {
+    if (openingInviteSeat === opening) openingInviteSeat = null
+  }
+}
+
+function acceptedSentInvite(snap) {
+  const seat = inviteSeatOf(snap)
+  if (!seat || !seat.request_id || !snap.you || !snap.you.id) return null
+  return (snap.requests || []).find(row => row.state === 'accepted' && row.id === seat.request_id
+    && row.from && row.from.id === snap.you.id)
 }
 
 // The seat the lobby just made, read once. A read that lands before the lobby's own "seated"
@@ -26492,10 +26589,24 @@ function InviteBell({ ctx, where = 'statusbar' }) {
     style: { display: 'inline-flex', alignItems: 'center', minWidth: 1, minHeight: 1 },
     children
   })
+  const sent = !request && !bell.panes && acceptedSentInvite(bell.snap)
+  if (sent && inviteBellDraws(where)) {
+    const open = async () => {
+      const seat = inviteSeatOf(bell.snap, sent.id)
+      if (!seat) return
+      const result = await openInviteSeat(ctx, seat)
+      if (!result || result.ok !== false) inviteBellOpen()
+    }
+    const name = (sent.to || {}).name || 'Someone'
+    return anchor(jsxs('span', { role: 'status', children: [
+      `${name} accepted ${lobbyTitle(sent.game)} · `, button('Open', open)
+    ] }))
+  }
   if (!drawing) return anchor(null)
-  const line = inviteBellLine(request)
+  const held = inviteHeld(request.id)
   const name = String((request.from && request.from.name) || 'them')
   const title = lobbyTitle(request.game)
+  const line = held ? `New: ${title} · ${name}` : inviteBellLine(request)
   const answer = async accept => {
     if (busy) return
     setBusy(true)
@@ -26531,7 +26642,7 @@ function InviteBell({ ctx, where = 'statusbar' }) {
         'data-invite-accept': '1',
         'aria-label': `Accept ${name}'s invitation to ${title}`,
         title: `Sit down with ${name} at ${title}.`,
-        disabled: busy,
+        disabled: busy || held,
         autoFocus: false,
         onClick: () => answer(true),
         style: pill(true),
@@ -26542,7 +26653,7 @@ function InviteBell({ ctx, where = 'statusbar' }) {
         'data-invite-decline': '1',
         'aria-label': `Decline ${name}'s invitation to ${title}`,
         title: `Say no to ${name} for ${title}.`,
-        disabled: busy,
+        disabled: busy || held,
         autoFocus: false,
         onClick: () => answer(false),
         style: pill(false),

@@ -196,7 +196,13 @@ function render() {
   const pending = effects; effects = []; pending.forEach(effect => effect())
   return tree
 }
-function reset() { cleanups.forEach(fn => fn && fn()); cleanups = []; hooks = []; effects = [] }
+function reset() {
+  cleanups.forEach(fn => fn && fn())
+  cleanups = []
+  hooks = []
+  effects = []
+  evaluate('inviteSlots.clear(); inviteHolds.clear()')
+}
 let tree = render()
 assert.ok(words(tree).includes('Spectating'), 'unseated viewers have an explicit read-only mode')
 assert.ok(words(tree).includes('Open seat'))

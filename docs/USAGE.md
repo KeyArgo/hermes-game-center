@@ -1,6 +1,6 @@
 # Usage
 
-_Applies to Game Center 1.0.0 · last revised 2026-11-24 (dc8be50a)_
+_Applies to Game Center 1.0.0 · last revised 2026-11-27 (555827f1)_
 
 A walkthrough of each user-facing feature, from the shelf to a finished game.
 
@@ -154,7 +154,7 @@ The wording comes from the table's refusal path in `kit.py`; the page draws it f
 The pane on the right of the conversation is its own small Games screen. Open it from the Games header, from the status bar item, or with its command in the palette.
 
 - The pane is always on the right of the chat. Its dock hint is enforced, so the host re-homes it there on every start: a pane that was once dragged somewhere else, or moved by a host update, goes back to the right instead of staying wrong for good.
-- Open **Play with people** to use the Hall. Turn on **Open to invites**, choose **Edit** beside **Games**, then press **Find a match** to search for those games. To invite someone directly, press **Ask** beside their name under **Here now**. Expand **#games chat** to join the conversation.
+- Open **Play with people** to use the Hall. Turn on **Open to invites**, choose **Edit** beside **Games**, then use the chips above **Find a match** to pick which of those games to search. Press **Find a match** to start. To invite someone directly, press **Ask** beside their name under **Here now**. Expand **#games chat** to join the conversation.
 - An invite stays at the top of every tab until it is answered or expires. **Accept** opens the table beside your chat. The status bar also offers **Accept** and **Decline**, with the titlebar taking over when the status bar is out of sight. If the invite is out of sight everywhere and **Open to invites** is on, you get one silent desktop notice.
 - The pane opens at 368 px. Drag its edge: it goes down to 300 px and out to 1200 px.
 - Everything inside answers to that width. The game list fills the row it is in, and the pane's sections (the game list, online play, alerts) sit two abreast once there is room, then stack again when the pane is narrow.

@@ -1328,3 +1328,25 @@ def test_hall_keeps_latest_status_until_search_ends(monkeypatch):
         assert hall.snapshot()["you"]["looking_text"] == ""
     hall.stop()
     assert hall.snapshot()["you"]["looking_text"] == ""
+
+
+def test_match_flow_logs_only_event_fields(caplog):
+    hall = Hall(None)
+    with caplog.at_level("INFO", logger="shelf.online_hall"):
+        hall._apply({"t": "hello", "you": {"id": "me"}})
+        for i, (sender, state) in enumerate([("me", "accepted"), ("other", "declined"), ("me", "cancelled")]):
+            card = {"id": str(i), "from": {"id": sender}, "offer": i != 1, "game": "checkers",
+                    "state": "pending", "text": "secret-chat", "token": "secret-token"}
+            if i == 1:
+                hall._apply({"t": "hello", "you": {"id": "me"}, "requests": [card]})
+            hall._apply({"t": "request", "request": card})
+            hall._apply({"t": "request_update", "request": dict(card, state=state)})
+        hall._apply({"t": "seated", "game": "checkers", "room_id": "room1"})
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("match ")]
+    assert len(lines) == 7
+    for event in ("sent", "received", "accepted", "declined", "cancelled", "seated"):
+        assert any(event in line and "checkers" in line for line in lines)
+    assert any("request received" in line for line in lines)
+    assert any("offer sent" in line for line in lines)
+    assert "room1" in lines[-1]
+    assert "secret-" not in caplog.text

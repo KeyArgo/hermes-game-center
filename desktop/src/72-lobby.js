@@ -382,7 +382,7 @@ function LobbyAcceptChips({ until, games, post, pending, busyNote, dim }) {
 // is the one who can answer it (the server refuses anyone else), so the dialog is
 // drawn only for them. The asker waits, with the seconds left and a way to take it back.
 function LobbyOfferDialog({ card, other, otherName, onJoin, onNotNow, busy, busyNote, surface }) {
-  const title = lobbyOfferLine(otherName, card.game)
+  const title = inviteHeld(card.id) ? `New: ${lobbyTitle(card.game)}` : lobbyOfferLine(otherName, card.game)
   return jsx('div', {
     ref: surface,
     'data-lobby-offer': String(card.id),
@@ -486,6 +486,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   }), [ctx])
 
   const inviteSurface = useInviteSurface('hall')
+  useInviteHoldTimer()
   const incoming = inviteOf(snap)
   const state = snap ? String(snap.state || '') : 'connecting'
   const you = (snap && snap.you) || {}
@@ -521,7 +522,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     handled.current.add(room)
     ;(async () => {
       let answer = null
-      try { answer = await openOnlineTable(ctx, room, seated.game) } catch (error) { answer = { ok: false } }
+      try { answer = await openInviteSeat(ctx, seated) } catch (error) { answer = { ok: false } }
       if (!answer || answer.ok === false) {
         handled.current.delete(room)
         const text = String((answer && answer.text) || '') || 'That table would not open. Try again.'
@@ -547,6 +548,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   // refusal is shown in the server's own words rather than swallowed.
   const post = async (key, path, body) => {
     if (inflight.current || pending) return { ok: false }
+    if (path === '/online/hall/respond' && inviteHeld(body.id)) return { ok: false }
     inflight.current = true
     setPending(key)
     setAck('')
@@ -768,11 +770,11 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
   const outbound = requests.filter(req => req.state === 'pending' && !req.offer && req.from && String(req.from.id) === String(you.id))
   const requestCards = [
     ...inbound.map(req => jsxs('div', { ref: req === incoming ? inviteSurface : undefined, 'data-hall-request': String(req.id), style: cardStyle, children: [
-      jsx('span', { style: { flex: 1, minWidth: 120 }, children: lobbyOfferLine(req.from.name, req.game) }),
+      jsx('span', { style: { flex: 1, minWidth: 120 }, children: inviteHeld(req.id) ? `New: ${lobbyTitle(req.game)}` : lobbyOfferLine(req.from.name, req.game) }),
       button('Accept', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: true }),
-        { primary: true, ...held(`Accept and sit down with ${req.from.name}.`) }),
+        { primary: true, ...held(`Accept and sit down with ${req.from.name}.`), disabled: Boolean(pending) || inviteHeld(req.id) }),
       button('Decline', () => post(`respond:${req.id}`, '/online/hall/respond', { id: req.id, accept: false }),
-        held('Say no to this request.'))
+        { ...held('Say no to this request.'), disabled: Boolean(pending) || inviteHeld(req.id) })
     ] }, String(req.id))),
     ...outbound.map(req => jsxs('div', { 'data-hall-request': String(req.id), style: cardStyle, children: [
       jsx('span', { style: { flex: 1, minWidth: 120 }, children: `Asked ${req.to.name} to play ${lobbyTitle(req.game)}… ` }),
@@ -826,7 +828,7 @@ function LobbyHall({ ctx, current, view, onPlayHere }) {
     offer ? jsx(LobbyOfferDialog, {
       surface: offer === incoming ? inviteSurface : undefined,
       card: offer, other: offerOther, otherName: String(offerOther.name || 'Someone'),
-      busy: Boolean(pending), busyNote: HALL_BUSY_NOTE,
+      busy: Boolean(pending) || inviteHeld(offer.id), busyNote: HALL_BUSY_NOTE,
       onJoin: () => post(`offer:${offer.id}`, '/online/hall/respond', { id: offer.id, accept: true }),
       onNotNow: () => post(`offer:${offer.id}`, '/online/hall/respond', { id: offer.id, accept: false })
     }) : null

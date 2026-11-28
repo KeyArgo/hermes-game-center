@@ -32,6 +32,7 @@ HOUR = 3600.0
 MAX_PER_HOUR = 8
 MAX_INBOUND = 5
 DECLINE_SECONDS = 120.0
+PAIR_PAUSE_SECONDS = 3.0
 
 # Appear offline: the account is in nobody's roster and takes no requests. One
 # sentence either way, so it never says which of the two is behind it.
@@ -463,6 +464,8 @@ class Service:
         if self.store.pair_pending(a, b):
             return False
         if self.store.inbound_pending_count(b) >= MAX_INBOUND:
+            return False
+        if self.store.pair_declined_since(a, b, now - PAIR_PAUSE_SECONDS):
             return False
         since = now - DECLINE_SECONDS
         return not (self.store.declined_recently(a, b, game, since)

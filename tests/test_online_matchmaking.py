@@ -209,7 +209,7 @@ def test_auto_matching_waits_after_a_decline_in_either_direction(world, first_se
 
 
 def test_declining_a_search_offer_leaves_other_games_eligible(world):
-    _store, _rooms, people, _clock, hub, service = world
+    _store, _rooms, people, clock, hub, service = world
 
     async def scenario():
         ada, bea = people["Ada"], people["Bea"]
@@ -220,6 +220,9 @@ def test_declining_a_search_offer_leaves_other_games_eligible(world):
         assert first["game"] == "go"
         hub.sent.clear()
         assert (await service.handle(bea, {"t": "respond", "id": first["id"], "accept": False}))["ok"]
+        assert not offers(hub)
+        clock.now += 3
+        await service.pair_looking(clock.now)
         second = asked_card(hub)
         assert (second["to_id"], second["game"]) == (bea["id"], "hex")
         assert [card["id"] for card in service.pending_for(ada["id"])] == [second["id"]]

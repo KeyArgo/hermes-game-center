@@ -29,6 +29,8 @@ CHECKS = [
     "paneKeepsLayoutOnFailedRead",
     "soundSwitchesAgree",
     "inviteNoteBelongsToItsRequest",
+    "replacementInvitePauses",
+    "seekerOpensAcceptedSeat",
 ]
 
 

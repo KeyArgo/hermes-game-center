@@ -666,3 +666,24 @@ def test_first_open_syncs_hall_game_choices(world, monkeypatch):
     assert hall.prefs(open=True)["ok"]
     assert hall.snapshot()["prefs"] == service.prefs(ada["id"])
     assert all(hall.snapshot()["prefs"]["games"].values())
+
+
+def test_offer_pair_waits_three_seconds_after_decline(world):
+    _store, _rooms, people, clock, hub, service = world
+
+    async def scenario():
+        ada, bea = people["Ada"], people["Bea"]
+        await open_up(service, hub, ada, bea)
+        search = {"t": "looking", "games": ["connect4", "checkers"]}
+        await service.handle(ada, search)
+        first, = service.pending_for(bea["id"])
+        await service.handle(ada, search)
+        assert service.pending_for(bea["id"])[0]["id"] == first["id"]
+        await service.handle(bea, {"t": "respond", "id": first["id"], "accept": False})
+        await service.pair_looking(clock.now + 2.999)
+        assert not service.pending_for(bea["id"])
+        await service.pair_looking(clock.now + 3)
+        second, = service.pending_for(bea["id"])
+        assert second["game"] != first["game"]
+
+    run(scenario())

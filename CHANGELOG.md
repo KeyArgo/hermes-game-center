@@ -6,6 +6,10 @@ top of Game Center's Settings and at `GET /v1/version`.
 
 ## Unreleased
 
+- The side pane lets you pick which accepted games to search and opens your table when someone accepts.
+  Replacement invitations pause their answer buttons for 1.5 seconds. After a decline the lobby waits
+  at least three seconds before offering that pair another game. Match events appear in the shelf log.
+
 - **Bug hunt 3: 23 fixes, each with a regression test that fails on 6e59ea7.**
   - *Online lobby and account (shelf/, online/):* a changed sign-in key or server reopens the Hall
     session instead of keeping the old one; exporting two accounts with the same name keeps both files,

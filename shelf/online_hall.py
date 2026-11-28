@@ -733,6 +733,19 @@ class Hall:
             except queue.Empty:
                 break
 
+    def _remember_request(self, req: dict) -> None:
+        previous = self._requests.get(req["id"]) or {}
+        self._requests[req["id"]] = req
+        state = req.get("state")
+        if previous.get("state") == state:
+            return
+        event = state
+        if state == "pending":
+            event = "sent" if (req.get("from") or {}).get("id") == self._you["id"] else "received"
+        if event in ("sent", "received", "accepted", "declined", "cancelled"):
+            log.info("match %s %s id=%s game=%s", "offer" if req.get("offer") else "request",
+                     event, req["id"], req.get("game"))
+
     def _apply(self, message: dict) -> None:
         kind = message.get("t")
         with self._lock:
@@ -748,8 +761,10 @@ class Hall:
                 self._prefs = self._clean_prefs(message.get("prefs"))
                 self._roster = {row["id"]: row for row in (message.get("roster") or [])
                                 if isinstance(row, dict) and row.get("id")}
-                self._requests = {req["id"]: req for req in (message.get("requests") or [])
-                                  if isinstance(req, dict) and req.get("id")}
+                cards = [req for req in (message.get("requests") or []) if isinstance(req, dict) and req.get("id")]
+                for req in cards:
+                    self._remember_request(req)
+                self._requests = {req["id"]: req for req in cards}
                 self._state = "live"
                 self._error = ""
                 self._misses = 0
@@ -783,11 +798,13 @@ class Hall:
             elif kind in ("request", "request_update"):
                 req = message.get("request") or {}
                 if isinstance(req, dict) and req.get("id"):
-                    self._requests[req["id"]] = req
+                    self._remember_request(req)
             elif kind == "seated":
                 # A seat is the end of find match: the person is at a table now.
                 self._you["looking"] = []
                 self._you["looking_text"] = ""
+                if message.get("room_id") and message["room_id"] != (self._seated or {}).get("room_id"):
+                    log.info("match seated room=%s game=%s", message["room_id"], message.get("game"))
                 self._seated = {
                     "room_id": message.get("room_id"),
                     "game": message.get("game"),
