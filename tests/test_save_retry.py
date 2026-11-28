@@ -214,7 +214,7 @@ def test_the_replace_budget_is_about_two_seconds():
 def test_a_win_is_taken_back_when_the_state_cannot_be_saved(monkeypatch, tmp_path):
     """A stand that wins pays before the table is written; if that write never lands the table still
     holds the unplayed hand, so the payout must come back off the wallet - or a retry pays it twice
-    (Codex review, 2026-11-17)."""
+    (review, 2026-11-17)."""
     bj = _load("blackjack")
     bj.use_wallet(tmp_path / "wallet.json")
     table = bj.create(tmp_path / "blackjack")

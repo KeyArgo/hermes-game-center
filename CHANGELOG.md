@@ -323,7 +323,7 @@ top of Game Center's Settings and at `GET /v1/version`.
   `test_a_server_that_cannot_be_reached_says_so_and_clears_when_it_answers`,
   `test_two_halls_find_each_other_again_after_the_server_restarts`, and the down-server check in
   `tests/table_ui_harness.cjs`.
-- **Second-opinion review fixes (Codex, Spark GLM).** A blackjack stand or double that won, or a
+- **Second-opinion review fixes.** A blackjack stand or double that won, or a
   slot spin that paid, on a move whose table state could not be saved kept the payout while the
   table still held the move unplayed, so a retry paid it twice: the failed-save undo in `kit.py` now
   takes a payout back as well as returning a bet (`chips_reclaim` in `blackjack/game.py` and

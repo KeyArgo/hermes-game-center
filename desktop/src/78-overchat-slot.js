@@ -249,7 +249,7 @@ function OverChatStrip({ ctx }) {
     if (!on) return undefined
     const box = overchatAnchor(anchor)
     // The window's own size goes along: a window that only gets shorter or taller moves nothing the
-    // anchor measures, and the stage's height budget still has to follow it (Codex review, 2026-11-17).
+    // anchor measures, and the stage's height budget still has to follow it (review, 2026-11-17).
     const win = overchatWindow()
     const viewHeight = win && Number(win.innerHeight) > 0 ? Number(win.innerHeight) : 0
     const viewWidth = win && Number(win.innerWidth) > 0 ? Number(win.innerWidth) : 0

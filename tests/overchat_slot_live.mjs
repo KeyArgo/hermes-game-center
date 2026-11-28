@@ -312,7 +312,7 @@ check('and a wider one grows it back',
   `narrow ${narrower && narrower.copyWidth}, wide ${wider && wider.copyWidth}`)
 
 // Only the window's height changes: the composer keeps its left edge and width, so nothing the anchor
-// shares moves - and the stage's height budget (60% of the window) still has to follow (Codex review).
+// shares moves - and the stage's height budget (60% of the window) still has to follow (review).
 await resize(1400, 600)
 const shorter = await evaluate(FACTS)
 check('a window that only gets shorter re-fits the backdrop to the new height',
